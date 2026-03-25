@@ -1,4 +1,6 @@
-
-/.idea/
-/**/.gradle/
-/**/gradle/wrapper/gradle-wrapper.jar
+.idea/
+coverage/
+dist/
+lib/
+node_modules/
+*.tsbuildinfo
