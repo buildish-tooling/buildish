@@ -21,7 +21,7 @@ import tsParser from '@typescript-eslint/parser';
 
 export default [
   {
-    ignores: ['coverage/**', 'dist/**', 'lib/**', 'node_modules/**'],
+    ignores: ['build/**', 'coverage/**', 'dist/**', 'lib/**', 'node_modules/**'],
   },
   js.configs.recommended,
   {
@@ -46,6 +46,21 @@ export default [
       'no-unused-vars': 'off',
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        console: 'readonly',
+        fetch: 'readonly',
+        process: 'readonly',
+      },
+    },
+    rules: {
+      'no-console': 'off',
     },
   },
   eslintConfigPrettier,

@@ -1,3 +1,19 @@
+<!--
+Copyright 2026 The Project Nessie Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
 # cache-gradle
 
 GitHub Action for secure Gradle wrapper provisioning and Gradle cache management.
@@ -37,8 +53,11 @@ steps:
 - GitHub Action runtime: Node 24
 - Local development baseline: Node `24.13.0`
 - Expected npm version for repository tooling: `11.6.2`
+- Java `21+` for Apache RAT license-header checks
 
 The repository pins these versions so local development, CI, and the published action runtime stay aligned.
+
+For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/). Install at least Java 21 before running the RAT checks locally.
 
 ## Inputs
 
@@ -146,7 +165,12 @@ Common commands:
 - `make build`
 - `make test`
 - `make lint-check`
+- `make rat-check`
 - `make check`
+
+Equivalent npm script:
+
+- `npm run rat-check`
 
 The Makefile verifies the expected `node` and `npm` versions before running user-facing targets.
 
@@ -155,6 +179,8 @@ The Makefile verifies the expected `node` and `npm` versions before running user
 Full local verification:
 
 - `npm run verify`
+- `make rat-check`
+- `make check`
 
 This runs:
 
@@ -162,6 +188,7 @@ This runs:
 - formatting checks
 - unit tests
 - a fresh rebuild
+- Apache RAT license-header verification (`make check`)
 
 ## License
 
