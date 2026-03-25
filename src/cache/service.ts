@@ -22,6 +22,8 @@ import { DEFAULT_CACHE_KEY_TEMPLATE, type CacheModel } from './model';
 
 const POST_ACTION_ARMED_STATE = 'cache-gradle-base-cache-armed';
 const REF_NAME_PLACEHOLDER = '${refName}';
+const NO_CACHE_PATHS_FOUND_ERROR_FRAGMENT =
+  'Path Validation Error: Path(s) specified in the action for caching do(es) not exist';
 
 /**
  * Minimal wrapper around `@actions/cache` so restore/save behavior can be tested deterministically.
@@ -116,6 +118,7 @@ export interface BaseCacheSaveResult {
    * - `read-only`: config forbids writes
    * - `distributed-worker`: worker jobs do not save shared base caches
    * - `feature-unavailable`: cache service unavailable in this environment
+   * - `missing-paths`: no configured cache paths currently exist on disk, so save is skipped
    * - `saved`: a new cache entry was created
    * - `not-saved`: toolkit ran but did not create a new cache entry
    */
@@ -124,6 +127,7 @@ export interface BaseCacheSaveResult {
     | 'read-only'
     | 'distributed-worker'
     | 'feature-unavailable'
+    | 'missing-paths'
     | 'saved'
     | 'not-saved';
   /** Primary cache key that the post phase attempted, or would have attempted, to save. */
@@ -295,7 +299,22 @@ export async function saveBaseCache(
     );
   }
 
-  const cacheId = await cacheApi.saveCache([...paths], cacheModel.cacheKey);
+  let cacheId: number;
+
+  try {
+    cacheId = await cacheApi.saveCache([...paths], cacheModel.cacheKey);
+  } catch (error) {
+    if (isMissingCachePathsError(error)) {
+      return createSaveResult(
+        'missing-paths',
+        cacheModel.cacheKey,
+        paths,
+        'Base cache save skipped because none of the configured cache paths exist yet.',
+      );
+    }
+
+    throw error;
+  }
 
   if (cacheId > 0) {
     return createSaveResult(
@@ -366,4 +385,8 @@ function createSaveResult(
     paths,
     message,
   };
+}
+
+function isMissingCachePathsError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(NO_CACHE_PATHS_FOUND_ERROR_FRAGMENT);
 }

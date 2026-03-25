@@ -171,6 +171,23 @@ describe('saveBaseCache', () => {
     expect(result.cacheId).toBe(77);
   });
 
+  it('skips saving when no cache paths currently exist on disk', async () => {
+    const result = await saveBaseCache(baseConfig, cacheModel, true, {
+      cacheApi: {
+        isFeatureAvailable: () => true,
+        restoreCache: async () => undefined,
+        saveCache: async () => {
+          throw new Error(
+            'Path Validation Error: Path(s) specified in the action for caching do(es) not exist, hence no cache is being saved.',
+          );
+        },
+      },
+    });
+
+    expect(result.status).toBe('missing-paths');
+    expect(result.message).toMatch(/none of the configured cache paths exist yet/i);
+  });
+
   it('returns not-saved when the toolkit declines to create a new cache entry', async () => {
     const result = await saveBaseCache(baseConfig, cacheModel, true, {
       cacheApi: {
@@ -181,6 +198,20 @@ describe('saveBaseCache', () => {
     });
 
     expect(result.status).toBe('not-saved');
+  });
+
+  it('rethrows unrelated save failures', async () => {
+    await expect(
+      saveBaseCache(baseConfig, cacheModel, true, {
+        cacheApi: {
+          isFeatureAvailable: () => true,
+          restoreCache: async () => undefined,
+          saveCache: async () => {
+            throw new Error('boom');
+          },
+        },
+      }),
+    ).rejects.toThrow('boom');
   });
 });
 
