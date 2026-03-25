@@ -299,6 +299,8 @@ implementable design.
 18. Add release workflows
     - Ensure LICENSE and NOTICE are present and up-to-date in the release artifacts.
     - Support version tags, but only immutable tags, no "moving" tags like 'v1' or so.
+19. Enhance Gradle wrapper download validation by checking the signature (.asc extension).
+    - We need to know the public GPG keys that can be used for verification.
 
 ## Deferred / explicitly out of scope for v1
 
