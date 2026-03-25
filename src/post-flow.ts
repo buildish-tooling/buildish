@@ -24,6 +24,7 @@ import {
 } from './artifacts/service';
 import { bootstrapPhase, type BootstrapDependencies, type BootstrapStatus } from './bootstrap';
 import { captureCacheManifest, computeCacheDelta } from './cache/manifest';
+import { appendJobSummary } from './logging/summary';
 import { loadPersistedPreBuildCacheManifest } from './state/post-action';
 
 export interface PostDeltaArtifactResult {
@@ -90,11 +91,15 @@ export async function executePostAction(
   const deltaManifest = computeCacheDelta(preBuildManifest, currentManifest);
   const deltaArtifactResult = await uploadPostDeltaArtifact(deltaManifest, bootstrap, dependencies);
 
-  return {
+  const status = {
     bootstrap,
     deltaArtifactResult,
     message: createPostActionMessage(deltaArtifactResult),
-  };
+  } satisfies PostActionStatus;
+
+  await appendJobSummary(dependencies, createPostActionSummaryLines(status));
+
+  return status;
 }
 
 async function uploadPostDeltaArtifact(
@@ -195,4 +200,24 @@ function createPostActionMessage(deltaArtifactResult: PostDeltaArtifactResult): 
   }
 
   return 'Post action flow completed.';
+}
+
+export function createPostActionSummaryLines(status: PostActionStatus): readonly string[] {
+  if (!status.deltaArtifactResult) {
+    return ['## Cache Gradle post action', '- Delta artifact upload: not evaluated.'];
+  }
+
+  const result = status.deltaArtifactResult;
+  return [
+    '## Cache Gradle post action',
+    `- Delta artifact result: ${result.status}`,
+    `- Post-build cache delta: ${result.addedCount} added, ${result.modifiedCount} modified, ${result.deletedCount} deleted.`,
+    ...(result.artifactName
+      ? [
+          `- Uploaded artifact name: ${result.artifactName}`,
+          `- Uploaded artifact ID: ${result.artifactId ?? 'unknown'}`,
+        ]
+      : []),
+    `- Detail: ${result.message}`,
+  ];
 }

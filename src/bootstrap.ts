@@ -176,6 +176,7 @@ export async function bootstrapPhase(
           verifyWrapperSignature: dependencies.verifyWrapperSignature,
         })
       : [];
+  logWrapperProvisioningResults(provisionedWrappers, dependencies.logInfo ?? core.info);
   const baseCacheResult = await runBaseCachePhase(phase, config, cacheModel, dependencies);
   const status = createBootstrapStatus(
     phase,
@@ -242,7 +243,50 @@ export function createBootstrapSummaryLines(status: BootstrapStatus): readonly s
     `- Wrapper selection: ${status.config.wrapperSelectionMode}`,
     `- Wrapper files: ${status.validatedWrappers.length}`,
     `- Wrapper JARs ready: ${status.provisionedWrappers.length}`,
+    '## Wrapper provisioning',
+    ...createWrapperProvisioningSummaryLines(status),
   ];
+}
+
+function logWrapperProvisioningResults(
+  provisionedWrappers: readonly ProvisionedWrapperJar[],
+  logInfo: (message: string) => void,
+): void {
+  for (const wrapper of provisionedWrappers) {
+    logInfo(createWrapperProvisioningLogMessage(wrapper));
+  }
+}
+
+function createWrapperProvisioningSummaryLines(status: BootstrapStatus): readonly string[] {
+  if (status.phase === 'post') {
+    return ['- Wrapper provisioning skipped during post phase.'];
+  }
+
+  if (status.provisionedWrappers.length === 0) {
+    return ['- No Gradle wrapper properties files were selected for provisioning.'];
+  }
+
+  return status.provisionedWrappers.map(
+    (wrapper) =>
+      `- ${wrapper.relativePath}: ${describeWrapperProvisioningAction(wrapper)} trusted wrapper JAR at ${wrapper.wrapperJarRelativePath} for Gradle ${wrapper.wrapperSourceVersion}.`,
+  );
+}
+
+function createWrapperProvisioningLogMessage(wrapper: ProvisionedWrapperJar): string {
+  return (
+    `${capitalize(describeWrapperProvisioningAction(wrapper))} trusted wrapper JAR for ` +
+    `'${wrapper.relativePath}' at '${wrapper.wrapperJarRelativePath}' using Gradle ${wrapper.wrapperSourceVersion}.`
+  );
+}
+
+function describeWrapperProvisioningAction(
+  wrapper: ProvisionedWrapperJar,
+): 'downloaded' | 'reused' {
+  return wrapper.wasDownloaded ? 'downloaded' : 'reused';
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 async function runBaseCachePhase(

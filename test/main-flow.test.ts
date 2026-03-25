@@ -45,6 +45,7 @@ describe('executeMainAction', () => {
       const wrapperJarSha256 = sha256Hex(wrapperJarBytes);
       const savedState = new Map<string, string>();
       const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
+      const summary = createSummaryCapture();
 
       await mkdir(path.join(workspace, 'gradle', 'wrapper'), { recursive: true });
       await mkdir(gradleUserHome, { recursive: true });
@@ -122,7 +123,7 @@ describe('executeMainAction', () => {
         saveState(name: string, value: string): void {
           savedState.set(name, value);
         },
-        summaryWriter: createSummaryWriter(),
+        summaryWriter: summary.writer,
         verifyWrapperSignature: async () => {},
       });
 
@@ -151,6 +152,21 @@ describe('executeMainAction', () => {
           .flatMap((partition) => partition.entries)
           .map((entry) => entry.relativePath),
       ).toContain('caches/modules-2/files-2.1/example/module.bin');
+      expect(summary.lines).toEqual(
+        expect.arrayContaining([
+          '## Cache Gradle bootstrap',
+          '## Wrapper provisioning',
+          '- gradle/wrapper/gradle-wrapper.properties: reused trusted wrapper JAR at gradle/wrapper/gradle-wrapper.jar for Gradle 8.14.0.',
+          '## Cache Gradle main action',
+          '- Dependent jobs requested: worker-build',
+          '- Downloaded delta artifacts: 1',
+          `- Artifact names: ${status.dependentDeltaResult!.downloadedArtifactNames[0]}`,
+          '- Applied delta changes: 1 added, 0 modified, 0 deleted.',
+          '- Delta apply warnings: 0',
+          '- Pre-build manifest persisted: yes',
+        ]),
+      );
+      expect(summary.writeCalls).toBe(2);
     });
   });
 
@@ -160,6 +176,7 @@ describe('executeMainAction', () => {
       const wrapperJarBytes = Buffer.from('existing-wrapper-jar');
       const wrapperJarSha256 = sha256Hex(wrapperJarBytes);
       const savedState = new Map<string, string>();
+      const summary = createSummaryCapture();
 
       await mkdir(path.join(workspace, 'gradle', 'wrapper'), { recursive: true });
       await writeFile(
@@ -220,13 +237,22 @@ describe('executeMainAction', () => {
         saveState(name: string, value: string): void {
           savedState.set(name, value);
         },
-        summaryWriter: createSummaryWriter(),
+        summaryWriter: summary.writer,
         verifyWrapperSignature: async () => {},
       });
 
       expect(status.dependentDeltaResult).toBeNull();
       expect(status.preBuildManifestState).not.toBeNull();
       expect(savedState.get(PRE_BUILD_CACHE_MANIFEST_PATH_STATE)).toBeTruthy();
+      expect(summary.lines).toEqual(
+        expect.arrayContaining([
+          '## Cache Gradle main action',
+          '- Dependent jobs requested: none',
+          '- Downloaded delta artifacts: 0',
+          '- Pre-build manifest persisted: yes',
+        ]),
+      );
+      expect(summary.writeCalls).toBe(2);
     });
   });
 });
@@ -316,14 +342,30 @@ function createCacheApi(): BaseCacheApi {
   };
 }
 
-function createSummaryWriter(): SummaryWriter {
-  const summaryWriter: SummaryWriter = {
-    addRaw(): SummaryWriter {
-      return summaryWriter;
+function createSummaryCapture(): {
+  readonly lines: string[];
+  readonly writer: SummaryWriter;
+  get writeCalls(): number;
+} {
+  const lines: string[] = [];
+  let writeCalls = 0;
+  const writer: SummaryWriter = {
+    addRaw(text: string): SummaryWriter {
+      lines.push(text);
+      return writer;
     },
-    async write(): Promise<void> {},
+    async write(): Promise<void> {
+      writeCalls += 1;
+    },
   };
-  return summaryWriter;
+
+  return {
+    lines,
+    writer,
+    get writeCalls(): number {
+      return writeCalls;
+    },
+  };
 }
 
 async function withWorkspace(testBody: (workspace: string) => Promise<void>): Promise<void> {

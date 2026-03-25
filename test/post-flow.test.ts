@@ -42,6 +42,7 @@ describe('executePostAction', () => {
       const gradleUserHome = path.join(workspace, '.gradle');
       const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
       const savedState = new Map<string, string>();
+      const summary = createSummaryCapture();
 
       await writeGradleFile(
         gradleUserHome,
@@ -70,7 +71,7 @@ describe('executePostAction', () => {
           return savedState.get(name) ?? '';
         },
         inputProvider: createInputProvider('distributed-worker'),
-        summaryWriter: createSummaryWriter(),
+        summaryWriter: summary.writer,
       });
 
       expect(status.bootstrap.baseCacheResult).toEqual(
@@ -94,6 +95,17 @@ describe('executePostAction', () => {
       expect(
         downloaded.deltaManifest.partitions.some((partition) => partition.entries.length > 0),
       ).toBe(true);
+      expect(summary.lines).toEqual(
+        expect.arrayContaining([
+          '## Cache Gradle bootstrap',
+          '## Cache Gradle post action',
+          '- Delta artifact result: uploaded',
+          '- Post-build cache delta: 0 added, 1 modified, 0 deleted.',
+          `- Uploaded artifact name: ${artifacts[0]!.name}`,
+          `- Uploaded artifact ID: ${artifacts[0]!.id}`,
+        ]),
+      );
+      expect(summary.writeCalls).toBe(2);
       await rm(downloaded.downloadDirectory, { recursive: true, force: true });
     });
   });
@@ -104,6 +116,7 @@ describe('executePostAction', () => {
       const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
       const savedState = new Map<string, string>();
       let saveCalls = 0;
+      const summary = createSummaryCapture();
 
       await writeGradleFile(
         gradleUserHome,
@@ -137,7 +150,7 @@ describe('executePostAction', () => {
           return savedState.get(name) ?? '';
         },
         inputProvider: createInputProvider('standalone'),
-        summaryWriter: createSummaryWriter(),
+        summaryWriter: summary.writer,
       });
 
       expect(saveCalls).toBe(1);
@@ -151,6 +164,14 @@ describe('executePostAction', () => {
           totalChangedCount: 1,
         }),
       );
+      expect(summary.lines).toEqual(
+        expect.arrayContaining([
+          '## Cache Gradle post action',
+          '- Delta artifact result: not-distributed-worker',
+          '- Post-build cache delta: 0 added, 1 modified, 0 deleted.',
+        ]),
+      );
+      expect(summary.writeCalls).toBe(2);
       await expect(artifactApi.listArtifacts()).resolves.toHaveLength(0);
     });
   });
@@ -161,6 +182,7 @@ describe('executePostAction', () => {
       const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
       const savedState = new Map<string, string>();
       let saveCalls = 0;
+      const summary = createSummaryCapture();
 
       await writeGradleFile(
         gradleUserHome,
@@ -194,7 +216,7 @@ describe('executePostAction', () => {
           return savedState.get(name) ?? '';
         },
         inputProvider: createInputProvider('distributed-aggregator'),
-        summaryWriter: createSummaryWriter(),
+        summaryWriter: summary.writer,
       });
 
       expect(saveCalls).toBe(1);
@@ -208,6 +230,14 @@ describe('executePostAction', () => {
           totalChangedCount: 1,
         }),
       );
+      expect(summary.lines).toEqual(
+        expect.arrayContaining([
+          '## Cache Gradle post action',
+          '- Delta artifact result: not-distributed-worker',
+          '- Post-build cache delta: 0 added, 1 modified, 0 deleted.',
+        ]),
+      );
+      expect(summary.writeCalls).toBe(2);
       await expect(artifactApi.listArtifacts()).resolves.toHaveLength(0);
     });
   });
@@ -217,6 +247,7 @@ describe('executePostAction', () => {
       const gradleUserHome = path.join(workspace, '.gradle');
       const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
       const savedState = new Map<string, string>();
+      const summary = createSummaryCapture();
 
       await writeGradleFile(
         gradleUserHome,
@@ -240,7 +271,7 @@ describe('executePostAction', () => {
           return savedState.get(name) ?? '';
         },
         inputProvider: createInputProvider('distributed-worker'),
-        summaryWriter: createSummaryWriter(),
+        summaryWriter: summary.writer,
       });
 
       expect(status.deltaArtifactResult).toEqual(
@@ -252,6 +283,14 @@ describe('executePostAction', () => {
           totalChangedCount: 0,
         }),
       );
+      expect(summary.lines).toEqual(
+        expect.arrayContaining([
+          '## Cache Gradle post action',
+          '- Delta artifact result: no-changes',
+          '- Post-build cache delta: 0 added, 0 modified, 0 deleted.',
+        ]),
+      );
+      expect(summary.writeCalls).toBe(2);
       await expect(artifactApi.listArtifacts()).resolves.toHaveLength(0);
     });
   });
@@ -301,14 +340,30 @@ function createCacheApi(options: { readonly saveCache: () => Promise<number> }):
   };
 }
 
-function createSummaryWriter(): SummaryWriter {
-  const summaryWriter: SummaryWriter = {
-    addRaw(): SummaryWriter {
-      return summaryWriter;
+function createSummaryCapture(): {
+  readonly lines: string[];
+  readonly writer: SummaryWriter;
+  get writeCalls(): number;
+} {
+  const lines: string[] = [];
+  let writeCalls = 0;
+  const writer: SummaryWriter = {
+    addRaw(text: string): SummaryWriter {
+      lines.push(text);
+      return writer;
     },
-    async write(): Promise<void> {},
+    async write(): Promise<void> {
+      writeCalls += 1;
+    },
   };
-  return summaryWriter;
+
+  return {
+    lines,
+    writer,
+    get writeCalls(): number {
+      return writeCalls;
+    },
+  };
 }
 
 function createTestCacheModel(gradleUserHome: string): CacheModel {

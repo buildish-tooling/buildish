@@ -182,8 +182,10 @@ describe('bootstrap helpers', () => {
         '- Cache key: gradle-cache-1-21-linux-x64-main',
         '- Cache partitions: 1',
         '- Job mode: standalone',
+        '## Wrapper provisioning',
         '- Wrapper files: 1',
         '- Wrapper JARs ready: 1',
+        '- gradle/wrapper/gradle-wrapper.properties: downloaded trusted wrapper JAR at gradle/wrapper/gradle-wrapper.jar for Gradle 8.14.0.',
       ]),
     );
   });
@@ -282,8 +284,10 @@ describe('bootstrap helpers', () => {
           '- Base cache restore: exact-hit',
           '- Cache key: gradle-cache-1-21-linux-x64-main',
           '- Java major: 21',
+          '## Wrapper provisioning',
           '- Wrapper files: 1',
           '- Wrapper JARs ready: 1',
+          '- gradle/wrapper/gradle-wrapper.properties: downloaded trusted wrapper JAR at gradle/wrapper/gradle-wrapper.jar for Gradle 8.14.0.',
         ]),
       );
       expect(summaryLines.join('\n')).not.toContain('ghs_bootstrap_token');
@@ -359,6 +363,8 @@ describe('bootstrap helpers', () => {
         expect.arrayContaining([
           '- Base cache save: saved',
           "- Base cache detail: Base cache saved under key 'gradle-cache-1-21-linux-x64-main' (cache ID 42).",
+          '## Wrapper provisioning',
+          '- Wrapper provisioning skipped during post phase.',
         ]),
       );
       expect(writeCalls).toBe(1);

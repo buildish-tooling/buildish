@@ -35,6 +35,7 @@ import {
   persistPreBuildCacheManifest,
   type PersistedPreBuildCacheManifestState,
 } from './state/post-action';
+import { appendJobSummary } from './logging/summary';
 
 export interface MainDependentDeltaResult extends DeltaApplyResult {
   readonly requestedJobs: readonly string[];
@@ -76,12 +77,16 @@ export async function executeMainAction(
     { env: dependencies.env },
   );
 
-  return {
+  const status = {
     bootstrap,
     dependentDeltaResult,
     preBuildManifestState,
     message: createMainActionMessage(dependentDeltaResult),
-  };
+  } satisfies MainActionStatus;
+
+  await appendJobSummary(dependencies, createMainActionSummaryLines(status));
+
+  return status;
 }
 
 async function applyDependentJobDeltas(
@@ -150,4 +155,30 @@ function createMainActionMessage(dependentDeltaResult: MainDependentDeltaResult 
   }
 
   return 'Main action flow completed and captured the pre-build cache manifest for post processing.';
+}
+
+export function createMainActionSummaryLines(status: MainActionStatus): readonly string[] {
+  return [
+    '## Cache Gradle main action',
+    ...(status.dependentDeltaResult
+      ? [
+          `- Dependent jobs requested: ${formatSummaryList(status.dependentDeltaResult.requestedJobs)}`,
+          `- Downloaded delta artifacts: ${status.dependentDeltaResult.appliedArtifactCount}`,
+          `- Artifact names: ${formatSummaryList(status.dependentDeltaResult.downloadedArtifactNames)}`,
+          `- Applied delta changes: ${status.dependentDeltaResult.addedCount} added, ${status.dependentDeltaResult.modifiedCount} modified, ${status.dependentDeltaResult.deletedCount} deleted.`,
+          `- Delta apply warnings: ${status.dependentDeltaResult.warnings.length}`,
+          ...status.dependentDeltaResult.warnings.map((warning) => `- Warning: ${warning}`),
+        ]
+      : ['- Dependent jobs requested: none', '- Downloaded delta artifacts: 0']),
+    ...(status.preBuildManifestState
+      ? [
+          '- Pre-build manifest persisted: yes',
+          `- Pre-build manifest path: ${status.preBuildManifestState.manifestPath}`,
+        ]
+      : ['- Pre-build manifest persisted: no']),
+  ];
+}
+
+function formatSummaryList(values: readonly string[]): string {
+  return values.length === 0 ? 'none' : values.join(', ');
 }
