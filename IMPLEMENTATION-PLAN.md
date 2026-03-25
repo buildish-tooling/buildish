@@ -273,6 +273,9 @@ implementable design.
    - Add real GitHub workflow tests for standalone, distributed, read-only, and failure scenarios.
 16. Documentation
    - Write `README.md`, examples, permissions table, security section, and maintenance notes.
+17. Add release workflows
+   - Ensure LICENSE and NOTICE are present and up-to-date in the release artifacts.
+   - Support version tags, but only immutable tags.
 
 ## Deferred / explicitly out of scope for v1
 

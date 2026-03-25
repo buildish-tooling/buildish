@@ -17,10 +17,16 @@
 
 NPM ?= npm
 NODE_MODULES_STAMP := node_modules/.cache-gradle-installed
+BUILD_STAMP := dist/.cache-gradle-built
+BUILD_INPUTS := action.yml package.json tsconfig.json $(shell find src -type f 2>/dev/null)
+HELP_TARGETS := $(MAKEFILE_LIST)
 
-.PHONY: build check clean clean-all lint-check lint-fix sanity-check test
+.PHONY: build check clean clean-all help lint-check lint-fix rebuild sanity-check test
 
-sanity-check:
+help: ## Show available Make targets.
+	@awk 'BEGIN {FS = ":.*## "; printf "Available targets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(HELP_TARGETS)
+
+sanity-check: ## Verify the active node and npm versions match the project expectations.
 	@command -v node >/dev/null 2>&1 || { \
 		echo "Error: node is not available on PATH. Run 'nvm use' first."; \
 		exit 1; \
@@ -42,32 +48,38 @@ sanity-check:
 		exit 1; \
 	fi
 
-$(NODE_MODULES_STAMP): package.json package-lock.json sanity-check
+$(NODE_MODULES_STAMP): package.json package-lock.json
 	$(NPM) ci
 	@mkdir -p $(dir $@)
 	@touch $@
 
-clean: sanity-check
+$(BUILD_STAMP): $(NODE_MODULES_STAMP) $(BUILD_INPUTS)
+	$(NPM) run build
+	@mkdir -p $(dir $@)
+	@touch $@
+
+clean: sanity-check ## Remove generated build outputs.
 	$(NPM) run clean
 
-clean-all: clean
+clean-all: clean ## Remove build outputs, node_modules, and legacy lib outputs.
 	rm -rf lib node_modules
 
-build: sanity-check $(NODE_MODULES_STAMP)
-	$(NPM) run build
+build: sanity-check $(BUILD_STAMP) ## Perform an incremental-friendly build.
 
-test: sanity-check $(NODE_MODULES_STAMP)
+rebuild: clean build ## Perform a fresh rebuild from a clean workspace.
+
+test: build ## Run unit tests after ensuring the project is built.
 	$(NPM) run test
 
-lint-check: sanity-check $(NODE_MODULES_STAMP)
+lint-check: sanity-check $(NODE_MODULES_STAMP) ## Run linting and formatting checks.
 	$(NPM) run lint
 	$(NPM) run format
 
-lint-fix: sanity-check $(NODE_MODULES_STAMP)
+lint-fix: sanity-check $(NODE_MODULES_STAMP) ## Automatically fix lint issues and rewrite formatting.
 	$(NPM) exec eslint -- . --fix
 	$(NPM) run format:write
 
-check:
+check: ## Run a full clean verification: clean-all, build, test, and lint-check.
 	$(MAKE) clean-all
 	$(MAKE) build
 	$(MAKE) test
