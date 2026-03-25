@@ -276,22 +276,29 @@ implementable design.
 9. Artifact exchange layer
    - Package deltas, generate unique names, upload/download artifacts, and verify archive contents.
 10. Delta merge/apply engine
-   - Apply dependent deltas in declared order and fail on conflicting file content.
+    - Apply dependent deltas in declared order and fail on conflicting file content.
 11. Main action flow
-   - Wire together validation, wrapper provisioning, cache restore, dependent delta download, and state save.
+    - Wire together validation, wrapper provisioning, cache restore, dependent delta download, and state save.
 12. Post action flow
-   - Recompute deltas, optionally trigger cleanup, upload worker artifacts, and save final cache.
+    - Recompute deltas, optionally trigger cleanup, upload worker artifacts, and save final cache.
 13. Summary and observability
-   - Produce clear logs and job summaries for cache hits, misses, wrapper actions, and distributed merges.
+    - Produce clear logs and job summaries for cache hits, misses, wrapper actions, and distributed merges.
 14. Unit test suite
-   - Cover validation, wrapper logic, caching, artifacts, merging, and summaries.
+    - Cover validation, wrapper logic, caching, artifacts, merging, and summaries.
 15. Integration workflow suite
-   - Add real GitHub workflow tests for standalone, distributed, read-only, and failure scenarios.
+    - Add real GitHub workflow tests for standalone, distributed, read-only, and failure scenarios.
 16. Documentation
-   - Write `README.md`, examples, permissions table, security section, and maintenance notes.
-17. Add release workflows
-   - Ensure LICENSE and NOTICE are present and up-to-date in the release artifacts.
-   - Support version tags, but only immutable tags.
+    - Write `README.md`, examples, permissions table, security section, and maintenance notes.
+17. Need real GitHub workflows for integration testing.
+    - Those workflows are not part of the action itself, but required to run integration tests.
+    - Exercise a couple of real-world scenarios:
+      - Single job workflow
+      - Distributed workflow with multiple workers and an aggregator
+      - Read-only mode
+      - Failure handling
+18. Add release workflows
+    - Ensure LICENSE and NOTICE are present and up-to-date in the release artifacts.
+    - Support version tags, but only immutable tags, no "moving" tags like 'v1' or so.
 
 ## Deferred / explicitly out of scope for v1
 
