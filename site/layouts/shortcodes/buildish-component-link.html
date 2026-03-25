@@ -1,0 +1,160 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/*
+Render a generated component-aware link.
+
+Use this when the target is owned by site-pipeline metadata: component overview,
+development docs, release docs, or source repository. Use buildish-button when
+the page author knows the exact authored relative link target.
+*/}}
+
+{{/* Resolve the current staged component context. */}}
+{{- $componentContext := partial "buildish-component-context.html" .Page -}}
+{{- $component := index $componentContext "component" -}}
+{{- if not $component -}}
+  {{- errorf "%q shortcode requires sitePipelineComponent context on %s" .Name .Page.RelPermalink -}}
+{{- end -}}
+
+{{/* Publication paths are emitted under component.paths in old data and
+     component.publication.paths in current data. Support both shapes. */}}
+{{- $paths := dict -}}
+{{- with index $component "paths" }}{{ $paths = . }}{{ end -}}
+{{- if eq (len $paths) 0 -}}
+  {{- with index $component "publication" }}{{ with index . "paths" }}{{ $paths = . }}{{ end }}{{ end -}}
+{{- end -}}
+
+{{/* Parse common attributes. */}}
+{{- $kind := "docs" -}}
+{{- with .Get "kind" }}{{ $kind = lower (printf "%v" .) }}{{ end -}}
+{{- $appearance := "link" -}}
+{{- with .Get "appearance" }}{{ $appearance = lower (printf "%v" .) }}{{ end -}}
+{{- $optional := false -}}
+{{- with .Get "optional" }}{{ $optional = in (slice true "true" "True" "TRUE" 1 "1") . }}{{ end -}}
+{{- $href := "" -}}
+{{- $label := "" -}}
+{{- $external := false -}}
+{{- $componentSlug := index $component "slug" -}}
+{{- $developmentLabel := "Developer Docs (unreleased)" -}}
+{{- with index $component "developmentLabel" }}{{ $developmentLabel = . }}{{ end -}}
+
+{{/* Collect release metadata for kind="docs" and kind="release". */}}
+{{- $latestStableVersion := "" -}}
+{{- $releaseLines := slice -}}
+{{- with index $component "artifacts" -}}
+  {{- range $artifact := . -}}
+    {{- if not $latestStableVersion -}}
+      {{- with index $artifact "latestStable" }}{{ $latestStableVersion = printf "%v" . }}{{ end -}}
+    {{- end -}}
+    {{- if eq (len $releaseLines) 0 -}}
+      {{- with index $artifact "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $latestStableVersion -}}
+  {{- with index $component "latestStable" }}{{ with index . "version" }}{{ $latestStableVersion = . }}{{ end }}{{ end -}}
+{{- end -}}
+{{- if eq (len $releaseLines) 0 -}}
+  {{- with index $component "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
+{{- end -}}
+
+{{/* Resolve the target href and default label by kind. */}}
+{{- if eq $kind "overview" -}}
+  {{- with index $paths "component" }}{{ $href = . }}{{ end -}}
+  {{- $label = "Overview" -}}
+{{- else if eq $kind "development" -}}
+  {{- with index $paths "development" }}{{ $href = . }}{{ end -}}
+  {{- if not $href }}{{ with index $paths "docs" }}{{ $href = . }}{{ end }}{{ end -}}
+  {{- $label = $developmentLabel -}}
+{{- else if or (eq $kind "docs") (eq $kind "release") -}}
+  {{/* kind="docs" means latest released docs. kind="release" may choose an
+       exact version, latest stable, or the latest version in a release line. */}}
+  {{- $requestedVersion := "latest" -}}
+  {{- with .Get "version" }}{{ $requestedVersion = printf "%v" . }}{{ end -}}
+  {{- $requestedLine := "" -}}
+  {{- with .Get "line" }}{{ $requestedLine = printf "%v" . }}{{ end -}}
+  {{- with .Get "releaseLine" }}{{ $requestedLine = printf "%v" . }}{{ end -}}
+  {{- with .Get "release-line" }}{{ $requestedLine = printf "%v" . }}{{ end -}}
+  {{- if $requestedLine -}}
+    {{- range $releaseLine := $releaseLines -}}
+      {{- $lineKey := index $releaseLine "key" -}}
+      {{- if not $lineKey }}{{ $lineKey = index $releaseLine "line" }}{{ end -}}
+      {{- if and (eq (printf "%v" $lineKey) $requestedLine) (index $releaseLine "latest") -}}
+	{{- $requestedVersion = printf "%v" (index $releaseLine "latest") -}}
+      {{- end -}}
+    {{- end -}}
+  {{- else if eq $requestedVersion "latest" -}}
+    {{- $requestedVersion = $latestStableVersion -}}
+  {{- end -}}
+
+  {{/* Released docs are found in the staged routes aggregate. */}}
+  {{- if $requestedVersion -}}
+    {{- with index hugo.Data "routes" -}}
+      {{- with index . "items" -}}
+	{{- range $route := . -}}
+	  {{- $routeVersion := "" -}}
+	  {{- with index $route "version" }}{{ $routeVersion = printf "%v" . }}{{ end -}}
+	  {{- if not $routeVersion -}}
+	    {{- with index $route "targetId" -}}
+	      {{- $targetParts := split . ":" -}}
+	      {{- $routeVersion = index $targetParts (sub (len $targetParts) 1) -}}
+	    {{- end -}}
+	  {{- end -}}
+	  {{- if and
+	    (eq (index $route "componentSlug") $componentSlug)
+	    (eq (index $route "section") "released")
+	    (eq (index $route "routeKind") "context")
+	    (eq $routeVersion $requestedVersion)
+	    (index $route "path")
+	  -}}
+	    {{- $href = index $route "path" -}}
+	  {{- end -}}
+	{{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if eq $kind "docs" -}}
+    {{- $label = "Latest release docs" -}}
+  {{- else if $requestedLine -}}
+    {{- $label = printf "Latest %s release docs" $requestedLine -}}
+  {{- else if $requestedVersion -}}
+    {{- $label = printf "Release %s docs" $requestedVersion -}}
+  {{- else -}}
+    {{- $label = "Release docs" -}}
+  {{- end -}}
+{{- else if eq $kind "source" -}}
+  {{- with index $componentContext "repositoryPath" }}{{ $href = . }}{{ end -}}
+  {{- $label = "Source repository" -}}
+  {{- $external = true -}}
+{{- else -}}
+  {{- errorf "%q shortcode on %s does not support kind %q" .Name .Page.RelPermalink $kind -}}
+{{- end -}}
+{{- with .Get "label" }}{{ $label = printf "%v" . }}{{ end -}}
+{{- if and $external $href (not (or (hasPrefix $href "https://") (hasPrefix $href "http://"))) -}}
+  {{- errorf "%q shortcode on %s requires an http(s) repository URL, got %q" .Name .Page.RelPermalink $href -}}
+{{- end -}}
+
+{{/* Apply shared presentation and render the anchor. */}}
+{{- $class := partial "buildish-link-appearance-class.html" (dict "appearance" $appearance "shortcodeName" .Name "pagePath" .Page.RelPermalink) -}}
+{{- if and (eq $kind "source") (not $href) -}}
+  {{- $optional = true -}}
+{{- end -}}
+{{- if not $href -}}
+  {{- if not $optional -}}
+    {{- errorf "%q shortcode could not resolve target kind=%q on %s" .Name $kind .Page.RelPermalink -}}
+  {{- end -}}
+{{- else -}}
+  <a{{ with $class }} class="{{ . }}"{{ end }} href="{{ $href }}"{{ if $external }} target="_blank" rel="noopener"{{ end }}>{{ $label }}</a>
+{{- end -}}

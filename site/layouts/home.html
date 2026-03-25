@@ -1,0 +1,57 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{ define "main" }}
+{{ $componentsPage := .Site.GetPage "/components" }}
+{{ $componentSections := slice }}
+{{ with $componentsPage }}{{ $componentSections = partial "buildish-ordered-component-pages.html" (dict "page" . "pages" (where .Pages "Kind" "section")) }}{{ end }}
+<div class="td-content">
+  <div class="buildish-home-hero">
+    <div class="buildish-home-hero__logo" aria-hidden="true">{{ partial "buildish-pipeline-icon.html" (dict "gradientId" "buildish-home-panel") }}</div>
+    <div class="buildish-home-hero__content">
+      <h1>{{ .Title }}</h1>
+      {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
+      {{ .Content }}
+      <p class="buildish-home-actions mb-4">
+        <a class="btn btn-primary me-2 mb-2" href="{{ "/community/" | relURL }}">Community</a>
+        <a class="btn btn-outline-secondary me-2 mb-2" href="{{ "/about/" | relURL }}">About Buildish</a>
+        <a class="btn btn-link mb-2" href="{{ "/community/security/" | relURL }}">Security</a>
+      </p>
+    </div>
+  </div>
+  {{ with $componentsPage }}
+  <h2>Components</h2>
+  <div class="section-index">
+    <div class="row">
+      {{ range $componentSections }}
+      {{- $cardTitle := partial "buildish-resolved-title.html" (dict "page" . "preferLinkTitle" true) -}}
+      {{- $cardDesc := partial "buildish-resolved-description.html" (dict "page" .) -}}
+      <div class="col-12 col-md-6">
+        <div class="entry">
+          <h5><a href="{{ .RelPermalink }}">{{ $cardTitle }}</a></h5>
+          {{ with $cardDesc }}<p>{{ . | markdownify }}</p>{{ end }}
+        </div>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+  {{ with .Params.trademark_attribution }}
+  <div class="buildish-home-legal-card mt-3">
+    <p class="mb-0 small">{{ . | markdownify }}</p>
+  </div>
+  {{ end }}
+</div>
+{{ end }}

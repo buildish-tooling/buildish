@@ -1,0 +1,38 @@
+<!--
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+# Website
+
+The Website component is for contributors changing buildish.org. It consumes
+Site Pipeline's validated, renderer-neutral staged output and owns the
+Buildish-specific Hugo and Docsy rendering, navigation, branding, search, and
+publication integration.
+
+No Website release has been published. Its development documentation describes
+unreleased behavior and may change.
+
+Use the local docs for Buildish-specific rendering, container, and workflow
+notes:
+
+- [Unreleased Website development documentation](development/)
+
+For the canonical reusable pipeline docs, use the dedicated `site-pipeline`
+component:
+
+- [Unreleased Site Pipeline development documentation](/components/site-pipeline/development/)
+- [Site Pipeline overview](/components/site-pipeline/)
+- [Unreleased Site Pipeline development reference](/components/site-pipeline/development/reference/)
+- [Flexible component publication](/components/site-pipeline/development/reference/flexible-component-publication/)

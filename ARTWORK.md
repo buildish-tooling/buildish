@@ -1,0 +1,26 @@
+<!--
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+# Artwork provenance
+
+The Buildish logo proposals under `site/static/img/logo-proposals/` were
+created with generative-AI tools from prompts and creative direction supplied
+by the Buildish Authors. The selected logo was used to derive the favicon and
+application-icon files under `site/static/favicons/`.
+
+Copyright 2026 The Buildish Authors. The artwork is distributed under the
+Apache License, Version 2.0, along with the rest of this repository. See
+[`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).

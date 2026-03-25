@@ -1,0 +1,53 @@
+##
+## Copyright 2026 The Buildish Authors
+##
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+## http://www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+
+name: Container image retention
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report eligible package versions without deleting them
+        required: false
+        default: true
+        type: boolean
+  schedule:
+    - cron: '19 4 * * *'
+
+permissions: {}
+
+concurrency:
+  group: container-image-retention
+  cancel-in-progress: false
+
+jobs:
+  prune-untagged-versions:
+    name: Delete untagged image versions older than seven days
+    if: github.repository_owner == 'buildish-tooling'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    steps:
+      - name: Apply the retention policy
+        uses: snok/container-retention-policy@d3bdcf5ce9b05f685154e4a16c39233b245e3d53 # v3.1.0
+        with:
+          account: buildish-tooling
+          image-names: buildish-site-build
+          cut-off: 7d
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+          tag-selection: untagged
+          token: ${{ secrets.GITHUB_TOKEN }}
+          rust-log: container_retention_policy=INFO

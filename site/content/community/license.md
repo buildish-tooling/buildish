@@ -1,0 +1,33 @@
+---
+# Copyright 2026 The Buildish Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+title: License
+description: Licensing information for Buildish source code and distributions.
+type: docs
+weight: 60
+---
+
+Buildish source code is licensed under the
+[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+Each repository's `LICENSE` and `NOTICE` files are the authoritative legal
+documents for that repository.
+
+Some distributions include third-party software under other compatible
+licenses. Consult the `LICENSE` and `NOTICE` files shipped with a distribution
+for the complete terms and attributions that apply to it.
+
+The rendered website publishes the license texts for its distributed theme,
+font, and JavaScript dependencies in the generated
+[third-party license inventory](/third-party-licenses.txt). The inventory is
+regenerated from the exact installed dependency tree during every site build.
