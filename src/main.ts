@@ -16,12 +16,18 @@
 
 import * as core from '@actions/core';
 
-import { bootstrapPhase } from './bootstrap';
+import { executeMainAction } from './main-flow';
 
 export async function runMain(): Promise<void> {
-  const status = await bootstrapPhase('main');
-  if (status.baseCacheResult) {
-    core.info(status.baseCacheResult.message);
+  const status = await executeMainAction();
+  if (status.bootstrap.baseCacheResult) {
+    core.info(status.bootstrap.baseCacheResult.message);
+  }
+  if (status.dependentDeltaResult) {
+    core.info(status.dependentDeltaResult.message);
+    for (const warning of status.dependentDeltaResult.warnings) {
+      core.warning(warning);
+    }
   }
   core.info(status.message);
 }
