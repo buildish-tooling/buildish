@@ -99,11 +99,10 @@ inputs:
   github-token:
     description: >-
       Optional GitHub token used only for authenticated wrapper JAR downloads
-      against the GitHub API to reduce throttling. Defaults to `${{ github.token
-      }}` on GitHub Actions and is never written to summaries or persisted action
-      state.
+      against the GitHub API to reduce throttling. When omitted, the action uses
+      `GITHUB_TOKEN` from the runner environment if present; otherwise requests
+      are unauthenticated. Never written to summaries or persisted action state.
     required: false
-    default: ${{ github.token }}
 runs:
   using: node24
   main: dist/main/index.cjs

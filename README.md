@@ -155,8 +155,9 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 
 ### `github-token`
 
-- Default: `${{ github.token }}`
+- Default: unset
 - Optional GitHub token used only for authenticated wrapper JAR downloads against the GitHub API.
+- When omitted, the action uses `GITHUB_TOKEN` from the runner environment if available.
 - Helps reduce throttling when fetching `gradle-wrapper.jar` from the Gradle source repository.
 - Downloaded wrapper JARs are accepted only after detached-signature and SHA-256 verification.
 - Gradle signing keys are pinned in-source as an allowlist so old and new keys can overlap during rotation.
