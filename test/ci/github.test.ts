@@ -1,0 +1,112 @@
+/*
+ * Copyright 2026 The Project Nessie Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import { describe, expect, it } from 'vitest';
+
+import { createGitHubContext, createGitHubPlatform } from '../../src/ci/github';
+import type { SummaryWriter } from '../../src/ci/types';
+
+describe('createGitHubContext', () => {
+  it('resolves push refs from branch refs', () => {
+    const context = createGitHubContext(
+      {
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REF: 'refs/heads/feature/cache-improvements',
+        GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+      },
+      {
+        repository: { default_branch: 'main' },
+      },
+    );
+
+    expect(context.resolvedRefName).toBe('feature/cache-improvements');
+    expect(context.safeRefName).toBe('feature-cache-improvements');
+  });
+
+  it('uses the pull request base branch for pull_request events', () => {
+    const context = createGitHubContext(
+      {
+        GITHUB_EVENT_NAME: 'pull_request',
+        GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+      },
+      {
+        repository: { default_branch: 'main' },
+        pull_request: { base: { ref: 'release/1.0' } },
+      },
+    );
+
+    expect(context.isPullRequest).toBe(true);
+    expect(context.resolvedRefName).toBe('release/1.0');
+  });
+
+  it('falls back to the repository default branch for unsupported events', () => {
+    const context = createGitHubContext(
+      {
+        GITHUB_EVENT_NAME: 'schedule',
+        GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+      },
+      {
+        repository: { default_branch: 'main' },
+      },
+    );
+
+    expect(context.resolvedRefName).toBe('main');
+  });
+});
+
+describe('createGitHubPlatform', () => {
+  it('publishes summaries through the configured writer', async () => {
+    const summaryLines: Array<{ text: string; addEol: boolean | undefined }> = [];
+    let writeCalls = 0;
+    const writer: SummaryWriter = {
+      addRaw(text: string, addEol?: boolean): SummaryWriter {
+        summaryLines.push({ text, addEol });
+        return this;
+      },
+      async write(): Promise<void> {
+        writeCalls += 1;
+      },
+    };
+
+    const platform = createGitHubPlatform({
+      env: {
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+      },
+      eventPayload: {
+        repository: { default_branch: 'main' },
+      },
+      summaryWriter: writer,
+    });
+
+    await platform.publishSummary(['first line', 'second line']);
+
+    expect(summaryLines).toEqual([
+      { text: 'first line', addEol: true },
+      { text: 'second line', addEol: true },
+    ]);
+    expect(writeCalls).toBe(1);
+  });
+});

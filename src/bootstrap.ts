@@ -14,16 +14,69 @@
  * limitations under the License.
  */
 
+import { createGitHubPlatform, type GitHubPlatformOptions } from './ci/github';
+import type { CiJobContext } from './ci/types';
+import {
+  normalizeActionConfig,
+  readActionInputs,
+  type InputProvider,
+} from './config/action-config';
+import type { NormalizedActionConfig } from './config/types';
+
 export type BootstrapPhase = 'main' | 'post';
 
 export interface BootstrapStatus {
   readonly phase: BootstrapPhase;
   readonly message: string;
+  readonly config: NormalizedActionConfig;
+  readonly ciContext: CiJobContext;
 }
 
-export function createBootstrapStatus(phase: BootstrapPhase): BootstrapStatus {
+export interface BootstrapDependencies extends GitHubPlatformOptions {
+  readonly inputProvider?: InputProvider;
+}
+
+export async function bootstrapPhase(
+  phase: BootstrapPhase,
+  dependencies: BootstrapDependencies = {},
+): Promise<BootstrapStatus> {
+  const platform = createGitHubPlatform(dependencies);
+  const rawInputs = readActionInputs(dependencies.inputProvider);
+  const config = normalizeActionConfig(rawInputs, {
+    phase,
+    ciContext: platform.context,
+    env: dependencies.env,
+  });
+  const status = createBootstrapStatus(phase, config, platform.context);
+
+  await platform.publishSummary(createBootstrapSummaryLines(status));
+
+  return status;
+}
+
+export function createBootstrapStatus(
+  phase: BootstrapPhase,
+  config: NormalizedActionConfig,
+  ciContext: CiJobContext,
+): BootstrapStatus {
   return {
     phase,
-    message: `Bootstrap placeholder for the ${phase} entrypoint.`,
+    config,
+    ciContext,
+    message: `Prepared ${phase} phase for ${ciContext.eventName} on ${ciContext.safeRefName} in ${config.jobMode} mode.`,
   };
+}
+
+export function createBootstrapSummaryLines(status: BootstrapStatus): readonly string[] {
+  return [
+    '## Cache Gradle bootstrap',
+    `- Phase: ${status.phase}`,
+    `- Event: ${status.ciContext.eventName}`,
+    `- Ref: ${status.ciContext.resolvedRefName}`,
+    `- Safe ref: ${status.ciContext.safeRefName}`,
+    `- Job mode: ${status.config.jobMode}`,
+    `- Read only: ${status.config.readOnly}`,
+    `- Cache enabled: ${status.config.cacheEnabled}`,
+    `- Wrapper selection: ${status.config.wrapperSelectionMode}`,
+  ];
 }

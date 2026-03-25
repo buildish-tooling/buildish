@@ -1,0 +1,154 @@
+/*
+ * Copyright 2026 The Project Nessie Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import { describe, expect, it } from 'vitest';
+
+import {
+  normalizeActionConfig,
+  readActionInputs,
+  type InputProvider,
+} from '../../src/config/action-config';
+import type { CiJobContext } from '../../src/ci/types';
+
+const baseCiContext: CiJobContext = {
+  platform: 'github',
+  eventName: 'push',
+  resolvedRefName: 'main',
+  safeRefName: 'main',
+  defaultBranch: 'main',
+  isPullRequest: false,
+  repository: 'projectnessie/cache-gradle',
+  workflowName: 'CI',
+  jobName: 'check',
+  runId: 123,
+  runAttempt: 1,
+  workspace: '/workspace',
+  actionPath: '/workspace',
+};
+
+describe('readActionInputs', () => {
+  it('reads flat action inputs through the input provider', () => {
+    const inputProvider: InputProvider = {
+      getInput(name: string): string {
+        return (
+          {
+            'base-directory': 'subdir',
+            'cache-enabled': 'false',
+            'job-mode': 'distributed-worker',
+          }[name] ?? ''
+        );
+      },
+    };
+
+    expect(readActionInputs(inputProvider)).toMatchObject({
+      baseDirectory: 'subdir',
+      cacheEnabled: 'false',
+      jobMode: 'distributed-worker',
+    });
+  });
+});
+
+describe('normalizeActionConfig', () => {
+  it('applies secure defaults for a push event', () => {
+    const config = normalizeActionConfig(readActionInputs(emptyInputProvider()), {
+      phase: 'main',
+      ciContext: baseCiContext,
+      env: {},
+    });
+
+    expect(config).toMatchObject({
+      phase: 'main',
+      baseDirectory: '.',
+      cacheEnabled: true,
+      readOnly: false,
+      jobMode: 'standalone',
+      cacheKeyPrefix: 'gradle-cache-',
+      wrapperSelectionMode: 'default',
+      defaultWrapperPropertiesFile: 'gradle/wrapper/gradle-wrapper.properties',
+    });
+  });
+
+  it('defaults to read-only on pull requests', () => {
+    const config = normalizeActionConfig(readActionInputs(emptyInputProvider()), {
+      phase: 'main',
+      ciContext: { ...baseCiContext, eventName: 'pull_request', isPullRequest: true },
+      env: {},
+    });
+
+    expect(config.readOnly).toBe(true);
+  });
+
+  it('normalizes explicit wrapper file paths under the configured base directory', () => {
+    const config = normalizeActionConfig(
+      readActionInputs(
+        createInputProvider({
+          'base-directory': 'tools',
+          'wrapper-properties-files': 'app/gradle/wrapper/gradle-wrapper.properties',
+        }),
+      ),
+      {
+        phase: 'main',
+        ciContext: baseCiContext,
+        env: {},
+      },
+    );
+
+    expect(config.wrapperSelectionMode).toBe('explicit');
+    expect(config.wrapperPropertiesFiles).toEqual([
+      'tools/app/gradle/wrapper/gradle-wrapper.properties',
+    ]);
+  });
+
+  it('rejects conflicting wrapper selection configuration', () => {
+    expect(() =>
+      normalizeActionConfig(
+        readActionInputs(
+          createInputProvider({
+            'process-all-wrapper-files': 'true',
+            'wrapper-properties-files': 'gradle/wrapper/gradle-wrapper.properties',
+          }),
+        ),
+        {
+          phase: 'main',
+          ciContext: baseCiContext,
+          env: {},
+        },
+      ),
+    ).toThrow(/cannot be combined/);
+  });
+
+  it('rejects unsupported setup-java usage in v1', () => {
+    expect(() =>
+      normalizeActionConfig(readActionInputs(createInputProvider({ 'setup-java': 'true' })), {
+        phase: 'main',
+        ciContext: baseCiContext,
+        env: {},
+      }),
+    ).toThrow(/Run actions\/setup-java before this action instead/);
+  });
+});
+
+function emptyInputProvider(): InputProvider {
+  return createInputProvider({});
+}
+
+function createInputProvider(values: Record<string, string>): InputProvider {
+  return {
+    getInput(name: string): string {
+      return values[name] ?? '';
+    },
+  };
+}

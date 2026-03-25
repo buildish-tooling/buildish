@@ -16,6 +16,54 @@
 name: Cache Gradle
 description: Secure Gradle wrapper provisioning and Gradle cache management.
 author: Project Nessie
+inputs:
+  base-directory:
+    description: Base directory for Gradle wrapper discovery and project-relative paths.
+    required: false
+    default: .
+  cache-enabled:
+    description: Enable Gradle cache restore/save orchestration.
+    required: false
+    default: 'true'
+  read-only:
+    description: Disable persistence of modified cache state. Defaults to true for pull requests, otherwise false.
+    required: false
+  job-mode:
+    description: Execution personality for cache coordination.
+    required: false
+    default: standalone
+  dependent-jobs:
+    description: Comma- or newline-separated dependent job names whose cache deltas should be consumed later.
+    required: false
+  cache-key-prefix:
+    description: Prefix used for generated cache keys.
+    required: false
+    default: gradle-cache-
+  cache-key-template:
+    description: Optional restricted cache key template using supported placeholders.
+    required: false
+  process-all-wrapper-files:
+    description: Process every matching gradle-wrapper.properties file under the configured base directory.
+    required: false
+    default: 'false'
+  wrapper-properties-glob:
+    description: Glob used to discover Gradle wrapper property files.
+    required: false
+    default: '**/gradle/wrapper/gradle-wrapper.properties'
+  wrapper-properties-files:
+    description: Comma- or newline-separated explicit gradle-wrapper.properties files, relative to the base directory.
+    required: false
+  cleanup-enabled:
+    description: Enable the later Gradle cache cleanup trigger flow.
+    required: false
+    default: 'true'
+  gradle-user-home:
+    description: Optional Gradle user home path. Only the default location is supported in v1.
+    required: false
+  setup-java:
+    description: Reserved compatibility flag. Setting true fails in v1; run actions/setup-java before this action instead.
+    required: false
+    default: 'false'
 runs:
   using: node20
   main: dist/main/index.js

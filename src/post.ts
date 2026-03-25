@@ -16,10 +16,10 @@
 
 import * as core from '@actions/core';
 
-import { createBootstrapStatus } from './bootstrap';
+import { bootstrapPhase } from './bootstrap';
 
 export async function runPost(): Promise<void> {
-  const status = createBootstrapStatus('post');
+  const status = await bootstrapPhase('post');
   core.info(status.message);
 }
 

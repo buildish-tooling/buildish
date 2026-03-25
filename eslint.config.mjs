@@ -43,6 +43,7 @@ export default [
     rules: {
       'no-console': 'off',
       'no-undef': 'off',
+      'no-unused-vars': 'off',
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
