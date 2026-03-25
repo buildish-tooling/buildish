@@ -19,10 +19,31 @@ import { createReadStream } from 'node:fs';
 import { lstat, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
+import {
+  parseSerializedJsonObject,
+  validateArray,
+  validateLowercaseSha256 as validateSha256,
+  validateNonNegativeInteger,
+  validateNonNegativeNumber,
+  validateNormalizedRelativePosixPath,
+  validateRecord,
+  validateString,
+} from '../validation';
 import type { CacheModel, CachePartitionDefinition } from './model';
 
 export const CACHE_MANIFEST_SCHEMA_VERSION = 1;
 const STABLE_ENTRY_CAPTURE_ATTEMPTS = 3;
+const CACHE_PARTITION_ORDER: readonly CachePartitionDefinition['id'][] = [
+  'modules',
+  'transforms-metadata',
+  'kotlin-dsl',
+  'build-cache',
+  'wrapper-dists',
+];
+const CACHE_PARTITION_IDS = new Set<CachePartitionDefinition['id']>(CACHE_PARTITION_ORDER);
+const CACHE_PARTITION_RANKS = new Map(
+  CACHE_PARTITION_ORDER.map((partitionId, index) => [partitionId, index]),
+);
 
 interface CompiledGlobPattern {
   readonly source: string;
@@ -116,7 +137,7 @@ export interface CachePartitionDelta {
  * Full delta manifest between two cache manifests.
  */
 export interface CacheDeltaManifest {
-  /** Schema version for on-disk delta serialization. Currently always `1`. */
+  /** Schema version for on-disk delta serialization. Currently, always `1`. */
   readonly schemaVersion: typeof CACHE_MANIFEST_SCHEMA_VERSION;
   /** Absolute Gradle user home path shared by the compared manifests. */
   readonly gradleUserHome: string;
@@ -127,7 +148,7 @@ export interface CacheDeltaManifest {
 /**
  * Scans all configured cache partitions and captures a deterministic manifest of regular files.
  *
- * The scanner retries a small number of times when a file changes while being hashed so later delta
+ * The scanner retries a small number of times when a file changes while being hashed, so the later delta
  * computation does not observe inconsistent size/hash metadata for the same path.
  */
 export async function captureCacheManifest(cacheModel: CacheModel): Promise<CacheManifest> {
@@ -276,6 +297,32 @@ export function serializeCacheManifest(manifest: CacheManifest): string {
  */
 export function serializeCacheDeltaManifest(deltaManifest: CacheDeltaManifest): string {
   return `${JSON.stringify(deltaManifest)}\n`;
+}
+
+/**
+ * Parses a serialized cache manifest and validates that it conforms to the current schema.
+ */
+export function deserializeCacheManifest(serializedManifest: string): CacheManifest {
+  const parsed = parseSerializedJsonObject(serializedManifest, 'cache manifest');
+
+  return {
+    schemaVersion: validateSchemaVersion(parsed.schemaVersion, 'cache manifest'),
+    gradleUserHome: validateString(parsed.gradleUserHome, 'cache manifest gradleUserHome'),
+    partitions: validateManifestPartitions(parsed.partitions),
+  };
+}
+
+/**
+ * Parses a serialized delta manifest and validates that it conforms to the current schema.
+ */
+export function deserializeCacheDeltaManifest(serializedDeltaManifest: string): CacheDeltaManifest {
+  const parsed = parseSerializedJsonObject(serializedDeltaManifest, 'cache delta manifest');
+
+  return {
+    schemaVersion: validateSchemaVersion(parsed.schemaVersion, 'cache delta manifest'),
+    gradleUserHome: validateString(parsed.gradleUserHome, 'cache delta manifest gradleUserHome'),
+    partitions: validateDeltaPartitions(parsed.partitions),
+  };
 }
 
 async function captureStableFileEntry(
@@ -666,4 +713,204 @@ function toPosixRelativePath(baseDirectory: string, absolutePath: string): strin
 
 function isMissingPathError(error: unknown): boolean {
   return !!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT');
+}
+
+function validateManifestPartitions(value: unknown): readonly CachePartitionManifest[] {
+  const partitions = validateArray(value, 'cache manifest partitions');
+  let previousPartitionRank = -1;
+
+  return partitions.map((partitionValue, index) => {
+    const partition = validateRecord(partitionValue, `cache manifest partition at index ${index}`);
+    const partitionId = validatePartitionId(
+      partition.partitionId,
+      `cache manifest partition ${index}`,
+    );
+    const partitionRank = getPartitionRank(partitionId);
+
+    if (previousPartitionRank >= partitionRank) {
+      throw new Error('Cache manifest partitions must follow the cache model partition order.');
+    }
+    previousPartitionRank = partitionRank;
+
+    return {
+      partitionId,
+      entries: validateManifestEntries(
+        partition.entries,
+        `cache manifest partition '${partitionId}' entries`,
+      ),
+    };
+  });
+}
+
+function validateDeltaPartitions(value: unknown): readonly CachePartitionDelta[] {
+  const partitions = validateArray(value, 'cache delta manifest partitions');
+  let previousPartitionRank = -1;
+
+  return partitions.map((partitionValue, index) => {
+    const partition = validateRecord(partitionValue, `cache delta partition at index ${index}`);
+    const partitionId = validatePartitionId(
+      partition.partitionId,
+      `cache delta partition ${index}`,
+    );
+    const partitionRank = getPartitionRank(partitionId);
+
+    if (previousPartitionRank >= partitionRank) {
+      throw new Error(
+        'Cache delta manifest partitions must follow the cache model partition order.',
+      );
+    }
+    previousPartitionRank = partitionRank;
+
+    return {
+      partitionId,
+      entries: validateDeltaEntries(
+        partition.entries,
+        `cache delta partition '${partitionId}' entries`,
+      ),
+    };
+  });
+}
+
+function validateManifestEntries(value: unknown, label: string): readonly CacheFileManifestEntry[] {
+  const entries = validateArray(value, label);
+  let previousRelativePath = '';
+
+  return entries.map((entryValue, index) => {
+    const entry = validateRecord(entryValue, `${label} entry at index ${index}`);
+    const relativePath = validateCacheRelativePath(
+      entry.relativePath,
+      `${label} entry ${index} relativePath`,
+    );
+
+    if (previousRelativePath.localeCompare(relativePath) >= 0) {
+      throw new Error(`${label} must be sorted by strictly increasing relativePath.`);
+    }
+    previousRelativePath = relativePath;
+
+    return {
+      relativePath,
+      ...validateSnapshot(entry, `${label} entry '${relativePath}'`),
+    };
+  });
+}
+
+function validateDeltaEntries(value: unknown, label: string): readonly CacheDeltaEntry[] {
+  const entries = validateArray(value, label);
+  let previousRelativePath = '';
+
+  return entries.map((entryValue, index) => {
+    const entry = validateRecord(entryValue, `${label} entry at index ${index}`);
+    const relativePath = validateCacheRelativePath(
+      entry.relativePath,
+      `${label} entry ${index} relativePath`,
+    );
+
+    if (previousRelativePath.localeCompare(relativePath) >= 0) {
+      throw new Error(`${label} must be sorted by strictly increasing relativePath.`);
+    }
+    previousRelativePath = relativePath;
+
+    const changeType = validateDeltaChangeType(
+      entry.changeType,
+      `${label} entry '${relativePath}'`,
+    );
+    const previous = validateNullableSnapshot(
+      entry.previous,
+      `${label} entry '${relativePath}' previous`,
+    );
+    const current = validateNullableSnapshot(
+      entry.current,
+      `${label} entry '${relativePath}' current`,
+    );
+    validateDeltaSnapshotCombination(relativePath, changeType, previous, current);
+
+    return {
+      relativePath,
+      changeType,
+      previous,
+      current,
+    };
+  });
+}
+
+function validateDeltaSnapshotCombination(
+  relativePath: string,
+  changeType: CacheDeltaEntry['changeType'],
+  previous: CacheFileSnapshot | null,
+  current: CacheFileSnapshot | null,
+): void {
+  if (changeType === 'added' && (previous || !current)) {
+    throw new Error(`Delta entry '${relativePath}' must only include a current snapshot.`);
+  }
+
+  if (changeType === 'deleted' && (!previous || current)) {
+    throw new Error(`Delta entry '${relativePath}' must only include a previous snapshot.`);
+  }
+
+  if (changeType === 'modified' && (!previous || !current)) {
+    throw new Error(
+      `Delta entry '${relativePath}' must include both previous and current snapshots.`,
+    );
+  }
+}
+
+function validateSnapshot(value: unknown, label: string): CacheFileSnapshot {
+  const snapshot = validateRecord(value, label);
+
+  return {
+    contentSha256: validateSha256(snapshot.contentSha256, `${label} contentSha256`),
+    size: validateNonNegativeInteger(snapshot.size, `${label} size`),
+    mode: validateNonNegativeInteger(snapshot.mode, `${label} mode`),
+    atimeMs: validateNonNegativeNumber(snapshot.atimeMs, `${label} atimeMs`),
+    mtimeMs: validateNonNegativeNumber(snapshot.mtimeMs, `${label} mtimeMs`),
+  };
+}
+
+function validateNullableSnapshot(value: unknown, label: string): CacheFileSnapshot | null {
+  return value === null ? null : validateSnapshot(value, label);
+}
+
+function validateSchemaVersion(
+  value: unknown,
+  label: string,
+): typeof CACHE_MANIFEST_SCHEMA_VERSION {
+  if (value !== CACHE_MANIFEST_SCHEMA_VERSION) {
+    throw new Error(
+      `${label} schemaVersion must be ${CACHE_MANIFEST_SCHEMA_VERSION}, but was '${String(value)}'.`,
+    );
+  }
+
+  return CACHE_MANIFEST_SCHEMA_VERSION;
+}
+
+function validatePartitionId(value: unknown, label: string): CachePartitionDefinition['id'] {
+  if (
+    typeof value !== 'string' ||
+    !CACHE_PARTITION_IDS.has(value as CachePartitionDefinition['id'])
+  ) {
+    throw new Error(`${label} contains unsupported partition identifier '${String(value)}'.`);
+  }
+
+  return value as CachePartitionDefinition['id'];
+}
+
+function getPartitionRank(partitionId: CachePartitionDefinition['id']): number {
+  const partitionRank = CACHE_PARTITION_RANKS.get(partitionId);
+  if (partitionRank === undefined) {
+    throw new Error(`Unsupported cache partition identifier '${partitionId}'.`);
+  }
+
+  return partitionRank;
+}
+
+function validateDeltaChangeType(value: unknown, label: string): CacheDeltaEntry['changeType'] {
+  if (value !== 'added' && value !== 'modified' && value !== 'deleted') {
+    throw new Error(`${label} contains unsupported change type '${String(value)}'.`);
+  }
+
+  return value;
+}
+
+function validateCacheRelativePath(value: unknown, label: string): string {
+  return validateNormalizedRelativePosixPath(value, label, 'Gradle user home');
 }

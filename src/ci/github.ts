@@ -18,6 +18,7 @@ import * as core from '@actions/core';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 
+import { isRecord } from '../validation';
 import type { CiJobContext, CiPlatformAdapter, SummaryWriter } from './types';
 
 const METADATA_PATTERN = /^[A-Za-z0-9._/-]{0,200}$/;
@@ -291,13 +292,6 @@ function readNestedString(
   }
 
   return typeof current === 'string' && current.trim().length > 0 ? current.trim() : null;
-}
-
-/**
- * Narrow utility for guarding JSON values before object property access.
- */
-function isRecord(input: unknown): input is Record<string, unknown> {
-  return typeof input === 'object' && input !== null && !Array.isArray(input);
 }
 
 function defaultRead(eventPath: string): string {

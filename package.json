@@ -29,6 +29,7 @@
   },
   "packageManager": "npm@11.6.2",
   "dependencies": {
+    "@actions/artifact": "2.3.2",
     "@actions/cache": "6.0.0",
     "@actions/core": "3.0.0"
   },
