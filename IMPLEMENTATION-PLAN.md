@@ -294,6 +294,7 @@ implementable design.
     - Explicitly document the base cache design in the docs/ directory.
     - Explicitly document the CI abstraction layer in the docs/ directory.
     - Explicitly document the bootstrap process in the docs/ directory.
+    - All types and functions must have JSDoc comments.
 17. Need real GitHub workflows for integration testing.
     - Those workflows are not part of the action itself, but required to run integration tests.
     - Exercise a couple of real-world scenarios:
@@ -306,6 +307,7 @@ implementable design.
     - Support version tags, but only immutable tags, no "moving" tags like 'v1' or so.
 19. Enhance Gradle wrapper download validation by checking the signature (.asc extension).
     - We need to know the public GPG keys that can be used for verification.
+20. Make sure the delta artifacts are either deleted after the aggregator job has finished or after 12 hours.
 
 ## Deferred / explicitly out of scope for v1
 
