@@ -15,6 +15,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 import {
   bootstrapPhase,
@@ -22,6 +25,7 @@ import {
   createBootstrapSummaryLines,
 } from '../src/bootstrap';
 import type { SummaryWriter } from '../src/ci/types';
+import type { ValidatedWrapperPropertiesFile } from '../src/wrapper/types';
 
 const config = {
   phase: 'main',
@@ -57,23 +61,43 @@ const ciContext = {
   actionPath: '/workspace',
 } as const;
 
+const validatedWrappers: readonly ValidatedWrapperPropertiesFile[] = [
+  {
+    relativePath: 'gradle/wrapper/gradle-wrapper.properties',
+    absolutePath: '/workspace/gradle/wrapper/gradle-wrapper.properties',
+    wrapperDirectoryRelativePath: 'gradle/wrapper',
+    wrapperJarRelativePath: 'gradle/wrapper/gradle-wrapper.jar',
+    properties: {
+      distributionUrl: 'https://services.gradle.org/distributions/gradle-8.14-bin.zip',
+      distributionSha256Sum: '61ad310d3c7d3e5da131b76bbf22b5a4c0786e9d892dae8c1658d4b484de3caa',
+      validateDistributionUrl: 'true',
+    },
+    distributionUrl: 'https://services.gradle.org/distributions/gradle-8.14-bin.zip',
+    distributionSha256Sum: '61ad310d3c7d3e5da131b76bbf22b5a4c0786e9d892dae8c1658d4b484de3caa',
+  },
+] as const;
+
 describe('bootstrap helpers', () => {
   it('creates a status message with config and CI context details', () => {
-    expect(createBootstrapStatus('main', config, ciContext)).toEqual({
+    expect(createBootstrapStatus('main', config, ciContext, validatedWrappers)).toEqual({
       phase: 'main',
       config,
       ciContext,
+      validatedWrappers,
       message: 'Prepared main phase for push on main in standalone mode.',
     });
   });
 
   it('renders summary lines for the bootstrap status', () => {
-    expect(createBootstrapSummaryLines(createBootstrapStatus('main', config, ciContext))).toContain(
-      '- Job mode: standalone',
-    );
+    expect(
+      createBootstrapSummaryLines(
+        createBootstrapStatus('main', config, ciContext, validatedWrappers),
+      ),
+    ).toEqual(expect.arrayContaining(['- Job mode: standalone', '- Wrapper files: 1']));
   });
 
   it('bootstraps the main phase and publishes a summary', async () => {
+    const workspace = await createWorkspaceWithWrapper();
     const summaryLines: string[] = [];
     let writeCalls = 0;
     const summaryWriter: SummaryWriter = {
@@ -85,28 +109,56 @@ describe('bootstrap helpers', () => {
         writeCalls += 1;
       },
     };
-
-    const status = await bootstrapPhase('main', {
-      env: {
-        GITHUB_EVENT_NAME: 'push',
-        GITHUB_REF: 'refs/heads/main',
-        GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
-        GITHUB_WORKFLOW: 'CI',
-        GITHUB_JOB: 'check',
-      },
-      eventPayload: {
-        repository: { default_branch: 'main' },
-      },
-      inputProvider: {
-        getInput(): string {
-          return '';
+    try {
+      const status = await bootstrapPhase('main', {
+        env: {
+          GITHUB_EVENT_NAME: 'push',
+          GITHUB_REF: 'refs/heads/main',
+          GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
+          GITHUB_WORKFLOW: 'CI',
+          GITHUB_JOB: 'check',
+          GITHUB_WORKSPACE: workspace,
         },
-      },
-      summaryWriter,
-    });
+        eventPayload: {
+          repository: { default_branch: 'main' },
+        },
+        inputProvider: {
+          getInput(): string {
+            return '';
+          },
+        },
+        summaryWriter,
+      });
 
-    expect(status.message).toBe('Prepared main phase for push on main in standalone mode.');
-    expect(summaryLines[0]).toBe('## Cache Gradle bootstrap');
-    expect(writeCalls).toBe(1);
+      expect(status.message).toBe('Prepared main phase for push on main in standalone mode.');
+      expect(status.validatedWrappers).toHaveLength(1);
+      expect(summaryLines).toEqual(
+        expect.arrayContaining(['## Cache Gradle bootstrap', '- Wrapper files: 1']),
+      );
+      expect(writeCalls).toBe(1);
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
   });
 });
+
+async function createWorkspaceWithWrapper(): Promise<string> {
+  const workspace = await mkdtemp(path.join(os.tmpdir(), 'cache-gradle-bootstrap-'));
+  const wrapperDirectory = path.join(workspace, 'gradle', 'wrapper');
+  await mkdir(wrapperDirectory, { recursive: true });
+  await writeFile(
+    path.join(wrapperDirectory, 'gradle-wrapper.properties'),
+    [
+      'distributionBase=GRADLE_USER_HOME',
+      'distributionPath=wrapper/dists',
+      'distributionSha256Sum=61ad310d3c7d3e5da131b76bbf22b5a4c0786e9d892dae8c1658d4b484de3caa',
+      'distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14-bin.zip',
+      'validateDistributionUrl=true',
+      'zipStoreBase=GRADLE_USER_HOME',
+      'zipStorePath=wrapper/dists',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+  return workspace;
+}

@@ -69,7 +69,7 @@ export interface RawActionInputs {
 /**
  * Validated action configuration used by the rest of the implementation.
  *
- * By the time a value reaches this structure it should already be safe to consume by
+ * By the time a value reaches this structure, it should already be safe to consume by
  * later modules without repeating GitHub input parsing logic.
  */
 export interface NormalizedActionConfig {

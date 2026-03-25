@@ -241,7 +241,7 @@ function validateCacheKeyTemplate(input: string): string | null {
   }
 
   const allowedPlaceholders = new Set<string>(CACHE_KEY_TEMPLATE_PLACEHOLDERS);
-  const placeholders = [...trimmed.matchAll(/\$\{([A-Za-z0-9]+)\}/g)];
+  const placeholders = [...trimmed.matchAll(/\$\{([A-Za-z0-9]+)}/g)];
 
   for (const match of placeholders) {
     if (!allowedPlaceholders.has(match[1])) {
@@ -249,7 +249,7 @@ function validateCacheKeyTemplate(input: string): string | null {
     }
   }
 
-  const literalPortion = trimmed.replace(/\$\{([A-Za-z0-9]+)\}/g, '');
+  const literalPortion = trimmed.replace(/\$\{([A-Za-z0-9]+)}/g, '');
 
   if (!/^[A-Za-z0-9._:-]*$/.test(literalPortion)) {
     throw new Error(
@@ -261,7 +261,7 @@ function validateCacheKeyTemplate(input: string): string | null {
 }
 
 /**
- * Determines how wrapper properties should be discovered once mutually-exclusive input
+ * Determines how wrapper properties should be discovered once mutually exclusive input
  * combinations have been validated.
  */
 function determineWrapperSelectionMode(
@@ -360,7 +360,7 @@ function normalizeRelativePath(input: string, inputName: string): string {
 }
 
 /**
- * Pull requests default to read-only mode so untrusted branches do not mutate shared
+ * Pull requests default to read-only mode, so untrusted branches do not mutate the shared
  * cache state unless the caller opts in explicitly.
  */
 function defaultReadOnlyForEvent(eventName: string): boolean {
@@ -368,7 +368,7 @@ function defaultReadOnlyForEvent(eventName: string): boolean {
 }
 
 /**
- * v1 intentionally supports only the default Gradle user home so later cache logic can
+ * v1 intentionally supports only the default Gradle user home, so later cache logic can
  * make strong assumptions about on-disk layout.
  */
 function normalizeGradleUserHome(input: string, env: NodeJS.ProcessEnv | undefined): string {

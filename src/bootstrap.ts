@@ -22,6 +22,8 @@ import {
   type InputProvider,
 } from './config/action-config';
 import type { NormalizedActionConfig } from './config/types';
+import { validateTargetWrapperProperties } from './wrapper/static-validation';
+import type { ValidatedWrapperPropertiesFile } from './wrapper/types';
 
 export type BootstrapPhase = 'main' | 'post';
 
@@ -33,6 +35,7 @@ export interface BootstrapStatus {
   readonly message: string;
   readonly config: NormalizedActionConfig;
   readonly ciContext: CiJobContext;
+  readonly validatedWrappers: readonly ValidatedWrapperPropertiesFile[];
 }
 
 /**
@@ -43,7 +46,7 @@ export interface BootstrapDependencies extends GitHubPlatformOptions {
 }
 
 /**
- * Shared startup path for both the main and post action entrypoints.
+ * Shared startup path for both the main and post-action entrypoints.
  *
  * This is the only place that currently knows how to read GitHub metadata, read action
  * inputs, normalize runtime config, and publish a small job summary.
@@ -59,7 +62,11 @@ export async function bootstrapPhase(
     ciContext: platform.context,
     env: dependencies.env,
   });
-  const status = createBootstrapStatus(phase, config, platform.context);
+  const validatedWrappers =
+    phase === 'main'
+      ? await validateTargetWrapperProperties(config, platform.context.workspace)
+      : [];
+  const status = createBootstrapStatus(phase, config, platform.context, validatedWrappers);
 
   await platform.publishSummary(createBootstrapSummaryLines(status));
 
@@ -73,11 +80,13 @@ export function createBootstrapStatus(
   phase: BootstrapPhase,
   config: NormalizedActionConfig,
   ciContext: CiJobContext,
+  validatedWrappers: readonly ValidatedWrapperPropertiesFile[] = [],
 ): BootstrapStatus {
   return {
     phase,
     config,
     ciContext,
+    validatedWrappers,
     message: `Prepared ${phase} phase for ${ciContext.eventName} on ${ciContext.safeRefName} in ${config.jobMode} mode.`,
   };
 }
@@ -96,5 +105,6 @@ export function createBootstrapSummaryLines(status: BootstrapStatus): readonly s
     `- Read only: ${status.config.readOnly}`,
     `- Cache enabled: ${status.config.cacheEnabled}`,
     `- Wrapper selection: ${status.config.wrapperSelectionMode}`,
+    `- Wrapper files: ${status.validatedWrappers.length}`,
   ];
 }
