@@ -26,6 +26,7 @@ import type {
 } from './types';
 
 const DISTRIBUTION_HOST = 'services.gradle.org';
+const GRADLE_SOURCE_HOST = 'raw.githubusercontent.com';
 const DISTRIBUTION_PATH_PATTERN =
   /^\/distributions\/gradle-([0-9]+(?:\.[0-9]+){1,2})-[A-Za-z][A-Za-z0-9-]*\.zip$/u;
 const SHA256_PATTERN = /^[A-Fa-f0-9]{64}$/;
@@ -70,6 +71,10 @@ export interface WrapperProvisionOptions {
 /**
  * Maps a validated distribution URL to the remote resources needed to provision a trusted
  * wrapper JAR.
+ *
+ * Gradle publishes the wrapper JAR checksum and detached signature on `services.gradle.org`, but
+ * not the wrapper JAR bytes themselves. The actual JAR still has to be fetched from the matching
+ * Gradle source tag on GitHub and then verified against the checksum served by Gradle.
  */
 export function deriveWrapperDownloadPlan(
   wrapper: ValidatedWrapperPropertiesFile,
@@ -89,7 +94,7 @@ export function deriveWrapperDownloadPlan(
     distributionVersion,
     wrapperSourceVersion,
     wrapperChecksumUrl: `https://${DISTRIBUTION_HOST}/distributions/gradle-${distributionVersion}-wrapper.jar.sha256`,
-    wrapperJarUrl: `https://${DISTRIBUTION_HOST}/distributions/gradle-${distributionVersion}-wrapper.jar`,
+    wrapperJarUrl: `https://${GRADLE_SOURCE_HOST}/gradle/gradle/v${wrapperSourceVersion}/gradle/wrapper/gradle-wrapper.jar`,
   };
 }
 

@@ -41,13 +41,14 @@ describe('deriveWrapperDownloadPlan', () => {
           wrapperSourceVersion: '8.14.0',
           wrapperChecksumUrl:
             'https://services.gradle.org/distributions/gradle-8.14-wrapper.jar.sha256',
-          wrapperJarUrl: 'https://services.gradle.org/distributions/gradle-8.14-wrapper.jar',
+          wrapperJarUrl:
+            'https://raw.githubusercontent.com/gradle/gradle/v8.14.0/gradle/wrapper/gradle-wrapper.jar',
         });
       },
     );
   });
 
-  it('uses the Gradle distribution service for wrapper jar downloads', async () => {
+  it('preserves three-segment distribution versions for the Gradle source tag', async () => {
     await withValidatedWrappers(
       {
         'gradle/wrapper/gradle-wrapper.properties': validWrapperProperties({
@@ -56,7 +57,7 @@ describe('deriveWrapperDownloadPlan', () => {
       },
       async ([wrapper]) => {
         expect(deriveWrapperDownloadPlan(wrapper).wrapperJarUrl).toBe(
-          'https://services.gradle.org/distributions/gradle-9.4.1-wrapper.jar',
+          'https://raw.githubusercontent.com/gradle/gradle/v9.4.1/gradle/wrapper/gradle-wrapper.jar',
         );
       },
     );
@@ -81,7 +82,7 @@ describe('provisionWrapperJars', () => {
               return new Response(`${jarSha256}\n`, { status: 200 });
             }
 
-            if (url.endsWith('/gradle-8.14-wrapper.jar')) {
+            if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
               return new Response(jarBytes, { status: 200 });
             }
 
@@ -129,7 +130,7 @@ describe('provisionWrapperJars', () => {
                 : new Response(`${jarSha256}\n`, { status: 200 });
             }
 
-            if (url.endsWith('/gradle-8.14-wrapper.jar')) {
+            if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
               return new Response(jarBytes, { status: 200 });
             }
 
@@ -172,7 +173,7 @@ describe('provisionWrapperJars', () => {
               return new Response(`${jarSha256}\n`, { status: 200 });
             }
 
-            if (url.endsWith('/gradle-8.14-wrapper.jar')) {
+            if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
               jarAttempts += 1;
               return jarAttempts === 1
                 ? new Response('rate limited', {
@@ -242,7 +243,7 @@ describe('provisionWrapperJars', () => {
                 return new Response(`${'a'.repeat(64)}\n`, { status: 200 });
               }
 
-              if (url.endsWith('/gradle-8.14-wrapper.jar')) {
+              if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
                 return new Response(Buffer.from('mismatched wrapper jar'), { status: 200 });
               }
 
