@@ -28,6 +28,8 @@ describe('createGitHubContext', () => {
         GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
         GITHUB_WORKFLOW: 'CI',
         GITHUB_JOB: 'check',
+        RUNNER_OS: 'Linux',
+        RUNNER_ARCH: 'X64',
       },
       {
         repository: { default_branch: 'main' },
@@ -36,6 +38,8 @@ describe('createGitHubContext', () => {
 
     expect(context.resolvedRefName).toBe('feature/cache-improvements');
     expect(context.safeRefName).toBe('feature-cache-improvements');
+    expect(context.runnerOs).toBe('linux');
+    expect(context.runnerArch).toBe('x64');
   });
 
   it('uses the pull request base branch for pull_request events', () => {
@@ -54,6 +58,26 @@ describe('createGitHubContext', () => {
 
     expect(context.isPullRequest).toBe(true);
     expect(context.resolvedRefName).toBe('release/1.0');
+  });
+
+  it('normalizes runner metadata into cache-safe values', () => {
+    const context = createGitHubContext(
+      {
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+        RUNNER_OS: 'macOS',
+        RUNNER_ARCH: 'AMD64',
+      },
+      {
+        repository: { default_branch: 'main' },
+      },
+    );
+
+    expect(context.runnerOs).toBe('macos');
+    expect(context.runnerArch).toBe('x64');
   });
 
   it('falls back to the repository default branch for unsupported events', () => {
@@ -94,6 +118,8 @@ describe('createGitHubPlatform', () => {
         GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
         GITHUB_WORKFLOW: 'CI',
         GITHUB_JOB: 'check',
+        RUNNER_OS: 'Linux',
+        RUNNER_ARCH: 'X64',
       },
       eventPayload: {
         repository: { default_branch: 'main' },

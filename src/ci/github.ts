@@ -16,12 +16,14 @@
 
 import * as core from '@actions/core';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 
 import type { CiJobContext, CiPlatformAdapter, SummaryWriter } from './types';
 
 const METADATA_PATTERN = /^[A-Za-z0-9._/-]{0,200}$/;
 const DISPLAY_NAME_PATTERN = /^[A-Za-z0-9._ -]{0,100}$/;
 const REF_NAME_PATTERN = /^[A-Za-z0-9._/ -]{1,100}$/;
+const RUNNER_VALUE_PATTERN = /^[a-z0-9][a-z0-9._-]{0,31}$/;
 
 /**
  * Optional overrides used to build a deterministic GitHub adapter in tests.
@@ -76,6 +78,8 @@ export function createGitHubContext(
     eventName,
     resolvedRefName,
     safeRefName: sanitizeRefName(resolvedRefName),
+    runnerOs: normalizeRunnerOs(env.RUNNER_OS),
+    runnerArch: normalizeRunnerArch(env.RUNNER_ARCH),
     defaultBranch,
     isPullRequest: eventName === 'pull_request' || eventName === 'pull_request_target',
     repository: validateMetadataValue(env.GITHUB_REPOSITORY?.trim() || '', 'GITHUB_REPOSITORY'),
@@ -186,6 +190,48 @@ function sanitizeRefName(refName: string): string {
   }
 
   return safeRefName;
+}
+
+/**
+ * Normalizes the runner operating system identifier into a lower-case cache-safe value.
+ */
+function normalizeRunnerOs(input: string | undefined): string {
+  const normalizedInput = input?.trim().toLowerCase() || os.platform().toLowerCase();
+  const runnerOs =
+    normalizedInput === 'darwin' || normalizedInput === 'macos'
+      ? 'macos'
+      : normalizedInput === 'win32' || normalizedInput === 'windows'
+        ? 'windows'
+        : normalizedInput === 'linux'
+          ? 'linux'
+          : normalizedInput;
+
+  return validateRunnerValue(runnerOs, 'runner operating system');
+}
+
+/**
+ * Normalizes the runner architecture identifier into a lower-case cache-safe value.
+ */
+function normalizeRunnerArch(input: string | undefined): string {
+  const normalizedInput = input?.trim().toLowerCase() || os.arch().toLowerCase();
+  const runnerArch =
+    normalizedInput === 'x86_64' || normalizedInput === 'amd64'
+      ? 'x64'
+      : normalizedInput === 'aarch64'
+        ? 'arm64'
+        : normalizedInput === 'i386' || normalizedInput === 'i686'
+          ? 'x86'
+          : normalizedInput;
+
+  return validateRunnerValue(runnerArch, 'runner architecture');
+}
+
+function validateRunnerValue(value: string, label: string): string {
+  if (!RUNNER_VALUE_PATTERN.test(value)) {
+    throw new Error(`Resolved ${label} contains unsupported characters.`);
+  }
+
+  return value;
 }
 
 /**

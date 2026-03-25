@@ -24,6 +24,8 @@ export interface CiJobContext {
   readonly eventName: string;
   readonly resolvedRefName: string;
   readonly safeRefName: string;
+  readonly runnerOs: string;
+  readonly runnerArch: string;
   readonly defaultBranch: string;
   readonly isPullRequest: boolean;
   readonly repository: string;

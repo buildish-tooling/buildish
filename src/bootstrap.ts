@@ -16,6 +16,7 @@
 
 import { createGitHubPlatform, type GitHubPlatformOptions } from './ci/github';
 import type { CiJobContext } from './ci/types';
+import { createCacheModel, type CacheModel, type CommandOutputCapture } from './cache/model';
 import {
   normalizeActionConfig,
   readActionInputs,
@@ -36,6 +37,7 @@ export interface BootstrapStatus {
   readonly message: string;
   readonly config: NormalizedActionConfig;
   readonly ciContext: CiJobContext;
+  readonly cacheModel: CacheModel | null;
   readonly validatedWrappers: readonly ValidatedWrapperPropertiesFile[];
   readonly provisionedWrappers: readonly ProvisionedWrapperJar[];
 }
@@ -46,6 +48,7 @@ export interface BootstrapStatus {
 export interface BootstrapDependencies extends GitHubPlatformOptions {
   readonly inputProvider?: InputProvider;
   readonly fetchImpl?: typeof fetch;
+  readonly captureCommandOutput?: CommandOutputCapture;
 }
 
 /**
@@ -65,6 +68,12 @@ export async function bootstrapPhase(
     ciContext: platform.context,
     env: dependencies.env,
   });
+  const cacheModel = config.cacheEnabled
+    ? await createCacheModel(config, platform.context, {
+        captureCommandOutput: dependencies.captureCommandOutput,
+        env: dependencies.env,
+      })
+    : null;
   const validatedWrappers =
     phase === 'main'
       ? await validateTargetWrapperProperties(config, platform.context.workspace)
@@ -77,6 +86,7 @@ export async function bootstrapPhase(
     phase,
     config,
     platform.context,
+    cacheModel,
     validatedWrappers,
     provisionedWrappers,
   );
@@ -93,6 +103,7 @@ export function createBootstrapStatus(
   phase: BootstrapPhase,
   config: NormalizedActionConfig,
   ciContext: CiJobContext,
+  cacheModel: CacheModel | null = null,
   validatedWrappers: readonly ValidatedWrapperPropertiesFile[] = [],
   provisionedWrappers: readonly ProvisionedWrapperJar[] = [],
 ): BootstrapStatus {
@@ -100,6 +111,7 @@ export function createBootstrapStatus(
     phase,
     config,
     ciContext,
+    cacheModel,
     validatedWrappers,
     provisionedWrappers,
     message: `Prepared ${phase} phase for ${ciContext.eventName} on ${ciContext.safeRefName} in ${config.jobMode} mode.`,
@@ -116,9 +128,13 @@ export function createBootstrapSummaryLines(status: BootstrapStatus): readonly s
     `- Event: ${status.ciContext.eventName}`,
     `- Ref: ${status.ciContext.resolvedRefName}`,
     `- Safe ref: ${status.ciContext.safeRefName}`,
+    `- Runner: ${status.ciContext.runnerOs}/${status.ciContext.runnerArch}`,
     `- Job mode: ${status.config.jobMode}`,
     `- Read only: ${status.config.readOnly}`,
     `- Cache enabled: ${status.config.cacheEnabled}`,
+    `- Cache key: ${status.cacheModel?.cacheKey ?? 'disabled'}`,
+    `- Java major: ${status.cacheModel?.javaMajor ?? 'n/a'}`,
+    `- Cache partitions: ${status.cacheModel?.partitions.length ?? 0}`,
     `- Wrapper selection: ${status.config.wrapperSelectionMode}`,
     `- Wrapper files: ${status.validatedWrappers.length}`,
     `- Wrapper JARs ready: ${status.provisionedWrappers.length}`,

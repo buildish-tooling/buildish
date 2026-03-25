@@ -25,6 +25,7 @@ import {
   createBootstrapStatus,
   createBootstrapSummaryLines,
 } from '../src/bootstrap';
+import type { CacheModel } from '../src/cache/model';
 import type { SummaryWriter } from '../src/ci/types';
 import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from '../src/wrapper/types';
 
@@ -51,6 +52,8 @@ const ciContext = {
   eventName: 'push',
   resolvedRefName: 'main',
   safeRefName: 'main',
+  runnerOs: 'linux',
+  runnerArch: 'x64',
   defaultBranch: 'main',
   isPullRequest: false,
   repository: 'projectnessie/cache-gradle',
@@ -78,6 +81,27 @@ const validatedWrappers: readonly ValidatedWrapperPropertiesFile[] = [
   },
 ] as const;
 
+const cacheModel: CacheModel = {
+  cacheKey: 'gradle-cache-1-21-linux-x64-main',
+  javaMajor: 21,
+  runnerOs: 'linux',
+  runnerArch: 'x64',
+  safeRefName: 'main',
+  includePaths: ['/home/runner/.gradle/caches/modules-2/**'],
+  excludePaths: ['/home/runner/.gradle/**/configuration-cache/**'],
+  partitions: [
+    {
+      id: 'modules',
+      displayName: 'Dependency modules',
+      description: 'Downloaded dependency metadata and artifact stores shared across builds.',
+      relativeIncludeGlobs: ['caches/modules-2/**'],
+      relativeExcludeGlobs: ['**/configuration-cache/**'],
+      absoluteIncludeGlobs: ['/home/runner/.gradle/caches/modules-2/**'],
+      absoluteExcludeGlobs: ['/home/runner/.gradle/**/configuration-cache/**'],
+    },
+  ],
+};
+
 const provisionedWrappers: readonly ProvisionedWrapperJar[] = [
   {
     relativePath: 'gradle/wrapper/gradle-wrapper.properties',
@@ -96,11 +120,19 @@ const provisionedWrappers: readonly ProvisionedWrapperJar[] = [
 describe('bootstrap helpers', () => {
   it('creates a status message with config and CI context details', () => {
     expect(
-      createBootstrapStatus('main', config, ciContext, validatedWrappers, provisionedWrappers),
+      createBootstrapStatus(
+        'main',
+        config,
+        ciContext,
+        cacheModel,
+        validatedWrappers,
+        provisionedWrappers,
+      ),
     ).toEqual({
       phase: 'main',
       config,
       ciContext,
+      cacheModel,
       validatedWrappers,
       provisionedWrappers,
       message: 'Prepared main phase for push on main in standalone mode.',
@@ -110,10 +142,19 @@ describe('bootstrap helpers', () => {
   it('renders summary lines for the bootstrap status', () => {
     expect(
       createBootstrapSummaryLines(
-        createBootstrapStatus('main', config, ciContext, validatedWrappers, provisionedWrappers),
+        createBootstrapStatus(
+          'main',
+          config,
+          ciContext,
+          cacheModel,
+          validatedWrappers,
+          provisionedWrappers,
+        ),
       ),
     ).toEqual(
       expect.arrayContaining([
+        '- Cache key: gradle-cache-1-21-linux-x64-main',
+        '- Cache partitions: 1',
         '- Job mode: standalone',
         '- Wrapper files: 1',
         '- Wrapper JARs ready: 1',
@@ -144,10 +185,13 @@ describe('bootstrap helpers', () => {
           GITHUB_WORKFLOW: 'CI',
           GITHUB_JOB: 'check',
           GITHUB_WORKSPACE: workspace,
+          RUNNER_OS: 'Linux',
+          RUNNER_ARCH: 'X64',
         },
         eventPayload: {
           repository: { default_branch: 'main' },
         },
+        captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         fetchImpl: async (input: string | URL | Request): Promise<Response> => {
           const url = String(input);
 
@@ -170,11 +214,14 @@ describe('bootstrap helpers', () => {
       });
 
       expect(status.message).toBe('Prepared main phase for push on main in standalone mode.');
+      expect(status.cacheModel?.cacheKey).toBe('gradle-cache-1-21-linux-x64-main');
       expect(status.validatedWrappers).toHaveLength(1);
       expect(status.provisionedWrappers).toHaveLength(1);
       expect(summaryLines).toEqual(
         expect.arrayContaining([
           '## Cache Gradle bootstrap',
+          '- Cache key: gradle-cache-1-21-linux-x64-main',
+          '- Java major: 21',
           '- Wrapper files: 1',
           '- Wrapper JARs ready: 1',
         ]),

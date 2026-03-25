@@ -28,6 +28,8 @@ const baseCiContext: CiJobContext = {
   eventName: 'push',
   resolvedRefName: 'main',
   safeRefName: 'main',
+  runnerOs: 'linux',
+  runnerArch: 'x64',
   defaultBranch: 'main',
   isPullRequest: false,
   repository: 'projectnessie/cache-gradle',
