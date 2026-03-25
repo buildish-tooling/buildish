@@ -276,7 +276,7 @@ implementable design.
 9. Artifact exchange layer
    - Package deltas, generate unique names, upload/download artifacts, and verify archive contents.
 10. Delta merge/apply engine
-    - Apply dependent deltas in declared order and fail on conflicting file content.
+    - Apply dependent deltas in declared order and emit a warning, logged in the job summary, on conflicting file content.
 11. Main action flow
     - Wire together validation, wrapper provisioning, cache restore, dependent delta download, and state save.
 12. Post action flow
