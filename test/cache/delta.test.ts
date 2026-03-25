@@ -14,13 +14,26 @@
  * limitations under the License.
  */
 
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile,
+} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type DownloadedDeltaArtifactPackage, stageDeltaArtifactPackage } from '../../src/artifacts/service';
+import {
+  type DownloadedDeltaArtifactPackage,
+  stageDeltaArtifactPackage,
+} from '../../src/artifacts/service';
 import { applyMergedDeltaPlan, mergeDeltaArtifactPackages } from '../../src/cache/delta';
 import { captureCacheManifest, computeCacheDelta } from '../../src/cache/manifest';
 import { createCachePartitions, type CacheModel } from '../../src/cache/model';
@@ -39,14 +52,25 @@ describe('cache delta merge/apply engine', () => {
   });
 
   it('merges ordered delta packages and applies them to a Gradle user home', async () => {
-    const packageA = await createDownloadedPackage(temporaryDirectories, 'Worker A', async (home) => {
-      await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'after-a');
-    });
-    const packageB = await createDownloadedPackage(temporaryDirectories, 'Worker B', async (home) => {
-      await writeGradleFile(home, 'caches/build-cache-1/output.bin', 'build-output');
-      await rm(path.join(home, 'wrapper/dists/gradle-8.10/bin.zip'));
-    });
-    const targetGradleUserHome = await createGradleUserHome(temporaryDirectories, 'cache-gradle-apply-');
+    const packageA = await createDownloadedPackage(
+      temporaryDirectories,
+      'Worker A',
+      async (home) => {
+        await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'after-a');
+      },
+    );
+    const packageB = await createDownloadedPackage(
+      temporaryDirectories,
+      'Worker B',
+      async (home) => {
+        await writeGradleFile(home, 'caches/build-cache-1/output.bin', 'build-output');
+        await rm(path.join(home, 'wrapper/dists/gradle-8.10/bin.zip'));
+      },
+    );
+    const targetGradleUserHome = await createGradleUserHome(
+      temporaryDirectories,
+      'cache-gradle-apply-',
+    );
     await seedBaseGradleUserHome(targetGradleUserHome);
 
     const plan = mergeDeltaArtifactPackages([packageA, packageB]);
@@ -57,23 +81,38 @@ describe('cache delta merge/apply engine', () => {
         .filter((partition) => partition.entries.length > 0)
         .map((partition) => partition.partitionId),
     ).toEqual(['modules', 'build-cache', 'wrapper-dists']);
-    expect(result).toMatchObject({ addedCount: 1, modifiedCount: 1, deletedCount: 1, warnings: [] });
+    expect(result).toMatchObject({
+      addedCount: 1,
+      modifiedCount: 1,
+      deletedCount: 1,
+      warnings: [],
+    });
     await expect(
       readFile(path.join(targetGradleUserHome, 'caches/modules-2/files-2.1/example.jar'), 'utf8'),
     ).resolves.toBe('after-a');
     await expect(
       readFile(path.join(targetGradleUserHome, 'caches/build-cache-1/output.bin'), 'utf8'),
     ).resolves.toBe('build-output');
-    await expect(stat(path.join(targetGradleUserHome, 'wrapper/dists/gradle-8.10/bin.zip'))).rejects.toThrow();
+    await expect(
+      stat(path.join(targetGradleUserHome, 'wrapper/dists/gradle-8.10/bin.zip')),
+    ).rejects.toThrow();
   });
 
   it('fails hard when dependent deltas change the same file to different content', async () => {
-    const packageA = await createDownloadedPackage(temporaryDirectories, 'Worker A', async (home) => {
-      await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'after-a');
-    });
-    const packageB = await createDownloadedPackage(temporaryDirectories, 'Worker B', async (home) => {
-      await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'after-b');
-    });
+    const packageA = await createDownloadedPackage(
+      temporaryDirectories,
+      'Worker A',
+      async (home) => {
+        await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'after-a');
+      },
+    );
+    const packageB = await createDownloadedPackage(
+      temporaryDirectories,
+      'Worker B',
+      async (home) => {
+        await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'after-b');
+      },
+    );
 
     expect(() => mergeDeltaArtifactPackages([packageA, packageB])).toThrow(
       /Conflicting dependent deltas.*example.jar/u,
@@ -81,24 +120,41 @@ describe('cache delta merge/apply engine', () => {
   });
 
   it('allows identical overlapping content from multiple dependent deltas', async () => {
-    const packageA = await createDownloadedPackage(temporaryDirectories, 'Worker A', async (home) => {
-      await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'same-after');
-    });
-    const packageB = await createDownloadedPackage(temporaryDirectories, 'Worker B', async (home) => {
-      await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'same-after');
-    });
+    const packageA = await createDownloadedPackage(
+      temporaryDirectories,
+      'Worker A',
+      async (home) => {
+        await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'same-after');
+      },
+    );
+    const packageB = await createDownloadedPackage(
+      temporaryDirectories,
+      'Worker B',
+      async (home) => {
+        await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'same-after');
+      },
+    );
 
     const plan = mergeDeltaArtifactPackages([packageA, packageB]);
     expect(plan.payloads).toHaveLength(1);
-    expect(plan.deltaManifest.partitions.find((partition) => partition.partitionId === 'modules')?.entries)
-      .toHaveLength(1);
+    expect(
+      plan.deltaManifest.partitions.find((partition) => partition.partitionId === 'modules')
+        ?.entries,
+    ).toHaveLength(1);
   });
 
   it('warns and falls back to preserving only mtime when atime restoration fails', async () => {
-    const packageA = await createDownloadedPackage(temporaryDirectories, 'Worker A', async (home) => {
-      await writeGradleFile(home, 'caches/build-cache-1/output.bin', 'build-output');
-    });
-    const targetGradleUserHome = await createGradleUserHome(temporaryDirectories, 'cache-gradle-times-');
+    const packageA = await createDownloadedPackage(
+      temporaryDirectories,
+      'Worker A',
+      async (home) => {
+        await writeGradleFile(home, 'caches/build-cache-1/output.bin', 'build-output');
+      },
+    );
+    const targetGradleUserHome = await createGradleUserHome(
+      temporaryDirectories,
+      'cache-gradle-times-',
+    );
     const basePlan = mergeDeltaArtifactPackages([packageA]);
     const plan = {
       ...basePlan,
@@ -118,8 +174,8 @@ describe('cache delta merge/apply engine', () => {
       },
     };
     const expectedMtimeMs =
-      plan.deltaManifest.partitions.find((partition) => partition.partitionId === 'build-cache')?.entries[0]
-        ?.current?.mtimeMs ?? 0;
+      plan.deltaManifest.partitions.find((partition) => partition.partitionId === 'build-cache')
+        ?.entries[0]?.current?.mtimeMs ?? 0;
     const setTimes = vi.fn(async (filePath: string, atime: Date, mtime: Date) => {
       if (atime.getTime() !== mtime.getTime()) {
         throw new Error('atime not supported');
@@ -128,7 +184,9 @@ describe('cache delta merge/apply engine', () => {
     });
 
     const result = await applyMergedDeltaPlan(plan, targetGradleUserHome, { setTimes });
-    const fileStats = await stat(path.join(targetGradleUserHome, 'caches/build-cache-1/output.bin'));
+    const fileStats = await stat(
+      path.join(targetGradleUserHome, 'caches/build-cache-1/output.bin'),
+    );
 
     expect(result.warnings).toEqual([
       "Could not fully restore access time for 'caches/build-cache-1/output.bin'; preserved modification time only.",
@@ -138,17 +196,24 @@ describe('cache delta merge/apply engine', () => {
   });
 
   it('rejects existing symbolic-link targets during apply', async () => {
-    const packageA = await createDownloadedPackage(temporaryDirectories, 'Worker A', async (home) => {
-      await writeGradleFile(home, 'caches/build-cache-1/output.bin', 'build-output');
-    });
-    const targetGradleUserHome = await createGradleUserHome(temporaryDirectories, 'cache-gradle-symlink-');
+    const packageA = await createDownloadedPackage(
+      temporaryDirectories,
+      'Worker A',
+      async (home) => {
+        await writeGradleFile(home, 'caches/build-cache-1/output.bin', 'build-output');
+      },
+    );
+    const targetGradleUserHome = await createGradleUserHome(
+      temporaryDirectories,
+      'cache-gradle-symlink-',
+    );
     const targetPath = path.join(targetGradleUserHome, 'caches/build-cache-1/output.bin');
     await mkdir(path.dirname(targetPath), { recursive: true });
     await symlink('/tmp/escape', targetPath);
 
-    await expect(applyMergedDeltaPlan(mergeDeltaArtifactPackages([packageA]), targetGradleUserHome)).rejects.toThrow(
-      /must not be a symbolic link/u,
-    );
+    await expect(
+      applyMergedDeltaPlan(mergeDeltaArtifactPackages([packageA]), targetGradleUserHome),
+    ).rejects.toThrow(/must not be a symbolic link/u);
   });
 });
 
@@ -170,7 +235,12 @@ async function createDownloadedPackage(
     createFixtureCiContext(jobName),
     cacheModel,
     deltaManifest,
-    { parentDirectory: await createTempDirectory(temporaryDirectories, 'cache-gradle-stage-parent-') },
+    {
+      parentDirectory: await createTempDirectory(
+        temporaryDirectories,
+        'cache-gradle-stage-parent-',
+      ),
+    },
   );
 
   return {

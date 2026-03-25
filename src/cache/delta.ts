@@ -82,7 +82,10 @@ export function mergeDeltaArtifactPackages(
   const expectedPartitionIds = packages[0]!.deltaManifest.partitions.map(
     (partition) => partition.partitionId,
   );
-  const mergedByPartition = new Map<CachePartitionDefinition['id'], Map<string, MergedDeltaState>>();
+  const mergedByPartition = new Map<
+    CachePartitionDefinition['id'],
+    Map<string, MergedDeltaState>
+  >();
 
   for (const artifactPackage of packages) {
     assertPortableDeltaPackage(artifactPackage, expectedPartitionIds);
@@ -90,13 +93,12 @@ export function mergeDeltaArtifactPackages(
 
     for (const partition of artifactPackage.deltaManifest.partitions) {
       const partitionEntries =
-        mergedByPartition.get(partition.partitionId) ??
-        new Map<string, MergedDeltaState>();
+        mergedByPartition.get(partition.partitionId) ?? new Map<string, MergedDeltaState>();
       mergedByPartition.set(partition.partitionId, partitionEntries);
 
       for (const entry of partition.entries) {
         const candidatePayloadPath =
-          entry.changeType === 'deleted' ? null : payloads.get(entry.relativePath) ?? null;
+          entry.changeType === 'deleted' ? null : (payloads.get(entry.relativePath) ?? null);
         if (entry.changeType !== 'deleted' && !candidatePayloadPath) {
           throw new Error(
             `Downloaded delta artifact '${artifactPackage.artifact.name}' is missing payload metadata for '${entry.relativePath}'.`,
@@ -183,7 +185,9 @@ export async function applyMergedDeltaPlan(
 
       const currentSnapshot = entry.current;
       if (!currentSnapshot) {
-        throw new Error(`Merged delta entry '${entry.relativePath}' is missing its current snapshot.`);
+        throw new Error(
+          `Merged delta entry '${entry.relativePath}' is missing its current snapshot.`,
+        );
       }
 
       const payload = payloads.get(entry.relativePath);
@@ -198,7 +202,12 @@ export async function applyMergedDeltaPlan(
         entry.relativePath,
         currentSnapshot,
       );
-      const timestampWarning = await restoreFileTimestamps(targetPath, entry.relativePath, currentSnapshot, setTimes);
+      const timestampWarning = await restoreFileTimestamps(
+        targetPath,
+        entry.relativePath,
+        currentSnapshot,
+        setTimes,
+      );
       if (timestampWarning) {
         warnings.push(timestampWarning);
       }
@@ -264,7 +273,12 @@ function areMergeCompatible(left: CacheDeltaEntry, right: CacheDeltaEntry): bool
     return areSnapshotsEquivalent(left.current, right.current);
   }
 
-  if (!left.current && !right.current && left.changeType === 'deleted' && right.changeType === 'deleted') {
+  if (
+    !left.current &&
+    !right.current &&
+    left.changeType === 'deleted' &&
+    right.changeType === 'deleted'
+  ) {
     return left.previous !== null && right.previous !== null
       ? areSnapshotsEquivalent(left.previous, right.previous)
       : false;
@@ -295,7 +309,10 @@ async function writePayloadAtomically(
 ): Promise<void> {
   await ensureDirectoryPath(gradleUserHome, path.posix.dirname(relativePath));
   await assertReplaceableFile(targetPath, relativePath);
-  const temporaryPath = path.join(path.dirname(targetPath), `.cache-gradle-delta.${randomUUID()}.tmp`);
+  const temporaryPath = path.join(
+    path.dirname(targetPath),
+    `.cache-gradle-delta.${randomUUID()}.tmp`,
+  );
 
   try {
     await copyAndVerifyPayload(payloadPath, temporaryPath, relativePath, expectedSnapshot);
@@ -352,7 +369,10 @@ async function copyAndVerifyPayload(
     throw new Error(`Delta payload '${relativePath}' changed while it was being applied.`);
   }
 
-  if (copiedBytes !== expectedSnapshot.size || hash.digest('hex') !== expectedSnapshot.contentSha256) {
+  if (
+    copiedBytes !== expectedSnapshot.size ||
+    hash.digest('hex') !== expectedSnapshot.contentSha256
+  ) {
     throw new Error(`Delta payload '${relativePath}' does not match the expected snapshot.`);
   }
 }
@@ -427,7 +447,10 @@ async function assertReplaceableFile(targetPath: string, relativePath: string): 
   }
 }
 
-async function ensureDirectoryPath(directoryPath: string, relativeDirectory: string): Promise<void> {
+async function ensureDirectoryPath(
+  directoryPath: string,
+  relativeDirectory: string,
+): Promise<void> {
   await verifyDirectoryPath(directoryPath, relativeDirectory, true);
 }
 
@@ -436,7 +459,8 @@ async function verifyDirectoryPath(
   relativeDirectory: string,
   createMissing: boolean,
 ): Promise<void> {
-  const segments = relativeDirectory === '.' || relativeDirectory.length === 0 ? [] : relativeDirectory.split('/');
+  const segments =
+    relativeDirectory === '.' || relativeDirectory.length === 0 ? [] : relativeDirectory.split('/');
   let currentPath = path.resolve(directoryPath);
 
   const rootStats = await lstat(currentPath).catch((error: unknown) => {
@@ -478,7 +502,9 @@ async function verifyDirectoryPath(
       throw new Error(`Merged delta directory '${relativeDirectory}' contains a symbolic link.`);
     }
     if (!stats.isDirectory()) {
-      throw new Error(`Merged delta directory '${relativeDirectory}' contains a non-directory path.`);
+      throw new Error(
+        `Merged delta directory '${relativeDirectory}' contains a non-directory path.`,
+      );
     }
   }
 }

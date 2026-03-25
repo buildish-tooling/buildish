@@ -33,7 +33,7 @@ import {
   type InputProvider,
 } from './config/action-config';
 import type { NormalizedActionConfig } from './config/types';
-import { provisionWrapperJars } from './wrapper/download';
+import { provisionWrapperJars, type WrapperProvisionOptions } from './wrapper/download';
 import { validateTargetWrapperProperties } from './wrapper/static-validation';
 import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from './wrapper/types';
 
@@ -118,6 +118,12 @@ export interface BootstrapDependencies extends GitHubPlatformOptions {
    */
   readonly logInfo?: (message: string) => void;
   /**
+   * Optional detached-signature verifier override used by focused wrapper tests.
+   *
+   * Defaults to the pinned Gradle signing-key verifier when omitted.
+   */
+  readonly verifyWrapperSignature?: WrapperProvisionOptions['verifyWrapperSignature'];
+  /**
    * Optional post-action state writer override.
    *
    * Defaults to `@actions/core.saveState` when omitted.
@@ -167,6 +173,7 @@ export async function bootstrapPhase(
           fetchImpl: dependencies.fetchImpl,
           httpHeadersByHost: platform.httpHeadersByHost,
           logRetry: dependencies.logInfo ?? core.info,
+          verifyWrapperSignature: dependencies.verifyWrapperSignature,
         })
       : [];
   const baseCacheResult = await runBaseCachePhase(phase, config, cacheModel, dependencies);

@@ -42,6 +42,8 @@ describe('deriveWrapperDownloadPlan', () => {
           wrapperSourceVersion: '8.14.0',
           wrapperChecksumUrl:
             'https://services.gradle.org/distributions/gradle-8.14-wrapper.jar.sha256',
+          wrapperSignatureUrl:
+            'https://services.gradle.org/distributions/gradle-8.14-wrapper.jar.asc',
           wrapperJarUrl:
             'https://raw.githubusercontent.com/gradle/gradle/v8.14.0/gradle/wrapper/gradle-wrapper.jar',
         });
@@ -74,6 +76,7 @@ describe('provisionWrapperJars', () => {
       async ([wrapper]) => {
         const jarBytes = Buffer.from('verified wrapper jar');
         const jarSha256 = sha256(jarBytes);
+        const verifyWrapperSignature = vi.fn(async () => {});
 
         const provisioned = await provisionWrapperJars([wrapper], {
           fetchImpl: async (input: string | URL | Request): Promise<Response> => {
@@ -83,12 +86,17 @@ describe('provisionWrapperJars', () => {
               return new Response(`${jarSha256}\n`, { status: 200 });
             }
 
+            if (url.endsWith('gradle-8.14-wrapper.jar.asc')) {
+              return new Response(TEST_SIGNATURE_ARMORED, { status: 200 });
+            }
+
             if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
               return new Response(jarBytes, { status: 200 });
             }
 
             throw new Error(`Unexpected fetch URL: ${url}`);
           },
+          verifyWrapperSignature,
         });
 
         expect(provisioned).toHaveLength(1);
@@ -98,6 +106,17 @@ describe('provisionWrapperJars', () => {
           expectedWrapperJarSha256: jarSha256,
           wasDownloaded: true,
         });
+        expect(verifyWrapperSignature).toHaveBeenCalledOnce();
+        const verifiedCall = verifyWrapperSignature.mock.calls[0] as unknown as
+          | [Uint8Array, string, { readonly relativePath: string }]
+          | undefined;
+        expect(verifiedCall).toBeDefined();
+        const [verifiedJarBytes, verifiedSignature, verifiedPlan] = verifiedCall!;
+        expect(Buffer.from(verifiedJarBytes)).toEqual(jarBytes);
+        expect(verifiedSignature).toBe(TEST_SIGNATURE_ARMORED);
+        expect(verifiedPlan).toEqual(
+          expect.objectContaining({ relativePath: wrapper.relativePath }),
+        );
         await expect(
           readFile(path.join(path.dirname(wrapper.absolutePath), 'gradle-wrapper.jar')),
         ).resolves.toEqual(jarBytes);
@@ -113,12 +132,18 @@ describe('provisionWrapperJars', () => {
       async ([wrapper]) => {
         const jarBytes = Buffer.from('verified wrapper jar');
         const jarSha256 = sha256(jarBytes);
+        const verifyWrapperSignature = vi.fn(async () => {});
         const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
           const url = String(input);
 
           if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
             expect(init).toBeUndefined();
             return new Response(`${jarSha256}\n`, { status: 200 });
+          }
+
+          if (url.endsWith('gradle-8.14-wrapper.jar.asc')) {
+            expect(init).toBeUndefined();
+            return new Response(TEST_SIGNATURE_ARMORED, { status: 200 });
           }
 
           if (
@@ -142,10 +167,103 @@ describe('provisionWrapperJars', () => {
             authorization: 'Bearer ghs_test_token',
             'x-github-api-version': '2022-11-28',
           }),
+          verifyWrapperSignature,
         });
 
         expect(provisioned[0]?.wasDownloaded).toBe(true);
+        expect(fetchImpl).toHaveBeenCalledTimes(3);
+        expect(verifyWrapperSignature).toHaveBeenCalledOnce();
+      },
+    );
+  });
+
+  it('verifies a pre-existing wrapper jar with the detached signature when the checksum already matches', async () => {
+    await withValidatedWrappers(
+      {
+        'gradle/wrapper/gradle-wrapper.properties': validWrapperProperties(),
+      },
+      async ([wrapper]) => {
+        const jarBytes = Buffer.from('already present wrapper jar');
+        const jarSha256 = sha256(jarBytes);
+        const verifyWrapperSignature = vi.fn(async () => {});
+
+        await writeFile(
+          path.join(path.dirname(wrapper.absolutePath), 'gradle-wrapper.jar'),
+          jarBytes,
+        );
+
+        const fetchImpl = vi.fn(async (input: string | URL | Request): Promise<Response> => {
+          const url = String(input);
+
+          if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
+            return new Response(`${jarSha256}\n`, { status: 200 });
+          }
+
+          if (url.endsWith('gradle-8.14-wrapper.jar.asc')) {
+            return new Response(TEST_SIGNATURE_ARMORED, { status: 200 });
+          }
+
+          throw new Error(`Unexpected fetch URL: ${url}`);
+        });
+
+        const provisioned = await provisionWrapperJars([wrapper], {
+          fetchImpl,
+          verifyWrapperSignature,
+        });
+
+        expect(provisioned[0]?.wasDownloaded).toBe(false);
         expect(fetchImpl).toHaveBeenCalledTimes(2);
+        expect(verifyWrapperSignature).toHaveBeenCalledOnce();
+        const verifiedCall = verifyWrapperSignature.mock.calls[0] as unknown as
+          | [Uint8Array, string, { readonly relativePath: string }]
+          | undefined;
+        expect(verifiedCall).toBeDefined();
+        const [verifiedJarBytes, verifiedSignature, verifiedPlan] = verifiedCall!;
+        expect(Buffer.from(verifiedJarBytes)).toEqual(jarBytes);
+        expect(verifiedSignature).toBe(TEST_SIGNATURE_ARMORED);
+        expect(verifiedPlan).toEqual(
+          expect.objectContaining({ relativePath: wrapper.relativePath }),
+        );
+      },
+    );
+  });
+
+  it('rejects detached signature verification failures and leaves no temporary files behind', async () => {
+    await withValidatedWrappers(
+      {
+        'gradle/wrapper/gradle-wrapper.properties': validWrapperProperties(),
+      },
+      async ([wrapper]) => {
+        const wrapperDirectory = path.dirname(wrapper.absolutePath);
+        const jarBytes = Buffer.from('verified wrapper jar');
+        const jarSha256 = sha256(jarBytes);
+
+        await expect(
+          provisionWrapperJars([wrapper], {
+            fetchImpl: async (input: string | URL | Request): Promise<Response> => {
+              const url = String(input);
+
+              if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
+                return new Response(`${jarSha256}\n`, { status: 200 });
+              }
+
+              if (url.endsWith('gradle-8.14-wrapper.jar.asc')) {
+                return new Response(TEST_SIGNATURE_ARMORED, { status: 200 });
+              }
+
+              if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
+                return new Response(jarBytes, { status: 200 });
+              }
+
+              throw new Error(`Unexpected fetch URL: ${url}`);
+            },
+            verifyWrapperSignature: async () => {
+              throw new Error('detached signature mismatch');
+            },
+          }),
+        ).rejects.toThrow(/detached signature mismatch/);
+
+        expect(await readdir(wrapperDirectory)).toEqual(['gradle-wrapper.properties']);
       },
     );
   });
@@ -160,6 +278,7 @@ describe('provisionWrapperJars', () => {
         const jarSha256 = sha256(jarBytes);
         const logRetry = vi.fn();
         const sleep = vi.fn(async (_milliseconds: number) => {});
+        const verifyWrapperSignature = vi.fn(async () => {});
         let checksumAttempts = 0;
 
         const provisioned = await provisionWrapperJars([wrapper], {
@@ -176,12 +295,17 @@ describe('provisionWrapperJars', () => {
                 : new Response(`${jarSha256}\n`, { status: 200 });
             }
 
+            if (url.endsWith('gradle-8.14-wrapper.jar.asc')) {
+              return new Response(TEST_SIGNATURE_ARMORED, { status: 200 });
+            }
+
             if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
               return new Response(jarBytes, { status: 200 });
             }
 
             throw new Error(`Unexpected fetch URL: ${url}`);
           },
+          verifyWrapperSignature,
         });
 
         expect(provisioned[0]?.wasDownloaded).toBe(true);
@@ -206,6 +330,7 @@ describe('provisionWrapperJars', () => {
         const jarSha256 = sha256(jarBytes);
         const logRetry = vi.fn();
         const sleep = vi.fn(async (_milliseconds: number) => {});
+        const verifyWrapperSignature = vi.fn(async () => {});
         let jarAttempts = 0;
 
         const provisioned = await provisionWrapperJars([wrapper], {
@@ -217,6 +342,10 @@ describe('provisionWrapperJars', () => {
 
             if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
               return new Response(`${jarSha256}\n`, { status: 200 });
+            }
+
+            if (url.endsWith('gradle-8.14-wrapper.jar.asc')) {
+              return new Response(TEST_SIGNATURE_ARMORED, { status: 200 });
             }
 
             if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
@@ -231,6 +360,7 @@ describe('provisionWrapperJars', () => {
 
             throw new Error(`Unexpected fetch URL: ${url}`);
           },
+          verifyWrapperSignature,
         });
 
         expect(provisioned[0]?.wasDownloaded).toBe(true);
@@ -265,7 +395,7 @@ describe('provisionWrapperJars', () => {
           }),
         ).rejects.toThrow(/404 Not Found/);
 
-        expect(fetchImpl).toHaveBeenCalledOnce();
+        expect(fetchImpl).toHaveBeenCalledTimes(2);
         expect(logRetry).not.toHaveBeenCalled();
         expect(sleep).not.toHaveBeenCalled();
       },
@@ -287,6 +417,10 @@ describe('provisionWrapperJars', () => {
 
               if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
                 return new Response(`${'a'.repeat(64)}\n`, { status: 200 });
+              }
+
+              if (url.endsWith('gradle-8.14-wrapper.jar.asc')) {
+                return new Response(TEST_SIGNATURE_ARMORED, { status: 200 });
               }
 
               if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
@@ -372,9 +506,13 @@ function sha256(contents: Uint8Array): string {
   return createHash('sha256').update(contents).digest('hex');
 }
 
-function createHttpHeadersByHost(
-  host: string,
-  headers: Record<string, string>,
-): HttpHeadersByHost {
+const TEST_SIGNATURE_ARMORED = `-----BEGIN PGP SIGNATURE-----
+Version: test
+
+ZmFrZQ==
+=abcd
+-----END PGP SIGNATURE-----`;
+
+function createHttpHeadersByHost(host: string, headers: Record<string, string>): HttpHeadersByHost {
   return new Map([[host, new Map(Object.entries(headers))]]);
 }

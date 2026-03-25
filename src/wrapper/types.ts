@@ -63,6 +63,8 @@ export interface WrapperDownloadPlan {
   readonly wrapperSourceVersion: string;
   /** Absolute HTTPS URL for the authoritative wrapper JAR checksum file. */
   readonly wrapperChecksumUrl: string;
+  /** Absolute HTTPS URL for the authoritative wrapper JAR detached signature file. */
+  readonly wrapperSignatureUrl: string;
   /** Absolute HTTPS URL for the authoritative wrapper JAR download. */
   readonly wrapperJarUrl: string;
 }

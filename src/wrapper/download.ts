@@ -20,6 +20,7 @@ import path from 'node:path';
 import { setTimeout as sleepTimeout } from 'node:timers/promises';
 
 import type { HttpHeadersByHost } from '../ci/types';
+import { verifyGradleDetachedSignature } from './signature';
 import type {
   ProvisionedWrapperJar,
   ValidatedWrapperPropertiesFile,
@@ -29,8 +30,7 @@ import type {
 const DISTRIBUTION_HOST = 'services.gradle.org';
 const GITHUB_API_HOST = 'api.github.com';
 const GRADLE_SOURCE_HOST = 'raw.githubusercontent.com';
-const GRADLE_SOURCE_API_BASE_URL =
-  `https://${GITHUB_API_HOST}/repos/gradle/gradle/contents/gradle/wrapper/gradle-wrapper.jar`;
+const GRADLE_SOURCE_API_BASE_URL = `https://${GITHUB_API_HOST}/repos/gradle/gradle/contents/gradle/wrapper/gradle-wrapper.jar`;
 const DISTRIBUTION_PATH_PATTERN =
   /^\/distributions\/gradle-([0-9]+(?:\.[0-9]+){1,2})-[A-Za-z][A-Za-z0-9-]*\.zip$/u;
 const SHA256_PATTERN = /^[A-Fa-f0-9]{64}$/;
@@ -83,6 +83,16 @@ export interface WrapperProvisionOptions {
    * unrelated hosts.
    */
   readonly httpHeadersByHost?: HttpHeadersByHost;
+  /**
+   * Optional detached-signature verifier override used by focused tests.
+   *
+   * Defaults to the pinned Gradle signing-key verifier when omitted.
+   */
+  readonly verifyWrapperSignature?: (
+    jarBytes: Uint8Array,
+    armoredSignature: string,
+    plan: WrapperDownloadPlan,
+  ) => Promise<void>;
 }
 
 /**
@@ -91,7 +101,8 @@ export interface WrapperProvisionOptions {
  *
  * Gradle publishes the wrapper JAR checksum and detached signature on `services.gradle.org`, but
  * not the wrapper JAR bytes themselves. The actual JAR still has to be fetched from the matching
- * Gradle source tag on GitHub and then verified against the checksum served by Gradle.
+ * Gradle source tag on GitHub and then verified against both Gradle-published authenticity and
+ * integrity metadata.
  */
 export function deriveWrapperDownloadPlan(
   wrapper: ValidatedWrapperPropertiesFile,
@@ -111,6 +122,7 @@ export function deriveWrapperDownloadPlan(
     distributionVersion,
     wrapperSourceVersion,
     wrapperChecksumUrl: `https://${DISTRIBUTION_HOST}/distributions/gradle-${distributionVersion}-wrapper.jar.sha256`,
+    wrapperSignatureUrl: `https://${DISTRIBUTION_HOST}/distributions/gradle-${distributionVersion}-wrapper.jar.asc`,
     wrapperJarUrl: `https://${GRADLE_SOURCE_HOST}/gradle/gradle/v${wrapperSourceVersion}/gradle/wrapper/gradle-wrapper.jar`,
   };
 }
@@ -128,13 +140,15 @@ export async function provisionWrapperJars(
   const retryDelayMs = validateRetryDelay(options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS);
   const logRetry = options.logRetry;
   const httpHeadersByHost = options.httpHeadersByHost ?? EMPTY_HTTP_HEADERS_BY_HOST;
+  const verifyWrapperSignature = options.verifyWrapperSignature ?? defaultVerifyWrapperSignature;
   const checksumCache = new Map<string, Promise<string>>();
+  const signatureCache = new Map<string, Promise<string>>();
   const jarCache = new Map<string, Promise<Uint8Array>>();
   const results: ProvisionedWrapperJar[] = [];
 
   for (const wrapper of wrappers) {
     const plan = deriveWrapperDownloadPlan(wrapper);
-    const expectedWrapperJarSha256 = await getOrCreate(
+    const expectedWrapperJarSha256Promise = getOrCreate(
       checksumCache,
       plan.wrapperChecksumUrl,
       async () =>
@@ -147,18 +161,37 @@ export async function provisionWrapperJars(
           logRetry,
         ),
     );
+    const wrapperJarSignaturePromise = getOrCreate(
+      signatureCache,
+      plan.wrapperSignatureUrl,
+      async () =>
+        await downloadExpectedWrapperJarSignature(
+          plan,
+          fetchImpl,
+          sleep,
+          retryAttempts,
+          retryDelayMs,
+          logRetry,
+        ),
+    );
+    const [expectedWrapperJarSha256, wrapperJarSignature] = await Promise.all([
+      expectedWrapperJarSha256Promise,
+      wrapperJarSignaturePromise,
+    ]);
     const wrapperJarAbsolutePath = path.join(
       path.dirname(wrapper.absolutePath),
       'gradle-wrapper.jar',
     );
-    const existingJarMatches = await doesExistingWrapperJarMatch(
+    const existingJarBytes = await readExistingWrapperJarIfExpectedSha256(
       wrapperJarAbsolutePath,
       expectedWrapperJarSha256,
       wrapper.relativePath,
     );
     let wasDownloaded = false;
 
-    if (!existingJarMatches) {
+    if (existingJarBytes) {
+      await verifyWrapperSignature(existingJarBytes, wrapperJarSignature, plan);
+    } else {
       const wrapperJarRequest = resolveWrapperJarRequest(plan, httpHeadersByHost);
       const jarBytes = await getOrCreate(
         jarCache,
@@ -181,6 +214,8 @@ export async function provisionWrapperJars(
           `Downloaded wrapper JAR for '${wrapper.relativePath}' failed checksum verification.`,
         );
       }
+
+      await verifyWrapperSignature(jarBytes, wrapperJarSignature, plan);
 
       await placeWrapperJarAtomically(wrapperJarAbsolutePath, jarBytes);
       wasDownloaded = true;
@@ -281,6 +316,35 @@ async function downloadExpectedWrapperJarSha256(
   }
 
   return checksum.toLowerCase();
+}
+
+async function downloadExpectedWrapperJarSignature(
+  plan: WrapperDownloadPlan,
+  fetchImpl: typeof fetch,
+  sleep: (milliseconds: number) => Promise<unknown>,
+  retryAttempts: number,
+  retryDelayMs: number,
+  logRetry: ((message: string) => void) | undefined,
+): Promise<string> {
+  const response = await fetchWithRetries(
+    plan.wrapperSignatureUrl,
+    undefined,
+    fetchImpl,
+    sleep,
+    retryAttempts,
+    retryDelayMs,
+    `wrapper signature for '${plan.relativePath}'`,
+    logRetry,
+  );
+  const armoredSignature = (await response.text()).trim();
+
+  if (!armoredSignature.startsWith('-----BEGIN PGP SIGNATURE-----')) {
+    throw new Error(
+      `Wrapper signature response for '${plan.relativePath}' was not valid ASCII-armored OpenPGP data.`,
+    );
+  }
+
+  return armoredSignature;
 }
 
 async function downloadWrapperJar(
@@ -426,16 +490,28 @@ function createRequestInitForUrl(
   };
 }
 
-async function doesExistingWrapperJarMatch(
+async function defaultVerifyWrapperSignature(
+  jarBytes: Uint8Array,
+  armoredSignature: string,
+  plan: WrapperDownloadPlan,
+): Promise<void> {
+  await verifyGradleDetachedSignature(
+    jarBytes,
+    armoredSignature,
+    `wrapper JAR for '${plan.relativePath}'`,
+  );
+}
+
+async function readExistingWrapperJarIfExpectedSha256(
   wrapperJarAbsolutePath: string,
   expectedWrapperJarSha256: string,
   relativePath: string,
-): Promise<boolean> {
+): Promise<Uint8Array | null> {
   let stats;
   try {
     stats = await lstat(wrapperJarAbsolutePath);
   } catch {
-    return false;
+    return null;
   }
 
   if (stats.isSymbolicLink()) {
@@ -451,7 +527,7 @@ async function doesExistingWrapperJarMatch(
   }
 
   const existingContents = await readFile(wrapperJarAbsolutePath);
-  return computeSha256(existingContents) === expectedWrapperJarSha256;
+  return computeSha256(existingContents) === expectedWrapperJarSha256 ? existingContents : null;
 }
 
 async function placeWrapperJarAtomically(

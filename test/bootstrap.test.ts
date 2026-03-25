@@ -129,6 +129,7 @@ const provisionedWrappers: readonly ProvisionedWrapperJar[] = [
     distributionVersion: '8.14',
     wrapperSourceVersion: '8.14.0',
     wrapperChecksumUrl: 'https://services.gradle.org/distributions/gradle-8.14-wrapper.jar.sha256',
+    wrapperSignatureUrl: 'https://services.gradle.org/distributions/gradle-8.14-wrapper.jar.asc',
     wrapperJarUrl:
       'https://raw.githubusercontent.com/gradle/gradle/v8.14.0/gradle/wrapper/gradle-wrapper.jar',
     wrapperJarRelativePath: 'gradle/wrapper/gradle-wrapper.jar',
@@ -238,6 +239,11 @@ describe('bootstrap helpers', () => {
             return new Response(`${wrapperJarSha256}\n`, { status: 200 });
           }
 
+          if (url.endsWith('gradle-8.14-wrapper.jar.asc')) {
+            expect(init).toBeUndefined();
+            return new Response(TEST_SIGNATURE_ARMORED, { status: 200 });
+          }
+
           if (
             url ===
             'https://api.github.com/repos/gradle/gradle/contents/gradle/wrapper/gradle-wrapper.jar?ref=v8.14.0'
@@ -259,6 +265,10 @@ describe('bootstrap helpers', () => {
           savedState.set(name, value);
         },
         summaryWriter,
+        verifyWrapperSignature: async (jarBytes: Uint8Array, armoredSignature: string) => {
+          expect(Buffer.from(jarBytes)).toEqual(wrapperJarBytes);
+          expect(armoredSignature).toBe(TEST_SIGNATURE_ARMORED);
+        },
       });
 
       expect(status.message).toBe('Prepared main phase for push on main in standalone mode.');
@@ -394,3 +404,10 @@ async function withWorkspace(
     await rm(workspace, { recursive: true, force: true });
   }
 }
+
+const TEST_SIGNATURE_ARMORED = `-----BEGIN PGP SIGNATURE-----
+Version: test
+
+ZmFrZQ==
+=abcd
+-----END PGP SIGNATURE-----`;
