@@ -285,7 +285,8 @@ implementable design.
     - Produce clear logs and job summaries for cache hits, misses, wrapper actions, and distributed merges.
 14. Unit test suite
     - Cover validation, wrapper logic, caching, artifacts, merging, and summaries.
-15. Integration workflow suite
+15. Make sure the delta artifacts are either deleted after the aggregator job has finished or after 12 hours.
+16. Integration workflow suite
     - Those workflows are not part of the action itself, but required to run integration tests.
     - Add real GitHub workflow tests for standalone, distributed, read-only, and failure scenarios.
       - Single job workflow
@@ -296,7 +297,12 @@ implementable design.
       - Read-only mode
         - Exercise for standalone and distributed jobs
       - Failure handling
-16. Documentation
+17. Add a safeguard to prevent the action from run more than once per job.
+18. Built-in invocation of `actions/setup-java`
+19. Support macOS and Windows runners
+20. Cleanup job summary
+21. Cleanup the code base
+22. Documentation
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
     - Explicitly document the Gradle wrapper jar download and verification process in the docs/ directory.
     - Explicitly document the cache key generation process in the docs/ directory.
@@ -304,12 +310,7 @@ implementable design.
     - Explicitly document the CI abstraction layer in the docs/ directory.
     - Explicitly document the bootstrap process in the docs/ directory.
     - All types and functions must have JSDoc comments.
-17. Make sure the delta artifacts are either deleted after the aggregator job has finished or after 12 hours.
-18. Add a safeguard to prevent the action from run more than once per job.
-19. Built-in invocation of `actions/setup-java`
-20. Support macOS and Windows runners
-21. Cleanup the code base
-22. Add release workflows
+23. Add release workflows
     - Ensure LICENSE and NOTICE are present and up-to-date in the release artifacts.
     - Support version tags, but only immutable tags, no "moving" tags like 'v1' or so.
 
