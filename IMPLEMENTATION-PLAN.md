@@ -286,12 +286,15 @@ implementable design.
 14. Unit test suite
     - Cover validation, wrapper logic, caching, artifacts, merging, and summaries.
 15. Integration workflow suite
-    - Add real GitHub workflow tests for standalone, distributed, read-only, and failure scenarios.
     - Those workflows are not part of the action itself, but required to run integration tests.
-    - Exercise a couple of real-world scenarios:
+    - Add real GitHub workflow tests for standalone, distributed, read-only, and failure scenarios.
       - Single job workflow
       - Distributed workflow with multiple workers and an aggregator
+        - All workers finish with deltas
+        - Some workers finish without deltas
+        - No workers finish with deltas
       - Read-only mode
+        - Exercise for standalone and distributed jobs
       - Failure handling
 16. Documentation
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
