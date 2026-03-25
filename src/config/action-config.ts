@@ -102,6 +102,7 @@ export function readActionInputs(inputProvider: InputProvider = core): RawAction
     cleanupEnabled: inputProvider.getInput('cleanup-enabled', { trimWhitespace: true }),
     gradleUserHome: inputProvider.getInput('gradle-user-home', { trimWhitespace: true }),
     setupJava: inputProvider.getInput('setup-java', { trimWhitespace: true }),
+    githubToken: inputProvider.getInput('github-token', { trimWhitespace: true }),
   };
 }
 

@@ -19,6 +19,7 @@ import { lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path';
 import { setTimeout as sleepTimeout } from 'node:timers/promises';
 
+import type { HttpHeadersByHost } from '../ci/types';
 import type {
   ProvisionedWrapperJar,
   ValidatedWrapperPropertiesFile,
@@ -26,13 +27,22 @@ import type {
 } from './types';
 
 const DISTRIBUTION_HOST = 'services.gradle.org';
+const GITHUB_API_HOST = 'api.github.com';
 const GRADLE_SOURCE_HOST = 'raw.githubusercontent.com';
+const GRADLE_SOURCE_API_BASE_URL =
+  `https://${GITHUB_API_HOST}/repos/gradle/gradle/contents/gradle/wrapper/gradle-wrapper.jar`;
 const DISTRIBUTION_PATH_PATTERN =
   /^\/distributions\/gradle-([0-9]+(?:\.[0-9]+){1,2})-[A-Za-z][A-Za-z0-9-]*\.zip$/u;
 const SHA256_PATTERN = /^[A-Fa-f0-9]{64}$/;
 const DEFAULT_RETRY_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 1000;
 const MAX_RETRY_AFTER_DELAY_MS = 300_000;
+const EMPTY_HTTP_HEADERS_BY_HOST: HttpHeadersByHost = new Map();
+
+interface WrapperRemoteRequest {
+  readonly url: string;
+  readonly requestInit?: RequestInit;
+}
 
 export interface WrapperProvisionOptions {
   /**
@@ -66,6 +76,13 @@ export interface WrapperProvisionOptions {
    * logging API.
    */
   readonly logRetry?: (message: string) => void;
+  /**
+   * Optional exact-host HTTP headers applied only to matching HTTPS requests.
+   *
+   * This is used for authenticated GitHub API wrapper downloads without sending credentials to
+   * unrelated hosts.
+   */
+  readonly httpHeadersByHost?: HttpHeadersByHost;
 }
 
 /**
@@ -110,6 +127,7 @@ export async function provisionWrapperJars(
   const retryAttempts = validateRetryAttempts(options.retryAttempts ?? DEFAULT_RETRY_ATTEMPTS);
   const retryDelayMs = validateRetryDelay(options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS);
   const logRetry = options.logRetry;
+  const httpHeadersByHost = options.httpHeadersByHost ?? EMPTY_HTTP_HEADERS_BY_HOST;
   const checksumCache = new Map<string, Promise<string>>();
   const jarCache = new Map<string, Promise<Uint8Array>>();
   const results: ProvisionedWrapperJar[] = [];
@@ -141,11 +159,20 @@ export async function provisionWrapperJars(
     let wasDownloaded = false;
 
     if (!existingJarMatches) {
+      const wrapperJarRequest = resolveWrapperJarRequest(plan, httpHeadersByHost);
       const jarBytes = await getOrCreate(
         jarCache,
-        plan.wrapperJarUrl,
+        wrapperJarRequest.url,
         async () =>
-          await downloadWrapperJar(plan, fetchImpl, sleep, retryAttempts, retryDelayMs, logRetry),
+          await downloadWrapperJar(
+            plan,
+            wrapperJarRequest,
+            fetchImpl,
+            sleep,
+            retryAttempts,
+            retryDelayMs,
+            logRetry,
+          ),
       );
       const downloadedJarSha256 = computeSha256(jarBytes);
 
@@ -237,6 +264,7 @@ async function downloadExpectedWrapperJarSha256(
 ): Promise<string> {
   const response = await fetchWithRetries(
     plan.wrapperChecksumUrl,
+    undefined,
     fetchImpl,
     sleep,
     retryAttempts,
@@ -257,6 +285,7 @@ async function downloadExpectedWrapperJarSha256(
 
 async function downloadWrapperJar(
   plan: WrapperDownloadPlan,
+  request: WrapperRemoteRequest,
   fetchImpl: typeof fetch,
   sleep: (milliseconds: number) => Promise<unknown>,
   retryAttempts: number,
@@ -264,7 +293,8 @@ async function downloadWrapperJar(
   logRetry: ((message: string) => void) | undefined,
 ): Promise<Uint8Array> {
   const response = await fetchWithRetries(
-    plan.wrapperJarUrl,
+    request.url,
+    request.requestInit,
     fetchImpl,
     sleep,
     retryAttempts,
@@ -277,6 +307,7 @@ async function downloadWrapperJar(
 
 async function fetchWithRetries(
   url: string,
+  requestInit: RequestInit | undefined,
   fetchImpl: typeof fetch,
   sleep: (milliseconds: number) => Promise<unknown>,
   retryAttempts: number,
@@ -288,7 +319,7 @@ async function fetchWithRetries(
 
   for (let attempt = 1; attempt <= retryAttempts; attempt += 1) {
     try {
-      const response = await fetchImpl(url);
+      const response = await fetchImpl(url, requestInit);
 
       if (response.ok) {
         return response;
@@ -342,6 +373,57 @@ async function fetchWithRetries(
   }
 
   throw lastError ?? new Error(`Could not download ${resourceDescription}.`);
+}
+
+function resolveWrapperJarRequest(
+  plan: WrapperDownloadPlan,
+  httpHeadersByHost: HttpHeadersByHost,
+): WrapperRemoteRequest {
+  const authenticatedUrl = `${GRADLE_SOURCE_API_BASE_URL}?ref=v${encodeURIComponent(plan.wrapperSourceVersion)}`;
+  const authenticatedRequestInit = createRequestInitForUrl(authenticatedUrl, httpHeadersByHost);
+
+  if (authenticatedRequestInit) {
+    return {
+      url: authenticatedUrl,
+      requestInit: authenticatedRequestInit,
+    };
+  }
+
+  return {
+    url: plan.wrapperJarUrl,
+    requestInit: createRequestInitForUrl(plan.wrapperJarUrl, httpHeadersByHost),
+  };
+}
+
+function createRequestInitForUrl(
+  url: string,
+  httpHeadersByHost: HttpHeadersByHost,
+): RequestInit | undefined {
+  let parsedUrl: URL;
+
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return undefined;
+  }
+
+  if (
+    parsedUrl.protocol !== 'https:' ||
+    parsedUrl.port.length > 0 ||
+    parsedUrl.username.length > 0 ||
+    parsedUrl.password.length > 0
+  ) {
+    return undefined;
+  }
+
+  const hostHeaders = httpHeadersByHost.get(parsedUrl.hostname.toLowerCase());
+  if (!hostHeaders || hostHeaders.size === 0) {
+    return undefined;
+  }
+
+  return {
+    headers: new Headers(Array.from(hostHeaders.entries())),
+  };
 }
 
 async function doesExistingWrapperJarMatch(

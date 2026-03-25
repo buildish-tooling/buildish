@@ -101,6 +101,8 @@ export interface RawActionInputs {
   readonly gradleUserHome: string;
   /** Raw `setup-java` input. Empty string later defaults to `'false'`; `true` is currently rejected. */
   readonly setupJava: string;
+  /** Raw `github-token` input used only for authenticated GitHub-host fetches. */
+  readonly githubToken: string;
 }
 
 /**

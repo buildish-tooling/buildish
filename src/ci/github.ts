@@ -19,12 +19,17 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 
 import { isRecord } from '../validation';
-import type { CiJobContext, CiPlatformAdapter, SummaryWriter } from './types';
+import type { CiJobContext, CiPlatformAdapter, HttpHeadersByHost, SummaryWriter } from './types';
 
 const METADATA_PATTERN = /^[A-Za-z0-9._/-]{0,200}$/;
 const DISPLAY_NAME_PATTERN = /^[A-Za-z0-9._ -]{0,100}$/;
 const REF_NAME_PATTERN = /^[A-Za-z0-9._/ -]{1,100}$/;
 const RUNNER_VALUE_PATTERN = /^[a-z0-9][a-z0-9._-]{0,31}$/;
+const GITHUB_API_HOST = 'api.github.com';
+const GITHUB_API_VERSION = '2022-11-28';
+const GITHUB_API_ACCEPT = 'application/vnd.github.raw';
+const ACTION_USER_AGENT = 'projectnessie-cache-gradle-action';
+const EMPTY_HTTP_HEADERS_BY_HOST: HttpHeadersByHost = new Map();
 
 /**
  * Optional overrides used to build a deterministic GitHub adapter in tests.
@@ -34,6 +39,13 @@ export interface GitHubPlatformOptions {
   readonly eventPayload?: Record<string, unknown>;
   readonly eventPayloadReader?: (eventPath: string) => string;
   readonly summaryWriter?: SummaryWriter;
+  /**
+   * Optional GitHub token used only for authenticated GitHub-host requests.
+   *
+   * This is intentionally kept out of the normalized action config and summaries so it never
+   * becomes user-visible status data.
+   */
+  readonly githubToken?: string;
 }
 
 /**
@@ -45,9 +57,11 @@ export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPla
     options.eventPayload ?? readGitHubEventPayload(env, options.eventPayloadReader ?? defaultRead);
   const summaryWriter = options.summaryWriter ?? core.summary;
   const context = createGitHubContext(env, eventPayload);
+  const httpHeadersByHost = createGitHubHttpHeadersByHost(options.githubToken ?? env.GITHUB_TOKEN);
 
   return {
     context,
+    httpHeadersByHost,
     async publishSummary(lines: readonly string[]): Promise<void> {
       for (const line of lines) {
         summaryWriter.addRaw(line, true);
@@ -56,6 +70,26 @@ export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPla
       await summaryWriter.write();
     },
   };
+}
+
+function createGitHubHttpHeadersByHost(githubToken: string | undefined): HttpHeadersByHost {
+  const trimmedToken = githubToken?.trim();
+
+  if (!trimmedToken) {
+    return EMPTY_HTTP_HEADERS_BY_HOST;
+  }
+
+  return new Map([
+    [
+      GITHUB_API_HOST,
+      new Map([
+        ['accept', GITHUB_API_ACCEPT],
+        ['authorization', `Bearer ${trimmedToken}`],
+        ['user-agent', ACTION_USER_AGENT],
+        ['x-github-api-version', GITHUB_API_VERSION],
+      ]),
+    ],
+  ]);
 }
 
 /**

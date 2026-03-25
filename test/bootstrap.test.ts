@@ -230,22 +230,29 @@ describe('bootstrap helpers', () => {
         },
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         cacheApi,
-        fetchImpl: async (input: string | URL | Request): Promise<Response> => {
+        fetchImpl: async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
           const url = String(input);
 
           if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
+            expect(init).toBeUndefined();
             return new Response(`${wrapperJarSha256}\n`, { status: 200 });
           }
 
-          if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
+          if (
+            url ===
+            'https://api.github.com/repos/gradle/gradle/contents/gradle/wrapper/gradle-wrapper.jar?ref=v8.14.0'
+          ) {
+            const headers = new Headers(init?.headers);
+            expect(headers.get('authorization')).toBe('Bearer ghs_bootstrap_token');
+            expect(headers.get('accept')).toBe('application/vnd.github.raw');
             return new Response(wrapperJarBytes, { status: 200 });
           }
 
           throw new Error(`Unexpected fetch URL: ${url}`);
         },
         inputProvider: {
-          getInput(): string {
-            return '';
+          getInput(name: string): string {
+            return name === 'github-token' ? 'ghs_bootstrap_token' : '';
           },
         },
         saveState(name: string, value: string): void {
@@ -269,6 +276,7 @@ describe('bootstrap helpers', () => {
           '- Wrapper JARs ready: 1',
         ]),
       );
+      expect(summaryLines.join('\n')).not.toContain('ghs_bootstrap_token');
       expect(savedState.get('cache-gradle-base-cache-armed')).toBe('true');
       expect(writeCalls).toBe(1);
       await expect(

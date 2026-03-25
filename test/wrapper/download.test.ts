@@ -21,6 +21,7 @@ import path from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import type { HttpHeadersByHost } from '../../src/ci/types';
 import type { NormalizedActionConfig } from '../../src/config/types';
 import { deriveWrapperDownloadPlan, provisionWrapperJars } from '../../src/wrapper/download';
 import { validateTargetWrapperProperties } from '../../src/wrapper/static-validation';
@@ -100,6 +101,51 @@ describe('provisionWrapperJars', () => {
         await expect(
           readFile(path.join(path.dirname(wrapper.absolutePath), 'gradle-wrapper.jar')),
         ).resolves.toEqual(jarBytes);
+      },
+    );
+  });
+
+  it('uses the authenticated GitHub API wrapper download when exact-host headers are available', async () => {
+    await withValidatedWrappers(
+      {
+        'gradle/wrapper/gradle-wrapper.properties': validWrapperProperties(),
+      },
+      async ([wrapper]) => {
+        const jarBytes = Buffer.from('verified wrapper jar');
+        const jarSha256 = sha256(jarBytes);
+        const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+          const url = String(input);
+
+          if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
+            expect(init).toBeUndefined();
+            return new Response(`${jarSha256}\n`, { status: 200 });
+          }
+
+          if (
+            url ===
+            'https://api.github.com/repos/gradle/gradle/contents/gradle/wrapper/gradle-wrapper.jar?ref=v8.14.0'
+          ) {
+            const headers = new Headers(init?.headers);
+            expect(headers.get('authorization')).toBe('Bearer ghs_test_token');
+            expect(headers.get('accept')).toBe('application/vnd.github.raw');
+            expect(headers.get('x-github-api-version')).toBe('2022-11-28');
+            return new Response(jarBytes, { status: 200 });
+          }
+
+          throw new Error(`Unexpected fetch URL: ${url}`);
+        });
+
+        const provisioned = await provisionWrapperJars([wrapper], {
+          fetchImpl,
+          httpHeadersByHost: createHttpHeadersByHost('api.github.com', {
+            accept: 'application/vnd.github.raw',
+            authorization: 'Bearer ghs_test_token',
+            'x-github-api-version': '2022-11-28',
+          }),
+        });
+
+        expect(provisioned[0]?.wasDownloaded).toBe(true);
+        expect(fetchImpl).toHaveBeenCalledTimes(2);
       },
     );
   });
@@ -324,4 +370,11 @@ function validWrapperProperties(overrides: Record<string, string> = {}): string 
 
 function sha256(contents: Uint8Array): string {
   return createHash('sha256').update(contents).digest('hex');
+}
+
+function createHttpHeadersByHost(
+  host: string,
+  headers: Record<string, string>,
+): HttpHeadersByHost {
+  return new Map([[host, new Map(Object.entries(headers))]]);
 }

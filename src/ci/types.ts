@@ -80,11 +80,21 @@ export interface SummaryWriter {
 }
 
 /**
+ * Exact-host HTTP headers that are safe to apply to outbound requests.
+ *
+ * Keys are lower-case host names without ports. Callers must only apply these headers to matching
+ * HTTPS requests so credentials never bleed to unrelated endpoints.
+ */
+export type HttpHeadersByHost = ReadonlyMap<string, ReadonlyMap<string, string>>;
+
+/**
  * Provider-neutral CI adapter surface used by the bootstrap flow.
  */
 export interface CiPlatformAdapter {
   /** Normalized CI metadata for the current execution. */
   readonly context: CiJobContext;
+  /** Optional exact-host HTTP headers, such as GitHub API auth headers derived from CI tokens. */
+  readonly httpHeadersByHost: HttpHeadersByHost;
   /** Publishes the provided markdown lines to the provider summary surface. */
   publishSummary(lines: readonly string[]): Promise<void>;
 }

@@ -153,6 +153,13 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 - In v1, setting `true` fails intentionally.
 - Run `actions/setup-java` before this action instead.
 
+### `github-token`
+
+- Default: `${{ github.token }}`
+- Optional GitHub token used only for authenticated wrapper JAR downloads against the GitHub API.
+- Helps reduce throttling when fetching `gradle-wrapper.jar` from the Gradle source repository.
+- Never written to summaries or persisted post-action state.
+
 ## Development
 
 The repository provides both npm scripts and Make targets.

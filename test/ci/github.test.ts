@@ -135,4 +135,30 @@ describe('createGitHubPlatform', () => {
     ]);
     expect(writeCalls).toBe(1);
   });
+
+  it('exposes exact-host GitHub API headers when a token is configured', () => {
+    const platform = createGitHubPlatform({
+      env: {
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+      },
+      eventPayload: {
+        repository: { default_branch: 'main' },
+      },
+      githubToken: '  ghs_test_token  ',
+    });
+
+    expect(platform.httpHeadersByHost.get('api.github.com')).toEqual(
+      new Map([
+        ['accept', 'application/vnd.github.raw'],
+        ['authorization', 'Bearer ghs_test_token'],
+        ['user-agent', 'projectnessie-cache-gradle-action'],
+        ['x-github-api-version', '2022-11-28'],
+      ]),
+    );
+    expect(platform.httpHeadersByHost.get('raw.githubusercontent.com')).toBeUndefined();
+  });
 });

@@ -59,6 +59,7 @@ describe('readActionInputs', () => {
       baseDirectory: 'subdir',
       cacheEnabled: 'false',
       jobMode: 'distributed-worker',
+      githubToken: '',
     });
   });
 });

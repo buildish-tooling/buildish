@@ -141,8 +141,11 @@ export async function bootstrapPhase(
   phase: BootstrapPhase,
   dependencies: BootstrapDependencies = {},
 ): Promise<BootstrapStatus> {
-  const platform = createGitHubPlatform(dependencies);
   const rawInputs = readActionInputs(dependencies.inputProvider);
+  const platform = createGitHubPlatform({
+    ...dependencies,
+    githubToken: dependencies.githubToken ?? rawInputs.githubToken,
+  });
   const config = normalizeActionConfig(rawInputs, {
     phase,
     ciContext: platform.context,
@@ -162,6 +165,7 @@ export async function bootstrapPhase(
     phase === 'main'
       ? await provisionWrapperJars(validatedWrappers, {
           fetchImpl: dependencies.fetchImpl,
+          httpHeadersByHost: platform.httpHeadersByHost,
           logRetry: dependencies.logInfo ?? core.info,
         })
       : [];
