@@ -25,6 +25,7 @@ import {
   createBootstrapStatus,
   createBootstrapSummaryLines,
 } from '../src/bootstrap';
+import type { BaseCacheApi, BaseCacheRestoreResult } from '../src/cache/service';
 import type { CacheModel } from '../src/cache/model';
 import type { SummaryWriter } from '../src/ci/types';
 import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from '../src/wrapper/types';
@@ -88,18 +89,38 @@ const cacheModel: CacheModel = {
   runnerArch: 'x64',
   safeRefName: 'main',
   includePaths: ['/home/runner/.gradle/caches/modules-2/**'],
-  excludePaths: ['/home/runner/.gradle/**/configuration-cache/**'],
+  excludePaths: [
+    '/home/runner/.gradle/**/configuration-cache/**',
+    '/home/runner/.gradle/**/*.lock',
+  ],
   partitions: [
     {
       id: 'modules',
       displayName: 'Dependency modules',
       description: 'Downloaded dependency metadata and artifact stores shared across builds.',
       relativeIncludeGlobs: ['caches/modules-2/**'],
-      relativeExcludeGlobs: ['**/configuration-cache/**'],
+      relativeExcludeGlobs: ['**/configuration-cache/**', '**/*.lock'],
       absoluteIncludeGlobs: ['/home/runner/.gradle/caches/modules-2/**'],
-      absoluteExcludeGlobs: ['/home/runner/.gradle/**/configuration-cache/**'],
+      absoluteExcludeGlobs: [
+        '/home/runner/.gradle/**/configuration-cache/**',
+        '/home/runner/.gradle/**/*.lock',
+      ],
     },
   ],
+};
+
+const restoreResult: BaseCacheRestoreResult = {
+  operation: 'restore',
+  status: 'exact-hit',
+  cacheKey: 'gradle-cache-1-21-linux-x64-main',
+  matchedKey: 'gradle-cache-1-21-linux-x64-main',
+  restoreKeys: ['gradle-cache-1-21-linux-x64-'],
+  paths: [
+    '/home/runner/.gradle/caches/modules-2/**',
+    '!/home/runner/.gradle/**/configuration-cache/**',
+    '!/home/runner/.gradle/**/*.lock',
+  ],
+  message: "Base cache restore hit exact key 'gradle-cache-1-21-linux-x64-main'.",
 };
 
 const provisionedWrappers: readonly ProvisionedWrapperJar[] = [
@@ -125,6 +146,7 @@ describe('bootstrap helpers', () => {
         config,
         ciContext,
         cacheModel,
+        restoreResult,
         validatedWrappers,
         provisionedWrappers,
       ),
@@ -133,6 +155,7 @@ describe('bootstrap helpers', () => {
       config,
       ciContext,
       cacheModel,
+      baseCacheResult: restoreResult,
       validatedWrappers,
       provisionedWrappers,
       message: 'Prepared main phase for push on main in standalone mode.',
@@ -147,12 +170,14 @@ describe('bootstrap helpers', () => {
           config,
           ciContext,
           cacheModel,
+          restoreResult,
           validatedWrappers,
           provisionedWrappers,
         ),
       ),
     ).toEqual(
       expect.arrayContaining([
+        '- Base cache restore: exact-hit',
         '- Cache key: gradle-cache-1-21-linux-x64-main',
         '- Cache partitions: 1',
         '- Job mode: standalone',
@@ -167,6 +192,18 @@ describe('bootstrap helpers', () => {
     const wrapperJarSha256 = createHash('sha256').update(wrapperJarBytes).digest('hex');
     const summaryLines: string[] = [];
     let writeCalls = 0;
+    const savedState = new Map<string, string>();
+    const cacheApi: BaseCacheApi = {
+      isFeatureAvailable(): boolean {
+        return true;
+      },
+      async restoreCache(): Promise<string | undefined> {
+        return 'gradle-cache-1-21-linux-x64-main';
+      },
+      async saveCache(): Promise<number> {
+        throw new Error('saveCache should not be called during main bootstrap');
+      },
+    };
     const summaryWriter: SummaryWriter = {
       addRaw(text: string, _addEol?: boolean): SummaryWriter {
         summaryLines.push(text);
@@ -192,6 +229,7 @@ describe('bootstrap helpers', () => {
           repository: { default_branch: 'main' },
         },
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
+        cacheApi,
         fetchImpl: async (input: string | URL | Request): Promise<Response> => {
           const url = String(input);
 
@@ -210,26 +248,102 @@ describe('bootstrap helpers', () => {
             return '';
           },
         },
+        saveState(name: string, value: string): void {
+          savedState.set(name, value);
+        },
         summaryWriter,
       });
 
       expect(status.message).toBe('Prepared main phase for push on main in standalone mode.');
       expect(status.cacheModel?.cacheKey).toBe('gradle-cache-1-21-linux-x64-main');
+      expect(status.baseCacheResult?.status).toBe('exact-hit');
       expect(status.validatedWrappers).toHaveLength(1);
       expect(status.provisionedWrappers).toHaveLength(1);
       expect(summaryLines).toEqual(
         expect.arrayContaining([
           '## Cache Gradle bootstrap',
+          '- Base cache restore: exact-hit',
           '- Cache key: gradle-cache-1-21-linux-x64-main',
           '- Java major: 21',
           '- Wrapper files: 1',
           '- Wrapper JARs ready: 1',
         ]),
       );
+      expect(savedState.get('cache-gradle-base-cache-armed')).toBe('true');
       expect(writeCalls).toBe(1);
       await expect(
         readFile(path.join(workspace, 'gradle', 'wrapper', 'gradle-wrapper.jar')),
       ).resolves.toEqual(wrapperJarBytes);
+    });
+  });
+
+  it('bootstraps the post phase and saves the base cache when armed', async () => {
+    const summaryLines: string[] = [];
+    let writeCalls = 0;
+    const cacheApi: BaseCacheApi = {
+      isFeatureAvailable(): boolean {
+        return true;
+      },
+      async restoreCache(): Promise<string | undefined> {
+        throw new Error('restoreCache should not be called during post bootstrap');
+      },
+      async saveCache(): Promise<number> {
+        return 42;
+      },
+    };
+    const summaryWriter: SummaryWriter = {
+      addRaw(text: string, _addEol?: boolean): SummaryWriter {
+        summaryLines.push(text);
+        return this;
+      },
+      async write(): Promise<void> {
+        writeCalls += 1;
+      },
+    };
+
+    await withWorkspace({}, async (workspace) => {
+      const status = await bootstrapPhase('post', {
+        env: {
+          GITHUB_EVENT_NAME: 'push',
+          GITHUB_REF: 'refs/heads/main',
+          GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
+          GITHUB_WORKFLOW: 'CI',
+          GITHUB_JOB: 'check',
+          GITHUB_WORKSPACE: workspace,
+          RUNNER_OS: 'Linux',
+          RUNNER_ARCH: 'X64',
+        },
+        eventPayload: {
+          repository: { default_branch: 'main' },
+        },
+        captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
+        cacheApi,
+        getState(name: string): string {
+          return name === 'cache-gradle-base-cache-armed' ? 'true' : '';
+        },
+        inputProvider: {
+          getInput(): string {
+            return '';
+          },
+        },
+        summaryWriter,
+      });
+
+      expect(status.baseCacheResult).toEqual(
+        expect.objectContaining({
+          operation: 'save',
+          status: 'saved',
+          cacheKey: 'gradle-cache-1-21-linux-x64-main',
+          cacheId: 42,
+        }),
+      );
+      expect(summaryLines).toEqual(
+        expect.arrayContaining([
+          '- Base cache save: saved',
+          "- Base cache detail: Base cache saved under key 'gradle-cache-1-21-linux-x64-main' (cache ID 42).",
+        ]),
+      );
+      expect(writeCalls).toBe(1);
     });
   });
 });

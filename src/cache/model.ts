@@ -20,7 +20,7 @@ import path from 'node:path';
 import type { CiJobContext } from '../ci/types';
 import type { NormalizedActionConfig } from '../config/types';
 
-const DEFAULT_CACHE_KEY_TEMPLATE =
+export const DEFAULT_CACHE_KEY_TEMPLATE =
   '${cacheKeyPrefix}${schemaVersion}-${javaMajor}-${runnerOs}-${runnerArch}-${refName}';
 const CACHE_KEY_PATTERN = /^[A-Za-z0-9._:-]{1,512}$/;
 

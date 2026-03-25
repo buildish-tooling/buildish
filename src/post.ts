@@ -20,6 +20,9 @@ import { bootstrapPhase } from './bootstrap';
 
 export async function runPost(): Promise<void> {
   const status = await bootstrapPhase('post');
+  if (status.baseCacheResult) {
+    core.info(status.baseCacheResult.message);
+  }
   core.info(status.message);
 }
 

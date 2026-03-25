@@ -14,7 +14,17 @@
  * limitations under the License.
  */
 
+import * as core from '@actions/core';
+
 import { createGitHubPlatform, type GitHubPlatformOptions } from './ci/github';
+import {
+  armBaseCachePostAction,
+  isBaseCachePostActionArmed,
+  restoreBaseCache,
+  saveBaseCache,
+  type BaseCacheApi,
+  type BaseCacheOperationResult,
+} from './cache/service';
 import type { CiJobContext } from './ci/types';
 import { createCacheModel, type CacheModel, type CommandOutputCapture } from './cache/model';
 import {
@@ -38,6 +48,7 @@ export interface BootstrapStatus {
   readonly config: NormalizedActionConfig;
   readonly ciContext: CiJobContext;
   readonly cacheModel: CacheModel | null;
+  readonly baseCacheResult: BaseCacheOperationResult | null;
   readonly validatedWrappers: readonly ValidatedWrapperPropertiesFile[];
   readonly provisionedWrappers: readonly ProvisionedWrapperJar[];
 }
@@ -49,6 +60,9 @@ export interface BootstrapDependencies extends GitHubPlatformOptions {
   readonly inputProvider?: InputProvider;
   readonly fetchImpl?: typeof fetch;
   readonly captureCommandOutput?: CommandOutputCapture;
+  readonly cacheApi?: BaseCacheApi;
+  readonly saveState?: (name: string, value: string) => void;
+  readonly getState?: (name: string) => string;
 }
 
 /**
@@ -82,11 +96,13 @@ export async function bootstrapPhase(
     phase === 'main'
       ? await provisionWrapperJars(validatedWrappers, { fetchImpl: dependencies.fetchImpl })
       : [];
+  const baseCacheResult = await runBaseCachePhase(phase, config, cacheModel, dependencies);
   const status = createBootstrapStatus(
     phase,
     config,
     platform.context,
     cacheModel,
+    baseCacheResult,
     validatedWrappers,
     provisionedWrappers,
   );
@@ -104,6 +120,7 @@ export function createBootstrapStatus(
   config: NormalizedActionConfig,
   ciContext: CiJobContext,
   cacheModel: CacheModel | null = null,
+  baseCacheResult: BaseCacheOperationResult | null = null,
   validatedWrappers: readonly ValidatedWrapperPropertiesFile[] = [],
   provisionedWrappers: readonly ProvisionedWrapperJar[] = [],
 ): BootstrapStatus {
@@ -112,6 +129,7 @@ export function createBootstrapStatus(
     config,
     ciContext,
     cacheModel,
+    baseCacheResult,
     validatedWrappers,
     provisionedWrappers,
     message: `Prepared ${phase} phase for ${ciContext.eventName} on ${ciContext.safeRefName} in ${config.jobMode} mode.`,
@@ -135,8 +153,43 @@ export function createBootstrapSummaryLines(status: BootstrapStatus): readonly s
     `- Cache key: ${status.cacheModel?.cacheKey ?? 'disabled'}`,
     `- Java major: ${status.cacheModel?.javaMajor ?? 'n/a'}`,
     `- Cache partitions: ${status.cacheModel?.partitions.length ?? 0}`,
+    ...(status.baseCacheResult
+      ? [
+          `- Base cache ${status.baseCacheResult.operation}: ${status.baseCacheResult.status}`,
+          `- Base cache detail: ${status.baseCacheResult.message}`,
+        ]
+      : []),
     `- Wrapper selection: ${status.config.wrapperSelectionMode}`,
     `- Wrapper files: ${status.validatedWrappers.length}`,
     `- Wrapper JARs ready: ${status.provisionedWrappers.length}`,
   ];
+}
+
+async function runBaseCachePhase(
+  phase: BootstrapPhase,
+  config: NormalizedActionConfig,
+  cacheModel: CacheModel | null,
+  dependencies: BootstrapDependencies,
+): Promise<BaseCacheOperationResult | null> {
+  if (!cacheModel) {
+    return null;
+  }
+
+  if (phase === 'main') {
+    const restoreResult = await restoreBaseCache(config, cacheModel, {
+      cacheApi: dependencies.cacheApi,
+    });
+
+    armBaseCachePostAction(dependencies.saveState ?? core.saveState);
+    return restoreResult;
+  }
+
+  return await saveBaseCache(
+    config,
+    cacheModel,
+    isBaseCachePostActionArmed(dependencies.getState ?? core.getState),
+    {
+      cacheApi: dependencies.cacheApi,
+    },
+  );
 }

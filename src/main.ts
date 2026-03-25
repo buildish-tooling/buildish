@@ -20,6 +20,9 @@ import { bootstrapPhase } from './bootstrap';
 
 export async function runMain(): Promise<void> {
   const status = await bootstrapPhase('main');
+  if (status.baseCacheResult) {
+    core.info(status.baseCacheResult.message);
+  }
   core.info(status.message);
 }
 
