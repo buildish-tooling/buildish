@@ -28,9 +28,17 @@ Until the first public release exists, use a repository ref you control for test
 
 ```yaml
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v5
   - uses: projectnessie/cache-gradle@<ref>
 ```
+
+## Runtime and toolchain requirements
+
+- GitHub Action runtime: Node 24
+- Local development baseline: Node `24.13.0`
+- Expected npm version for repository tooling: `11.6.2`
+
+The repository pins these versions so local development, CI, and the published action runtime stay aligned.
 
 ## Inputs
 
@@ -129,6 +137,8 @@ steps:
 ## Development
 
 The repository provides both npm scripts and Make targets.
+
+Use Node `24.13.0` and npm `11.6.2` for local development. The Makefile sanity check enforces those versions.
 
 Common commands:
 

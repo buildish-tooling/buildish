@@ -6,8 +6,8 @@
     "clean": "node -e \"for (const path of [\\\"dist\\\",\\\"coverage\\\"]) { require(\\\"fs\\\").rmSync(path, { recursive: true, force: true }); }\"",
     "compile": "tsc -p tsconfig.json --noEmit",
     "bundle": "npm run bundle:main && npm run bundle:post",
-    "bundle:main": "esbuild src/main.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/main/index.js",
-    "bundle:post": "esbuild src/post.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/post/index.js",
+    "bundle:main": "esbuild src/main.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/main/index.js",
+    "bundle:post": "esbuild src/post.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/post/index.js",
     "build": "npm run compile && npm run bundle",
     "rebuild": "npm run clean && npm run build",
     "lint": "eslint .",
@@ -22,9 +22,9 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20 <21"
+    "node": ">=24 <25"
   },
-  "packageManager": "npm@10.8.2",
+  "packageManager": "npm@11.6.2",
   "dependencies": {
     "@actions/core": "3.0.0"
   },
