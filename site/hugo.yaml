@@ -1,0 +1,201 @@
+#
+# Copyright 2026 The Buildish Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+baseURL: https://buildish.org/
+title: Buildish
+locale: en-us
+enableRobotsTXT: true
+publishDir: .public
+
+disableKinds:
+  - taxonomy
+  - term
+  - RSS
+
+markup:
+  highlight:
+    # See https://www.docsy.dev/docs/content/lookandfeel/#code-highlighting-with-chroma
+    # See https://gohugo.io/content-management/syntax-highlighting/
+    #
+    # "Prism" syntax highlighting looks a bit nicer, but quite some code blocks become a bit
+    # too big (horizontally), so users would have to scroll horizontally to see the code.
+    # 'lineNumbersInTable=true' is "required" (for UX reasons) as well.
+    anchorLineNos: false
+    codeFences: true
+    guessSyntax: false
+    hl_Lines: ""
+    hl_inline: false
+    lineAnchors: ''
+    lineNoStart: 1
+    lineNos: true
+    lineNumbersInTable: false
+    noClasses: true
+    noHl: false
+    # 'tango' == "Chroma" syntax highlighting theme
+    #style: 'tango'
+    tabWidth: 4
+  goldmark:
+    parser:
+      autoHeadingID: true
+      autoHeadingIDType: github
+      attribute:
+        # See https://gohugo.io/render-hooks/blockquotes/#alerts
+        block: true
+    renderer:
+      unsafe: false
+
+params:
+  author:
+    name: 'Buildish'
+  offlineSearch: true
+
+  github_repo: https://github.com/buildish-tooling/buildish
+  github_project_repo: https://github.com/buildish-tooling/buildish
+  github_branch: main
+  github_subdir: site
+
+  ui:
+    breadcrumb_disable: false
+    navbar_logo: false
+    sidebar_menu_foldable: true
+    sidebar_menu_compact: true
+    sidebar_search_disable: true
+    showLightDarkModeMenu: false
+  plantuml:
+    # Disabled for now because it loads external JavaScript.
+    enable: false
+  markmap:
+    # Disabled for now because it loads external JavaScript.
+    enable: false
+
+module:
+  proxy: "https://proxy.golang.org,direct"
+  hugoVersion:
+    extended: true
+    min: 0.160.1
+  imports:
+    - path: github.com/google/docsy/theme
+      disable: false
+  mounts:
+    # These mounts assemble Hugo's virtual filesystem from two sources:
+    # 1. consumer-authored site roots in this repository, and
+    # 2. pipeline-generated staged roots under `.stage/`.
+    #
+    # `source` is the real directory on disk. `target` is the Hugo root where
+    # that directory should appear (`content`, `data`, `static`, ...).
+    #
+    # Entries where `source == target` are intentional. Once we switch from
+    # Hugo's implicit default roots to explicit mounts, every local root we still
+    # want Hugo to see must be mounted again explicitly.
+    # Consumer-authored content such as section roots and cascades. This must be
+    # mounted alongside staged content so local docs section metadata keeps
+    # applying to pipeline-generated pages under the same tree.
+    - source: content
+      target: content
+    # Pipeline-assembled staged content is the primary content tree.
+    - source: .stage/content
+      target: content
+    # Pipeline data files (components.json, routes.json, etc.).
+    - source: .stage/data
+      target: data
+    # Consumer-owned data files (component_repos.json, etc.) stay visible in
+    # `site.Data` alongside the pipeline data.  This explicit `data -> data`
+    # mount keeps the local data root present after opting into explicit mounts.
+    - source: data
+      target: data
+    # Pipeline-assembled static assets (component asset trees, etc.).
+    - source: .stage/static
+      target: static
+    # Authored site-level static assets (favicons, fonts, …).
+    - source: static
+      target: static
+    # Local layout overrides and custom partials / shortcodes.
+    - source: layouts
+      target: layouts
+    # SCSS / JS / image assets processed by Hugo Pipes.
+    - source: assets
+      target: assets
+
+privacy:
+  googleAnalytics:
+    disable: true
+  instagram:
+    simple: true
+  x: # was 'twitter'
+    enableDNT: true
+    simple: true
+  vimeo:
+    enableDNT: true
+    simple: true
+  youtube:
+    privacyEnhanced: true
+
+menu:
+  main:
+    - identifier: about
+      name: About
+      pageRef: /about
+      weight: 5
+    - identifier: components
+      name: Components
+      weight: 10
+    - identifier: community
+      name: Community
+      weight: 20
+    - identifier: community-overview
+      name: Overview
+      pageRef: /community
+      parent: community
+      weight: 5
+    - identifier: community-contact
+      name: Contact
+      pageRef: /community/contact
+      parent: community
+      weight: 10
+    - identifier: get-involved
+      name: Get Involved
+      pageRef: /community/get-involved
+      parent: community
+      weight: 20
+    - identifier: contributing-guidelines
+      name: Contributing Guidelines
+      pageRef: /community/contributing-guidelines
+      parent: community
+      weight: 30
+    - identifier: community-guidelines
+      name: Community Guidelines
+      pageRef: /community/community-guidelines
+      parent: community
+      weight: 40
+    - identifier: code-of-conduct
+      name: Code of Conduct
+      url: https://github.com/buildish-tooling/buildish/blob/main/CODE_OF_CONDUCT.md
+      parent: community
+      weight: 50
+    - identifier: security
+      name: Security
+      pageRef: /community/security
+      parent: community
+      weight: 60
+    - identifier: license
+      name: License
+      pageRef: /community/license
+      parent: community
+      weight: 70
+    - identifier: source-code
+      name: Source Code
+      url: https://github.com/buildish-tooling/buildish
+      parent: community
+      weight: 80

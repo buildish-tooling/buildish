@@ -1,0 +1,69 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/*
+Render prominent page-level version warnings.
+
+Development docs, release candidates, withdrawn releases, unsupported releases,
+and limited-maintenance releases all get visible policy/status banners.
+*/}}
+
+{{ if .Site.Params.archived_version -}}
+{{ $latestVersion := .Site.Params.url_latest_version -}}
+{{ $currentVersion := .Site.Params.version -}}
+<div class="pageinfo pageinfo-primary">
+{{ with $currentVersion }}<p>Version {{ . | markdownify }} of the documentation is no longer actively maintained. The site that you are currently viewing is an archived snapshot.{{ with $latestVersion }} For up-to-date documentation, see the <a href="{{ . | safeURL }}" target="_blank" rel="noopener">latest version</a>.{{ end }}</p>{{ end }}
+</div>
+{{ end -}}
+
+{{ $version := dict -}}
+{{ with .Params.pipeline }}{{ with index . "page" }}{{ with index . "version" }}{{ $version = . }}{{ end }}{{ end }}{{ end -}}
+{{ $kind := "" -}}
+{{ with index $version "kind" }}{{ $kind = printf "%v" . }}{{ end -}}
+{{ $label := "" -}}
+{{ with index $version "label" }}{{ $label = printf "%v" . }}{{ end -}}
+{{ $publicationState := "" -}}
+{{ with index $version "publicationState" }}{{ $publicationState = lower (printf "%v" .) }}{{ end -}}
+{{ $supportStatus := "" -}}
+{{ with index $version "supportStatus" }}{{ $supportStatus = lower (printf "%v" .) }}{{ end -}}
+{{ $maintenancePhase := "" -}}
+{{ with index $version "supportWindow" }}{{ with index . "maintenancePhase" }}{{ $maintenancePhase = lower (printf "%v" .) }}{{ end }}{{ end -}}
+{{ if not $supportStatus -}}
+{{ with index $version "releaseLine" }}{{ with index . "supportStatus" }}{{ $supportStatus = lower (printf "%v" .) }}{{ end }}{{ with index . "supportWindow" }}{{ with index . "maintenancePhase" }}{{ $maintenancePhase = lower (printf "%v" .) }}{{ end }}{{ end }}{{ end -}}
+{{ end -}}
+{{ $isUnsupported := or (in (slice "eol" "end-of-life" "end_of_life" "unsupported" "retired") $supportStatus) (in (slice "eol" "end-of-life" "end_of_life" "unsupported" "retired") $maintenancePhase) -}}
+{{ $isLimitedMaintenance := or (in (slice "security-only" "security-fix-only" "security-fixes" "security") $supportStatus) (in (slice "security-only" "security-fix-only" "security-fixes" "security") $maintenancePhase) -}}
+
+{{ if eq $kind "development" -}}
+<div class="pageinfo pageinfo-warning">
+<p><strong>IMPORTANT:</strong> Developer documentation for the current development branch. This content is unreleased, may change without notice, and must not be treated as Buildish release documentation.</p>
+</div>
+{{ else if eq $kind "candidate" -}}
+<div class="pageinfo pageinfo-warning">
+<p><strong>IMPORTANT:</strong> Release-candidate documentation{{ with $label }} for {{ . }}{{ end }}. This content is not final Buildish release documentation and may change before a release is approved.</p>
+</div>
+{{ else if or (eq $publicationState "withdrawn") (eq $publicationState "tombstoned") -}}
+<div class="pageinfo pageinfo-danger">
+<p><strong>IMPORTANT:</strong> This release documentation{{ with $label }} for {{ . }}{{ end }} is marked {{ $publicationState }} and should not be used as current Buildish documentation.</p>
+</div>
+{{ else if $isUnsupported -}}
+<div class="pageinfo pageinfo-danger">
+<p><strong>IMPORTANT:</strong> This release documentation{{ with $label }} for {{ . }}{{ end }} is for a release that is no longer maintained.</p>
+</div>
+{{ else if $isLimitedMaintenance -}}
+<div class="pageinfo pageinfo-warning">
+<p><strong>IMPORTANT:</strong> This release documentation{{ with $label }} for {{ . }}{{ end }} is for a release in limited maintenance. Check the project support policy before relying on it for new deployments.</p>
+</div>
+{{ end -}}

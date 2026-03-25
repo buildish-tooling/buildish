@@ -1,0 +1,139 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/*
+Choose the sidebar root for the current page.
+
+Buildish splits component navigation into static component pages and
+version-specific docs. Static pages use the component root and hide versioned
+docs roots; versioned docs use that version's docs root.
+*/}}
+
+{{/* Notes:
+
+- Sidebars are generated for "blog", "docs", and possibly other page types.
+- The "active" toggle here may delay rendering, so we only cache this side
+  bar menu for bigger sites.
+
+*/ -}}
+
+{{ $sidebarCacheLimit := .Site.Params.ui.sidebar_cache_limit | default 2000 -}}
+{{ $cacheSidebar := ge (len .Site.Pages) $sidebarCacheLimit -}}
+
+{{/* Determine sidebar root and ID (if enabled) */ -}}
+{{ $sidebarRoot := .FirstSection -}}
+{{ $navRoot := cond (and (ne .Params.toc_root true) (eq .Site.Home.Type "docs")) .Site.Home .FirstSection -}}
+{{ $componentContext := partial "buildish-component-context.html" . -}}
+{{ $skipRootSection := false -}}
+{{ $excludeVersionedRoots := false -}}
+{{ $versionContext := dict -}}
+{{ with .Params.pipeline }}{{ with index . "page" }}{{ with index . "version" }}{{ $versionContext = . }}{{ end }}{{ end }}{{ end -}}
+{{ if .Site.Params.ui.sidebar_root_enabled -}}
+  {{ if and .IsSection (eq .Params.sidebar_root_for "self") -}}
+    {{ $sidebarRoot = . -}}
+  {{ else -}}
+    {{/* Check ancestors for sidebar_root_for (any value) */ -}}
+    {{ range .Ancestors -}}
+      {{ if not .IsSection -}}
+        {{ continue -}}
+      {{ end -}}
+      {{ $rootFor := .Params.sidebar_root_for -}}
+      {{ if not $rootFor -}}
+        {{ continue -}}
+      {{ end -}}
+      {{ if not (or (eq $rootFor "self") (eq $rootFor "children")) -}}
+        {{ warnf "%s: sidebar_root_for should be 'self' or 'children'. Invalid value: '%s'." .Path $rootFor -}}
+        {{ continue -}}
+      {{ end -}}
+      {{ $sidebarRoot = . -}}
+      {{ break -}}
+    {{ end -}}
+  {{ end -}}
+
+  {{/* Warn if sidebar_root_for is set to self for a top-level section */ -}}
+  {{ $rootKind := $sidebarRoot.Params.sidebar_root_for -}}
+  {{ if and (eq $rootKind "self") (eq $sidebarRoot $navRoot) -}}
+    {{ $msg := slice
+        "Setting sidebar_root_for to `self` for a section that is already a root is redundant."
+        "The `self` mode is intended for nested sections proper."
+        "Did you mean to use `children` instead?"
+    -}}
+    {{ $filename := .Path -}}
+    {{ with $sidebarRoot.File -}}
+      {{ $filename = .Filename -}}
+    {{ end -}}
+    {{ warnf "%s: %s for page '%s'." $sidebarRoot.File.Filename (delimit $msg " ") .Path -}}
+  {{ end -}}
+{{ end -}}
+
+{{ if index $componentContext "enabled" -}}
+  {{ $componentSidebarRoot := "" -}}
+  {{ $versionSidebarRoot := "" -}}
+  {{ with index $versionContext "docsPath" -}}
+    {{ $versionSidebarRoot = strings.TrimSuffix "/" . -}}
+  {{ end -}}
+  {{ with index $componentContext "componentPath" -}}
+    {{ $componentSidebarRoot = strings.TrimSuffix "/" . -}}
+  {{ end -}}
+  {{ if not $componentSidebarRoot -}}
+    {{ with index $componentContext "component" -}}
+      {{ with index . "slug" -}}
+      {{ $componentSidebarRoot = printf "/components/%s" . -}}
+      {{ end -}}
+    {{ end -}}
+  {{ end -}}
+  {{ with $versionSidebarRoot -}}
+    {{ with $.Site.GetPage . -}}
+      {{ $sidebarRoot = . -}}
+      {{ $skipRootSection = false -}}
+    {{ end -}}
+  {{ else with $componentSidebarRoot -}}
+    {{ with $.Site.GetPage . -}}
+      {{ $sidebarRoot = . -}}
+      {{ $skipRootSection = true -}}
+      {{ $excludeVersionedRoots = true -}}
+    {{ end -}}
+  {{ end -}}
+{{ end -}}
+
+{{ $sidebarRootID := $sidebarRoot.RelPermalink -}}
+{{ $args := dict
+    "context" .
+    "cacheSidebar" $cacheSidebar
+    "sidebarRoot" $sidebarRoot
+    "sidebarRootID" $sidebarRootID
+    "skipRootSection" $skipRootSection
+    "excludeVersionedRoots" $excludeVersionedRoots
+    "componentContext" $componentContext
+-}}
+{{ if $cacheSidebar -}}
+  {{ $mid := printf "m-%s" (.RelPermalink | anchorize | safeJS) }}
+  <script>
+    $(function() {
+    $("#td-section-nav a").removeClass("active");
+    $("#td-section-nav #{{ $mid }}").addClass("active");
+    $("#td-section-nav #{{ $mid }}-li span").addClass("td-sidebar-nav-active-item");
+    $("#td-section-nav #{{ $mid }}").parents("li").addClass("active-path");
+    $("#td-section-nav li.active-path").addClass("show");
+    $("#td-section-nav li.active-path").children("input").prop('checked', true);
+    $("#td-section-nav #{{ $mid }}-li").siblings("li").addClass("show");
+    $("#td-section-nav #{{ $mid }}-li").children("ul").children("li").addClass("show");
+    $("#td-sidebar-menu").toggleClass("d-none");
+    });
+  </script>
+  {{ partialCached "sidebar-tree.html" $args $sidebarRootID $skipRootSection }}
+{{ else -}}
+  {{ partial "sidebar-tree.html" $args }}
+{{- end }}

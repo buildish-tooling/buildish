@@ -1,0 +1,208 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/*
+Return normalized component context for the current staged page.
+
+This is the central bridge from site-pipeline front matter and aggregate data to
+Hugo layouts. It returns component paths, docs dropdown items, release dropdown
+items, repository URL, brand label, and component landing-page detection.
+*/}}
+
+{{/* Read component/page metadata from both old and current front matter shapes. */}}
+{{- $component := .Params.sitePipelineComponent -}}
+{{- if not $component -}}
+  {{- with index .Params "pipeline" }}{{ with index . "component" }}{{ $component = . }}{{ end }}{{ end -}}
+{{- end -}}
+{{- $page := .Params.sitePipelineComponentPage -}}
+{{- if not $page -}}
+  {{- with index .Params "pipeline" }}{{ with index . "page" }}{{ $page = . }}{{ end }}{{ end -}}
+{{- end -}}
+{{- $context := dict "enabled" false -}}
+{{- if $component -}}
+  {{- $paths := dict -}}
+  {{- with index $component "paths" }}{{ $paths = . }}{{ end -}}
+  {{- if eq (len $paths) 0 -}}
+    {{- with index $component "publication" }}{{ with index . "paths" }}{{ $paths = . }}{{ end }}{{ end -}}
+  {{- end -}}
+  {{- $componentPath := "" -}}
+  {{- with index $paths "component" }}{{ $componentPath = . }}{{ end -}}
+  {{- $docsPath := "" -}}
+  {{- with index $paths "docs" }}{{ $docsPath = . }}{{ end -}}
+  {{- /* Repository URL: try legacy field first, then the consumer slug-to-URL map. */ -}}
+  {{- $repositoryPath := "" -}}
+  {{- with index $component "repository" }}{{ $repositoryPath = . }}{{ end -}}
+  {{- if not $repositoryPath -}}
+    {{- $slug := index $component "slug" -}}
+    {{- with $slug -}}
+      {{- with index hugo.Data "component_repos" -}}
+        {{- with index . $slug }}{{ $repositoryPath = . }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* Development label: old pipeline injected this; new pipeline does not. Default "Development". */ -}}
+  {{- $developmentLabel := "Developer Docs (unreleased)" -}}
+  {{- with index $component "developmentLabel" }}{{ $developmentLabel = . }}{{ end -}}
+
+  {{- /* Collect release data.
+       New pipeline: release lines and latest-stable version live inside
+         pipeline.component.artifacts[N].releaseLines / .latestStable
+       The latestStable value is now a plain version string (not an object).
+       Old pipeline: releaseLines and latestStable were direct fields on the
+         component object; kept as fallback for backward compatibility.
+  */ -}}
+  {{- $releaseLines := slice -}}
+  {{- $latestStableVersion := "" -}}
+  {{- with index $component "artifacts" -}}
+    {{- range $artifact := . -}}
+      {{- if not $latestStableVersion -}}
+        {{- with index $artifact "latestStable" }}{{ $latestStableVersion = printf "%v" . }}{{ end -}}
+      {{- end -}}
+      {{- if eq (len $releaseLines) 0 -}}
+        {{- with index $artifact "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* Backward-compatible fallback for old pipeline output. */ -}}
+  {{- if not $latestStableVersion -}}
+    {{- with index $component "latestStable" }}{{ with index . "version" }}{{ $latestStableVersion = . }}{{ end }}{{ end -}}
+  {{- end -}}
+  {{- if eq (len $releaseLines) 0 -}}
+    {{- with index $component "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
+  {{- end -}}
+
+  {{- $docsItems := slice -}}
+  {{- if $componentPath -}}
+    {{- $docsItems = $docsItems | append (dict "label" "Overview" "href" $componentPath "kind" "overview") -}}
+  {{- end -}}
+  {{- $releaseDocEntries := slice -}}
+  {{- $componentSlug := index $component "slug" -}}
+  {{- if $componentSlug -}}
+  {{- with index hugo.Data "routes" -}}
+  {{- with index . "items" -}}
+  {{- range $route := . -}}
+  {{- if and
+    (eq (index $route "componentSlug") $componentSlug)
+    (eq (index $route "routeKind") "context")
+    (eq (index $route "section") "released")
+    (index $route "path")
+  -}}
+  {{- $version := "" -}}
+  {{- with index $route "version" }}{{ $version = printf "%v" . }}{{ end -}}
+  {{- if not $version -}}
+  {{- with index $route "targetId" -}}
+  {{- $targetParts := split . ":" -}}
+  {{- $version = index $targetParts (sub (len $targetParts) 1) -}}
+  {{- end -}}
+  {{- end -}}
+  {{- $label := $version -}}
+  {{- if and $latestStableVersion (eq $version $latestStableVersion) -}}
+  {{- $label = printf "%s (latest)" $version -}}
+  {{- end -}}
+  {{- if $label -}}
+  {{- $releaseDocEntries = $releaseDocEntries | append (dict
+    "label" $label
+    "href" (index $route "path")
+    "kind" "release"
+    "version" $version
+    "orderKey" (printf "%s:%s" $version (index $route "path"))
+  ) -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- range sort $releaseDocEntries "orderKey" "desc" -}}
+    {{- $docsItems = $docsItems | append . -}}
+  {{- end -}}
+  {{- if $docsPath -}}
+    {{- $docsItems = $docsItems | append (dict "label" $developmentLabel "href" $docsPath "kind" "development") -}}
+  {{- end -}}
+
+  {{- $releaseAnchor := "" -}}
+  {{- if $componentPath -}}
+    {{- $releaseAnchor = printf "%s#release-lines" $componentPath -}}
+  {{- end -}}
+  {{- $releaseItems := slice -}}
+  {{- /* Latest-stable entry: new pipeline gives a plain string; no dedicated path yet, so
+       always fall back to the component landing anchor. */ -}}
+  {{- with $latestStableVersion -}}
+    {{- if $releaseAnchor -}}
+      {{- $releaseItems = $releaseItems | append (dict "label" (printf "Latest stable (%s)" .) "href" $releaseAnchor "kind" "latest") -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* Release lines: new field names are "key" (was "line") and "supportStatus" (was "status").
+       Both are checked so old and new pipeline output work without changes to the template. */ -}}
+  {{- range $releaseLine := $releaseLines -}}
+    {{- $lineKey := index $releaseLine "key" -}}
+    {{- if not $lineKey }}{{ $lineKey = index $releaseLine "line" }}{{ end -}}
+    {{- $lineStatus := index $releaseLine "supportStatus" -}}
+    {{- if not $lineStatus }}{{ $lineStatus = index $releaseLine "status" }}{{ end -}}
+    {{- $href := $releaseAnchor -}}
+    {{- with index $releaseLine "path" }}{{ $href = . }}{{ end -}}
+    {{- if $href -}}
+      {{- $releaseItems = $releaseItems | append (dict
+	"label" (printf "%s - %s" $lineKey $lineStatus)
+        "href" $href
+        "kind" "line"
+        "status" $lineStatus
+        "version" (index $releaseLine "latest")) -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- $isComponentLanding := false -}}
+  {{- with $page -}}
+    {{- $kind := index . "kind" -}}
+    {{- /* The new pipeline currently uses `component-page` both for the true
+         component landing page (`/components/<slug>/`) and for nested component
+         docs such as `/components/<slug>/how-to/...`. Only the true component
+         root should opt into the landing-page layout that hides the left docs
+         sidebar. */ -}}
+    {{- $componentLandingPath := "" -}}
+    {{- $componentLandingIndexPath := "" -}}
+    {{- with $componentPath -}}
+      {{- $componentLandingPath = strings.TrimSuffix "/" . -}}
+      {{- $componentLandingIndexPath = printf "%s/_index" $componentLandingPath -}}
+    {{- end -}}
+    {{- $pagePath := index . "path" -}}
+    {{- $normalizedPagePath := strings.TrimSuffix "/" $pagePath -}}
+    {{- $isComponentLanding = or (eq $kind "component-home") (and (eq $kind "component-page") (or (eq $normalizedPagePath $componentLandingPath) (eq $normalizedPagePath $componentLandingIndexPath))) -}}
+  {{- end -}}
+
+  {{- /* displayName: fall back to slug when the pipeline has not (yet) populated it. */ -}}
+  {{- $displayName := index $component "displayName" -}}
+  {{- if not $displayName }}{{ $displayName = index $component "slug" }}{{ end -}}
+  {{- $brandLabel := .Site.Title -}}
+  {{- with $displayName -}}
+    {{- $brandLabel = printf "%s - %s" $.Site.Title . -}}
+  {{- end -}}
+
+  {{- $context = dict
+    "enabled" true
+    "component" $component
+    "page" $page
+    "componentPath" $componentPath
+    "docsPath" $docsPath
+    "repositoryPath" $repositoryPath
+    "docsItems" $docsItems
+    "releaseAnchor" $releaseAnchor
+    "releaseItems" $releaseItems
+    "brandLabel" $brandLabel
+    "isComponentLanding" $isComponentLanding
+    "hasReleaseContent" (or (gt (len $releaseItems) 0) (or (gt (len $releaseLines) 0) $latestStableVersion))
+  -}}
+{{- end -}}
+{{- return $context -}}

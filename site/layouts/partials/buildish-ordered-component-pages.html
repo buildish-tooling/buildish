@@ -1,0 +1,89 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/*
+Return component pages in catalog order.
+
+The component index needs the staged component aggregate order. Hugo page
+weights alone cannot express cross-repository component ordering reliably.
+*/}}
+
+{{- $page := .page -}}
+{{- $componentPages := slice -}}
+{{- with .pages }}{{ $componentPages = . }}{{ end -}}
+{{- if and (eq (len $componentPages) 0) $page -}}
+  {{- $componentPages = where $page.Pages "Kind" "section" -}}
+{{- end -}}
+
+{{- /*
+     Component ordering lives in the staged data contract (`data/components.json`),
+     not in the generated component section front matter, so page-level `.ByWeight`
+     cannot see it. Build the ordered page slice from the staged component list and
+     append any unmatched pages afterward as a deterministic fallback.
+*/ -}}
+{{- $pagesBySlug := dict -}}
+{{- range $componentPages -}}
+  {{- $componentContext := partial "buildish-component-context.html" . -}}
+  {{- $slug := "" -}}
+  {{- with index $componentContext "component" -}}
+    {{- with index . "slug" }}{{ $slug = . }}{{ end -}}
+  {{- end -}}
+  {{- if $slug -}}
+    {{- $pagesBySlug = merge $pagesBySlug (dict $slug .) -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $catalogEntries := slice -}}
+{{- with index hugo.Data "components" -}}
+  {{- with .items -}}
+    {{- range $index, $item := . -}}
+      {{- $slug := "" -}}
+      {{- with index $item "slug" }}{{ $slug = . }}{{ end -}}
+      {{- if $slug -}}
+        {{- $weight := 0 -}}
+        {{- with index $item "weight" }}{{ $weight = int . }}{{ end -}}
+        {{- $catalogEntries = $catalogEntries | append (dict
+          "slug" $slug
+          "orderKey" (printf "%012d:%06d:%s" (add $weight 1000000) $index $slug)
+        ) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $orderedPages := slice -}}
+{{- $seen := dict -}}
+{{- range sort $catalogEntries "orderKey" -}}
+  {{- $slug := index . "slug" -}}
+  {{- with index $pagesBySlug $slug -}}
+    {{- $orderedPages = $orderedPages | append . -}}
+    {{- $seen = merge $seen (dict .RelPermalink true) -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $fallbackEntries := slice -}}
+{{- range $componentPages -}}
+  {{- if not (index $seen .RelPermalink) -}}
+    {{- $fallbackEntries = $fallbackEntries | append (dict
+      "page" .
+      "orderKey" .RelPermalink
+    ) -}}
+  {{- end -}}
+{{- end -}}
+{{- range sort $fallbackEntries "orderKey" -}}
+  {{- $orderedPages = $orderedPages | append (index . "page") -}}
+{{- end -}}
+
+{{- return $orderedPages -}}

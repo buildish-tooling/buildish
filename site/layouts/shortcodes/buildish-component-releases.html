@@ -1,0 +1,89 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/*
+Render a compact release summary for the current component.
+
+This is a generated metadata helper, not an authored link helper. It reads the
+staged component release metadata and emits the latest stable version plus known
+release lines.
+*/}}
+
+{{/* Resolve the current staged component context. */}}
+{{- $componentContext := partial "buildish-component-context.html" .Page -}}
+{{- $component := index $componentContext "component" -}}
+{{- if not $component -}}
+  {{- errorf "%q shortcode requires sitePipelineComponent context on %s" .Name .Page.RelPermalink -}}
+{{- end -}}
+
+{{/* Parse attributes. */}}
+{{- $optional := false -}}
+{{- with .Get "optional" }}{{ $optional = in (slice true "true" "True" "TRUE" 1 "1") . }}{{ end -}}
+{{- $heading := "" -}}
+{{- with .Get "heading" }}{{ $heading = printf "%v" . }}{{ end -}}
+
+{{- /* Collect release data.
+     New pipeline: latestStable is a plain version string and releaseLines live inside
+       pipeline.component.artifacts[N].latestStable / .releaseLines.
+       New field names: "key" (was "line") and "supportStatus" (was "status").
+     Old pipeline: latestStable was an object with a "version" sub-key and releaseLines
+       were direct fields on the component object.  Both are handled for compatibility.
+*/ -}}
+{{- $latestStableVersion := "" -}}
+{{- $releaseLines := slice -}}
+{{- with index $component "artifacts" -}}
+  {{- range $artifact := . -}}
+    {{- if not $latestStableVersion -}}
+      {{- with index $artifact "latestStable" }}{{ $latestStableVersion = printf "%v" . }}{{ end -}}
+    {{- end -}}
+    {{- if eq (len $releaseLines) 0 -}}
+      {{- with index $artifact "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $latestStableVersion -}}
+  {{- with index $component "latestStable" }}{{ with index . "version" }}{{ $latestStableVersion = . }}{{ end }}{{ end -}}
+{{- end -}}
+{{- if eq (len $releaseLines) 0 -}}
+  {{- with index $component "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
+{{- end -}}
+
+{{/* Convert the release metadata into display strings. */}}
+{{- $items := slice -}}
+{{- with $latestStableVersion -}}
+  {{- $items = $items | append (printf "Latest stable (%s)" .) -}}
+{{- end -}}
+{{- range $releaseLine := $releaseLines -}}
+  {{- $lineKey := index $releaseLine "key" -}}
+  {{- if not $lineKey }}{{ $lineKey = index $releaseLine "line" }}{{ end -}}
+  {{- $lineStatus := index $releaseLine "supportStatus" -}}
+  {{- if not $lineStatus }}{{ $lineStatus = index $releaseLine "status" }}{{ end -}}
+  {{- $item := printf "%s - %s" $lineKey $lineStatus -}}
+  {{- with index $releaseLine "latest" }}{{ $item = printf "%s (latest %s)" $item . }}{{ end -}}
+  {{- with index $releaseLine "aliases" }}{{ if gt (len .) 0 }}{{ $item = printf "%s; aliases: %s" $item (delimit . ", ") }}{{ end }}{{ end -}}
+  {{- $items = $items | append $item -}}
+{{- end -}}
+{{- if eq (len $items) 0 -}}
+  {{- if not $optional -}}
+    {{- errorf "%q shortcode found no release metadata on %s" .Name .Page.RelPermalink -}}
+  {{- end -}}
+{{- else -}}
+  <div class="buildish-component-releases" id="release-lines">
+    {{- with $heading }}<h2>{{ . }}</h2>{{ end -}}
+    <ul class="buildish-component-releases__list">
+      {{- range $items }}<li>{{ . }}</li>{{ end -}}
+    </ul>
+  </div>
+{{- end -}}

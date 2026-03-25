@@ -1,0 +1,101 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/*
+Return layout-only source-link context for a page.
+
+Pipeline-staged pages must provide complete pipeline.page.source provenance.
+This Buildish consumer supports HTTPS github.com repositories and fails closed
+for other forge URL shapes. Direct Buildish content falls back to the
+repository settings in hugo.yaml.
+*/}}
+
+{{- $page := . -}}
+{{- $repository := "" -}}
+{{- $sourcePath := "" -}}
+{{- $viewRef := "" -}}
+{{- $editRef := "" -}}
+{{- $hasPipelinePage := false -}}
+{{- with index $page.Params "pipeline" -}}
+  {{- with index . "page" -}}
+    {{- $hasPipelinePage = true -}}
+    {{- with index . "source" -}}
+      {{- with index . "repository" }}{{ $repository = strings.TrimSuffix "/" . }}{{ end -}}
+      {{- with index . "path" }}{{ $sourcePath = strings.TrimPrefix "/" . }}{{ end -}}
+      {{- with index . "viewRef" }}{{ $viewRef = strings.Trim . "/" }}{{ end -}}
+      {{- with index . "editRef" }}{{ $editRef = strings.Trim . "/" }}{{ end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $isStagedFile := false -}}
+{{- $nativePath := "" -}}
+{{- with $page.File -}}
+  {{- $filename := replace .Filename "\\" "/" -}}
+  {{- $workingDir := replace hugo.WorkingDir "\\" "/" -}}
+  {{- $isStagedFile = or (strings.Contains $filename "/.stage/") (strings.HasPrefix $filename ".stage/") -}}
+  {{- $nativePath = strings.TrimPrefix (add $workingDir "/") $filename -}}
+  {{- $nativePath = strings.TrimPrefix "/" $nativePath -}}
+{{- end -}}
+
+{{- if and (not $hasPipelinePage) (not $isStagedFile) $nativePath -}}
+  {{- with $page.Param "github_repo" }}{{ $repository = strings.TrimSuffix "/" . }}{{ end -}}
+  {{- $nativeRef := $page.Param "github_branch" | default "main" -}}
+  {{- $viewRef = strings.Trim $nativeRef "/" -}}
+  {{- $editRef = $viewRef -}}
+  {{- $nativeSubdir := $page.Param "github_subdir" | default "" -}}
+  {{- $sourcePath = path.Join $nativeSubdir $nativePath -}}
+{{- end -}}
+
+{{- $supportedRepository := "" -}}
+{{- with $repository -}}
+  {{- $parsedRepository := urls.Parse . -}}
+  {{- $repositoryPathParts := split (strings.Trim $parsedRepository.Path "/") "/" -}}
+  {{- if and
+    (eq $parsedRepository.Scheme "https")
+    (eq $parsedRepository.Host "github.com")
+    (eq (len $repositoryPathParts) 2)
+    (not $parsedRepository.RawQuery)
+    (not $parsedRepository.Fragment)
+  -}}
+    {{- $supportedRepository = strings.TrimSuffix ".git" . -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $viewURL := "" -}}
+{{- if and $supportedRepository $sourcePath $viewRef -}}
+  {{- $escapedSourcePath := partial "buildish-url-path-escape.html" $sourcePath -}}
+  {{- $escapedViewRef := partial "buildish-url-path-escape.html" $viewRef -}}
+  {{- $viewURL = printf "%s/blob/%s/%s" $supportedRepository $escapedViewRef $escapedSourcePath -}}
+{{- end -}}
+{{- $editURL := "" -}}
+{{- $newPageURL := "" -}}
+{{- if and $supportedRepository $sourcePath $editRef -}}
+  {{- $escapedSourcePath := partial "buildish-url-path-escape.html" $sourcePath -}}
+  {{- $escapedEditRef := partial "buildish-url-path-escape.html" $editRef -}}
+  {{- $editURL = printf "%s/edit/%s/%s" $supportedRepository $escapedEditRef $escapedSourcePath -}}
+  {{- with resources.Get "stubs/new-page-template.md" -}}
+    {{- $newPageQuery := querify "value" .Content "filename" "change-me.md" -}}
+    {{- $newPageURL = printf "%s/new/%s/%s?%s" $supportedRepository $escapedEditRef (path.Dir $escapedSourcePath) $newPageQuery -}}
+  {{- end -}}
+{{- end -}}
+
+{{- return (dict
+  "repository" $supportedRepository
+  "sourcePath" $sourcePath
+  "viewURL" $viewURL
+  "editURL" $editURL
+  "newPageURL" $newPageURL
+) -}}
