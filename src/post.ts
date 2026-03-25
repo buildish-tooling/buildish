@@ -16,12 +16,15 @@
 
 import * as core from '@actions/core';
 
-import { bootstrapPhase } from './bootstrap';
+import { executePostAction } from './post-flow';
 
 export async function runPost(): Promise<void> {
-  const status = await bootstrapPhase('post');
-  if (status.baseCacheResult) {
-    core.info(status.baseCacheResult.message);
+  const status = await executePostAction();
+  if (status.bootstrap.baseCacheResult) {
+    core.info(status.bootstrap.baseCacheResult.message);
+  }
+  if (status.deltaArtifactResult) {
+    core.info(status.deltaArtifactResult.message);
   }
   core.info(status.message);
 }
