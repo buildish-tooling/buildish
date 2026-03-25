@@ -286,7 +286,10 @@ implementable design.
 14. Unit test suite
     - Cover validation, wrapper logic, caching, artifacts, merging, and summaries.
 15. Make sure the delta artifacts are either deleted after the aggregator job has finished or after 12 hours.
-16. Integration workflow suite
+16. Add a safeguard to prevent the action from run more than once per job.
+17. Built-in invocation of `actions/setup-java`
+18. Support macOS and Windows runners
+19. Integration workflow suite
     - Those workflows are not part of the action itself, but required to run integration tests.
     - Add real GitHub workflow tests for standalone, distributed, read-only, and failure scenarios.
       - Single job workflow
@@ -297,9 +300,6 @@ implementable design.
       - Read-only mode
         - Exercise for standalone and distributed jobs
       - Failure handling
-17. Add a safeguard to prevent the action from run more than once per job.
-18. Built-in invocation of `actions/setup-java`
-19. Support macOS and Windows runners
 20. Cleanup job summary
 21. Cleanup the code base
 22. Documentation
