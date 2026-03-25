@@ -37,19 +37,49 @@ import { provisionWrapperJars } from './wrapper/download';
 import { validateTargetWrapperProperties } from './wrapper/static-validation';
 import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from './wrapper/types';
 
+/**
+ * Action execution phase.
+ *
+ * Valid values are `main` for the primary action entrypoint and `post` for the GitHub post-action
+ * cleanup/save entrypoint.
+ */
 export type BootstrapPhase = 'main' | 'post';
 
 /**
  * Bootstrap output shared by the action entrypoints and tests.
  */
 export interface BootstrapStatus {
+  /** Phase currently being prepared. Valid values are `main` and `post`. */
   readonly phase: BootstrapPhase;
+  /** Human-readable one-line status summary generated from the normalized context and config. */
   readonly message: string;
+  /** Fully normalized action configuration used by later modules. */
   readonly config: NormalizedActionConfig;
+  /** Provider-neutral CI metadata for the current job execution. */
   readonly ciContext: CiJobContext;
+  /**
+   * Fully derived cache model, or `null` when `config.cacheEnabled` is `false`.
+   *
+   * Defaults to `null` in `createBootstrapStatus()`.
+   */
   readonly cacheModel: CacheModel | null;
+  /**
+   * Base cache restore/save outcome for the current phase, or `null` when caching is disabled.
+   *
+   * Defaults to `null` in `createBootstrapStatus()`.
+   */
   readonly baseCacheResult: BaseCacheOperationResult | null;
+  /**
+   * Wrapper properties files validated during bootstrap.
+   *
+   * Defaults to an empty array and is empty in the `post` phase.
+   */
   readonly validatedWrappers: readonly ValidatedWrapperPropertiesFile[];
+  /**
+   * Wrapper JAR provisioning results for validated wrappers.
+   *
+   * Defaults to an empty array and is empty in the `post` phase.
+   */
   readonly provisionedWrappers: readonly ProvisionedWrapperJar[];
 }
 
@@ -57,11 +87,41 @@ export interface BootstrapStatus {
  * Injectable dependencies for bootstrap-time environment/input discovery.
  */
 export interface BootstrapDependencies extends GitHubPlatformOptions {
+  /**
+   * Optional action-input provider override.
+   *
+   * Defaults to the GitHub Actions input API when omitted.
+   */
   readonly inputProvider?: InputProvider;
+  /**
+   * Optional `fetch` override used by wrapper download tests.
+   *
+   * Defaults to the runtime global `fetch` when omitted.
+   */
   readonly fetchImpl?: typeof fetch;
+  /**
+   * Optional command-capture override for Java version detection.
+   *
+   * Defaults to the internal child-process implementation when omitted.
+   */
   readonly captureCommandOutput?: CommandOutputCapture;
+  /**
+   * Optional cache-service override.
+   *
+   * Defaults to the `@actions/cache` toolkit module when omitted.
+   */
   readonly cacheApi?: BaseCacheApi;
+  /**
+   * Optional post-action state writer override.
+   *
+   * Defaults to `@actions/core.saveState` when omitted.
+   */
   readonly saveState?: (name: string, value: string) => void;
+  /**
+   * Optional post-action state reader override.
+   *
+   * Defaults to `@actions/core.getState` when omitted.
+   */
   readonly getState?: (name: string) => string;
 }
 

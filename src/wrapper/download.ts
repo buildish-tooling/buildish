@@ -33,9 +33,29 @@ const DEFAULT_RETRY_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 1000;
 
 export interface WrapperProvisionOptions {
+  /**
+   * Optional HTTP fetch implementation override.
+   *
+   * Defaults to the runtime global `fetch` when omitted.
+   */
   readonly fetchImpl?: typeof fetch;
+  /**
+   * Optional sleep implementation used between retry attempts.
+   *
+   * Defaults to the internal timer-based sleep helper when omitted.
+   */
   readonly sleep?: (milliseconds: number) => Promise<unknown>;
+  /**
+   * Maximum number of download attempts per resource.
+   *
+   * Defaults to `3` and must be an integer between `1` and `10` inclusive.
+   */
   readonly retryAttempts?: number;
+  /**
+   * Base retry delay in milliseconds before exponential backoff is applied.
+   *
+   * Defaults to `1000` and must be an integer between `0` and `60000` inclusive.
+   */
   readonly retryDelayMs?: number;
 }
 

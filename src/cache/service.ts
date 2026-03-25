@@ -30,12 +30,33 @@ const REF_NAME_PLACEHOLDER = '${refName}';
  * restore/save classification can be exercised without the GitHub cache runtime.
  */
 export interface BaseCacheApi {
+  /**
+   * Reports whether the GitHub cache runtime is usable in the current execution environment.
+   *
+   * Returns `false` in local smoke runs or unsupported runners; restore/save then degrade to a
+   * documented skip result instead of failing.
+   */
   isFeatureAvailable(): boolean;
+  /**
+   * Attempts to restore the cache for the primary key and optional prefix fallback keys.
+   *
+   * @param paths Ordered include paths plus negated excludes in the `@actions/cache` format.
+   * @param primaryKey Exact cache key for the current job.
+   * @param restoreKeys Optional ordered prefix keys used after a primary-key miss.
+   * @returns The matched cache key, or `undefined` when nothing was restored.
+   */
   restoreCache(
     paths: string[],
     primaryKey: string,
     restoreKeys?: string[],
   ): Promise<string | undefined>;
+  /**
+   * Attempts to create a new cache entry for the given key.
+   *
+   * @param paths Ordered include paths plus negated excludes in the `@actions/cache` format.
+   * @param key Exact cache key to reserve and save.
+   * @returns Positive cache ID on success; non-positive values indicate no new entry was created.
+   */
   saveCache(paths: string[], key: string): Promise<number>;
 }
 
@@ -54,7 +75,17 @@ export interface BaseCacheServiceDependencies {
  * orchestration can make policy decisions without reinterpreting raw toolkit return values.
  */
 export interface BaseCacheRestoreResult {
+  /** Discriminator for bootstrap consumers; always `restore` for this result shape. */
   readonly operation: 'restore';
+  /**
+   * Restore outcome classification.
+   *
+   * Valid values:
+   * - `feature-unavailable`: cache service unavailable in this environment
+   * - `miss`: no cache matched
+   * - `exact-hit`: exact primary key match restored
+   * - `partial-hit`: a prefix restore key matched instead of the primary key
+   */
   readonly status: 'feature-unavailable' | 'miss' | 'exact-hit' | 'partial-hit';
   /** Primary cache key derived for the current job. */
   readonly cacheKey: string;
@@ -75,7 +106,19 @@ export interface BaseCacheRestoreResult {
  * particular, save is skipped in modes that would create unsafe or redundant concurrent writers.
  */
 export interface BaseCacheSaveResult {
+  /** Discriminator for bootstrap consumers; always `save` for this result shape. */
   readonly operation: 'save';
+  /**
+   * Save outcome classification.
+   *
+   * Valid values:
+   * - `not-armed`: post phase was not paired with an armed main phase
+   * - `read-only`: config forbids writes
+   * - `distributed-worker`: worker jobs do not save shared base caches
+   * - `feature-unavailable`: cache service unavailable in this environment
+   * - `saved`: a new cache entry was created
+   * - `not-saved`: toolkit ran but did not create a new cache entry
+   */
   readonly status:
     | 'not-armed'
     | 'read-only'

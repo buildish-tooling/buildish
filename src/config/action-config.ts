@@ -40,6 +40,17 @@ const CACHE_SCHEMA_VERSION = 1;
  * real `@actions/core` implementation.
  */
 export interface InputProvider {
+  /**
+   * Reads a named action input.
+   *
+   * @param name GitHub Actions input name such as `cache-enabled` or `job-mode`.
+   * @param options Optional read behavior passed through to the provider.
+   * @param options.required When `true`, the provider may throw if the input is absent. This module
+   *   currently relies on explicit normalization defaults instead of required inputs.
+   * @param options.trimWhitespace When `true`, surrounding whitespace is removed before returning.
+   *   `readActionInputs()` always requests trimmed values.
+   * @returns Raw string input value; missing optional inputs are returned as an empty string.
+   */
   getInput(name: string, options?: { required?: boolean; trimWhitespace?: boolean }): string;
 }
 
@@ -47,8 +58,23 @@ export interface InputProvider {
  * Extra state required to turn raw user inputs into normalized runtime configuration.
  */
 export interface NormalizeActionConfigOptions {
+  /**
+   * Action phase being normalized.
+   *
+   * Valid values are `main` and `post`; this is supplied by bootstrap, not user input.
+   */
   readonly phase: 'main' | 'post';
+  /**
+   * Provider-neutral CI context used for event-dependent defaults.
+   *
+   * This is required so read-only mode and other derived behavior do not depend on raw env access.
+   */
   readonly ciContext: CiJobContext;
+  /**
+   * Optional environment override used for supported Gradle user home resolution.
+   *
+   * Defaults to `process.env`-equivalent runtime state when omitted by higher-level callers.
+   */
   readonly env?: NodeJS.ProcessEnv;
 }
 

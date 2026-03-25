@@ -31,13 +31,55 @@ const CACHE_KEY_PATTERN = /^[A-Za-z0-9._:-]{1,512}$/;
  * cache restore/save or delta-manifest logic.
  */
 export interface CacheModel {
+  /**
+   * Fully resolved primary cache key for this job.
+   *
+   * Must satisfy the GitHub cache key constraints enforced by `CACHE_KEY_PATTERN`: only
+   * `[A-Za-z0-9._:-]` characters and a maximum length of 512 characters.
+   */
   readonly cacheKey: string;
+  /**
+   * Detected Java major version from `java -version`.
+   *
+   * Must be an integer >= 8; versions below 8 are rejected during model creation.
+   */
   readonly javaMajor: number;
+  /**
+   * Normalized runner operating system, lower-cased by the CI adapter.
+   *
+   * Typical values include `linux`, `windows`, and `macos`.
+   */
   readonly runnerOs: string;
+  /**
+   * Normalized runner architecture, lower-cased by the CI adapter.
+   *
+   * Typical values include `x64`, `arm64`, and `x86`.
+   */
   readonly runnerArch: string;
+  /**
+   * Ref name sanitized for safe cache-key usage.
+   *
+   * This is derived by the CI adapter and excludes path separators or other cache-unsafe
+   * characters.
+   */
   readonly safeRefName: string;
+  /**
+   * Ordered logical cache partitions that make up the Gradle cache model.
+   *
+   * Currently contains five partitions from `createCachePartitions()`.
+   */
   readonly partitions: readonly CachePartitionDefinition[];
+  /**
+   * Absolute include globs aggregated from all partitions.
+   *
+   * These are passed to cache and filesystem operations in listed order.
+   */
   readonly includePaths: readonly string[];
+  /**
+   * Absolute exclude globs aggregated and de-duplicated from all partitions.
+   *
+   * Always includes the shared exclusions for configuration-cache content and `*.lock` files.
+   */
   readonly excludePaths: readonly string[];
 }
 
@@ -49,12 +91,40 @@ export interface CacheModel {
  * to pass to filesystem or cache APIs for the current `gradleUserHome`.
  */
 export interface CachePartitionDefinition {
+  /**
+   * Stable machine-readable partition identifier.
+   *
+   * Valid values are `modules`, `transforms-metadata`, `kotlin-dsl`, `build-cache`, and
+   * `wrapper-dists`.
+   */
   readonly id: 'modules' | 'transforms-metadata' | 'kotlin-dsl' | 'build-cache' | 'wrapper-dists';
+  /** Short human-readable partition label for logs and summaries. */
   readonly displayName: string;
+  /** Longer human-readable explanation of what the partition stores. */
   readonly description: string;
+  /**
+   * Partition include globs relative to `gradleUserHome`.
+   *
+   * These remain stable across machines and are preferred for manifests and tests.
+   */
   readonly relativeIncludeGlobs: readonly string[];
+  /**
+   * Partition exclude globs relative to `gradleUserHome`.
+   *
+   * Every partition currently excludes configuration-cache content and `*.lock` files.
+   */
   readonly relativeExcludeGlobs: readonly string[];
+  /**
+   * Absolute include globs rooted under the effective `gradleUserHome`.
+   *
+   * These are the concrete paths used by cache restore/save operations for the current runner.
+   */
   readonly absoluteIncludeGlobs: readonly string[];
+  /**
+   * Absolute exclude globs rooted under the effective `gradleUserHome`.
+   *
+   * These mirror `relativeExcludeGlobs` after joining against `gradleUserHome`.
+   */
   readonly absoluteExcludeGlobs: readonly string[];
 }
 
@@ -65,7 +135,17 @@ export interface CachePartitionDefinition {
  * environment when detection must not read from `process.env`.
  */
 export interface CacheModelOptions {
+  /**
+   * Optional command runner override used for Java detection.
+   *
+   * Defaults to the internal child-process implementation when omitted.
+   */
   readonly captureCommandOutput?: CommandOutputCapture;
+  /**
+   * Optional environment override used during Java detection.
+   *
+   * Defaults to `process.env` when omitted.
+   */
   readonly env?: NodeJS.ProcessEnv;
 }
 
@@ -74,6 +154,11 @@ export interface CacheModelOptions {
  *
  * The cache model currently uses this for Java version detection, but keeping it typed makes the
  * bootstrap path deterministic in tests and avoids coupling callers to `child_process` directly.
+ *
+ * @param command Executable name or absolute path. Defaults to `java` in the built-in caller.
+ * @param args Command arguments, typically `['-version']` for Java detection.
+ * @param env Optional environment to run with; if omitted, the current process environment is used.
+ * @returns Combined stdout/stderr text from the completed command.
  */
 export type CommandOutputCapture = (
   command: string,
