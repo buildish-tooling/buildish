@@ -1,0 +1,68 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/*
+Docsy section-index override.
+
+Uses Buildish title/description fallback helpers so staged pages without
+authored front matter still render useful section cards.
+*/}}
+
+<div class="section-index">
+    {{ $page := .Page -}}
+    {{ $isComponentsLanding := and (eq $page.Section "components") (eq $page.RelPermalink ("/components/" | relURL)) -}}
+    {{ $pages := slice -}}
+    {{ if $isComponentsLanding -}}
+        {{ $pages = where $page.Pages "Kind" "section" -}}
+        {{ $pages = (where $pages "Type" "!=" "search") -}}
+        {{ $pages = (where $pages ".Params.hide_summary" "!=" true) -}}
+        {{ $pages = partial "buildish-ordered-component-pages.html" (dict "page" $page "pages" $pages) -}}
+    {{ else -}}
+        {{ $pages = (where .Site.Pages "Section" .Section).ByWeight -}}
+        {{ $pages = (where $pages "Type" "!=" "search") -}}
+        {{ $pages = (where $pages ".Params.hide_summary" "!=" true) -}}
+        {{ $pages = (where $pages ".Parent" "!=" nil) -}}
+        {{ $pages = (where $pages ".Parent.File" "!=" nil) -}}
+        {{ if $page.File -}}
+            {{ $pages = (where $pages "Parent.File.UniqueID" "==" $page.File.UniqueID) -}}
+        {{ end -}}
+    {{ end -}}
+    {{ if or $page.Params.no_list (eq (len $pages) 0) -}}
+    {{/* If no_list is true or we don't have subpages we don't show a list of subpages */}}
+    {{ else if $page.Params.simple_list -}}
+    {{/* If simple_list is true we show a bulleted list of subpages */}}
+        <ul>
+            {{ range $pages -}}
+                {{ $manualLink := cond (isset .Params "manuallink") .Params.manualLink ( cond (isset .Params "manuallinkrelref") (relref . .Params.manualLinkRelref) .RelPermalink) }}
+                {{ $resolvedTitle := partial "buildish-resolved-title.html" (dict "page" . "preferLinkTitle" true) -}}
+                <li><a href="{{ $manualLink }}"{{ with .Params.manualLinkTitle }} title="{{ . }}"{{ end }}{{ with .Params.manualLinkTarget }} target="{{ . }}"{{ if eq . "_blank" }} rel="noopener"{{ end }}{{ end }}>{{- $resolvedTitle -}}</a></li>
+            {{ end -}}
+        </ul>
+    {{ else -}}
+    {{/* Otherwise we show a nice formatted list of subpages with page descriptions */}}
+    <hr class="panel-line">
+        {{ range $pages -}}
+            {{ $manualLink := cond (isset .Params "manuallink") .Params.manualLink ( cond (isset .Params "manuallinkrelref") (relref . .Params.manualLinkRelref) .RelPermalink) -}}
+            {{ $resolvedTitle := partial "buildish-resolved-title.html" (dict "page" . "preferLinkTitle" true) -}}
+            {{ $resolvedDescription := partial "buildish-resolved-description.html" (dict "page" .) -}}
+            <div class="entry">
+                <h5>
+                    <a href="{{ $manualLink }}"{{ with .Params.manualLinkTitle }} title="{{ . }}"{{ end }}{{ with .Params.manualLinkTarget }} target="{{ . }}"{{ if eq . "_blank" }} rel="noopener"{{ end }}{{ end }}>{{- $resolvedTitle -}}</a>
+                </h5>
+                <p>{{ $resolvedDescription | markdownify -}}</p>
+            </div>
+        {{ end -}}
+    {{ end -}}
+</div>

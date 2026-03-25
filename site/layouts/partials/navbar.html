@@ -1,0 +1,158 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/*
+Main navigation override.
+
+On component pages this renders component-aware Docs, Releases, and Source
+entries before the global site menu. The docs dropdown separates release docs
+from Developer Docs (unreleased).
+*/}}
+
+{{/* Resolve global and component navigation context. */}}
+{{ $p := . -}}
+{{ $baseURL := urls.Parse .Site.BaseURL -}}
+{{ $componentsPage := .Site.GetPage "/components" -}}
+{{ $componentSections := slice -}}
+{{ with $componentsPage }}{{ $componentSections = partial "buildish-ordered-component-pages.html" (dict "page" . "pages" (where .Pages "Kind" "section")) }}{{ end -}}
+{{ $componentContext := partial "buildish-component-context.html" . -}}
+{{ $componentMode := index $componentContext "enabled" -}}
+{{ $componentPage := dict -}}
+{{ $componentPath := "" -}}
+{{ $componentDisplayName := "" -}}
+{{ $componentDocsItems := slice -}}
+{{ $componentReleaseItems := slice -}}
+{{ $componentRepositoryPath := "" -}}
+{{ $componentDocsActive := false -}}
+{{ $componentReleasesActive := false -}}
+{{ $hasGlobalItems := or (gt (len .Site.Menus.main) 0) (or .Site.Params.versions (or (gt (len .Site.Home.Translations) 0) .Site.Params.ui.showLightDarkModeMenu)) -}}
+{{ with index $componentContext "page" }}{{ $componentPage = . }}{{ end -}}
+{{ with index $componentContext "componentPath" }}{{ $componentPath = . }}{{ end -}}
+{{ with index $componentContext "repositoryPath" }}{{ $componentRepositoryPath = . }}{{ end -}}
+{{ with index $componentContext "docsItems" }}{{ $componentDocsItems = . }}{{ end -}}
+{{ with index $componentContext "releaseItems" }}{{ $componentReleaseItems = . }}{{ end -}}
+{{ with index $componentContext "component" }}{{ with index . "displayName" }}{{ $componentDisplayName = . }}{{ end }}{{ end -}}
+{{ with index $componentPage "section" }}{{ $componentDocsActive = in (slice "component" "development" "docs") . }}{{ $componentReleasesActive = eq . "releases" }}{{ end -}}
+
+<nav class="td-navbar js-navbar-scroll" data-bs-theme="dark">
+<div class="td-navbar-container container-fluid flex-column flex-md-row">
+  <div class="td-navbar__top"><div class="navbar-brand"><a class="navbar-brand__home" href="{{ .Site.Home.RelPermalink }}"><span class="navbar-brand__logo navbar-logo" aria-hidden="true">{{ partial "buildish-pipeline-icon.html" (dict "gradientId" "buildish-navbar-panel") }}</span><span class="navbar-brand__name">{{ .Site.Title }}</span></a>{{ if and $componentMode $componentDisplayName $componentPath }}<span class="navbar-brand__divider" aria-hidden="true"></span><a class="navbar-brand__component" href="{{ $componentPath }}"><span class="navbar-brand__context">{{ $componentDisplayName }}</span></a>{{ end }}</div><button class="navbar-toggler td-navbar__toggle collapsed d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#main_navbar" aria-controls="main_navbar" aria-expanded="false" aria-label="Toggle site navigation"><span class="navbar-toggler-icon"></span></button></div>
+  <div class="collapse d-md-flex td-navbar__main td-navbar-nav-scroll td-navbar-nav-scroll--indicator" id="main_navbar">
+    <div class="scroll-indicator scroll-left"></div>
+    <ul class="navbar-nav">
+      {{ if $componentMode }}
+      {{ if gt (len $componentDocsItems) 0 }}
+      <li class="nav-item dropdown navbar-item--component">
+        <a class="nav-link dropdown-toggle d-none d-md-flex{{ if $componentDocsActive }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>Docs</span></a>
+        <span class="nav-link navbar-mobile-section-title d-md-none{{ if $componentDocsActive }} active{{ end }}"><span>Docs</span></span>
+        <ul class="dropdown-menu">
+		{{ $previousDocsKind := "" -}}
+          {{ range $componentDocsItems }}
+		{{ $itemKind := .kind | default "" -}}
+		{{ if and $previousDocsKind (ne $previousDocsKind $itemKind) (or (eq $itemKind "release") (eq $itemKind "development")) }}
+		<li><hr class="dropdown-divider"></li>
+		{{ end }}
+          {{ $itemActive := eq $p.RelPermalink .href }}
+          {{ if and .href (hasPrefix $p.RelPermalink .href) (ne .href $componentPath) }}{{ $itemActive = true }}{{ end }}
+          <li><a class="dropdown-item{{ if $itemActive }} active{{ end }}" href="{{ .href }}">{{ .label }}</a></li>
+		{{ $previousDocsKind = $itemKind -}}
+          {{ end }}
+        </ul>
+      </li>
+      {{ end }}
+      {{ if gt (len $componentReleaseItems) 0 }}
+      <li class="nav-item dropdown navbar-item--component">
+        <a class="nav-link dropdown-toggle d-none d-md-flex{{ if $componentReleasesActive }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>Releases</span></a>
+        <span class="nav-link navbar-mobile-section-title d-md-none{{ if $componentReleasesActive }} active{{ end }}"><span>Releases</span></span>
+        <ul class="dropdown-menu">
+          {{ range $componentReleaseItems }}
+          {{ $itemActive := eq $p.RelPermalink .href }}
+          <li><a class="dropdown-item{{ if $itemActive }} active{{ end }}" href="{{ .href }}">{{ .label }}</a></li>
+          {{ end }}
+        </ul>
+      </li>
+      {{ else if index $componentContext "hasReleaseContent" }}
+      {{ with index $componentContext "releaseAnchor" }}
+      <li class="nav-item navbar-item--component"><a class="nav-link{{ if $componentReleasesActive }} active{{ end }}" href="{{ . }}"><span>Releases</span></a></li>
+      {{ end }}
+      {{ end }}
+      {{ with $componentRepositoryPath }}
+      <li class="nav-item navbar-item--component"><a class="nav-link" href="{{ . }}" target="_blank" rel="noopener"><span>Source</span></a></li>
+      {{ end }}
+      {{ if $hasGlobalItems }}
+      <li class="nav-item navbar-group-separator" aria-hidden="true"><span class="navbar-group-separator__line"></span></li>
+      {{ end }}
+      {{ end }}
+      {{ range .Site.Menus.main -}}
+      {{ $menu := . -}}
+      {{ $href := "" -}}
+      {{ with $menu.Page -}}
+      {{ $href = .RelPermalink }}
+      {{ else -}}
+      {{ if $menu.URL -}}{{ $href = $menu.URL | relLangURL }}{{ end -}}
+      {{ end -}}
+      {{ $isComponents := eq $menu.Identifier "components" -}}
+      {{ $hasChildren := or $menu.HasChildren (and $isComponents (gt (len $componentSections) 0)) -}}
+      {{ $active := or ($p.IsMenuCurrent "main" $menu) ($p.HasMenuCurrent "main" $menu) -}}
+      {{ if and $isComponents $componentsPage }}{{ $active = or $active (eq $p.RelPermalink $componentsPage.RelPermalink) ($p.IsDescendant $componentsPage) }}{{ end -}}
+      {{ if and $componentMode $isComponents $componentsPage }}{{ $active = eq $p.RelPermalink $componentsPage.RelPermalink }}{{ end -}}
+      {{ if $hasChildren }}
+      <li class="nav-item dropdown{{ if $componentMode }} navbar-item--global{{ end }}">
+        <a class="nav-link dropdown-toggle d-none d-md-flex{{ if $active }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>{{ $menu.Name }}</span></a>
+        <span class="nav-link navbar-mobile-section-title d-md-none{{ if $active }} active{{ end }}"><span>{{ $menu.Name }}</span></span>
+        <ul class="dropdown-menu">
+          {{ if $isComponents }}
+          <li><a class="dropdown-item{{ if and $componentsPage (eq $p.RelPermalink $componentsPage.RelPermalink) }} active{{ end }}" href="{{ with $componentsPage }}{{ .RelPermalink }}{{ else }}{{ "/components/" | relURL }}{{ end }}">All components</a></li>
+          {{ if gt (len $componentSections) 0 }}<li><hr class="dropdown-divider"></li>{{ end }}
+          {{ range $componentSections }}
+          {{- /* The pipeline does not inject a top-level title: field, so .Title is empty.
+               Read displayName from the pipeline front matter and fall back to the slug,
+               then to Hugo's derived title as a last resort. */ -}}
+          {{- $sectionTitle := .Title -}}
+          {{- with index .Params "pipeline" -}}
+            {{- with index . "component" -}}
+              {{- with index . "displayName" }}{{ $sectionTitle = . }}{{ else }}{{ with index . "slug" }}{{ $sectionTitle = . }}{{ end }}{{ end -}}
+            {{- end -}}
+          {{- end -}}
+          <li><a class="dropdown-item{{ if or (eq $p.RelPermalink .RelPermalink) ($p.IsDescendant .) }} active{{ end }}" href="{{ .RelPermalink }}">{{ $sectionTitle }}</a></li>
+          {{ end }}
+          {{ else }}
+          {{ range $child := $menu.Children }}
+          {{ $childHref := "" }}
+          {{ with $child.Page }}{{ $childHref = .RelPermalink }}{{ else }}{{ $childHref = $child.URL | relLangURL }}{{ end }}
+          {{ $childActive := $p.IsMenuCurrent "main" $child }}
+          {{ $parsedChildURL := urls.Parse $child.URL }}
+          {{ $isExternal := and $child.URL $parsedChildURL.Host (ne $baseURL.Host $parsedChildURL.Host) }}
+          <li><a class="dropdown-item{{ if $childActive }} active{{ end }}" href="{{ $childHref }}"{{ if $isExternal }} target="_blank" rel="noopener"{{ end }}>{{ $child.Name }}</a></li>
+          {{ if and (eq $menu.Identifier "community") (eq $child.Identifier "community-overview") }}<li><hr class="dropdown-divider"></li>{{ end }}
+          {{ end }}
+          {{ end }}
+        </ul>
+      </li>
+      {{ else }}
+      {{ $parsedMenuURL := urls.Parse $menu.URL }}
+      {{ $isExternal := and $menu.URL $parsedMenuURL.Host (ne $baseURL.Host $parsedMenuURL.Host) }}
+      <li class="nav-item{{ if $componentMode }} navbar-item--global{{ end }}"><a class="nav-link{{ if $active }} active{{ end }}" href="{{ $href }}"{{ if $isExternal }} target="_blank" rel="noopener"{{ end }}><span>{{ $menu.Name }}</span></a></li>
+      {{ end }}
+      {{ end -}}
+      {{ if .Site.Params.versions -}}<li class="nav-item dropdown d-none d-lg-block{{ if $componentMode }} navbar-item--global{{ end }}">{{ partial "navbar-version-selector.html" . -}}</li>{{ end -}}
+      {{ if (gt (len .Site.Home.Translations) 0) -}}<li class="nav-item dropdown d-none d-lg-block{{ if $componentMode }} navbar-item--global{{ end }}">{{ partial "navbar-lang-selector.html" . -}}</li>{{ end -}}
+      {{ if .Site.Params.ui.showLightDarkModeMenu -}}<li class="td-light-dark-menu nav-item dropdown{{ if $componentMode }} navbar-item--global{{ end }}">{{ partial "theme-toggler" . }}</li>{{ end -}}
+    </ul>
+    <div class="scroll-indicator scroll-right"></div>
+  </div>
+  <div class="td-navbar__search d-none d-lg-block">{{ partial "search-input.html" . }}</div>
+</div>
+</nav>

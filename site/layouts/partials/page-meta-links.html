@@ -1,0 +1,54 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/*
+Render Docsy-compatible page metadata links using real source provenance.
+
+This layout-only override prevents Hugo's staged .File.Filename from leaking
+into repository URLs while retaining Docsy's Markdown, issue, and print links.
+*/}}
+
+{{- if .File -}}
+  {{- $sourceContext := partial "buildish-page-source-context.html" . -}}
+  {{- $viewURL := index $sourceContext "viewURL" -}}
+  {{- $editURL := index $sourceContext "editURL" -}}
+  {{- $newPageURL := index $sourceContext "newPageURL" -}}
+  {{- $issueRepository := .Param "github_repo" -}}
+  <div class="td-page-meta ms-2 pb-1 pt-2 mb-0">
+  {{- with .AlternativeOutputFormats.Get "markdown" }}
+    <a href="{{ .RelPermalink }}" class="td-page-meta__markdown"><i class="fa-brands fa-markdown fa-fw"></i> {{ T "post_view_markdown" }}</a>
+  {{- end }}
+  {{- with $viewURL }}
+    <a href="{{ . }}" class="td-page-meta--view td-page-meta__view" target="_blank" rel="noopener"><i class="fa-solid fa-file-lines fa-fw"></i> {{ T "post_view_this" }}</a>
+  {{- end }}
+  {{- with $editURL }}
+    <a href="{{ . }}" class="td-page-meta--edit td-page-meta__edit" target="_blank" rel="noopener"><i class="fa-solid fa-pen-to-square fa-fw"></i> {{ T "post_edit_this" }}</a>
+  {{- end }}
+  {{- with $newPageURL }}
+    <a href="{{ . | safeURL }}" class="td-page-meta--child td-page-meta__child" target="_blank" rel="noopener"><i class="fa-solid fa-pen-to-square fa-fw"></i> {{ T "post_create_child_page" }}</a>
+  {{- end }}
+  {{- with $issueRepository }}
+    {{- $issuesURL := printf "%s?%s" (urls.JoinPath . "issues/new") (querify "title" $.Title) -}}
+    <a href="{{ $issuesURL | safeURL }}" class="td-page-meta--issue td-page-meta__issue" target="_blank" rel="noopener"><i class="fa-solid fa-list-check fa-fw"></i> {{ T "post_create_issue" }}</a>
+  {{- end }}
+  {{- with .Param "github_project_repo" }}
+    {{- $projectIssueURL := urls.JoinPath . "issues/new" -}}
+    <a href="{{ $projectIssueURL }}" class="td-page-meta--project td-page-meta__project-issue" target="_blank" rel="noopener"><i class="fa-solid fa-list-check fa-fw"></i> {{ T "post_create_project_issue" }}</a>
+  {{- end }}
+  {{- with .CurrentSection.AlternativeOutputFormats.Get "print" }}
+    <a id="print" href="{{ .RelPermalink }}"><i class="fa-solid fa-print fa-fw"></i> {{ T "print_entire_section" }}</a>
+  {{- end }}
+  </div>
+{{- end }}

@@ -1,0 +1,55 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/*
+Emit social and schema metadata using Buildish title/description fallback rules.
+
+Hugo's embedded templates only see authored front matter. Staged pages may rely
+on pipeline-derived metadata, so this partial uses buildish-resolved-* helpers.
+*/}}
+
+{{- $page := . -}}
+{{- $resolvedTitle := $page.Site.Title -}}
+{{- if not $page.IsHome }}{{ $resolvedTitle = partial "buildish-resolved-title.html" (dict "page" $page) }}{{ end -}}
+{{- $resolvedDescription := partial "buildish-resolved-description.html" (dict "page" $page) -}}
+{{- $resolvedLocale := replace (lower $page.Site.Language.Lang) "-" "_" -}}
+{{- if not $resolvedLocale }}{{ $resolvedLocale = "en_us" }}{{ end -}}
+{{- $openGraphType := "website" -}}
+{{- if $page.IsPage }}{{ $openGraphType = "article" }}{{ end -}}
+{{- $resolvedUrl := $page.Permalink -}}
+{{- with $page.Params.redirect_url }}{{ $resolvedUrl = . | relURL | absURL }}{{ end -}}
+
+{{- /*
+     Hugo's embedded metadata templates only look at authored title/description.
+     Staged pages may instead rely on pipeline-derived values, so emit the common
+     social + schema metadata here using the shared safe fallback partials.
+*/ -}}
+<meta property="og:url" content="{{ $resolvedUrl | safeURL }}">
+<meta property="og:site_name" content="{{ $page.Site.Title }}">
+<meta property="og:title" content="{{ $resolvedTitle }}">
+<meta property="og:description" content="{{ $resolvedDescription }}">
+<meta property="og:locale" content="{{ $resolvedLocale }}">
+<meta property="og:type" content="{{ $openGraphType }}">
+{{- if and (eq $openGraphType "article") $page.Section }}
+<meta property="article:section" content="{{ $page.Section }}">
+{{- end }}
+<meta itemprop="name" content="{{ $resolvedTitle }}">
+<meta itemprop="description" content="{{ $resolvedDescription }}">
+{{- with $page.WordCount }}
+<meta itemprop="wordCount" content="{{ . }}">
+{{- end }}
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ $resolvedTitle }}">
+<meta name="twitter:description" content="{{ $resolvedDescription }}">

@@ -1,0 +1,7 @@
+{
+  "mammoth-cache": "https://github.com/buildish-tooling/buildish-mammoth-cache",
+  "no-gradle-wrapper-jar": "https://github.com/buildish-tooling/buildish-no-gradle-wrapper-jar",
+  "release-tooling": "https://github.com/buildish-tooling/buildish-release-tooling",
+  "site-pipeline": "https://github.com/buildish-tooling/buildish-site-pipeline",
+  "site": "https://github.com/buildish-tooling/buildish"
+}

@@ -1,0 +1,55 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/*
+Docsy breadcrumb override for Buildish component pages.
+
+This keeps pipeline-derived page titles visible in breadcrumbs and suppresses
+the generic /components/ crumb when the current page already has component
+context.
+*/}}
+
+{{ $componentContext := partial "buildish-component-context.html" . -}}
+{{ $isComponentPage := index $componentContext "enabled" -}}
+{{ $isSingle := true -}}
+{{ with .Parent -}}
+  {{ $isSingle = .IsHome -}}
+{{ end -}}
+<nav aria-label="breadcrumb" class="td-breadcrumbs{{ if $isSingle }} td-breadcrumbs__single{{ end }}">
+  <ol class="breadcrumb">
+    {{- template "buildish-breadcrumbnav" (dict "p1" . "p2" . "isComponentPage" $isComponentPage) -}}
+  </ol>
+</nav>
+
+{{- define "buildish-breadcrumbnav" -}}
+  {{ if .p1.Parent -}}
+    {{ if not .p1.Parent.IsHome -}}
+      {{ template "buildish-breadcrumbnav" (dict "p1" .p1.Parent "p2" .p2 "isComponentPage" .isComponentPage) -}}
+    {{ end -}}
+  {{ else if not .p1.IsHome -}}
+    {{ template "buildish-breadcrumbnav" (dict "p1" .p1.Site.Home "p2" .p2 "isComponentPage" .isComponentPage) -}}
+  {{ end -}}
+  {{ $skipComponents := and .isComponentPage (eq .p1.RelPermalink ("/components/" | relURL)) -}}
+  {{ if not $skipComponents -}}
+    {{ $isActive := eq .p1 .p2 -}}
+    <li class="breadcrumb-item{{ if $isActive }} active{{ end }}"{{ if $isActive }} aria-current="page"{{ end }}>
+      {{ if $isActive -}}
+        {{ partial "buildish-resolved-title.html" (dict "page" .p1 "preferLinkTitle" true) -}}
+      {{ else -}}
+        <a href="{{ .p1.RelPermalink }}">{{ partial "buildish-resolved-title.html" (dict "page" .p1 "preferLinkTitle" true) }}</a>
+      {{- end }}
+    </li>
+  {{ end -}}
+{{- end -}}

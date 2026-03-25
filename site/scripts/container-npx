@@ -1,0 +1,71 @@
+#!/usr/bin/env sh
+#
+# Copyright 2026 The Buildish Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -eu
+
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+path_without_wrapper_dir=''
+old_ifs="$IFS"
+IFS=:
+for path_entry in $PATH; do
+  if [ "$path_entry" = "$script_dir" ]; then
+    continue
+  fi
+  if [ -n "$path_without_wrapper_dir" ]; then
+    path_without_wrapper_dir="${path_without_wrapper_dir}:$path_entry"
+  else
+    path_without_wrapper_dir="$path_entry"
+  fi
+done
+IFS="$old_ifs"
+
+real_npx=''
+if [ -n "$path_without_wrapper_dir" ]; then
+  real_npx="$(PATH="$path_without_wrapper_dir" command -v npx || true)"
+fi
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --no-install|-y|--yes|--)
+      shift
+      continue
+      ;;
+    postcss)
+      shift
+      local_postcss=''
+      if [ -n "${NODE_MODULES_DIR:-}" ] && [ -x "${NODE_MODULES_DIR}/.bin/postcss" ]; then
+        local_postcss="${NODE_MODULES_DIR}/.bin/postcss"
+      elif [ -x "$PWD/node_modules/.bin/postcss" ]; then
+        local_postcss="$PWD/node_modules/.bin/postcss"
+      fi
+      if [ -n "$local_postcss" ]; then
+        exec "$local_postcss" "$@"
+      fi
+      exec postcss "$@"
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+if [ -n "$real_npx" ]; then
+  exec "$real_npx" "$@"
+fi
+
+printf 'Error: npx fallback is unavailable and postcss was not requested.
+' >&2
+exit 127

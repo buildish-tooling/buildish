@@ -1,0 +1,89 @@
+##
+## Copyright 2026 The Buildish Authors
+##
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+## http://www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+
+name: Site publishing
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-publishing
+  cancel-in-progress: false
+
+jobs:
+  publish-site:
+    name: Publish aggregate site
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to update this repository's gh-pages branch.
+    # Keep automatic and dispatched publishing constrained to this repository's
+    # main branch. Publishing remains disabled until all components are public.
+    if: >-
+      github.repository == 'buildish-tooling/buildish' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      false
+    steps:
+      - name: Check out aggregate repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: buildish
+          persist-credentials: false
+
+      - name: Check out Mammoth Cache
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: buildish-tooling/buildish-mammoth-cache
+          path: buildish-mammoth-cache
+          persist-credentials: false
+
+      - name: Check out No Gradle Wrapper Jar
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: buildish-tooling/buildish-no-gradle-wrapper-jar
+          path: buildish-no-gradle-wrapper-jar
+          persist-credentials: false
+
+      - name: Check out Release Tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: buildish-tooling/buildish-release-tooling
+          path: buildish-release-tooling
+          persist-credentials: false
+
+      - name: Check out Site Pipeline
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: buildish-tooling/buildish-site-pipeline
+          path: buildish-site-pipeline
+          persist-credentials: false
+
+      - name: Build site
+        env:
+          SITE_PIPELINE_ARGS: --missing-components fail
+        run: make -C buildish/site build
+
+      - name: Deploy Static Site to GitHub
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./buildish/site/.public
