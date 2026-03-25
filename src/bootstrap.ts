@@ -25,6 +25,9 @@ import type { NormalizedActionConfig } from './config/types';
 
 export type BootstrapPhase = 'main' | 'post';
 
+/**
+ * Bootstrap output shared by the action entrypoints and tests.
+ */
 export interface BootstrapStatus {
   readonly phase: BootstrapPhase;
   readonly message: string;
@@ -32,10 +35,19 @@ export interface BootstrapStatus {
   readonly ciContext: CiJobContext;
 }
 
+/**
+ * Injectable dependencies for bootstrap-time environment/input discovery.
+ */
 export interface BootstrapDependencies extends GitHubPlatformOptions {
   readonly inputProvider?: InputProvider;
 }
 
+/**
+ * Shared startup path for both the main and post action entrypoints.
+ *
+ * This is the only place that currently knows how to read GitHub metadata, read action
+ * inputs, normalize runtime config, and publish a small job summary.
+ */
 export async function bootstrapPhase(
   phase: BootstrapPhase,
   dependencies: BootstrapDependencies = {},
@@ -54,6 +66,9 @@ export async function bootstrapPhase(
   return status;
 }
 
+/**
+ * Creates a compact bootstrap status object suitable for logging and testing.
+ */
 export function createBootstrapStatus(
   phase: BootstrapPhase,
   config: NormalizedActionConfig,
@@ -67,6 +82,9 @@ export function createBootstrapStatus(
   };
 }
 
+/**
+ * Builds the initial job summary section emitted during bootstrap.
+ */
 export function createBootstrapSummaryLines(status: BootstrapStatus): readonly string[] {
   return [
     '## Cache Gradle bootstrap',

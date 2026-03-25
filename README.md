@@ -1,0 +1,163 @@
+# cache-gradle
+
+GitHub Action for secure Gradle wrapper provisioning and Gradle cache management.
+
+## Current status
+
+This repository is under active development.
+
+Implemented today:
+
+- action bootstrap entrypoints
+- runtime input parsing and validation
+- GitHub CI context abstraction
+- local build, lint, test, and CI workflows
+
+Not implemented yet:
+
+- Gradle wrapper discovery and static validation
+- wrapper download and checksum verification
+- cache restore/save orchestration
+- distributed worker / aggregator data exchange
+
+So the action metadata and configuration surface are ready, but the core Gradle behavior is still being built.
+
+## Usage
+
+Until the first public release exists, use a repository ref you control for testing.
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  - uses: projectnessie/cache-gradle@<ref>
+```
+
+## Inputs
+
+### `base-directory`
+
+- Default: `.`
+- Repository-relative base directory for wrapper discovery and other project-relative paths.
+- Must remain inside the repository workspace.
+
+### `cache-enabled`
+
+- Default: `true`
+- Accepted values: `true`, `false`
+- Enables or disables cache orchestration.
+
+### `read-only`
+
+- Default: event-dependent
+- Accepted values: `true`, `false`
+- Defaults to `true` for `pull_request` / `pull_request_target`.
+- Defaults to `false` for other events.
+- Use this to prevent cache mutation.
+
+### `job-mode`
+
+- Default: `standalone`
+- Supported values:
+  - `standalone`
+  - `distributed-worker`
+  - `distributed-aggregator`
+- Controls cache coordination behavior.
+
+### `dependent-jobs`
+
+- Default: empty
+- Comma- or newline-separated job names.
+- Only valid with distributed job modes.
+
+### `cache-key-prefix`
+
+- Default: `gradle-cache-`
+- Must start with an alphanumeric character.
+- Remaining characters may only be letters, numbers, `.`, `_`, or `-`.
+
+### `cache-key-template`
+
+- Default: unset
+- Optional restricted template for cache key generation.
+- Supported placeholders:
+  - `${cacheKeyPrefix}`
+  - `${schemaVersion}`
+  - `${javaMajor}`
+  - `${runnerOs}`
+  - `${runnerArch}`
+  - `${refName}`
+
+### `process-all-wrapper-files`
+
+- Default: `false`
+- Accepted values: `true`, `false`
+- Scans for every matching wrapper properties file under `base-directory`.
+- Cannot be combined with `wrapper-properties-files`.
+
+### `wrapper-properties-glob`
+
+- Default: `**/gradle/wrapper/gradle-wrapper.properties`
+- Repository-relative discovery glob used beneath `base-directory`.
+
+### `wrapper-properties-files`
+
+- Default: empty
+- Comma- or newline-separated explicit `gradle-wrapper.properties` files.
+- Paths are relative to `base-directory`.
+- Entries must be explicit file paths, not globs.
+
+### `cleanup-enabled`
+
+- Default: `true`
+- Accepted values: `true`, `false`
+- Enables the later cleanup-trigger flow used by cache management.
+
+### `gradle-user-home`
+
+- Default: `$GRADLE_USER_HOME` when set, otherwise `$HOME/.gradle`
+- In v1, only the default Gradle user home is supported.
+- Non-default values fail validation intentionally.
+
+### `setup-java`
+
+- Default: `false`
+- Accepted values: `true`, `false`
+- Reserved compatibility flag.
+- In v1, setting `true` fails intentionally.
+- Run `actions/setup-java` before this action instead.
+
+## Development
+
+The repository provides both npm scripts and Make targets.
+
+Common commands:
+
+- `make help`
+- `make build`
+- `make test`
+- `make lint-check`
+- `make check`
+
+The Makefile verifies the expected `node` and `npm` versions before running user-facing targets.
+
+## Local verification
+
+Full local verification:
+
+- `npm run verify`
+
+This runs:
+
+- lint
+- formatting checks
+- unit tests
+- a fresh rebuild
+
+## License
+
+This project is licensed under Apache License 2.0.
+
+See:
+
+- `LICENSE`
+- `NOTICE`

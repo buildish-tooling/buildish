@@ -33,16 +33,28 @@ const EXPLICIT_PATH_GLOB_PATTERN = /[*?[\]{}!]/;
 const MAX_TEMPLATE_LENGTH = 200;
 const CACHE_SCHEMA_VERSION = 1;
 
+/**
+ * Minimal abstraction over the GitHub Actions input API.
+ *
+ * Tests use this interface to provide deterministic input values without pulling in the
+ * real `@actions/core` implementation.
+ */
 export interface InputProvider {
   getInput(name: string, options?: { required?: boolean; trimWhitespace?: boolean }): string;
 }
 
+/**
+ * Extra state required to turn raw user inputs into normalized runtime configuration.
+ */
 export interface NormalizeActionConfigOptions {
   readonly phase: 'main' | 'post';
   readonly ciContext: CiJobContext;
   readonly env?: NodeJS.ProcessEnv;
 }
 
+/**
+ * Reads every supported action input exactly once and returns the raw string values.
+ */
 export function readActionInputs(inputProvider: InputProvider = core): RawActionInputs {
   return {
     baseDirectory: inputProvider.getInput('base-directory', { trimWhitespace: true }),
@@ -67,6 +79,14 @@ export function readActionInputs(inputProvider: InputProvider = core): RawAction
   };
 }
 
+/**
+ * Validates and normalizes raw GitHub Action inputs into the internal runtime config.
+ *
+ * This function is intentionally strict:
+ * - booleans must be explicit `true` / `false`
+ * - path-like inputs must stay inside the repository workspace
+ * - unsupported v1 features fail early with actionable messages
+ */
 export function normalizeActionConfig(
   rawInputs: RawActionInputs,
   options: NormalizeActionConfigOptions,
@@ -134,6 +154,10 @@ export function normalizeActionConfig(
   };
 }
 
+/**
+ * Parses strict boolean inputs so ambiguous values fail fast instead of silently
+ * changing behavior later in the action flow.
+ */
 function parseBooleanInput(input: string, inputName: string): boolean {
   const normalized = input.trim().toLowerCase();
 
@@ -148,6 +172,9 @@ function parseBooleanInput(input: string, inputName: string): boolean {
   throw new Error(`${inputName} must be either 'true' or 'false'.`);
 }
 
+/**
+ * Parses a closed string enum exposed through action inputs.
+ */
 function parseEnumInput<const T extends readonly string[]>(
   input: string,
   allowedValues: T,
@@ -160,6 +187,9 @@ function parseEnumInput<const T extends readonly string[]>(
   throw new Error(`${inputName} must be one of: ${allowedValues.join(', ')}.`);
 }
 
+/**
+ * Splits comma- or newline-separated list inputs into trimmed non-empty entries.
+ */
 function parseListInput(input: string): string[] {
   return input
     .split(/[\n,]/)
@@ -167,6 +197,9 @@ function parseListInput(input: string): string[] {
     .filter((value) => value.length > 0);
 }
 
+/**
+ * Validates human-readable names that later influence cache coordination behavior.
+ */
 function validateNamedValue(value: string, inputName: string): string {
   if (!NAME_PATTERN.test(value)) {
     throw new Error(
@@ -177,6 +210,10 @@ function validateNamedValue(value: string, inputName: string): string {
   return value;
 }
 
+/**
+ * Restricts the cache key prefix to a conservative character set so future cache-key
+ * composition never has to deal with unsafe separators or shell-sensitive values.
+ */
 function validateCacheKeyPrefix(input: string): string {
   const trimmed = input.trim();
 
@@ -189,6 +226,9 @@ function validateCacheKeyPrefix(input: string): string {
   return trimmed;
 }
 
+/**
+ * Validates the optional cache key template against the small supported placeholder set.
+ */
 function validateCacheKeyTemplate(input: string): string | null {
   const trimmed = input.trim();
 
@@ -220,6 +260,10 @@ function validateCacheKeyTemplate(input: string): string | null {
   return trimmed;
 }
 
+/**
+ * Determines how wrapper properties should be discovered once mutually-exclusive input
+ * combinations have been validated.
+ */
 function determineWrapperSelectionMode(
   processAllWrapperFiles: boolean,
   explicitWrapperPropertiesFileCount: number,
@@ -239,6 +283,10 @@ function determineWrapperSelectionMode(
   return 'default';
 }
 
+/**
+ * Resolves an explicitly provided wrapper properties file relative to the configured
+ * base directory while preventing globbing or traversal semantics.
+ */
 function resolveWrapperPropertiesPath(baseDirectory: string, input: string): string {
   const normalizedRelativePath = normalizeRelativePath(input, 'wrapper-properties-files');
 
@@ -257,11 +305,18 @@ function resolveWrapperPropertiesPath(baseDirectory: string, input: string): str
   return joinWithinBaseDirectory(baseDirectory, normalizedRelativePath);
 }
 
+/**
+ * Resolves the wrapper discovery glob relative to the normalized base directory.
+ */
 function resolveGlobPattern(baseDirectory: string, input: string): string {
   const normalized = normalizeRelativePath(input, 'wrapper-properties-glob');
   return joinWithinBaseDirectory(baseDirectory, normalized);
 }
 
+/**
+ * Joins a path underneath the configured base directory while preserving the simpler
+ * relative form for the repository root.
+ */
 function joinWithinBaseDirectory(baseDirectory: string, relativePath: string): string {
   if (baseDirectory === '.') {
     return relativePath;
@@ -270,6 +325,10 @@ function joinWithinBaseDirectory(baseDirectory: string, relativePath: string): s
   return path.posix.join(baseDirectory, relativePath);
 }
 
+/**
+ * Normalizes user-controlled relative paths and rejects anything that attempts to leave
+ * the repository workspace.
+ */
 function normalizeRelativePath(input: string, inputName: string): string {
   const trimmed = input.trim();
 
@@ -300,10 +359,18 @@ function normalizeRelativePath(input: string, inputName: string): string {
   return normalizedPath === '' ? '.' : normalizedPath.replace(/\/$/, '') || '.';
 }
 
+/**
+ * Pull requests default to read-only mode so untrusted branches do not mutate shared
+ * cache state unless the caller opts in explicitly.
+ */
 function defaultReadOnlyForEvent(eventName: string): boolean {
   return eventName === 'pull_request' || eventName === 'pull_request_target';
 }
 
+/**
+ * v1 intentionally supports only the default Gradle user home so later cache logic can
+ * make strong assumptions about on-disk layout.
+ */
 function normalizeGradleUserHome(input: string, env: NodeJS.ProcessEnv | undefined): string {
   const supportedDefault = env?.GRADLE_USER_HOME || path.join(os.homedir(), '.gradle');
   const trimmed = input.trim();

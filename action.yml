@@ -18,50 +18,82 @@ description: Secure Gradle wrapper provisioning and Gradle cache management.
 author: Project Nessie
 inputs:
   base-directory:
-    description: Base directory for Gradle wrapper discovery and project-relative paths.
+    description: >-
+      Repository-relative base directory used for Gradle wrapper discovery and any
+      project-relative paths. Must stay inside the workspace. Default: `.`.
     required: false
     default: .
   cache-enabled:
-    description: Enable Gradle cache restore/save orchestration.
+    description: >-
+      Enables Gradle cache orchestration for this action. Accepted values: `true`
+      or `false`. Default: `true`.
     required: false
     default: 'true'
   read-only:
-    description: Disable persistence of modified cache state. Defaults to true for pull requests, otherwise false.
+    description: >-
+      Prevents persistence of modified cache state. Accepted values: `true` or
+      `false`. Defaults to `true` for pull requests and `false` for other events
+      when omitted.
     required: false
   job-mode:
-    description: Execution personality for cache coordination.
+    description: >-
+      Cache coordination mode. Supported values: `standalone`,
+      `distributed-worker`, or `distributed-aggregator`. Default: `standalone`.
     required: false
     default: standalone
   dependent-jobs:
-    description: Comma- or newline-separated dependent job names whose cache deltas should be consumed later.
+    description: >-
+      Comma- or newline-separated dependent job names whose cache deltas should be
+      consumed later. Only valid with distributed job modes.
     required: false
   cache-key-prefix:
-    description: Prefix used for generated cache keys.
+    description: >-
+      Prefix used for generated cache keys. Must start with an alphanumeric
+      character and then use only letters, numbers, dot, underscore, and dash.
+      Default: `gradle-cache-`.
     required: false
     default: gradle-cache-
   cache-key-template:
-    description: Optional restricted cache key template using supported placeholders.
+    description: >-
+      Optional restricted cache key template. Supported placeholders:
+      `${cacheKeyPrefix}`, `${schemaVersion}`, `${javaMajor}`, `${runnerOs}`,
+      `${runnerArch}`, and `${refName}`.
     required: false
   process-all-wrapper-files:
-    description: Process every matching gradle-wrapper.properties file under the configured base directory.
+    description: >-
+      Process every matching `gradle-wrapper.properties` file under the configured
+      base directory. Accepted values: `true` or `false`. Cannot be combined with
+      `wrapper-properties-files`. Default: `false`.
     required: false
     default: 'false'
   wrapper-properties-glob:
-    description: Glob used to discover Gradle wrapper property files.
+    description: >-
+      Repository-relative glob used to discover Gradle wrapper properties beneath
+      `base-directory`. Default:
+      `**/gradle/wrapper/gradle-wrapper.properties`.
     required: false
     default: '**/gradle/wrapper/gradle-wrapper.properties'
   wrapper-properties-files:
-    description: Comma- or newline-separated explicit gradle-wrapper.properties files, relative to the base directory.
+    description: >-
+      Comma- or newline-separated explicit `gradle-wrapper.properties` files,
+      relative to `base-directory`. Entries must be explicit file paths, not
+      glob patterns.
     required: false
   cleanup-enabled:
-    description: Enable the later Gradle cache cleanup trigger flow.
+    description: >-
+      Enables the later Gradle cache cleanup trigger flow. Accepted values:
+      `true` or `false`. Default: `true`.
     required: false
     default: 'true'
   gradle-user-home:
-    description: Optional Gradle user home path. Only the default location is supported in v1.
+    description: >-
+      Optional Gradle user home path. In v1 only the default location is supported:
+      `$GRADLE_USER_HOME` when set, otherwise `$HOME/.gradle`.
     required: false
   setup-java:
-    description: Reserved compatibility flag. Setting true fails in v1; run actions/setup-java before this action instead.
+    description: >-
+      Reserved compatibility flag. Setting this to `true` intentionally fails in
+      v1; run `actions/setup-java` before this action instead. Default: `false`.
     required: false
     default: 'false'
 runs:

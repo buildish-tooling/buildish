@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+/**
+ * Normalized CI metadata consumed by later cache and coordination code.
+ *
+ * The goal is to isolate provider-specific environment parsing in a single adapter layer.
+ */
 export interface CiJobContext {
   readonly platform: 'github';
   readonly eventName: string;
@@ -30,11 +35,17 @@ export interface CiJobContext {
   readonly actionPath: string | null;
 }
 
+/**
+ * Minimal interface for job summary writers.
+ */
 export interface SummaryWriter {
   addRaw(text: string, addEol?: boolean): SummaryWriter;
   write(): Promise<unknown>;
 }
 
+/**
+ * Provider-neutral CI adapter surface used by the bootstrap flow.
+ */
 export interface CiPlatformAdapter {
   readonly context: CiJobContext;
   publishSummary(lines: readonly string[]): Promise<void>;

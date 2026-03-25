@@ -23,6 +23,9 @@ const METADATA_PATTERN = /^[A-Za-z0-9._/-]{0,200}$/;
 const DISPLAY_NAME_PATTERN = /^[A-Za-z0-9._ -]{0,100}$/;
 const REF_NAME_PATTERN = /^[A-Za-z0-9._/ -]{1,100}$/;
 
+/**
+ * Optional overrides used to build a deterministic GitHub adapter in tests.
+ */
 export interface GitHubPlatformOptions {
   readonly env?: NodeJS.ProcessEnv;
   readonly eventPayload?: Record<string, unknown>;
@@ -30,6 +33,9 @@ export interface GitHubPlatformOptions {
   readonly summaryWriter?: SummaryWriter;
 }
 
+/**
+ * Creates the GitHub-specific CI adapter used by the bootstrap layer.
+ */
 export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPlatformAdapter {
   const env = options.env ?? process.env;
   const eventPayload =
@@ -49,6 +55,10 @@ export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPla
   };
 }
 
+/**
+ * Normalizes GitHub environment variables and event payload fields into a provider-neutral
+ * `CiJobContext`.
+ */
 export function createGitHubContext(
   env: NodeJS.ProcessEnv,
   eventPayload: Record<string, unknown>,
@@ -78,6 +88,9 @@ export function createGitHubContext(
   };
 }
 
+/**
+ * Reads the GitHub event payload JSON if GitHub exposed one for the current run.
+ */
 function readGitHubEventPayload(
   env: NodeJS.ProcessEnv,
   eventPayloadReader: (eventPath: string) => string,
@@ -98,6 +111,12 @@ function readGitHubEventPayload(
   return isRecord(parsed) ? parsed : {};
 }
 
+/**
+ * Resolves the logical branch name used for cache partitioning and read-only defaults.
+ *
+ * Pull requests use the base branch, while branch pushes and manual dispatches prefer the
+ * triggering branch ref.
+ */
 function resolveGitHubRefName(
   eventName: string,
   env: NodeJS.ProcessEnv,
@@ -127,6 +146,9 @@ function resolveGitHubRefName(
   return defaultBranch;
 }
 
+/**
+ * Extracts a branch name from GitHub's ref environment variables when one is available.
+ */
 function extractBranchRefName(
   ref: string | undefined,
   fallbackRefName: string | undefined,
@@ -141,6 +163,9 @@ function extractBranchRefName(
   return trimmedFallback && !trimmedFallback.startsWith('refs/') ? trimmedFallback : null;
 }
 
+/**
+ * Produces a cache-safe ref name while preserving enough structure to remain human-readable.
+ */
 function sanitizeRefName(refName: string): string {
   const trimmed = refName.trim();
 
@@ -163,6 +188,9 @@ function sanitizeRefName(refName: string): string {
   return safeRefName;
 }
 
+/**
+ * Validates machine-oriented metadata such as repository identifiers.
+ */
 function validateMetadataValue(value: string, variableName: string): string {
   if (!METADATA_PATTERN.test(value)) {
     throw new Error(`${variableName} contains unsupported characters.`);
@@ -171,6 +199,9 @@ function validateMetadataValue(value: string, variableName: string): string {
   return value;
 }
 
+/**
+ * Validates human-readable GitHub display fields like workflow and job names.
+ */
 function validateDisplayName(value: string, variableName: string): string {
   if (!DISPLAY_NAME_PATTERN.test(value)) {
     throw new Error(`${variableName} contains unsupported characters.`);
@@ -179,6 +210,9 @@ function validateDisplayName(value: string, variableName: string): string {
   return value;
 }
 
+/**
+ * Parses optional integer-valued GitHub metadata when present.
+ */
 function parseOptionalInteger(value: string | undefined, variableName: string): number | null {
   if (!value || value.trim().length === 0) {
     return null;
@@ -193,6 +227,9 @@ function parseOptionalInteger(value: string | undefined, variableName: string): 
   return parsed;
 }
 
+/**
+ * Reads a nested string from the event payload without assuming the payload shape.
+ */
 function readNestedString(
   input: Record<string, unknown>,
   pathSegments: readonly string[],
@@ -210,6 +247,9 @@ function readNestedString(
   return typeof current === 'string' && current.trim().length > 0 ? current.trim() : null;
 }
 
+/**
+ * Narrow utility for guarding JSON values before object property access.
+ */
 function isRecord(input: unknown): input is Record<string, unknown> {
   return typeof input === 'object' && input !== null && !Array.isArray(input);
 }

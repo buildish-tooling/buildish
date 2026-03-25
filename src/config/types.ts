@@ -14,12 +14,27 @@
  * limitations under the License.
  */
 
+/**
+ * Supported execution personalities for the action.
+ *
+ * These values intentionally mirror the flat string inputs exposed from `action.yml`
+ * so parsing can stay simple and explicit.
+ */
 export const JOB_MODES = ['standalone', 'distributed-worker', 'distributed-aggregator'] as const;
 export type JobMode = (typeof JOB_MODES)[number];
 
+/**
+ * How wrapper property files should be selected after input normalization.
+ */
 export const WRAPPER_SELECTION_MODES = ['default', 'all', 'explicit'] as const;
 export type WrapperSelectionMode = (typeof WRAPPER_SELECTION_MODES)[number];
 
+/**
+ * Restricted placeholder names accepted by the cache key template input.
+ *
+ * Keeping this list centralized makes it harder to accidentally widen the user-facing
+ * templating surface without updating validation and tests together.
+ */
 export const CACHE_KEY_TEMPLATE_PLACEHOLDERS = [
   'cacheKeyPrefix',
   'schemaVersion',
@@ -29,6 +44,12 @@ export const CACHE_KEY_TEMPLATE_PLACEHOLDERS = [
   'refName',
 ] as const;
 
+/**
+ * Raw string inputs read directly from the GitHub Actions input API.
+ *
+ * This shape intentionally preserves the stringly-typed external contract before the
+ * normalization layer applies defaults, validation, and derived values.
+ */
 export interface RawActionInputs {
   readonly baseDirectory: string;
   readonly cacheEnabled: string;
@@ -45,6 +66,12 @@ export interface RawActionInputs {
   readonly setupJava: string;
 }
 
+/**
+ * Validated action configuration used by the rest of the implementation.
+ *
+ * By the time a value reaches this structure it should already be safe to consume by
+ * later modules without repeating GitHub input parsing logic.
+ */
 export interface NormalizedActionConfig {
   readonly phase: 'main' | 'post';
   readonly baseDirectory: string;
