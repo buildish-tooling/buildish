@@ -304,14 +304,12 @@ implementable design.
     - Explicitly document the CI abstraction layer in the docs/ directory.
     - Explicitly document the bootstrap process in the docs/ directory.
     - All types and functions must have JSDoc comments.
-17. Enhance Gradle wrapper download validation by checking the signature (.asc extension).
-    - We need to know the public GPG keys that can be used for verification.
-18. Make sure the delta artifacts are either deleted after the aggregator job has finished or after 12 hours.
-19. Add a safeguard to prevent the action from run more than once per job.
-20. Built-in invocation of `actions/setup-java`
-21. Support macOS and Windows runners
-22. Cleanup the code base
-23. Add release workflows
+17. Make sure the delta artifacts are either deleted after the aggregator job has finished or after 12 hours.
+18. Add a safeguard to prevent the action from run more than once per job.
+19. Built-in invocation of `actions/setup-java`
+20. Support macOS and Windows runners
+21. Cleanup the code base
+22. Add release workflows
     - Ensure LICENSE and NOTICE are present and up-to-date in the release artifacts.
     - Support version tags, but only immutable tags, no "moving" tags like 'v1' or so.
 
