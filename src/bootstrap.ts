@@ -22,8 +22,9 @@ import {
   type InputProvider,
 } from './config/action-config';
 import type { NormalizedActionConfig } from './config/types';
+import { provisionWrapperJars } from './wrapper/download';
 import { validateTargetWrapperProperties } from './wrapper/static-validation';
-import type { ValidatedWrapperPropertiesFile } from './wrapper/types';
+import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from './wrapper/types';
 
 export type BootstrapPhase = 'main' | 'post';
 
@@ -36,6 +37,7 @@ export interface BootstrapStatus {
   readonly config: NormalizedActionConfig;
   readonly ciContext: CiJobContext;
   readonly validatedWrappers: readonly ValidatedWrapperPropertiesFile[];
+  readonly provisionedWrappers: readonly ProvisionedWrapperJar[];
 }
 
 /**
@@ -43,6 +45,7 @@ export interface BootstrapStatus {
  */
 export interface BootstrapDependencies extends GitHubPlatformOptions {
   readonly inputProvider?: InputProvider;
+  readonly fetchImpl?: typeof fetch;
 }
 
 /**
@@ -66,7 +69,17 @@ export async function bootstrapPhase(
     phase === 'main'
       ? await validateTargetWrapperProperties(config, platform.context.workspace)
       : [];
-  const status = createBootstrapStatus(phase, config, platform.context, validatedWrappers);
+  const provisionedWrappers =
+    phase === 'main'
+      ? await provisionWrapperJars(validatedWrappers, { fetchImpl: dependencies.fetchImpl })
+      : [];
+  const status = createBootstrapStatus(
+    phase,
+    config,
+    platform.context,
+    validatedWrappers,
+    provisionedWrappers,
+  );
 
   await platform.publishSummary(createBootstrapSummaryLines(status));
 
@@ -81,12 +94,14 @@ export function createBootstrapStatus(
   config: NormalizedActionConfig,
   ciContext: CiJobContext,
   validatedWrappers: readonly ValidatedWrapperPropertiesFile[] = [],
+  provisionedWrappers: readonly ProvisionedWrapperJar[] = [],
 ): BootstrapStatus {
   return {
     phase,
     config,
     ciContext,
     validatedWrappers,
+    provisionedWrappers,
     message: `Prepared ${phase} phase for ${ciContext.eventName} on ${ciContext.safeRefName} in ${config.jobMode} mode.`,
   };
 }
@@ -106,5 +121,6 @@ export function createBootstrapSummaryLines(status: BootstrapStatus): readonly s
     `- Cache enabled: ${status.config.cacheEnabled}`,
     `- Wrapper selection: ${status.config.wrapperSelectionMode}`,
     `- Wrapper files: ${status.validatedWrappers.length}`,
+    `- Wrapper JARs ready: ${status.provisionedWrappers.length}`,
   ];
 }

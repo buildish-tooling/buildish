@@ -10,6 +10,7 @@
     "bundle:post": "esbuild src/post.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/post/index.cjs",
     "build": "npm run compile && npm run bundle",
     "rebuild": "npm run clean && npm run build",
+    "smoke-test": "node scripts/smoke-test.mjs",
     "lint": "eslint .",
     "format": "prettier --check .",
     "format:write": "prettier --write .",

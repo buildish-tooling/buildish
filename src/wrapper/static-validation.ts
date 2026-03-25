@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { lstat, readFile, readdir } from 'node:fs/promises';
+import { lstat, readFile, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { NormalizedActionConfig } from '../config/types';
@@ -34,10 +34,12 @@ export async function validateTargetWrapperProperties(
   config: NormalizedActionConfig,
   workspace: string,
 ): Promise<readonly ValidatedWrapperPropertiesFile[]> {
+  const realWorkspace = await realpath(workspace);
   const targetedFiles = await discoverTargetWrapperPropertiesFiles(config, workspace);
   return await Promise.all(
     targetedFiles.map(
-      async (relativePath) => await validateWrapperPropertiesFile(relativePath, workspace),
+      async (relativePath) =>
+        await validateWrapperPropertiesFile(relativePath, workspace, realWorkspace),
     ),
   );
 }
@@ -150,8 +152,10 @@ async function collectMatchingWrapperPropertiesFiles(
 async function validateWrapperPropertiesFile(
   relativePath: string,
   workspace: string,
+  realWorkspace: string,
 ): Promise<ValidatedWrapperPropertiesFile> {
   const absolutePath = resolveWorkspaceFile(workspace, relativePath, 'wrapper properties file');
+  assertRealPathInsideWorkspace(realWorkspace, await realpath(absolutePath), relativePath);
   const contents = await readFile(absolutePath, 'utf8');
   const properties = parseProperties(contents);
   const distributionUrl = requireNonEmptyProperty(properties, relativePath, 'distributionUrl');
@@ -210,6 +214,24 @@ async function validateWrapperPropertiesFile(
     distributionUrl,
     distributionSha256Sum,
   };
+}
+
+function assertRealPathInsideWorkspace(
+  realWorkspace: string,
+  realAbsolutePath: string,
+  relativePath: string,
+): void {
+  const relativeToWorkspace = path.relative(realWorkspace, realAbsolutePath);
+
+  if (
+    relativeToWorkspace === '..' ||
+    relativeToWorkspace.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativeToWorkspace)
+  ) {
+    throw new Error(
+      `Wrapper properties file '${relativePath}' resolves outside the workspace through a symbolic link.`,
+    );
+  }
 }
 
 function ensureUniqueRelativePaths(

@@ -26,3 +26,24 @@ export interface ValidatedWrapperPropertiesFile {
   readonly distributionUrl: string;
   readonly distributionSha256Sum: string;
 }
+
+/**
+ * Derived remote metadata needed to provision a trusted Gradle wrapper JAR.
+ */
+export interface WrapperDownloadPlan {
+  readonly relativePath: string;
+  readonly distributionVersion: string;
+  readonly wrapperSourceVersion: string;
+  readonly wrapperChecksumUrl: string;
+  readonly wrapperJarUrl: string;
+}
+
+/**
+ * A wrapper JAR that has been verified and is ready beside its wrapper properties file.
+ */
+export interface ProvisionedWrapperJar extends WrapperDownloadPlan {
+  readonly wrapperJarRelativePath: string;
+  readonly wrapperJarAbsolutePath: string;
+  readonly expectedWrapperJarSha256: string;
+  readonly wasDownloaded: boolean;
+}

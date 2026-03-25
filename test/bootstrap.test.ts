@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-import { describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { describe, expect, it } from 'vitest';
 
 import {
   bootstrapPhase,
@@ -25,7 +26,7 @@ import {
   createBootstrapSummaryLines,
 } from '../src/bootstrap';
 import type { SummaryWriter } from '../src/ci/types';
-import type { ValidatedWrapperPropertiesFile } from '../src/wrapper/types';
+import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from '../src/wrapper/types';
 
 const config = {
   phase: 'main',
@@ -77,13 +78,31 @@ const validatedWrappers: readonly ValidatedWrapperPropertiesFile[] = [
   },
 ] as const;
 
+const provisionedWrappers: readonly ProvisionedWrapperJar[] = [
+  {
+    relativePath: 'gradle/wrapper/gradle-wrapper.properties',
+    distributionVersion: '8.14',
+    wrapperSourceVersion: '8.14.0',
+    wrapperChecksumUrl: 'https://services.gradle.org/distributions/gradle-8.14-wrapper.jar.sha256',
+    wrapperJarUrl:
+      'https://raw.githubusercontent.com/gradle/gradle/v8.14.0/gradle/wrapper/gradle-wrapper.jar',
+    wrapperJarRelativePath: 'gradle/wrapper/gradle-wrapper.jar',
+    wrapperJarAbsolutePath: '/workspace/gradle/wrapper/gradle-wrapper.jar',
+    expectedWrapperJarSha256: 'ecf4726f7d253471e541f6385b55d00e809387ed44250fb53f65b0deaf8e72ad',
+    wasDownloaded: true,
+  },
+] as const;
+
 describe('bootstrap helpers', () => {
   it('creates a status message with config and CI context details', () => {
-    expect(createBootstrapStatus('main', config, ciContext, validatedWrappers)).toEqual({
+    expect(
+      createBootstrapStatus('main', config, ciContext, validatedWrappers, provisionedWrappers),
+    ).toEqual({
       phase: 'main',
       config,
       ciContext,
       validatedWrappers,
+      provisionedWrappers,
       message: 'Prepared main phase for push on main in standalone mode.',
     });
   });
@@ -91,13 +110,20 @@ describe('bootstrap helpers', () => {
   it('renders summary lines for the bootstrap status', () => {
     expect(
       createBootstrapSummaryLines(
-        createBootstrapStatus('main', config, ciContext, validatedWrappers),
+        createBootstrapStatus('main', config, ciContext, validatedWrappers, provisionedWrappers),
       ),
-    ).toEqual(expect.arrayContaining(['- Job mode: standalone', '- Wrapper files: 1']));
+    ).toEqual(
+      expect.arrayContaining([
+        '- Job mode: standalone',
+        '- Wrapper files: 1',
+        '- Wrapper JARs ready: 1',
+      ]),
+    );
   });
 
   it('bootstraps the main phase and publishes a summary', async () => {
-    const workspace = await createWorkspaceWithWrapper();
+    const wrapperJarBytes = Buffer.from('verified wrapper jar');
+    const wrapperJarSha256 = createHash('sha256').update(wrapperJarBytes).digest('hex');
     const summaryLines: string[] = [];
     let writeCalls = 0;
     const summaryWriter: SummaryWriter = {
@@ -109,7 +135,7 @@ describe('bootstrap helpers', () => {
         writeCalls += 1;
       },
     };
-    try {
+    await withWorkspaceWithWrapper(async (workspace) => {
       const status = await bootstrapPhase('main', {
         env: {
           GITHUB_EVENT_NAME: 'push',
@@ -122,6 +148,19 @@ describe('bootstrap helpers', () => {
         eventPayload: {
           repository: { default_branch: 'main' },
         },
+        fetchImpl: async (input: string | URL | Request): Promise<Response> => {
+          const url = String(input);
+
+          if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
+            return new Response(`${wrapperJarSha256}\n`, { status: 200 });
+          }
+
+          if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
+            return new Response(wrapperJarBytes, { status: 200 });
+          }
+
+          throw new Error(`Unexpected fetch URL: ${url}`);
+        },
         inputProvider: {
           getInput(): string {
             return '';
@@ -132,33 +171,57 @@ describe('bootstrap helpers', () => {
 
       expect(status.message).toBe('Prepared main phase for push on main in standalone mode.');
       expect(status.validatedWrappers).toHaveLength(1);
+      expect(status.provisionedWrappers).toHaveLength(1);
       expect(summaryLines).toEqual(
-        expect.arrayContaining(['## Cache Gradle bootstrap', '- Wrapper files: 1']),
+        expect.arrayContaining([
+          '## Cache Gradle bootstrap',
+          '- Wrapper files: 1',
+          '- Wrapper JARs ready: 1',
+        ]),
       );
       expect(writeCalls).toBe(1);
-    } finally {
-      await rm(workspace, { recursive: true, force: true });
-    }
+      await expect(
+        readFile(path.join(workspace, 'gradle', 'wrapper', 'gradle-wrapper.jar')),
+      ).resolves.toEqual(wrapperJarBytes);
+    });
   });
 });
 
-async function createWorkspaceWithWrapper(): Promise<string> {
-  const workspace = await mkdtemp(path.join(os.tmpdir(), 'cache-gradle-bootstrap-'));
-  const wrapperDirectory = path.join(workspace, 'gradle', 'wrapper');
-  await mkdir(wrapperDirectory, { recursive: true });
-  await writeFile(
-    path.join(wrapperDirectory, 'gradle-wrapper.properties'),
-    [
-      'distributionBase=GRADLE_USER_HOME',
-      'distributionPath=wrapper/dists',
-      'distributionSha256Sum=61ad310d3c7d3e5da131b76bbf22b5a4c0786e9d892dae8c1658d4b484de3caa',
-      'distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14-bin.zip',
-      'validateDistributionUrl=true',
-      'zipStoreBase=GRADLE_USER_HOME',
-      'zipStorePath=wrapper/dists',
-      '',
-    ].join('\n'),
-    'utf8',
+async function withWorkspaceWithWrapper(
+  testBody: (workspace: string) => Promise<void>,
+): Promise<void> {
+  await withWorkspace(
+    {
+      'gradle/wrapper/gradle-wrapper.properties': [
+        'distributionBase=GRADLE_USER_HOME',
+        'distributionPath=wrapper/dists',
+        'distributionSha256Sum=61ad310d3c7d3e5da131b76bbf22b5a4c0786e9d892dae8c1658d4b484de3caa',
+        'distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14-bin.zip',
+        'validateDistributionUrl=true',
+        'zipStoreBase=GRADLE_USER_HOME',
+        'zipStorePath=wrapper/dists',
+        '',
+      ].join('\n'),
+    },
+    testBody,
   );
-  return workspace;
+}
+
+async function withWorkspace(
+  files: Record<string, string>,
+  testBody: (workspace: string) => Promise<void>,
+): Promise<void> {
+  const workspace = await mkdtemp(path.join(os.tmpdir(), 'cache-gradle-bootstrap-'));
+
+  try {
+    for (const [relativePath, contents] of Object.entries(files)) {
+      const absolutePath = path.join(workspace, relativePath);
+      await mkdir(path.dirname(absolutePath), { recursive: true });
+      await writeFile(absolutePath, contents, 'utf8');
+    }
+
+    await testBody(workspace);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 }

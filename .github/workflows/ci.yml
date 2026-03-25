@@ -93,10 +93,16 @@ jobs:
       - name: Build the action bundle
         run: make build
 
+      - name: Stage smoke fixture in build directory
+        run: |
+          rm -rf build/smoke-fixture
+          mkdir -p build
+          cp -R test/fixtures/smoke build/smoke-fixture
+
       - name: Run the local action
         uses: ./
         with:
-          base-directory: test/fixtures/smoke
+          base-directory: build/smoke-fixture
 
   required_check:
     name: Summary

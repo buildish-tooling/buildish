@@ -163,6 +163,7 @@ Common commands:
 
 - `make help`
 - `make build`
+- `make smoke-test`
 - `make test`
 - `make lint-check`
 - `make rat-check`
@@ -171,6 +172,7 @@ Common commands:
 Equivalent npm script:
 
 - `npm run rat-check`
+- `npm run smoke-test`
 
 The Makefile verifies the expected `node` and `npm` versions before running user-facing targets.
 
@@ -179,6 +181,7 @@ The Makefile verifies the expected `node` and `npm` versions before running user
 Full local verification:
 
 - `npm run verify`
+- `make smoke-test`
 - `make rat-check`
 - `make check`
 
@@ -190,11 +193,13 @@ This runs:
 - a fresh rebuild
 - Apache RAT license-header verification (`make check`)
 
+`make smoke-test` / `npm run smoke-test` performs a lightweight bundled-action smoke run against a temporary copy of `test/fixtures/smoke`, so it does not modify committed fixture files.
+
 ## License
 
 This project is licensed under Apache License 2.0.
 
 See:
 
-- `LICENSE`
-- `NOTICE`
+- [`LICENSE`](./LICENSE)
+- [`NOTICE`](./NOTICE)

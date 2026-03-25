@@ -27,7 +27,7 @@ describe('validateTargetWrapperProperties', () => {
   it('validates the default wrapper properties file and normalizes escaped values', async () => {
     await withWorkspace(
       {
-      'gradle/wrapper/gradle-wrapper.properties': validWrapperProperties(),
+        'gradle/wrapper/gradle-wrapper.properties': validWrapperProperties(),
       },
       async (workspace) => {
         const wrappers = await validateTargetWrapperProperties(createConfig(), workspace);
@@ -46,8 +46,8 @@ describe('validateTargetWrapperProperties', () => {
   it('discovers and sorts all matching wrapper properties files', async () => {
     await withWorkspace(
       {
-      'apps/zulu/gradle/wrapper/gradle-wrapper.properties': validWrapperProperties(),
-      'apps/alpha/gradle/wrapper/gradle-wrapper.properties': validWrapperProperties(),
+        'apps/zulu/gradle/wrapper/gradle-wrapper.properties': validWrapperProperties(),
+        'apps/alpha/gradle/wrapper/gradle-wrapper.properties': validWrapperProperties(),
       },
       async (workspace) => {
         const wrappers = await validateTargetWrapperProperties(
