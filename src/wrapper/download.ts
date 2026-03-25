@@ -31,6 +31,7 @@ const DISTRIBUTION_PATH_PATTERN =
 const SHA256_PATTERN = /^[A-Fa-f0-9]{64}$/;
 const DEFAULT_RETRY_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 1000;
+const MAX_RETRY_AFTER_DELAY_MS = 300_000;
 
 export interface WrapperProvisionOptions {
   /**
@@ -57,6 +58,13 @@ export interface WrapperProvisionOptions {
    * Defaults to `1000` and must be an integer between `0` and `60000` inclusive.
    */
   readonly retryDelayMs?: number;
+  /**
+   * Optional logger invoked immediately before a retry delay is applied.
+   *
+   * This keeps retry observability injectable without coupling this module to a specific runtime
+   * logging API.
+   */
+  readonly logRetry?: (message: string) => void;
 }
 
 /**
@@ -81,7 +89,7 @@ export function deriveWrapperDownloadPlan(
     distributionVersion,
     wrapperSourceVersion,
     wrapperChecksumUrl: `https://${DISTRIBUTION_HOST}/distributions/gradle-${distributionVersion}-wrapper.jar.sha256`,
-    wrapperJarUrl: `https://raw.githubusercontent.com/gradle/gradle/v${wrapperSourceVersion}/gradle/wrapper/gradle-wrapper.jar`,
+    wrapperJarUrl: `https://${DISTRIBUTION_HOST}/distributions/gradle-${distributionVersion}-wrapper.jar`,
   };
 }
 
@@ -96,6 +104,7 @@ export async function provisionWrapperJars(
   const sleep = options.sleep ?? defaultSleep;
   const retryAttempts = validateRetryAttempts(options.retryAttempts ?? DEFAULT_RETRY_ATTEMPTS);
   const retryDelayMs = validateRetryDelay(options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS);
+  const logRetry = options.logRetry;
   const checksumCache = new Map<string, Promise<string>>();
   const jarCache = new Map<string, Promise<Uint8Array>>();
   const results: ProvisionedWrapperJar[] = [];
@@ -106,7 +115,14 @@ export async function provisionWrapperJars(
       checksumCache,
       plan.wrapperChecksumUrl,
       async () =>
-        await downloadExpectedWrapperJarSha256(plan, fetchImpl, sleep, retryAttempts, retryDelayMs),
+        await downloadExpectedWrapperJarSha256(
+          plan,
+          fetchImpl,
+          sleep,
+          retryAttempts,
+          retryDelayMs,
+          logRetry,
+        ),
     );
     const wrapperJarAbsolutePath = path.join(
       path.dirname(wrapper.absolutePath),
@@ -123,7 +139,8 @@ export async function provisionWrapperJars(
       const jarBytes = await getOrCreate(
         jarCache,
         plan.wrapperJarUrl,
-        async () => await downloadWrapperJar(plan, fetchImpl, sleep, retryAttempts, retryDelayMs),
+        async () =>
+          await downloadWrapperJar(plan, fetchImpl, sleep, retryAttempts, retryDelayMs, logRetry),
       );
       const downloadedJarSha256 = computeSha256(jarBytes);
 
@@ -211,6 +228,7 @@ async function downloadExpectedWrapperJarSha256(
   sleep: (milliseconds: number) => Promise<unknown>,
   retryAttempts: number,
   retryDelayMs: number,
+  logRetry: ((message: string) => void) | undefined,
 ): Promise<string> {
   const response = await fetchWithRetries(
     plan.wrapperChecksumUrl,
@@ -219,6 +237,7 @@ async function downloadExpectedWrapperJarSha256(
     retryAttempts,
     retryDelayMs,
     `wrapper checksum for '${plan.relativePath}'`,
+    logRetry,
   );
   const checksum = (await response.text()).trim();
 
@@ -237,6 +256,7 @@ async function downloadWrapperJar(
   sleep: (milliseconds: number) => Promise<unknown>,
   retryAttempts: number,
   retryDelayMs: number,
+  logRetry: ((message: string) => void) | undefined,
 ): Promise<Uint8Array> {
   const response = await fetchWithRetries(
     plan.wrapperJarUrl,
@@ -245,6 +265,7 @@ async function downloadWrapperJar(
     retryAttempts,
     retryDelayMs,
     `wrapper JAR for '${plan.relativePath}'`,
+    logRetry,
   );
   return new Uint8Array(await response.arrayBuffer());
 }
@@ -256,6 +277,7 @@ async function fetchWithRetries(
   retryAttempts: number,
   retryDelayMs: number,
   resourceDescription: string,
+  logRetry: ((message: string) => void) | undefined,
 ): Promise<Response> {
   let lastError: Error | null = null;
 
@@ -273,9 +295,25 @@ async function fetchWithRetries(
         );
       }
 
+      const retryAfterDelayMs = parseRetryAfterDelay(response.headers.get('retry-after'));
+
       lastError = new Error(
         `Could not download ${resourceDescription}: '${url}' returned HTTP ${response.status}.`,
       );
+
+      if (attempt < retryAttempts) {
+        const delayMs = Math.max(retryDelayMs * 2 ** (attempt - 1), retryAfterDelayMs ?? 0);
+        logRetryAttempt(
+          logRetry,
+          resourceDescription,
+          attempt,
+          retryAttempts,
+          delayMs,
+          `HTTP ${response.status}`,
+        );
+        await sleep(delayMs);
+      }
+      continue;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
@@ -285,7 +323,16 @@ async function fetchWithRetries(
     }
 
     if (attempt < retryAttempts) {
-      await sleep(retryDelayMs * 2 ** (attempt - 1));
+      const delayMs = retryDelayMs * 2 ** (attempt - 1);
+      logRetryAttempt(
+        logRetry,
+        resourceDescription,
+        attempt,
+        retryAttempts,
+        delayMs,
+        lastError.message,
+      );
+      await sleep(delayMs);
     }
   }
 
@@ -374,6 +421,37 @@ function validateRetryDelay(value: number): number {
   }
 
   return value;
+}
+
+function parseRetryAfterDelay(value: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const retryAfterSeconds = Number(value);
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
+    return Math.min(Math.ceil(retryAfterSeconds * 1000), MAX_RETRY_AFTER_DELAY_MS);
+  }
+
+  const retryAfterDate = Date.parse(value);
+  if (!Number.isNaN(retryAfterDate)) {
+    return Math.min(Math.max(retryAfterDate - Date.now(), 0), MAX_RETRY_AFTER_DELAY_MS);
+  }
+
+  return null;
+}
+
+function logRetryAttempt(
+  logRetry: ((message: string) => void) | undefined,
+  resourceDescription: string,
+  attempt: number,
+  retryAttempts: number,
+  delayMs: number,
+  reason: string,
+): void {
+  logRetry?.(
+    `Retrying download of ${resourceDescription} after attempt ${attempt} of ${retryAttempts} failed with ${reason}; waiting ${delayMs}ms before retrying.`,
+  );
 }
 
 function getOrCreate<T>(

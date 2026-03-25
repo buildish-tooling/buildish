@@ -41,14 +41,13 @@ describe('deriveWrapperDownloadPlan', () => {
           wrapperSourceVersion: '8.14.0',
           wrapperChecksumUrl:
             'https://services.gradle.org/distributions/gradle-8.14-wrapper.jar.sha256',
-          wrapperJarUrl:
-            'https://raw.githubusercontent.com/gradle/gradle/v8.14.0/gradle/wrapper/gradle-wrapper.jar',
+          wrapperJarUrl: 'https://services.gradle.org/distributions/gradle-8.14-wrapper.jar',
         });
       },
     );
   });
 
-  it('preserves three-segment distribution versions for the Gradle source tag', async () => {
+  it('uses the Gradle distribution service for wrapper jar downloads', async () => {
     await withValidatedWrappers(
       {
         'gradle/wrapper/gradle-wrapper.properties': validWrapperProperties({
@@ -57,7 +56,7 @@ describe('deriveWrapperDownloadPlan', () => {
       },
       async ([wrapper]) => {
         expect(deriveWrapperDownloadPlan(wrapper).wrapperJarUrl).toBe(
-          'https://raw.githubusercontent.com/gradle/gradle/v9.4.1/gradle/wrapper/gradle-wrapper.jar',
+          'https://services.gradle.org/distributions/gradle-9.4.1-wrapper.jar',
         );
       },
     );
@@ -82,7 +81,7 @@ describe('provisionWrapperJars', () => {
               return new Response(`${jarSha256}\n`, { status: 200 });
             }
 
-            if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
+            if (url.endsWith('/gradle-8.14-wrapper.jar')) {
               return new Response(jarBytes, { status: 200 });
             }
 
@@ -112,10 +111,12 @@ describe('provisionWrapperJars', () => {
       async ([wrapper]) => {
         const jarBytes = Buffer.from('verified wrapper jar');
         const jarSha256 = sha256(jarBytes);
+        const logRetry = vi.fn();
         const sleep = vi.fn(async (_milliseconds: number) => {});
         let checksumAttempts = 0;
 
         const provisioned = await provisionWrapperJars([wrapper], {
+          logRetry,
           sleep,
           retryDelayMs: 5,
           fetchImpl: async (input: string | URL | Request): Promise<Response> => {
@@ -128,7 +129,7 @@ describe('provisionWrapperJars', () => {
                 : new Response(`${jarSha256}\n`, { status: 200 });
             }
 
-            if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
+            if (url.endsWith('/gradle-8.14-wrapper.jar')) {
               return new Response(jarBytes, { status: 200 });
             }
 
@@ -138,8 +139,61 @@ describe('provisionWrapperJars', () => {
 
         expect(provisioned[0]?.wasDownloaded).toBe(true);
         expect(checksumAttempts).toBe(2);
+        expect(logRetry).toHaveBeenCalledOnce();
+        expect(logRetry).toHaveBeenCalledWith(
+          "Retrying download of wrapper checksum for 'gradle/wrapper/gradle-wrapper.properties' after attempt 1 of 3 failed with HTTP 503; waiting 5ms before retrying.",
+        );
         expect(sleep).toHaveBeenCalledOnce();
         expect(sleep).toHaveBeenCalledWith(5);
+      },
+    );
+  });
+
+  it('honors Retry-After when the wrapper jar download is throttled', async () => {
+    await withValidatedWrappers(
+      {
+        'gradle/wrapper/gradle-wrapper.properties': validWrapperProperties(),
+      },
+      async ([wrapper]) => {
+        const jarBytes = Buffer.from('verified wrapper jar');
+        const jarSha256 = sha256(jarBytes);
+        const logRetry = vi.fn();
+        const sleep = vi.fn(async (_milliseconds: number) => {});
+        let jarAttempts = 0;
+
+        const provisioned = await provisionWrapperJars([wrapper], {
+          logRetry,
+          sleep,
+          retryDelayMs: 5,
+          fetchImpl: async (input: string | URL | Request): Promise<Response> => {
+            const url = String(input);
+
+            if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
+              return new Response(`${jarSha256}\n`, { status: 200 });
+            }
+
+            if (url.endsWith('/gradle-8.14-wrapper.jar')) {
+              jarAttempts += 1;
+              return jarAttempts === 1
+                ? new Response('rate limited', {
+                    status: 429,
+                    headers: { 'retry-after': '7' },
+                  })
+                : new Response(jarBytes, { status: 200 });
+            }
+
+            throw new Error(`Unexpected fetch URL: ${url}`);
+          },
+        });
+
+        expect(provisioned[0]?.wasDownloaded).toBe(true);
+        expect(jarAttempts).toBe(2);
+        expect(logRetry).toHaveBeenCalledOnce();
+        expect(logRetry).toHaveBeenCalledWith(
+          "Retrying download of wrapper JAR for 'gradle/wrapper/gradle-wrapper.properties' after attempt 1 of 3 failed with HTTP 429; waiting 7000ms before retrying.",
+        );
+        expect(sleep).toHaveBeenCalledOnce();
+        expect(sleep).toHaveBeenCalledWith(7000);
       },
     );
   });
@@ -150,6 +204,7 @@ describe('provisionWrapperJars', () => {
         'gradle/wrapper/gradle-wrapper.properties': validWrapperProperties(),
       },
       async ([wrapper]) => {
+        const logRetry = vi.fn();
         const sleep = vi.fn(async (_milliseconds: number) => {});
         const fetchImpl = vi.fn(async (_input: string | URL | Request): Promise<Response> => {
           return new Response('not found', { status: 404 });
@@ -158,11 +213,13 @@ describe('provisionWrapperJars', () => {
         await expect(
           provisionWrapperJars([wrapper], {
             fetchImpl,
+            logRetry,
             sleep,
           }),
         ).rejects.toThrow(/404 Not Found/);
 
         expect(fetchImpl).toHaveBeenCalledOnce();
+        expect(logRetry).not.toHaveBeenCalled();
         expect(sleep).not.toHaveBeenCalled();
       },
     );
@@ -185,7 +242,7 @@ describe('provisionWrapperJars', () => {
                 return new Response(`${'a'.repeat(64)}\n`, { status: 200 });
               }
 
-              if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
+              if (url.endsWith('/gradle-8.14-wrapper.jar')) {
                 return new Response(Buffer.from('mismatched wrapper jar'), { status: 200 });
               }
 

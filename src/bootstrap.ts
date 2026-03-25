@@ -112,6 +112,12 @@ export interface BootstrapDependencies extends GitHubPlatformOptions {
    */
   readonly cacheApi?: BaseCacheApi;
   /**
+   * Optional informational logger override.
+   *
+   * Defaults to `@actions/core.info` when omitted.
+   */
+  readonly logInfo?: (message: string) => void;
+  /**
    * Optional post-action state writer override.
    *
    * Defaults to `@actions/core.saveState` when omitted.
@@ -154,7 +160,10 @@ export async function bootstrapPhase(
       : [];
   const provisionedWrappers =
     phase === 'main'
-      ? await provisionWrapperJars(validatedWrappers, { fetchImpl: dependencies.fetchImpl })
+      ? await provisionWrapperJars(validatedWrappers, {
+          fetchImpl: dependencies.fetchImpl,
+          logRetry: dependencies.logInfo ?? core.info,
+        })
       : [];
   const baseCacheResult = await runBaseCachePhase(phase, config, cacheModel, dependencies);
   const status = createBootstrapStatus(

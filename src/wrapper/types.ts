@@ -55,10 +55,10 @@ export interface WrapperDownloadPlan {
   /** Gradle distribution version parsed from `distributionUrl`, such as `8.12.1`. */
   readonly distributionVersion: string;
   /**
-   * Gradle version used to source the trusted wrapper JAR/checksum artifacts.
+   * Normalized Gradle version metadata derived from `distributionUrl`.
    *
-   * This may differ from `distributionVersion` when the implementation maps to a trusted source
-   * version.
+   * This may differ from `distributionVersion` when the distribution version omits a trailing
+   * patch segment, such as `8.14` becoming `8.14.0`.
    */
   readonly wrapperSourceVersion: string;
   /** Absolute HTTPS URL for the authoritative wrapper JAR checksum file. */

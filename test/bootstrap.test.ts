@@ -129,8 +129,7 @@ const provisionedWrappers: readonly ProvisionedWrapperJar[] = [
     distributionVersion: '8.14',
     wrapperSourceVersion: '8.14.0',
     wrapperChecksumUrl: 'https://services.gradle.org/distributions/gradle-8.14-wrapper.jar.sha256',
-    wrapperJarUrl:
-      'https://raw.githubusercontent.com/gradle/gradle/v8.14.0/gradle/wrapper/gradle-wrapper.jar',
+    wrapperJarUrl: 'https://services.gradle.org/distributions/gradle-8.14-wrapper.jar',
     wrapperJarRelativePath: 'gradle/wrapper/gradle-wrapper.jar',
     wrapperJarAbsolutePath: '/workspace/gradle/wrapper/gradle-wrapper.jar',
     expectedWrapperJarSha256: 'ecf4726f7d253471e541f6385b55d00e809387ed44250fb53f65b0deaf8e72ad',
@@ -237,7 +236,7 @@ describe('bootstrap helpers', () => {
             return new Response(`${wrapperJarSha256}\n`, { status: 200 });
           }
 
-          if (url.endsWith('/v8.14.0/gradle/wrapper/gradle-wrapper.jar')) {
+          if (url.endsWith('/gradle-8.14-wrapper.jar')) {
             return new Response(wrapperJarBytes, { status: 200 });
           }
 
