@@ -289,6 +289,11 @@ implementable design.
     - Add real GitHub workflow tests for standalone, distributed, read-only, and failure scenarios.
 16. Documentation
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
+    - Explicitly document the Gradle wrapper jar download and verification process in the docs/ directory.
+    - Explicitly document the cache key generation process in the docs/ directory.
+    - Explicitly document the base cache design in the docs/ directory.
+    - Explicitly document the CI abstraction layer in the docs/ directory.
+    - Explicitly document the bootstrap process in the docs/ directory.
 17. Need real GitHub workflows for integration testing.
     - Those workflows are not part of the action itself, but required to run integration tests.
     - Exercise a couple of real-world scenarios:
