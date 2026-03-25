@@ -1,3 +1,21 @@
+## AUGMENT INSTRUCTIONS
+
+This document is not user-facing but defines the rules and constraints to build the action.
+Consider this as the general potentially vague concept. It may be not precise enough in every detail.
+Feel free to adjust things for better usability and better security.
+
+If the general idea is sound, go ahead and create a file named `IMPLEMENTATION-PLAN.md` to contain:
+1. A high-level plan of how to implement the action, what libraries to use, what APIs to implement, etc.
+2. A list of tasks to implement the action. The tasks shall be self-contained and build upon each other.
+
+Assume that it is, for now, only "you" and me working on this. But the intent is to eventually publish this work
+as open source.
+
+This document and the implementation plan will not be part of the eventually open-sourced work.
+
+The eventually open-sourced work however must contain a user-facing `README.md` that explains the action, how it
+works, the configuration options, the use cases, and the security considerations.
+
 ## Summary
 
 GitHub action to be used by GitHub repositories using the Gradle build tool.
@@ -46,7 +64,7 @@ The cache key is composed of the current major Java version, for example `21`, a
 The current Java version is derived from either the Java version to set up via `actions/setup-java`, if configured,
 or from the Java version as reported by the `java` command, aka resolved via the `PATH` environment variable.
 Users can override the cache key via the configuration.
-If the `actions/setup-java` action is enabled/used and it fails, this action must fail as well.
+If the `actions/setup-java` action is enabled/used, and it fails, this action must fail as well.
 The branch name is derived depending on the event that triggered the currently running workflow:
 
 * For `push` events, the name of the branch being pushed to is used.
@@ -78,7 +96,7 @@ in such workflows.
 * The previous point requires that the cached files are restored with the correct `atime`. This is implemented as a
   best-effort.
 * The names of the GitHub artifacts are an implementation internal concern. Those shall ensure that they are unique and
-  do not clash with other artifacts in the workflow. The names should be user-readable though, for debugging and
+  do not clash with other artifacts in the workflow. The names should be user-readable, though, for debugging and
   troubleshooting purposes, using the job name plus necessary unique identifiers (GH job ID, GH workflow run ID)
   seems fine, as long as it is unique. The "run attempt" feels risky to include in the artifact names, because jobs
   can be individually re-tried, so the "run attempt" numbers of different jobs can be different.
@@ -148,7 +166,7 @@ The root directory must contain a `LICENSE` file with the Apache License 2.0 tex
 required notices, according to ASF project standards. Do only use dependencies that comply
 with https://www.apache.org/legal/resolved.html.
 
-The eventually distributed GitHub action artifacts bundle generated for example via ncc/esbuild must contain the
+The eventually distributed GitHub action artifacts bundle generated, for example, via ncc/esbuild must contain the
 correct LICENSE and NOTICE files.
 
 The Java version is derived from the current default Java version of the GitHub workflow environment.
