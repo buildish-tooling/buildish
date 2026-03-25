@@ -287,6 +287,12 @@ implementable design.
     - Cover validation, wrapper logic, caching, artifacts, merging, and summaries.
 15. Integration workflow suite
     - Add real GitHub workflow tests for standalone, distributed, read-only, and failure scenarios.
+    - Those workflows are not part of the action itself, but required to run integration tests.
+    - Exercise a couple of real-world scenarios:
+      - Single job workflow
+      - Distributed workflow with multiple workers and an aggregator
+      - Read-only mode
+      - Failure handling
 16. Documentation
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
     - Explicitly document the Gradle wrapper jar download and verification process in the docs/ directory.
@@ -295,25 +301,20 @@ implementable design.
     - Explicitly document the CI abstraction layer in the docs/ directory.
     - Explicitly document the bootstrap process in the docs/ directory.
     - All types and functions must have JSDoc comments.
-17. Need real GitHub workflows for integration testing.
-    - Those workflows are not part of the action itself, but required to run integration tests.
-    - Exercise a couple of real-world scenarios:
-      - Single job workflow
-      - Distributed workflow with multiple workers and an aggregator
-      - Read-only mode
-      - Failure handling
-18. Add release workflows
+17. Enhance Gradle wrapper download validation by checking the signature (.asc extension).
+    - We need to know the public GPG keys that can be used for verification.
+18. Make sure the delta artifacts are either deleted after the aggregator job has finished or after 12 hours.
+19. Add a safeguard to prevent the action from run more than once per job.
+20. Built-in invocation of `actions/setup-java`
+21. Support macOS and Windows runners
+22. Cleanup the code base
+23. Add release workflows
     - Ensure LICENSE and NOTICE are present and up-to-date in the release artifacts.
     - Support version tags, but only immutable tags, no "moving" tags like 'v1' or so.
-19. Enhance Gradle wrapper download validation by checking the signature (.asc extension).
-    - We need to know the public GPG keys that can be used for verification.
-20. Make sure the delta artifacts are either deleted after the aggregator job has finished or after 12 hours.
 
 ## Deferred / explicitly out of scope for v1
 
-- Built-in invocation of `actions/setup-java`
 - Non-default `GRADLE_USER_HOME`
 - Project-local `.gradle`
-- macOS and Windows runners
 - Non-GitHub CI implementations
 - Java versions below 8
