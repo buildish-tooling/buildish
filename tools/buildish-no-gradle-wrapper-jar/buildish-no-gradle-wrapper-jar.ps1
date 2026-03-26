@@ -103,6 +103,63 @@ function Write-BuildishNoGradleWrapperJarAsciiFile {
   [System.IO.File]::WriteAllText($Path, $Content, [System.Text.Encoding]::ASCII)
 }
 
+function ConvertTo-BuildishWindowsCommandLineArgument {
+  param([string]$Argument)
+
+  if ($Argument -notmatch '[\s"]') {
+    return $Argument
+  }
+
+  $builder = [System.Text.StringBuilder]::new()
+  $backslash = [char]92
+  [void]$builder.Append('"')
+  $backslashCount = 0
+
+  foreach ($character in $Argument.ToCharArray()) {
+    if ($character -eq $backslash) {
+      $backslashCount += 1
+      continue
+    }
+
+    if ($character -eq '"') {
+      [void]$builder.Append($backslash, $backslashCount * 2 + 1)
+      [void]$builder.Append('"')
+      $backslashCount = 0
+      continue
+    }
+
+    if ($backslashCount -gt 0) {
+      [void]$builder.Append($backslash, $backslashCount)
+      $backslashCount = 0
+    }
+
+    [void]$builder.Append($character)
+  }
+
+  if ($backslashCount -gt 0) {
+    [void]$builder.Append($backslash, $backslashCount * 2)
+  }
+
+  [void]$builder.Append('"')
+  return $builder.ToString()
+}
+
+function Get-BuildishNoGradleWrapperJarInjectedInitScriptArguments {
+  param([string]$InitScriptPath)
+
+  if (-not (Test-Path -LiteralPath $InitScriptPath -PathType Leaf)) {
+    return ''
+  }
+
+  $originalArguments = $env:BUILDISH_NO_GRADLE_WRAPPER_JAR_ORIGINAL_ARGS
+  if (-not [string]::IsNullOrWhiteSpace($originalArguments) -and
+      $originalArguments.IndexOf($InitScriptPath, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+    return ''
+  }
+
+  return "--init-script $(ConvertTo-BuildishWindowsCommandLineArgument -Argument $InitScriptPath)"
+}
+
 function Get-BuildishNoGradleWrapperJarExpectedSha256 {
   param([string]$Path)
 
@@ -261,6 +318,8 @@ try {
   $GradleWrapperSha256Url = "https://services.gradle.org/distributions/gradle-$GradleDistributionVersion-wrapper.jar.sha256"
   $GradleWrapperSignatureUrl = "https://services.gradle.org/distributions/gradle-$GradleDistributionVersion-wrapper.jar.asc"
   $GradleWrapperJarUrl = "https://raw.githubusercontent.com/gradle/gradle/v$GradleSourceVersion/gradle/wrapper/gradle-wrapper.jar"
+  $GradleInitScriptPath = Join-Path -Path $env:APP_HOME -ChildPath 'gradle\buildish-no-gradle-wrapper-jar.init.gradle.kts'
+  $wrapperJarReady = $false
 
   Ensure-BuildishNoGradleWrapperJarMetadataFiles
   $ExpectedWrapperSha256 = Get-BuildishNoGradleWrapperJarExpectedSha256 -Path $GradleWrapperSha256Path
@@ -270,28 +329,34 @@ try {
       $existingChecksum = (Get-FileHash -LiteralPath $GradleWrapperJarPath -Algorithm SHA256).Hash.ToLowerInvariant()
       if ($existingChecksum -eq $ExpectedWrapperSha256) {
         Test-BuildishNoGradleWrapperJarDetachedSignature -SignaturePath $GradleWrapperSignaturePath -PayloadPath $GradleWrapperJarPath -GpgCommand $GpgCommand
-        return
+        $wrapperJarReady = $true
       }
     } catch {
       Write-Warning "Existing Gradle wrapper JAR verification failed; the helper will re-download it. $($_.Exception.Message)"
     }
 
-    Remove-Item -LiteralPath $GradleWrapperJarPath -Force -ErrorAction SilentlyContinue
-  }
-
-  $downloadedWrapperPath = New-BuildishNoGradleWrapperJarTempPath -Directory $GradleWrapperDirectory
-  try {
-    Invoke-WebRequest -Uri $GradleWrapperJarUrl -OutFile $downloadedWrapperPath -UseBasicParsing -ErrorAction Stop
-    $downloadedChecksum = (Get-FileHash -LiteralPath $downloadedWrapperPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($downloadedChecksum -ne $ExpectedWrapperSha256) {
-      throw 'Downloaded Gradle wrapper JAR checksum did not match the expected SHA-256.'
+    if (-not $wrapperJarReady) {
+      Remove-Item -LiteralPath $GradleWrapperJarPath -Force -ErrorAction SilentlyContinue
     }
-
-    Test-BuildishNoGradleWrapperJarDetachedSignature -SignaturePath $GradleWrapperSignaturePath -PayloadPath $downloadedWrapperPath -GpgCommand $GpgCommand
-    Move-Item -LiteralPath $downloadedWrapperPath -Destination $GradleWrapperJarPath -Force
-  } finally {
-    Remove-Item -LiteralPath $downloadedWrapperPath -Force -ErrorAction SilentlyContinue
   }
+
+  if (-not $wrapperJarReady) {
+    $downloadedWrapperPath = New-BuildishNoGradleWrapperJarTempPath -Directory $GradleWrapperDirectory
+    try {
+      Invoke-WebRequest -Uri $GradleWrapperJarUrl -OutFile $downloadedWrapperPath -UseBasicParsing -ErrorAction Stop
+      $downloadedChecksum = (Get-FileHash -LiteralPath $downloadedWrapperPath -Algorithm SHA256).Hash.ToLowerInvariant()
+      if ($downloadedChecksum -ne $ExpectedWrapperSha256) {
+        throw 'Downloaded Gradle wrapper JAR checksum did not match the expected SHA-256.'
+      }
+
+      Test-BuildishNoGradleWrapperJarDetachedSignature -SignaturePath $GradleWrapperSignaturePath -PayloadPath $downloadedWrapperPath -GpgCommand $GpgCommand
+      Move-Item -LiteralPath $downloadedWrapperPath -Destination $GradleWrapperJarPath -Force
+    } finally {
+      Remove-Item -LiteralPath $downloadedWrapperPath -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  [Console]::Out.WriteLine((Get-BuildishNoGradleWrapperJarInjectedInitScriptArguments -InitScriptPath $GradleInitScriptPath))
 } catch {
   Write-Error "buildish-no-gradle-wrapper-jar: $($_.Exception.Message)"
   exit 1

@@ -208,6 +208,37 @@ buildish_no_gradle_wrapper_jar_require_command mktemp
 BUILDISH_HELPER_WRAPPER_DIR="${APP_HOME}/gradle/wrapper"
 BUILDISH_HELPER_PROPERTIES_PATH="${BUILDISH_HELPER_WRAPPER_DIR}/gradle-wrapper.properties"
 BUILDISH_HELPER_JAR_PATH="${BUILDISH_HELPER_WRAPPER_DIR}/gradle-wrapper.jar"
+BUILDISH_HELPER_INIT_SCRIPT_PATH="${APP_HOME}/gradle/buildish-no-gradle-wrapper-jar.init.gradle.kts"
+
+buildish_no_gradle_wrapper_jar_has_init_script_arg=0
+if [ -f "$BUILDISH_HELPER_INIT_SCRIPT_PATH" ]; then
+  buildish_no_gradle_wrapper_jar_previous_arg=''
+  for buildish_no_gradle_wrapper_jar_arg do
+    case "$buildish_no_gradle_wrapper_jar_previous_arg" in
+      --init-script|-I)
+        if [ "$buildish_no_gradle_wrapper_jar_arg" = "$BUILDISH_HELPER_INIT_SCRIPT_PATH" ]; then
+          buildish_no_gradle_wrapper_jar_has_init_script_arg=1
+          break
+        fi
+        buildish_no_gradle_wrapper_jar_previous_arg=''
+        continue
+        ;;
+    esac
+
+    case "$buildish_no_gradle_wrapper_jar_arg" in
+      "--init-script=$BUILDISH_HELPER_INIT_SCRIPT_PATH"|"-I$BUILDISH_HELPER_INIT_SCRIPT_PATH")
+        buildish_no_gradle_wrapper_jar_has_init_script_arg=1
+        break
+        ;;
+    esac
+
+    buildish_no_gradle_wrapper_jar_previous_arg=$buildish_no_gradle_wrapper_jar_arg
+  done
+
+  if [ "$buildish_no_gradle_wrapper_jar_has_init_script_arg" -ne 1 ]; then
+    set -- --init-script "$BUILDISH_HELPER_INIT_SCRIPT_PATH" "$@"
+  fi
+fi
 
 [ -f "$BUILDISH_HELPER_PROPERTIES_PATH" ] ||
   buildish_no_gradle_wrapper_jar_fail "Gradle wrapper properties file was not found at '${BUILDISH_HELPER_PROPERTIES_PATH}'."

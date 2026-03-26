@@ -73,6 +73,15 @@ function Save-BuildishDownloadedFile {
   }
 }
 
+function Convert-BuildishTextToNewlineStyle {
+  param(
+    [string]$Text,
+    [string]$Newline
+  )
+
+  return (($Text -split "`r?`n") -join $Newline)
+}
+
 function Add-BuildishLineAfterAnchor {
   param(
     [string]$Path,
@@ -88,21 +97,69 @@ function Add-BuildishLineAfterAnchor {
 
   Assert-BuildishNotSymlink -Path $Path -Label $Label
   $content = [System.IO.File]::ReadAllText($Path)
-  if ($content.Contains($Insertion)) {
+
+  $newline = if ($content.Contains("`r`n")) { "`r`n" } else { "`n" }
+  $normalizedInsertion = Convert-BuildishTextToNewlineStyle -Text $Insertion -Newline $newline
+  if ($content.Contains($normalizedInsertion)) {
     return
   }
 
-  $newline = if ($content.Contains("`r`n")) { "`r`n" } else { "`n" }
   $anchorWithNewline = "$Anchor$newline"
   if ($content.Contains($anchorWithNewline)) {
-    $updated = $content.Replace($anchorWithNewline, "$Anchor$newline$Insertion$newline")
+    $updated = $content.Replace($anchorWithNewline, "$Anchor$newline$normalizedInsertion$newline")
   } elseif ($content.EndsWith($Anchor)) {
-    $updated = $content.Substring(0, $content.Length - $Anchor.Length) + "$Anchor$newline$Insertion"
+    $updated = $content.Substring(0, $content.Length - $Anchor.Length) + "$Anchor$newline$normalizedInsertion"
   } else {
     throw "Unable to find the expected insertion point in $Label at '$Path'."
   }
 
   [System.IO.File]::WriteAllText($Path, $updated, (Get-BuildishUtf8NoBomEncoding))
+}
+
+function Replace-BuildishLineIfPresent {
+  param(
+    [string]$Path,
+    [string]$CurrentLine,
+    [string]$Replacement,
+    [string]$Label
+  )
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    Write-Warning "$BuildishToolName install: Skipping missing $Label at '$Path'."
+    return
+  }
+
+  Assert-BuildishNotSymlink -Path $Path -Label $Label
+  $content = [System.IO.File]::ReadAllText($Path)
+  $newline = if ($content.Contains("`r`n")) { "`r`n" } else { "`n" }
+  $normalizedReplacement = Convert-BuildishTextToNewlineStyle -Text $Replacement -Newline $newline
+  if ($content.Contains($normalizedReplacement)) {
+    return
+  }
+
+  $currentWithNewline = "$CurrentLine$newline"
+  if ($content.Contains($currentWithNewline)) {
+    $updated = $content.Replace($currentWithNewline, "$normalizedReplacement$newline")
+  } elseif ($content.EndsWith($CurrentLine)) {
+    $updated = $content.Substring(0, $content.Length - $CurrentLine.Length) + $normalizedReplacement
+  } else {
+    return
+  }
+
+  [System.IO.File]::WriteAllText($Path, $updated, (Get-BuildishUtf8NoBomEncoding))
+}
+
+function Assert-BuildishLinePresent {
+  param(
+    [string]$Path,
+    [string]$ExpectedLine,
+    [string]$Label
+  )
+
+  $content = [System.IO.File]::ReadAllText($Path)
+  if (-not ($content -split "`r?`n" | Where-Object { $_ -eq $ExpectedLine } | Select-Object -First 1)) {
+    throw "Unable to apply the expected update to $Label at '$Path'."
+  }
 }
 
 function Update-BuildishGitignore {
@@ -159,6 +216,16 @@ try {
   $GradlePropertiesPath = Join-Path -Path $WrapperDirectory -ChildPath 'gradle-wrapper.properties'
   $GradlewPath = Join-Path -Path $TargetDirectoryAbsolute -ChildPath 'gradlew'
   $GradlewBatPath = Join-Path -Path $TargetDirectoryAbsolute -ChildPath 'gradlew.bat'
+  $GradleInitScriptPath = Join-Path -Path $GradleDirectory -ChildPath 'buildish-no-gradle-wrapper-jar.init.gradle.kts'
+  $GradlewBatHelperBlock = @'
+set BUILDISH_NO_GRADLE_WRAPPER_JAR_ORIGINAL_ARGS=%*
+set BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS=
+for /f "delims=" %%a in ('powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_HOME%\gradle\buildish-no-gradle-wrapper-jar.ps1"') do @set BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS=%%a
+set BUILDISH_NO_GRADLE_WRAPPER_JAR_ORIGINAL_ARGS=
+if errorlevel 1 goto fail
+'@
+  $GradlewBatExecuteLine = '"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %*'
+  $GradlewBatPatchedExecuteLine = '"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS% %*'
 
   if (-not (Test-Path -LiteralPath $GradlePropertiesPath -PathType Leaf)) {
     throw "Gradle wrapper properties file was not found at '$GradlePropertiesPath'. Run this installer from a Gradle project root or pass that directory as the only argument."
@@ -167,9 +234,13 @@ try {
 
   Save-BuildishDownloadedFile -Path (Join-Path -Path $GradleDirectory -ChildPath 'buildish-no-gradle-wrapper-jar.sh') -Uri "$BaseUrl/buildish-no-gradle-wrapper-jar.sh" -Label 'POSIX helper script'
   Save-BuildishDownloadedFile -Path (Join-Path -Path $GradleDirectory -ChildPath 'buildish-no-gradle-wrapper-jar.ps1') -Uri "$BaseUrl/buildish-no-gradle-wrapper-jar.ps1" -Label 'PowerShell helper script'
+  Save-BuildishDownloadedFile -Path $GradleInitScriptPath -Uri "$BaseUrl/buildish-no-gradle-wrapper-jar.init.gradle.kts" -Label 'Gradle init script'
 
   Add-BuildishLineAfterAnchor -Path $GradlewPath -Anchor 'APP_HOME=$( cd -P "${APP_HOME:-./}" > /dev/null && printf ''%s\n'' "$PWD" ) || exit' -Insertion '. "${APP_HOME}/gradle/buildish-no-gradle-wrapper-jar.sh"' -Label 'gradlew'
-  Add-BuildishLineAfterAnchor -Path $GradlewBatPath -Anchor 'for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi' -Insertion 'powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_HOME%\gradle\buildish-no-gradle-wrapper-jar.ps1"' -Label 'gradlew.bat'
+  Replace-BuildishLineIfPresent -Path $GradlewBatPath -CurrentLine 'powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_HOME%\gradle\buildish-no-gradle-wrapper-jar.ps1"' -Replacement $GradlewBatHelperBlock -Label 'gradlew.bat'
+  Add-BuildishLineAfterAnchor -Path $GradlewBatPath -Anchor 'for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi' -Insertion $GradlewBatHelperBlock -Label 'gradlew.bat'
+  Replace-BuildishLineIfPresent -Path $GradlewBatPath -CurrentLine $GradlewBatExecuteLine -Replacement $GradlewBatPatchedExecuteLine -Label 'gradlew.bat'
+  Assert-BuildishLinePresent -Path $GradlewBatPath -ExpectedLine $GradlewBatPatchedExecuteLine -Label 'gradlew.bat'
   Update-BuildishGitignore
 
   Write-Host "$BuildishToolName install: Installed helper files into '$GradleDirectory' and updated launcher scripts in '$TargetDirectoryAbsolute'."

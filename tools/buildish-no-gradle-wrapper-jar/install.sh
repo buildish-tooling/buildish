@@ -62,6 +62,18 @@ buildish_install_download_to() {
   fi
 }
 
+buildish_install_write_block() {
+  text=$1
+  newline_kind=$2
+
+  printf '%s' "$text" | while IFS= read -r line || [ -n "$line" ]; do
+    case "$newline_kind" in
+      crlf) printf '%s\r\n' "$line" ;;
+      *) printf '%s\n' "$line" ;;
+    esac
+  done
+}
+
 buildish_install_patch_after_line() {
   target_path=$1
   anchor_line=$2
@@ -75,7 +87,8 @@ buildish_install_patch_after_line() {
 
   buildish_install_assert_not_symlink "$target_path" "$label"
 
-  if grep -Fqx "$inserted_line" "$target_path"; then
+  inserted_first_line=$(printf '%s' "$inserted_line" | sed -n '1p')
+  if grep -Fqx "$inserted_first_line" "$target_path"; then
     return 0
   fi
 
@@ -95,8 +108,8 @@ buildish_install_patch_after_line() {
     if [ "$normalized_line" = "$anchor_line" ]; then
       found_anchor=1
       case $current_line in
-        *"$BUILDISH_CR") printf '%s\r\n' "$inserted_line" >> "$temp_path" ;;
-        *) printf '%s\n' "$inserted_line" >> "$temp_path" ;;
+        *"$BUILDISH_CR") buildish_install_write_block "$inserted_line" crlf >> "$temp_path" ;;
+        *) buildish_install_write_block "$inserted_line" lf >> "$temp_path" ;;
       esac
     fi
   done < "$target_path"
@@ -114,6 +127,72 @@ buildish_install_patch_after_line() {
     rm -f "$temp_path"
     buildish_install_fail "Unable to replace patched $label at '$target_path'."
   fi
+}
+
+buildish_install_replace_line_if_present() {
+  target_path=$1
+  old_line=$2
+  replacement=$3
+  label=$4
+
+  if [ ! -f "$target_path" ]; then
+    buildish_install_warn "Skipping missing $label at '$target_path'."
+    return 0
+  fi
+
+  buildish_install_assert_not_symlink "$target_path" "$label"
+
+  replacement_first_line=$(printf '%s' "$replacement" | sed -n '1p')
+  if grep -Fqx "$replacement_first_line" "$target_path"; then
+    return 0
+  fi
+
+  temp_path=$(buildish_install_make_temp "$TARGET_DIR_ABSOLUTE") ||
+    buildish_install_fail "Unable to create a temporary file while updating $label."
+  was_executable=0
+  [ -x "$target_path" ] && was_executable=1
+  replaced=0
+
+  while IFS= read -r current_line || [ -n "$current_line" ]; do
+    normalized_line=$current_line
+    case $normalized_line in
+      *"$BUILDISH_CR") normalized_line=${normalized_line%"$BUILDISH_CR"} ;;
+    esac
+
+    if [ "$normalized_line" = "$old_line" ]; then
+      replaced=1
+      case $current_line in
+        *"$BUILDISH_CR") buildish_install_write_block "$replacement" crlf >> "$temp_path" ;;
+        *) buildish_install_write_block "$replacement" lf >> "$temp_path" ;;
+      esac
+      continue
+    fi
+
+    printf '%s\n' "$current_line" >> "$temp_path"
+  done < "$target_path"
+
+  if [ "$replaced" -ne 1 ]; then
+    rm -f "$temp_path"
+    return 0
+  fi
+
+  if [ "$was_executable" -eq 1 ]; then
+    chmod +x "$temp_path"
+  fi
+
+  if ! mv -f "$temp_path" "$target_path"; then
+    rm -f "$temp_path"
+    buildish_install_fail "Unable to replace updated $label at '$target_path'."
+  fi
+}
+
+buildish_install_ensure_line_present() {
+  target_path=$1
+  expected_line=$2
+  label=$3
+
+  grep -Fqx "$expected_line" "$target_path" ||
+    buildish_install_fail "Unable to apply the expected update to $label at '$target_path'."
 }
 
 buildish_install_update_gitignore() {
@@ -175,6 +254,17 @@ GRADLEW_PATH=$TARGET_DIR_ABSOLUTE/gradlew
 GRADLEW_BAT_PATH=$TARGET_DIR_ABSOLUTE/gradlew.bat
 HELPER_SH_PATH=$GRADLE_DIR/buildish-no-gradle-wrapper-jar.sh
 HELPER_PS1_PATH=$GRADLE_DIR/buildish-no-gradle-wrapper-jar.ps1
+HELPER_INIT_PATH=$GRADLE_DIR/buildish-no-gradle-wrapper-jar.init.gradle.kts
+GRADLEW_BAT_HELPER_BLOCK=$(cat <<'EOF'
+set BUILDISH_NO_GRADLE_WRAPPER_JAR_ORIGINAL_ARGS=%*
+set BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS=
+for /f "delims=" %%a in ('powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_HOME%\gradle\buildish-no-gradle-wrapper-jar.ps1"') do @set BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS=%%a
+set BUILDISH_NO_GRADLE_WRAPPER_JAR_ORIGINAL_ARGS=
+if errorlevel 1 goto fail
+EOF
+)
+GRADLEW_BAT_EXECUTE_LINE='"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %*'
+GRADLEW_BAT_PATCHED_EXECUTE_LINE='"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS% %*'
 
 [ -f "$PROPERTIES_PATH" ] ||
   buildish_install_fail "Gradle wrapper properties file was not found at '$PROPERTIES_PATH'. Run this installer from a Gradle project root or pass that directory as the only argument."
@@ -188,16 +278,34 @@ buildish_install_download_to \
   "$HELPER_PS1_PATH" \
   "$BUILDISH_BASE_URL/buildish-no-gradle-wrapper-jar.ps1" \
   'PowerShell helper script'
+buildish_install_download_to \
+  "$HELPER_INIT_PATH" \
+  "$BUILDISH_BASE_URL/buildish-no-gradle-wrapper-jar.init.gradle.kts" \
+  'Gradle init script'
 
 buildish_install_patch_after_line \
   "$GRADLEW_PATH" \
   'APP_HOME=$( cd -P "${APP_HOME:-./}" > /dev/null && printf '\''%s\n'\'' "$PWD" ) || exit' \
   '. "${APP_HOME}/gradle/buildish-no-gradle-wrapper-jar.sh"' \
   'gradlew'
+buildish_install_replace_line_if_present \
+  "$GRADLEW_BAT_PATH" \
+  'powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_HOME%\gradle\buildish-no-gradle-wrapper-jar.ps1"' \
+  "$GRADLEW_BAT_HELPER_BLOCK" \
+  'gradlew.bat'
 buildish_install_patch_after_line \
   "$GRADLEW_BAT_PATH" \
   'for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi' \
-  'powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_HOME%\gradle\buildish-no-gradle-wrapper-jar.ps1"' \
+  "$GRADLEW_BAT_HELPER_BLOCK" \
+  'gradlew.bat'
+buildish_install_replace_line_if_present \
+  "$GRADLEW_BAT_PATH" \
+  "$GRADLEW_BAT_EXECUTE_LINE" \
+  "$GRADLEW_BAT_PATCHED_EXECUTE_LINE" \
+  'gradlew.bat'
+buildish_install_ensure_line_present \
+  "$GRADLEW_BAT_PATH" \
+  "$GRADLEW_BAT_PATCHED_EXECUTE_LINE" \
   'gradlew.bat'
 buildish_install_update_gitignore
 

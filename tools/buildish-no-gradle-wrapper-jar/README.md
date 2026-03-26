@@ -23,6 +23,7 @@ Projects copy these files into their own `gradle/` directory as:
 
 - `gradle/buildish-no-gradle-wrapper-jar.sh`
 - `gradle/buildish-no-gradle-wrapper-jar.ps1`
+- `gradle/buildish-no-gradle-wrapper-jar.init.gradle.kts`
 
 Then they add one small invocation to their generated `gradlew` / `gradlew.bat`, following the
 same include-style approach used by `gradle-wrapper-no-jar`.
@@ -31,26 +32,28 @@ same include-style approach used by `gradle-wrapper-no-jar`.
 
 - `buildish-no-gradle-wrapper-jar.sh` — POSIX helper for `gradlew`
 - `buildish-no-gradle-wrapper-jar.ps1` — PowerShell helper for Windows / `gradlew.bat`
+- `buildish-no-gradle-wrapper-jar.init.gradle.kts` — Gradle init script that re-patches freshly generated launcher files after `:wrapper`
 
 The helpers are standalone on purpose. They do not import this repository's TypeScript runtime.
 
 ## Automatic installation scripts
 
-This repository also ships installer entrypoints that download the helper files, patch existing
-`gradlew` / `gradlew.bat`, and add the retained wrapper metadata patterns to `.gitignore`.
+This repository also ships installer entrypoints that download the helper files plus the init
+script, patch existing `gradlew` / `gradlew.bat`, and add the retained wrapper metadata patterns
+to `.gitignore`.
 
 ### POSIX / bash
 
 Run from the target project root:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apache/buildish/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/apache/buildish/main/tools/buildish-no-gradle-wrapper-jar/install.sh | bash
 ```
 
 To target a different directory:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apache/buildish/main/install.sh | bash -s -- /path/to/project
+curl -fsSL https://raw.githubusercontent.com/apache/buildish/main/tools/buildish-no-gradle-wrapper-jar/install.sh | bash -s -- /path/to/project
 ```
 
 ### Windows / PowerShell
@@ -58,13 +61,13 @@ curl -fsSL https://raw.githubusercontent.com/apache/buildish/main/install.sh | b
 Run from the target project root:
 
 ```powershell
-Invoke-RestMethod https://raw.githubusercontent.com/apache/buildish/main/install.ps1 | Invoke-Expression
+Invoke-RestMethod https://raw.githubusercontent.com/apache/buildish/main/tools/buildish-no-gradle-wrapper-jar/install.ps1 | Invoke-Expression
 ```
 
 Or run it against a specific directory after downloading/cloning this repository locally:
 
 ```powershell
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 C:\path\to\project
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\tools\buildish-no-gradle-wrapper-jar\install.ps1 C:\path\to\project
 ```
 
 ### Security note
@@ -76,7 +79,8 @@ execution if your environment requires stricter supply-chain controls.
 ## What the helpers do
 
 The helpers read `gradle/wrapper/gradle-wrapper.properties`, derive the configured Gradle version,
-and ensure that `gradle/wrapper/gradle-wrapper.jar` is present and verified before Gradle starts.
+ensure that `gradle/wrapper/gradle-wrapper.jar` is present and verified before Gradle starts, and
+inject the project-local Gradle init script when it is available.
 
 They mirror the _Apache Buildish Mammoth Cache for Gradle_ action's trust model:
 
@@ -95,6 +99,10 @@ The helpers retain the downloaded metadata beside the wrapper properties file as
 
 They write downloaded files through temporary paths and then move them into place, so partially
 written files are not left behind if a download or verification step fails.
+
+The injected init script hooks the Gradle `Wrapper` task so that when Renovate or a developer runs
+`./gradlew wrapper`, the freshly generated `gradlew` / `gradlew.bat` files are patched again with
+the Buildish helper invocation.
 
 ## Required tools
 
@@ -124,6 +132,7 @@ Copy:
 
 - `tools/buildish-no-gradle-wrapper-jar/buildish-no-gradle-wrapper-jar.sh` -> `gradle/buildish-no-gradle-wrapper-jar.sh`
 - `tools/buildish-no-gradle-wrapper-jar/buildish-no-gradle-wrapper-jar.ps1` -> `gradle/buildish-no-gradle-wrapper-jar.ps1`
+- `tools/buildish-no-gradle-wrapper-jar/buildish-no-gradle-wrapper-jar.init.gradle.kts` -> `gradle/buildish-no-gradle-wrapper-jar.init.gradle.kts`
 
 ### 2. Patch `gradlew`
 
@@ -141,11 +150,16 @@ APP_HOME=$( cd -P "${APP_HOME:-./}" > /dev/null && printf '%s\n' "$PWD" ) || exi
 
 ### 3. Patch `gradlew.bat`
 
-Insert the following line immediately after the `for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi`
-line:
+Insert the following block immediately after the `for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi`
+line, and replace the final `"%JAVA_EXE%" ... %*` invocation so it includes
+`%BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS%` before `%*`:
 
 ```bat
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_HOME%\gradle\buildish-no-gradle-wrapper-jar.ps1"
+set BUILDISH_NO_GRADLE_WRAPPER_JAR_ORIGINAL_ARGS=%*
+set BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS=
+for /f "delims=" %%a in ('powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_HOME%\gradle\buildish-no-gradle-wrapper-jar.ps1"') do @set BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS=%%a
+set BUILDISH_NO_GRADLE_WRAPPER_JAR_ORIGINAL_ARGS=
+if errorlevel 1 goto fail
 ```
 
 ### 4. Stop tracking `gradle-wrapper.jar`
