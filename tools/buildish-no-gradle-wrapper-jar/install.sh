@@ -16,6 +16,22 @@
 
 set -eu
 
+# POSIX installer for this helper tool.
+#
+# The installer assumes it is being run against an existing Gradle project that
+# already has `gradlew`, `gradlew.bat`, and `gradle/wrapper/gradle-wrapper.properties`.
+# It then:
+#   1. stages the helper files into `gradle/`
+#   2. removes any checked-in `gradle-wrapper.jar`
+#   3. patches `gradlew` and `gradlew.bat` so the helpers run on every launch
+#   4. updates `.gitignore` so retained checksum/signature side files stay local
+#
+# Security / safety properties:
+#   * existing symlinks are rejected instead of being followed
+#   * file updates go through temporary files and atomic moves where possible
+#   * a trusted local source directory can be used in tests instead of downloading
+#     helper files from GitHub
+
 BUILDISH_TOOL_NAME='buildish-no-gradle-wrapper-jar'
 BUILDISH_DEFAULT_BASE_URL='https://raw.githubusercontent.com/apache/buildish/main/tools/buildish-no-gradle-wrapper-jar'
 BUILDISH_BASE_URL=${BUILDISH_NO_GRADLE_WRAPPER_JAR_BASE_URL:-$BUILDISH_DEFAULT_BASE_URL}
@@ -23,6 +39,7 @@ BUILDISH_SOURCE_DIR=${BUILDISH_NO_GRADLE_WRAPPER_JAR_SOURCE_DIR:-}
 BUILDISH_CR=$(printf '\r')
 TARGET_DIR=${1:-.}
 
+# Consistent installer failure prefix.
 buildish_install_fail() {
   echo "${BUILDISH_TOOL_NAME} install: $*" >&2
   exit 1
@@ -32,18 +49,25 @@ buildish_install_warn() {
   echo "${BUILDISH_TOOL_NAME} install: $*" >&2
 }
 
+# Command preflight used before depending on external programs.
 buildish_install_require_command() {
   command -v "$1" >/dev/null 2>&1 || buildish_install_fail "Required command '$1' was not found on PATH."
 }
 
+# The installer never follows user-controlled symlinks. That keeps patching scoped
+# to ordinary files inside the target project and avoids surprising writes.
 buildish_install_assert_not_symlink() {
   [ ! -L "$1" ] || buildish_install_fail "$2 must not be a symbolic link: '$1'."
 }
 
+# Create temp files alongside the destination so the final move stays on the same
+# filesystem and is as atomic as the platform allows.
 buildish_install_make_temp() {
   mktemp "$1/.buildish-no-gradle-wrapper-jar-install.XXXXXX"
 }
 
+# Download one helper file into place via a temp file. The content is not executed
+# until after the move succeeds.
 buildish_install_download_to() {
   target_path=$1
   url=$2
@@ -63,6 +87,8 @@ buildish_install_download_to() {
   fi
 }
 
+# Local-copy variant used by integration tests and trusted development workflows.
+# This avoids spinning up an HTTP server just to stage the tool files.
 buildish_install_copy_to() {
   target_path=$1
   source_path=$2
@@ -84,6 +110,8 @@ buildish_install_copy_to() {
   fi
 }
 
+# Resolve whether a tool file should come from a trusted local checkout or from
+# the canonical GitHub raw URL.
 buildish_install_stage_tool_file() {
   target_path=$1
   file_name=$2
@@ -96,6 +124,8 @@ buildish_install_stage_tool_file() {
   fi
 }
 
+# Re-emit a possibly multi-line block using a caller-selected newline style so the
+# patched launchers preserve their original LF / CRLF convention.
 buildish_install_write_block() {
   text=$1
   newline_kind=$2
@@ -108,11 +138,14 @@ buildish_install_write_block() {
   done
 }
 
-buildish_install_patch_after_line() {
+# Insert a block after any one of several exact anchor lines, preserving newline
+# style and execute bits, and treating the operation as idempotent if the
+# inserted first line is already present.
+buildish_install_patch_after_any_line() {
   target_path=$1
-  anchor_line=$2
-  inserted_line=$3
-  label=$4
+  inserted_line=$2
+  label=$3
+  shift 3
 
   if [ ! -f "$target_path" ]; then
     buildish_install_warn "Skipping missing $label at '$target_path'."
@@ -139,12 +172,17 @@ buildish_install_patch_after_line() {
     esac
 
     printf '%s\n' "$current_line" >> "$temp_path"
-    if [ "$normalized_line" = "$anchor_line" ]; then
-      found_anchor=1
-      case $current_line in
-        *"$BUILDISH_CR") buildish_install_write_block "$inserted_line" crlf >> "$temp_path" ;;
-        *) buildish_install_write_block "$inserted_line" lf >> "$temp_path" ;;
-      esac
+    if [ "$found_anchor" -eq 0 ]; then
+      for anchor_line in "$@"; do
+        if [ "$normalized_line" = "$anchor_line" ]; then
+          found_anchor=1
+          case $current_line in
+            *"$BUILDISH_CR") buildish_install_write_block "$inserted_line" crlf >> "$temp_path" ;;
+            *) buildish_install_write_block "$inserted_line" lf >> "$temp_path" ;;
+          esac
+          break
+        fi
+      done
     fi
   done < "$target_path"
 
@@ -163,6 +201,9 @@ buildish_install_patch_after_line() {
   fi
 }
 
+# Replace one exact line when present. Missing lines are tolerated here because
+# newer Gradle versions may generate slightly different launchers; the installer
+# verifies the required patched line afterwards.
 buildish_install_replace_line_if_present() {
   target_path=$1
   old_line=$2
@@ -220,6 +261,7 @@ buildish_install_replace_line_if_present() {
   fi
 }
 
+# CRLF-aware exact-line check used after patching Windows launchers.
 buildish_install_ensure_line_present() {
   target_path=$1
   expected_line=$2
@@ -237,6 +279,7 @@ buildish_install_ensure_line_present() {
   buildish_install_fail "Unable to apply the expected update to $label at '$target_path'."
 }
 
+# Same as above, but accepts any of several supported generated launcher shapes.
 buildish_install_ensure_any_line_present() {
   target_path=$1
   label=$2
@@ -257,6 +300,8 @@ buildish_install_ensure_any_line_present() {
   buildish_install_fail "Unable to apply the expected update to $label at '$target_path'."
 }
 
+# The installer intentionally removes any existing wrapper JAR so subsequent
+# `./gradlew` runs must go through the helper's verification / redownload path.
 buildish_install_remove_regular_file() {
   target_path=$1
   label=$2
@@ -270,6 +315,8 @@ buildish_install_remove_regular_file() {
   rm -f "$target_path" || buildish_install_fail "Unable to remove $label at '$target_path'."
 }
 
+# Keep the retained metadata files out of source control by default while leaving
+# teams free to commit them if their policy prefers that.
 buildish_install_update_gitignore() {
   gitignore_path=$TARGET_DIR_ABSOLUTE/.gitignore
   entry_sha='gradle/wrapper/gradle-wrapper-*.sha256'
@@ -317,6 +364,7 @@ buildish_install_update_gitignore() {
 buildish_install_require_command curl
 buildish_install_require_command mktemp
 
+# Installer entrypoint validation and derived paths.
 [ "$#" -le 1 ] || buildish_install_fail 'Expected zero or one positional argument: the target project directory.'
 [ -d "$TARGET_DIR" ] || buildish_install_fail "Target directory does not exist: '$TARGET_DIR'."
 
@@ -337,6 +385,13 @@ GRADLEW_BAT_PATH=$TARGET_DIR_ABSOLUTE/gradlew.bat
 HELPER_SH_PATH=$GRADLE_DIR/buildish-no-gradle-wrapper-jar.sh
 HELPER_PS1_PATH=$GRADLE_DIR/buildish-no-gradle-wrapper-jar.ps1
 HELPER_INIT_PATH=$GRADLE_DIR/buildish-no-gradle-wrapper-jar.init.gradle.kts
+
+# The Windows launcher patch works in two stages:
+#   * a helper block captures the PowerShell helper's stdout into an env var
+#   * the final Java invocation line appends that env var before `%*`
+#
+# Supporting the pre-8.14 classpath/main-class form plus the later `-jar` forms
+# keeps the installer compatible across multiple Gradle minor lines.
 GRADLEW_BAT_HELPER_BLOCK=$(cat <<'EOF'
 set BUILDISH_NO_GRADLE_WRAPPER_JAR_ORIGINAL_ARGS=%*
 set BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS=
@@ -345,6 +400,8 @@ set BUILDISH_NO_GRADLE_WRAPPER_JAR_ORIGINAL_ARGS=
 if errorlevel 1 goto fail
 EOF
 )
+GRADLEW_BAT_OLD_EXECUTE_LINE='"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*'
+GRADLEW_BAT_PATCHED_OLD_EXECUTE_LINE='"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS% %*'
 GRADLEW_BAT_LEGACY_EXECUTE_LINE='"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %*'
 GRADLEW_BAT_PATCHED_LEGACY_EXECUTE_LINE='"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS% %*'
 GRADLEW_BAT_CURRENT_EXECUTE_LINE='"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %*'
@@ -353,7 +410,11 @@ GRADLEW_BAT_PATCHED_CURRENT_EXECUTE_LINE='"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_
 [ -f "$PROPERTIES_PATH" ] ||
   buildish_install_fail "Gradle wrapper properties file was not found at '$PROPERTIES_PATH'. Run this installer from a Gradle project root or pass that directory as the only argument."
 buildish_install_assert_not_symlink "$PROPERTIES_PATH" 'gradle-wrapper.properties'
+if ! grep -Eq '^distributionSha256Sum=[^[:space:]].*' "$PROPERTIES_PATH"; then
+  buildish_install_warn "WARNING: '$PROPERTIES_PATH' does not define distributionSha256Sum. Gradle itself will not pin the distribution ZIP checksum during wrapper downloads; this helper continues, but it only verifies gradle-wrapper.jar."
+fi
 
+# Stage helper files first so launcher patches never point at missing scripts.
 buildish_install_stage_tool_file \
   "$HELPER_SH_PATH" \
   'buildish-no-gradle-wrapper-jar.sh' \
@@ -368,20 +429,28 @@ buildish_install_stage_tool_file \
   'Gradle init script'
 buildish_install_remove_regular_file "$WRAPPER_JAR_PATH" 'gradle-wrapper.jar'
 
-buildish_install_patch_after_line \
+# Patch both launchers and then assert that the final expected batch execute line
+# is present so silent launcher-format drift does not go unnoticed.
+buildish_install_patch_after_any_line \
   "$GRADLEW_PATH" \
-  'APP_HOME=$( cd -P "${APP_HOME:-./}" > /dev/null && printf '\''%s\n'\'' "$PWD" ) || exit' \
   '. "${APP_HOME}/gradle/buildish-no-gradle-wrapper-jar.sh"' \
-  'gradlew'
+  'gradlew' \
+  'APP_HOME=$( cd -P "${APP_HOME:-./}" > /dev/null && printf '\''%s\n'\'' "$PWD" ) || exit' \
+  'APP_HOME=$( cd "${APP_HOME:-./}" && pwd -P ) || exit'
 buildish_install_replace_line_if_present \
   "$GRADLEW_BAT_PATH" \
   'powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_HOME%\gradle\buildish-no-gradle-wrapper-jar.ps1"' \
   "$GRADLEW_BAT_HELPER_BLOCK" \
   'gradlew.bat'
-buildish_install_patch_after_line \
+buildish_install_patch_after_any_line \
   "$GRADLEW_BAT_PATH" \
-  'for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi' \
   "$GRADLEW_BAT_HELPER_BLOCK" \
+  'gradlew.bat' \
+  'for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi'
+buildish_install_replace_line_if_present \
+  "$GRADLEW_BAT_PATH" \
+  "$GRADLEW_BAT_OLD_EXECUTE_LINE" \
+  "$GRADLEW_BAT_PATCHED_OLD_EXECUTE_LINE" \
   'gradlew.bat'
 buildish_install_replace_line_if_present \
   "$GRADLEW_BAT_PATH" \
@@ -396,6 +465,7 @@ buildish_install_replace_line_if_present \
 buildish_install_ensure_any_line_present \
   "$GRADLEW_BAT_PATH" \
   'gradlew.bat' \
+  "$GRADLEW_BAT_PATCHED_OLD_EXECUTE_LINE" \
   "$GRADLEW_BAT_PATCHED_LEGACY_EXECUTE_LINE" \
   "$GRADLEW_BAT_PATCHED_CURRENT_EXECUTE_LINE"
 buildish_install_update_gitignore

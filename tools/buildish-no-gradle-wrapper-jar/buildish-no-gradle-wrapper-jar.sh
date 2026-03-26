@@ -14,18 +14,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Included from gradlew after APP_HOME has been resolved.
+# This file is sourced from the generated `gradlew` launcher after `APP_HOME` has
+# been resolved by the launcher itself.
+#
+# High-level behavior:
+#   1. Optionally prepend this tool's init script to the Gradle invocation so the
+#      `Wrapper` task re-patches freshly generated launcher files.
+#   2. Read `gradle-wrapper.properties` to determine the requested Gradle version.
+#   3. Ensure the detached-signature metadata files for that version are present.
+#   4. Verify any existing `gradle-wrapper.jar` against the expected checksum and
+#      the pinned Gradle signing key.
+#   5. If the local JAR is missing or invalid, download a replacement, verify it,
+#      and install it into `gradle/wrapper/`.
+#
+# Trust model:
+#   * The helper accepts only canonical `https://services.gradle.org/...` wrapper
+#     distribution URLs so that it can derive the corresponding metadata URLs.
+#   * The checksum and detached signature are fetched from services.gradle.org.
+#   * The wrapper JAR bytes are fetched from the matching Gradle Git tag on GitHub.
+#   * The downloaded JAR is accepted only if both the checksum and detached
+#     signature validate against the pinned Gradle public signing key below.
 
+# Shared error helper so every failure uses one recognizable prefix.
 buildish_no_gradle_wrapper_jar_fail() {
   echo "buildish-no-gradle-wrapper-jar: $*" >&2
   exit 1
 }
 
+# Small command guard used before we rely on external tools such as curl and gpg.
 buildish_no_gradle_wrapper_jar_require_command() {
   command -v "$1" >/dev/null 2>&1 ||
     buildish_no_gradle_wrapper_jar_fail "Required command '$1' was not found on PATH."
 }
 
+# Return the lowercase SHA-256 hex digest of a file using whichever common tool is
+# available on the host. The helper needs this before it can trust an existing or
+# freshly downloaded wrapper JAR.
 buildish_no_gradle_wrapper_jar_sha256_file() {
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "$1" | awk '{ print tolower($1); exit }'
@@ -38,6 +62,9 @@ buildish_no_gradle_wrapper_jar_sha256_file() {
   buildish_no_gradle_wrapper_jar_fail "Neither 'sha256sum' nor 'shasum' is available for checksum verification."
 }
 
+# Download to a temporary file first and move into place only after the transfer
+# succeeds. This avoids leaving behind partially written metadata files if the
+# network call fails or is interrupted.
 buildish_no_gradle_wrapper_jar_download_to_file() {
   target_path=$1
   download_url=$2
@@ -56,6 +83,10 @@ buildish_no_gradle_wrapper_jar_download_to_file() {
   fi
 }
 
+# Normalize checksum files into the exact shape the helper expects:
+# a single lowercase 64-character SHA-256 hex value with a trailing newline.
+# Normalizing existing files lets the helper tolerate harmless formatting drift,
+# while rejecting malformed content that should be re-downloaded.
 buildish_no_gradle_wrapper_jar_normalize_checksum_file() {
   checksum_path=$1
   normalized_checksum=$(tr -d '\r\n' < "$checksum_path" | tr '[:upper:]' '[:lower:]')
@@ -66,12 +97,18 @@ buildish_no_gradle_wrapper_jar_normalize_checksum_file() {
   return 0
 }
 
+# The detached signature file is only accepted if it looks like ASCII-armored PGP
+# data. Full cryptographic verification happens later with GnuPG; this is just a
+# quick structural sanity check before the file is cached.
 buildish_no_gradle_wrapper_jar_validate_signature_file() {
   signature_path=$1
   first_line=$(sed -n '1p' "$signature_path")
   [ "$first_line" = '-----BEGIN PGP SIGNATURE-----' ]
 }
 
+# Ensure the per-version metadata files are present and structurally valid. If a
+# local file is missing or malformed, delete it and fetch a clean copy so later
+# verification steps can assume well-formed inputs.
 buildish_no_gradle_wrapper_jar_ensure_metadata_files() {
   if [ ! -f "$BUILDISH_HELPER_SHA256_PATH" ] ||
      ! buildish_no_gradle_wrapper_jar_normalize_checksum_file "$BUILDISH_HELPER_SHA256_PATH"; then
@@ -96,6 +133,10 @@ buildish_no_gradle_wrapper_jar_ensure_metadata_files() {
   fi
 }
 
+# Verify a wrapper JAR against the pinned Gradle signing key in an isolated,
+# throw-away GnuPG home. Using a temporary keyring avoids relying on or mutating
+# the caller's personal GPG configuration and blocks any ambient trust settings
+# from affecting the result.
 buildish_no_gradle_wrapper_jar_verify_signature() {
   signature_path=$1
   payload_path=$2
@@ -199,17 +240,28 @@ EOF
   return 0
 }
 
+# The helper must be able to fetch remote artifacts and validate detached
+# signatures before it can safely recreate `gradle-wrapper.jar`.
 buildish_no_gradle_wrapper_jar_require_command curl
 buildish_no_gradle_wrapper_jar_require_command gpg
 buildish_no_gradle_wrapper_jar_require_command mktemp
 
 [ -n "${APP_HOME:-}" ] || buildish_no_gradle_wrapper_jar_fail "APP_HOME must already be set by gradlew before including this helper."
 
+# Paths are derived from the already resolved Gradle application home. The
+# installer is responsible for placing these files in the expected locations.
 BUILDISH_HELPER_WRAPPER_DIR="${APP_HOME}/gradle/wrapper"
 BUILDISH_HELPER_PROPERTIES_PATH="${BUILDISH_HELPER_WRAPPER_DIR}/gradle-wrapper.properties"
 BUILDISH_HELPER_JAR_PATH="${BUILDISH_HELPER_WRAPPER_DIR}/gradle-wrapper.jar"
 BUILDISH_HELPER_INIT_SCRIPT_PATH="${APP_HOME}/gradle/buildish-no-gradle-wrapper-jar.init.gradle.kts"
 
+# If the project-local init script exists, prepend it once. The init script hooks
+# the Gradle `Wrapper` task so that when Gradle regenerates `gradlew` or
+# `gradlew.bat`, the launcher patches added by this tool are restored.
+#
+# The scan is intentionally conservative: it recognizes the separate
+# `--init-script <path>` / `-I <path>` forms plus their compact equivalents and
+# only injects the local init script when that exact path is not already present.
 buildish_no_gradle_wrapper_jar_has_init_script_arg=0
 if [ -f "$BUILDISH_HELPER_INIT_SCRIPT_PATH" ]; then
   buildish_no_gradle_wrapper_jar_previous_arg=''
@@ -243,6 +295,9 @@ fi
 [ -f "$BUILDISH_HELPER_PROPERTIES_PATH" ] ||
   buildish_no_gradle_wrapper_jar_fail "Gradle wrapper properties file was not found at '${BUILDISH_HELPER_PROPERTIES_PATH}'."
 
+# Extract the canonical wrapper distribution URL. The helper intentionally rejects
+# non-canonical or non-HTTPS forms because the metadata and source-JAR locations
+# are derived from this value and the security story depends on predictable URLs.
 distribution_line=$(sed -n '/^distributionUrl=/{p;q;}' "$BUILDISH_HELPER_PROPERTIES_PATH")
 [ -n "$distribution_line" ] ||
   buildish_no_gradle_wrapper_jar_fail "Gradle wrapper properties file is missing a distributionUrl entry."
@@ -253,6 +308,9 @@ BUILDISH_HELPER_DIST_VERSION=$(printf '%s' "$distribution_url" | sed -n 's#^http
 [ -n "$BUILDISH_HELPER_DIST_VERSION" ] ||
   buildish_no_gradle_wrapper_jar_fail "distributionUrl must be a canonical HTTPS services.gradle.org URL ending in gradle-<version>-bin.zip or gradle-<version>-all.zip."
 
+# Gradle Git tags always use three numeric version segments, while wrapper
+# distributions sometimes use two-segment versions such as `8.3`. Normalize those
+# to `8.3.0` for the GitHub source-JAR URL.
 case "$BUILDISH_HELPER_DIST_VERSION" in
   *.*.*) BUILDISH_HELPER_SOURCE_VERSION="$BUILDISH_HELPER_DIST_VERSION" ;;
   *.*) BUILDISH_HELPER_SOURCE_VERSION="${BUILDISH_HELPER_DIST_VERSION}.0" ;;
@@ -265,9 +323,13 @@ BUILDISH_HELPER_SHA256_URL="https://services.gradle.org/distributions/gradle-${B
 BUILDISH_HELPER_SIGNATURE_URL="https://services.gradle.org/distributions/gradle-${BUILDISH_HELPER_DIST_VERSION}-wrapper.jar.asc"
 BUILDISH_HELPER_JAR_URL="https://raw.githubusercontent.com/gradle/gradle/v${BUILDISH_HELPER_SOURCE_VERSION}/gradle/wrapper/gradle-wrapper.jar"
 
+# The metadata files are cached in the project so later runs can verify an
+# existing wrapper JAR without immediately redownloading side files.
 buildish_no_gradle_wrapper_jar_ensure_metadata_files
 expected_wrapper_checksum=$(tr -d '\r\n' < "$BUILDISH_HELPER_SHA256_PATH" | tr '[:upper:]' '[:lower:]')
 
+# Fast path: if the project already has a wrapper JAR with the expected checksum
+# and a valid detached signature, leave it in place and return immediately.
 if [ -f "$BUILDISH_HELPER_JAR_PATH" ]; then
   existing_wrapper_checksum=$(buildish_no_gradle_wrapper_jar_sha256_file "$BUILDISH_HELPER_JAR_PATH")
   if [ "$existing_wrapper_checksum" = "$expected_wrapper_checksum" ] &&
@@ -277,6 +339,8 @@ if [ -f "$BUILDISH_HELPER_JAR_PATH" ]; then
   rm -f "$BUILDISH_HELPER_JAR_PATH"
 fi
 
+# Slow path: fetch a fresh wrapper JAR, verify both checksum and detached
+# signature, then replace the local copy atomically.
 downloaded_wrapper_path=$(mktemp "${BUILDISH_HELPER_WRAPPER_DIR}/.buildish-no-gradle-wrapper-jar-wrapper.XXXXXX") ||
   buildish_no_gradle_wrapper_jar_fail "Unable to create a temporary path for the wrapper JAR download."
 

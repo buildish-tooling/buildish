@@ -14,11 +14,33 @@
  limitations under the License.
 #>
 
+<#
+This helper is invoked from `gradlew.bat` after `%APP_HOME%` has been resolved.
+
+High-level behavior:
+  1. Optionally emit a project-local `--init-script ...` argument fragment so the
+     wrapper update path keeps the launcher patches installed by this tool.
+  2. Read `gradle-wrapper.properties` to determine the requested Gradle version.
+  3. Ensure the detached-signature metadata files for that version exist.
+  4. Verify any existing `gradle-wrapper.jar` against the expected checksum and
+     the pinned Gradle public signing key.
+  5. Download and install a replacement JAR if the local one is missing or fails
+     validation.
+
+The PowerShell helper prints only the extra command-line fragment to stdout. The
+patched batch launcher captures that output into an environment variable and then
+appends it to the final Java invocation. Doing it that way avoids trying to mutate
+`%*` from a child process, which is brittle in cmd.exe.
+#>
+
 Import-Module $PSHOME\Modules\Microsoft.PowerShell.Utility -Function Get-FileHash
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
+# This fingerprint is the trust root for detached-signature verification. We pin
+# the exact Gradle signing key and verify the fingerprint before importing it into
+# the temporary GPG home used for each validation run.
 $TrustedGradleKeyFingerprint = '1bd97a6a154e7810ee0bc832e2f38302c8075e3d'
 $TrustedGradlePublicKey = @'
 -----BEGIN PGP PUBLIC KEY BLOCK-----
@@ -75,6 +97,8 @@ f7TkwC6aybc=
 -----END PGP PUBLIC KEY BLOCK-----
 '@
 
+# Locate the first available command from a preference-ordered name list. This is
+# primarily used to find `gpg.exe` / `gpg` without assuming a specific filename.
 function Get-BuildishNoGradleWrapperJarCommandPath {
   param([string[]]$Names)
 
@@ -88,12 +112,17 @@ function Get-BuildishNoGradleWrapperJarCommandPath {
   return $null
 }
 
+# Create a unique temporary path inside a caller-selected directory. Callers write
+# to the temp path first and move into place afterwards to avoid leaving partial
+# files behind.
 function New-BuildishNoGradleWrapperJarTempPath {
   param([string]$Directory)
 
   return [System.IO.Path]::Combine($Directory, ".buildish-no-gradle-wrapper-jar.$([System.IO.Path]::GetRandomFileName())")
 }
 
+# Write ASCII text deterministically. The checksum and armored-signature files are
+# specified as ASCII, and using a fixed encoding avoids host-dependent defaults.
 function Write-BuildishNoGradleWrapperJarAsciiFile {
   param(
     [string]$Path,
@@ -103,6 +132,8 @@ function Write-BuildishNoGradleWrapperJarAsciiFile {
   [System.IO.File]::WriteAllText($Path, $Content, [System.Text.Encoding]::ASCII)
 }
 
+# Quote one argument using the Windows command-line escaping rules expected by the
+# eventual Java process. The helper emits this quoted fragment back to cmd.exe.
 function ConvertTo-BuildishWindowsCommandLineArgument {
   param([string]$Argument)
 
@@ -144,6 +175,9 @@ function ConvertTo-BuildishWindowsCommandLineArgument {
   return $builder.ToString()
 }
 
+# Decide whether the helper needs to inject the tool-local init script argument.
+# The check deliberately looks for the exact project-local path so it does not add
+# duplicate `--init-script` fragments on repeated wrapper invocations.
 function Get-BuildishNoGradleWrapperJarInjectedInitScriptArguments {
   param([string]$InitScriptPath)
 
@@ -160,6 +194,9 @@ function Get-BuildishNoGradleWrapperJarInjectedInitScriptArguments {
   return "--init-script $(ConvertTo-BuildishWindowsCommandLineArgument -Argument $InitScriptPath)"
 }
 
+# Read, validate, normalize, and return the expected SHA-256 value from a cached
+# checksum file. The normalized file is written back so later comparisons use a
+# stable format.
 function Get-BuildishNoGradleWrapperJarExpectedSha256 {
   param([string]$Path)
 
@@ -171,6 +208,8 @@ function Get-BuildishNoGradleWrapperJarExpectedSha256 {
   return $checksum
 }
 
+# Lightweight structural check for detached-signature cache files. Full crypto
+# verification happens later; this just filters out obviously wrong content.
 function Test-BuildishNoGradleWrapperJarSignatureFile {
   param([string]$Path)
 
@@ -182,6 +221,8 @@ function Test-BuildishNoGradleWrapperJarSignatureFile {
   return $firstLine -eq '-----BEGIN PGP SIGNATURE-----'
 }
 
+# Download a file to a temp path, optionally validate it, then move it into place.
+# This keeps the cache directory free of partial or unvalidated results.
 function Save-BuildishNoGradleWrapperJarDownloadedFile {
   param(
     [string]$Path,
@@ -203,6 +244,8 @@ function Save-BuildishNoGradleWrapperJarDownloadedFile {
   }
 }
 
+# Ensure the per-version checksum and detached-signature files are present and
+# minimally well formed before the wrapper JAR is trusted or downloaded.
 function Ensure-BuildishNoGradleWrapperJarMetadataFiles {
   if (-not (Test-Path -LiteralPath $GradleWrapperSha256Path -PathType Leaf)) {
     Save-BuildishNoGradleWrapperJarDownloadedFile -Path $GradleWrapperSha256Path -Uri $GradleWrapperSha256Url -Label 'wrapper checksum' -Validator {
@@ -232,6 +275,9 @@ function Ensure-BuildishNoGradleWrapperJarMetadataFiles {
   }
 }
 
+# Perform detached-signature verification in a fresh temporary GPG home. This
+# makes the result independent of the caller's personal keyring, trust database,
+# or auto-key retrieval settings.
 function Test-BuildishNoGradleWrapperJarDetachedSignature {
   param(
     [string]$SignaturePath,
@@ -277,15 +323,20 @@ function Test-BuildishNoGradleWrapperJarDetachedSignature {
 }
 
 try {
+  # The patched batch launcher resolves APP_HOME before invoking this helper.
   if ([string]::IsNullOrWhiteSpace($env:APP_HOME)) {
     throw 'APP_HOME must already be set by gradlew.bat before invoking this helper.'
   }
 
+  # Detached-signature verification is mandatory; if GnuPG is unavailable the
+  # helper must fail closed rather than silently trusting downloaded bytes.
   $GpgCommand = Get-BuildishNoGradleWrapperJarCommandPath -Names @('gpg.exe', 'gpg')
   if ([string]::IsNullOrWhiteSpace($GpgCommand)) {
     throw "GnuPG command 'gpg.exe' is required for Gradle wrapper detached-signature verification but was not found on PATH."
   }
 
+  # All paths are project-local and derived from the existing Gradle launcher
+  # layout expected by the installer.
   $GradleWrapperDirectory = Join-Path -Path $env:APP_HOME -ChildPath 'gradle\wrapper'
   $GradlePropertiesPath = Join-Path -Path $GradleWrapperDirectory -ChildPath 'gradle-wrapper.properties'
   $GradleWrapperJarPath = Join-Path -Path $GradleWrapperDirectory -ChildPath 'gradle-wrapper.jar'
@@ -299,6 +350,8 @@ try {
     throw 'Gradle wrapper properties file is missing a distributionUrl entry.'
   }
 
+  # Only accept canonical services.gradle.org URLs so the checksum, signature,
+  # and source-JAR URLs can be derived predictably and reviewed easily.
   $distributionUrl = $distributionLine.Substring('distributionUrl='.Length).Replace('\:', ':')
   $distributionMatch = [regex]::Match($distributionUrl, '^https://services\.gradle\.org/distributions/gradle-([0-9]+(?:\.[0-9]+){1,2})-(?:bin|all)\.zip$')
   if (-not $distributionMatch.Success) {
@@ -307,6 +360,8 @@ try {
 
   $GradleDistributionVersion = $distributionMatch.Groups[1].Value
   $versionSegments = $GradleDistributionVersion.Split('.')
+  # Gradle Git tags use three numeric segments, so normalize `8.3` to `8.3.0`
+  # before building the GitHub raw URL for `gradle-wrapper.jar`.
   switch ($versionSegments.Count) {
     2 { $GradleSourceVersion = "$GradleDistributionVersion.0" }
     3 { $GradleSourceVersion = $GradleDistributionVersion }
@@ -321,9 +376,13 @@ try {
   $GradleInitScriptPath = Join-Path -Path $env:APP_HOME -ChildPath 'gradle\buildish-no-gradle-wrapper-jar.init.gradle.kts'
   $wrapperJarReady = $false
 
+  # Metadata is cached project-locally so repeated runs can validate an existing
+  # wrapper JAR without always redownloading the side files.
   Ensure-BuildishNoGradleWrapperJarMetadataFiles
   $ExpectedWrapperSha256 = Get-BuildishNoGradleWrapperJarExpectedSha256 -Path $GradleWrapperSha256Path
 
+  # Fast path: if the current wrapper JAR already matches the expected checksum
+  # and validates against the detached signature, keep it.
   if (Test-Path -LiteralPath $GradleWrapperJarPath -PathType Leaf) {
     try {
       $existingChecksum = (Get-FileHash -LiteralPath $GradleWrapperJarPath -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -340,6 +399,7 @@ try {
     }
   }
 
+  # Slow path: download, verify, and install a fresh wrapper JAR.
   if (-not $wrapperJarReady) {
     $downloadedWrapperPath = New-BuildishNoGradleWrapperJarTempPath -Directory $GradleWrapperDirectory
     try {
@@ -356,6 +416,8 @@ try {
     }
   }
 
+  # The patched batch launcher consumes this single line of stdout and appends it
+  # to the final Java invocation. Returning an empty string is the idempotent case.
   [Console]::Out.WriteLine((Get-BuildishNoGradleWrapperJarInjectedInitScriptArguments -InitScriptPath $GradleInitScriptPath))
 } catch {
   Write-Error "buildish-no-gradle-wrapper-jar: $($_.Exception.Message)"
