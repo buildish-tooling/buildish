@@ -306,7 +306,21 @@ implementable design.
     - Also add CONTRIBUTING.md, SECURITY.md and CODE_OF_CONDUCT.md.
       Use the files present on the branch https://github.com/apache/polaris/tree/release/1.2.x as templates.
       Keep the CONTRIBUTING.md very general and do not add any build or other project specific instructions.
-20. Integration workflow suite
+20. Change the project structure.
+    - The to-be-established "Apache Buildish" project will contain not just this action, but also other build related
+      functionality like Gradle plugins, other actions, build helper scripts, etc.
+    - We have to move everything for this action into a subdirectory.
+      Let's use `actions/cache-gradle` as the new root directory for this action.
+      IDEs would be opened using the `actions/cache-gradle` as the project root directory.
+    - Add a symlink from `actions/cache-gradle/dot-github` to the root `.github` directory.
+    - Add symlinks from the `actions/cache-gradle` directories for the LICENSE, NOTICE and DISCLAIMER files to the root
+      directory.
+    - Rename the current CI workflow to `ci-cache-gradle.yml` and scope it to changes in the `actions/cache-gradle`
+      directory.
+    - Move the current README.md to `actions/cache-gradle/README.md`.
+    - Add a new top-level README.md introducing the "Apache Buildish" project and list the available actions
+      (currently just this one).
+21. Integration workflow suite
     - Those workflows are not part of the action itself, but required to run integration tests.
     - Add real GitHub workflow tests for standalone, distributed, read-only, and failure scenarios.
       - Single job workflow
@@ -321,9 +335,9 @@ implementable design.
       - A subset of the the Linux based workflows above should be sufficient to exercise the macOS and Windows
         specific behaviors.
       - Do not copy the Linux workflows. Instead make those Matrix jobs
-20. Cleanup job summary
-21. Cleanup the code base
-22. Documentation
+22. Cleanup job summary
+23. Cleanup the code base
+24. Documentation
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
     - Explicitly document the Gradle wrapper jar download and verification process in the docs/ directory.
     - Explicitly document the cache key generation process in the docs/ directory.
@@ -331,7 +345,7 @@ implementable design.
     - Explicitly document the CI abstraction layer in the docs/ directory.
     - Explicitly document the bootstrap process in the docs/ directory.
     - All types and functions must have JSDoc comments.
-23. Add release workflows
+25. Add release workflows
     - Ensure LICENSE and NOTICE are present and up-to-date in the release artifacts.
     - Support version tags, but only immutable tags, no "moving" tags like 'v1' or so.
 
