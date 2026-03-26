@@ -289,7 +289,24 @@ implementable design.
 16. Add a safeguard to prevent the action from run more than once per job.
 17. Fail hard when no Java runtime is available.
 18. Support macOS and Windows runners
-19. Integration workflow suite
+19. Update licenses (C) and project name.
+    - This project will be part of a new Apache Incubator project.
+    - The name of the project will be "Apache Buildish (Incubating)"
+    - Need to have a DISCLAIMER file next to the LICENSE and NOTICE file.
+      Content template: https://raw.githubusercontent.com/apache/polaris/refs/heads/release/1.2.x/DISCLAIMER
+    - The (C) needs in all license headers needs to be updated to "The Apache Software Foundation"
+      Template: https://raw.githubusercontent.com/apache/polaris/refs/heads/main/codestyle/copyright-header.txt
+    - The project name needs to be updated everywhere in the code base.
+      Output of the code base, as in log message or job summaries, can just use "Apache Buildish" without the
+      "(Incubating)" suffix.
+    - Note: Documents like the README and the files in the docs/ directory only need to mention "Apache Buildish"
+      with the "(Incubating)" suffix once and can afterwards just use "Buildish" or "Apache Buildish."
+    - The README.md needs to have two sections at the end.
+      Template: Lines 206-214 from https://raw.githubusercontent.com/apache/polaris/refs/heads/release/1.2.x/README.md
+    - Also add CONTRIBUTING.md, SECURITY.md and CODE_OF_CONDUCT.md.
+      Use the files present on the branch https://github.com/apache/polaris/tree/release/1.2.x as templates.
+      Keep the CONTRIBUTING.md very general and do not add any build or other project specific instructions.
+20. Integration workflow suite
     - Those workflows are not part of the action itself, but required to run integration tests.
     - Add real GitHub workflow tests for standalone, distributed, read-only, and failure scenarios.
       - Single job workflow
@@ -300,6 +317,10 @@ implementable design.
       - Read-only mode
         - Exercise for standalone and distributed jobs
       - Failure handling
+    - Set of integration test workflows for macOS and Windows.
+      - A subset of the the Linux based workflows above should be sufficient to exercise the macOS and Windows
+        specific behaviors.
+      - Do not copy the Linux workflows. Instead make those Matrix jobs
 20. Cleanup job summary
 21. Cleanup the code base
 22. Documentation
