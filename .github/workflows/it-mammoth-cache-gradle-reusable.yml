@@ -1,0 +1,517 @@
+#
+# Copyright 2026 The Apache Software Foundation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: IT Mammoth Cache for Gradle (Reusable)
+
+# Real GitHub integration scenario graph for Mammoth Cache for Gradle.
+#
+# Scenario layout:
+# - standalone_seed -> standalone_restore exercises a writable Linux cache round-trip using one
+#   cache namespace shared only within the current workflow run.
+# - worker_a + worker_b -> aggregator exercises distributed worker delta publication plus
+#   same-run aggregator download/merge/apply using deterministic worker job names.
+# - duplicate_invocation_guard proves duplicate same-job action usage is rejected.
+# - pull_request_read_only checks the default PR read-only behavior under minimal permissions.
+# - standalone_cross_platform is a lightweight smoke check on macOS/Windows only.
+#
+# Isolation/safety notes:
+# - Every scenario stages a fresh fixture copy into a unique per-job build directory.
+# - Every cache-key-prefix includes github.run_id/github.run_attempt, so parallel workflow runs,
+#   retries, and sequential branch builds do not reuse writable cache keys accidentally.
+# - Distributed artifact exchange stays within the current workflow run only; the action never uses
+#   cross-run `findBy` lookups here.
+# - The Windows smoke job intentionally runs under `shell: bash` and executes `./gradlew`, so the
+#   fixture does not currently need a `gradlew.bat` launcher.
+
+on:
+  workflow_call:
+    inputs:
+      run-pr-scenarios:
+        description: >-
+          Run the fork-safe pull-request scenario that verifies PR events stay read-only by
+          default and can still consume the prepared wrapper/cache state.
+        required: true
+        type: boolean
+      run-writable-scenarios:
+        description: >-
+          Run the trusted Linux scenarios that are allowed to publish cache/artifact outputs:
+          standalone cache round-trip, distributed worker/aggregator flow, and duplicate-job guard.
+        required: true
+        type: boolean
+      run-cross-platform:
+        description: >-
+          Run the lightweight standalone macOS/Windows smoke scenario that verifies wrapper setup
+          and action/runtime compatibility without enabling writable cross-platform coverage.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  # The scenarios are designed to work with repository read-access only. Cache and current-run
+  # artifact operations use the Actions runtime; this workflow does not require broader repo scopes.
+  contents: read
+
+env:
+  ACTION_DIRECTORY: actions/mammoth-cache/gradle
+  FIXTURE_SOURCE_DIRECTORY: actions/mammoth-cache/gradle/test/fixtures/integration/gradle-project
+
+jobs:
+  # Seeds one unique per-run standalone base cache that the next job must restore offline.
+  standalone_seed:
+    name: Linux standalone seed (prime writable cache)
+    if: inputs.run-writable-scenarios
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: actions/mammoth-cache/gradle/.nvmrc
+          cache: npm
+          cache-dependency-path: actions/mammoth-cache/gradle/package-lock.json
+
+      - name: Install action dependencies
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm ci
+
+      - name: Bundle the action
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm run bundle
+
+      - name: Set up Java 21
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Stage standalone fixture
+        run: |
+          fixture_dir="${ACTION_DIRECTORY}/build/integration-fixtures/standalone-seed"
+          rm -rf "$fixture_dir"
+          mkdir -p "$fixture_dir"
+          cp -R "$FIXTURE_SOURCE_DIRECTORY"/. "$fixture_dir"
+          chmod +x "$fixture_dir/gradlew"
+
+      - name: Prepare Mammoth Cache for Gradle
+        uses: ./actions/mammoth-cache/gradle
+        with:
+          base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-seed
+          cache-key-prefix: it-standalone-${{ github.run_id }}-${{ github.run_attempt }}-
+
+      - name: Resolve standalone dependencies online
+        working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-seed
+        run: ./gradlew --no-daemon resolveStandalone
+
+  # Reuses the standalone cache namespace from standalone_seed and verifies an exact offline hit.
+  standalone_restore:
+    name: Linux standalone restore (offline exact-hit check)
+    if: inputs.run-writable-scenarios
+    needs: standalone_seed
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: actions/mammoth-cache/gradle/.nvmrc
+          cache: npm
+          cache-dependency-path: actions/mammoth-cache/gradle/package-lock.json
+
+      - name: Install action dependencies
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm ci
+
+      - name: Bundle the action
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm run bundle
+
+      - name: Set up Java 21
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Stage standalone fixture
+        run: |
+          fixture_dir="${ACTION_DIRECTORY}/build/integration-fixtures/standalone-restore"
+          rm -rf "$fixture_dir"
+          mkdir -p "$fixture_dir"
+          cp -R "$FIXTURE_SOURCE_DIRECTORY"/. "$fixture_dir"
+          chmod +x "$fixture_dir/gradlew"
+
+      - name: Prepare Mammoth Cache for Gradle
+        uses: ./actions/mammoth-cache/gradle
+        with:
+          base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-restore
+          cache-key-prefix: it-standalone-${{ github.run_id }}-${{ github.run_attempt }}-
+
+      - name: Verify the saved cache restores offline
+        working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-restore
+        run: ./gradlew --offline --no-daemon resolveStandalone
+
+      - name: Assert exact cache reuse
+        run: |
+          grep -F -- '- Base cache restore: exact-hit' "$GITHUB_STEP_SUMMARY"
+
+  # Worker A publishes one same-run delta artifact for the distributed aggregator scenario.
+  worker_a:
+    name: Linux distributed worker A (publish delta artifact)
+    if: inputs.run-writable-scenarios
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: actions/mammoth-cache/gradle/.nvmrc
+          cache: npm
+          cache-dependency-path: actions/mammoth-cache/gradle/package-lock.json
+
+      - name: Install action dependencies
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm ci
+
+      - name: Bundle the action
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm run bundle
+
+      - name: Set up Java 21
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Stage worker A fixture
+        run: |
+          fixture_dir="${ACTION_DIRECTORY}/build/integration-fixtures/worker-a"
+          rm -rf "$fixture_dir"
+          mkdir -p "$fixture_dir"
+          cp -R "$FIXTURE_SOURCE_DIRECTORY"/. "$fixture_dir"
+          chmod +x "$fixture_dir/gradlew"
+
+      - name: Prepare Mammoth Cache for Gradle
+        uses: ./actions/mammoth-cache/gradle
+        with:
+          base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/worker-a
+          job-mode: distributed-worker
+          cache-key-prefix: it-distributed-${{ github.run_id }}-${{ github.run_attempt }}-
+
+      - name: Produce worker A cache delta
+        working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/worker-a
+        run: ./gradlew --no-daemon resolveWorkerA
+
+  # Worker B publishes an independent same-run delta artifact for the distributed aggregator.
+  worker_b:
+    name: Linux distributed worker B (publish delta artifact)
+    if: inputs.run-writable-scenarios
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: actions/mammoth-cache/gradle/.nvmrc
+          cache: npm
+          cache-dependency-path: actions/mammoth-cache/gradle/package-lock.json
+
+      - name: Install action dependencies
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm ci
+
+      - name: Bundle the action
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm run bundle
+
+      - name: Set up Java 21
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Stage worker B fixture
+        run: |
+          fixture_dir="${ACTION_DIRECTORY}/build/integration-fixtures/worker-b"
+          rm -rf "$fixture_dir"
+          mkdir -p "$fixture_dir"
+          cp -R "$FIXTURE_SOURCE_DIRECTORY"/. "$fixture_dir"
+          chmod +x "$fixture_dir/gradlew"
+
+      - name: Prepare Mammoth Cache for Gradle
+        uses: ./actions/mammoth-cache/gradle
+        with:
+          base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/worker-b
+          job-mode: distributed-worker
+          cache-key-prefix: it-distributed-${{ github.run_id }}-${{ github.run_attempt }}-
+
+      - name: Produce worker B cache delta
+        working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/worker-b
+        run: ./gradlew --no-daemon resolveWorkerB
+
+  # Aggregator waits for both workers, downloads their current-run artifacts, applies both deltas,
+  # and confirms the combined result works offline before post-action cleanup removes consumed
+  # worker artifacts.
+  aggregator:
+    name: Linux distributed aggregator (download+merge worker deltas)
+    if: inputs.run-writable-scenarios
+    needs: [worker_a, worker_b]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: actions/mammoth-cache/gradle/.nvmrc
+          cache: npm
+          cache-dependency-path: actions/mammoth-cache/gradle/package-lock.json
+
+      - name: Install action dependencies
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm ci
+
+      - name: Bundle the action
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm run bundle
+
+      - name: Set up Java 21
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Stage aggregator fixture
+        run: |
+          fixture_dir="${ACTION_DIRECTORY}/build/integration-fixtures/aggregator"
+          rm -rf "$fixture_dir"
+          mkdir -p "$fixture_dir"
+          cp -R "$FIXTURE_SOURCE_DIRECTORY"/. "$fixture_dir"
+          chmod +x "$fixture_dir/gradlew"
+
+      - name: Prepare Mammoth Cache for Gradle
+        uses: ./actions/mammoth-cache/gradle
+        with:
+          base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/aggregator
+          job-mode: distributed-aggregator
+          dependent-jobs: worker_a,worker_b
+          cache-key-prefix: it-distributed-${{ github.run_id }}-${{ github.run_attempt }}-
+
+      - name: Verify dependent worker deltas restore offline
+        working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/aggregator
+        run: ./gradlew --offline --no-daemon resolveWorkerA resolveWorkerB
+
+      - name: Assert both worker artifacts were consumed
+        run: |
+          grep -F -- '- Downloaded delta artifacts: 2' "$GITHUB_STEP_SUMMARY"
+
+  # Proves that two action invocations in the same GitHub job cannot race or double-run post-work.
+  duplicate_invocation_guard:
+    name: Linux duplicate invocation guard (same-job safety)
+    if: inputs.run-writable-scenarios
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: actions/mammoth-cache/gradle/.nvmrc
+          cache: npm
+          cache-dependency-path: actions/mammoth-cache/gradle/package-lock.json
+
+      - name: Install action dependencies
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm ci
+
+      - name: Bundle the action
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm run bundle
+
+      - name: Set up Java 21
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Stage duplicate-guard fixture
+        run: |
+          fixture_dir="${ACTION_DIRECTORY}/build/integration-fixtures/duplicate-guard"
+          rm -rf "$fixture_dir"
+          mkdir -p "$fixture_dir"
+          cp -R "$FIXTURE_SOURCE_DIRECTORY"/. "$fixture_dir"
+          chmod +x "$fixture_dir/gradlew"
+
+      - name: First action invocation succeeds
+        uses: ./actions/mammoth-cache/gradle
+        with:
+          base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/duplicate-guard
+          cache-enabled: false
+          read-only: true
+
+      - name: Confirm the fixture Gradle wrapper runs
+        working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/duplicate-guard
+        run: ./gradlew --version
+
+      - name: Duplicate action invocation is rejected
+        id: duplicate_action
+        continue-on-error: true
+        uses: ./actions/mammoth-cache/gradle
+        with:
+          base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/duplicate-guard
+          cache-enabled: false
+          read-only: true
+
+      - name: Assert the duplicate invocation failed
+        run: |
+          test "${{ steps.duplicate_action.outcome }}" = 'failure'
+
+  # Validates the PR default remains read-only under minimal permissions.
+  pull_request_read_only:
+    name: Pull request standalone (default read-only behavior)
+    if: inputs.run-pr-scenarios
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: actions/mammoth-cache/gradle/.nvmrc
+          cache: npm
+          cache-dependency-path: actions/mammoth-cache/gradle/package-lock.json
+
+      - name: Install action dependencies
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm ci
+
+      - name: Bundle the action
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm run bundle
+
+      - name: Set up Java 21
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Stage pull-request fixture
+        run: |
+          fixture_dir="${ACTION_DIRECTORY}/build/integration-fixtures/pull-request"
+          rm -rf "$fixture_dir"
+          mkdir -p "$fixture_dir"
+          cp -R "$FIXTURE_SOURCE_DIRECTORY"/. "$fixture_dir"
+          chmod +x "$fixture_dir/gradlew"
+
+      - name: Prepare Mammoth Cache for Gradle
+        uses: ./actions/mammoth-cache/gradle
+        with:
+          base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/pull-request
+          cache-key-prefix: it-pr-${{ github.run_id }}-${{ github.run_attempt }}-
+
+      - name: Run a read-only PR build
+        working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/pull-request
+        run: ./gradlew --no-daemon resolveStandalone
+
+      - name: Assert the PR default stayed read-only
+        run: |
+          grep -F -- '- Read only: true' "$GITHUB_STEP_SUMMARY"
+
+  # Lightweight macOS/Windows smoke coverage only. This runs under bash on both platforms and uses
+  # `./gradlew`, so the fixture intentionally relies on the POSIX launcher rather than `gradlew.bat`.
+  standalone_cross_platform:
+    name: Cross-platform standalone smoke (${{ matrix.os }})
+    if: inputs.run-cross-platform
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: actions/mammoth-cache/gradle/.nvmrc
+          cache: npm
+          cache-dependency-path: actions/mammoth-cache/gradle/package-lock.json
+
+      - name: Install action dependencies
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm ci
+
+      - name: Bundle the action
+        working-directory: ${{ env.ACTION_DIRECTORY }}
+        run: npm run bundle
+
+      - name: Set up Java 21
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Stage cross-platform fixture
+        run: |
+          fixture_dir="${ACTION_DIRECTORY}/build/integration-fixtures/cross-platform-${{ matrix.os }}"
+          rm -rf "$fixture_dir"
+          mkdir -p "$fixture_dir"
+          cp -R "$FIXTURE_SOURCE_DIRECTORY"/. "$fixture_dir"
+          chmod +x "$fixture_dir/gradlew"
+
+      - name: Prepare Mammoth Cache for Gradle
+        uses: ./actions/mammoth-cache/gradle
+        with:
+          base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/cross-platform-${{ matrix.os }}
+          cache-key-prefix: it-cross-platform-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}-
+          read-only: true
+
+      - name: Verify Gradle runs on this runner
+        working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/cross-platform-${{ matrix.os }}
+        run: ./gradlew --version

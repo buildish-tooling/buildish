@@ -60,6 +60,44 @@ describe('createGitHubContext', () => {
     expect(context.resolvedRefName).toBe('release/1.0');
   });
 
+  it('treats pull_request_target like a pull request for ref resolution and trust checks', () => {
+    const context = createGitHubContext(
+      {
+        GITHUB_EVENT_NAME: 'pull_request_target',
+        GITHUB_REPOSITORY: 'apache/buildish',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+      },
+      {
+        repository: { default_branch: 'main' },
+        pull_request: { base: { ref: 'stable/2.x' } },
+      },
+    );
+
+    expect(context.isPullRequest).toBe(true);
+    expect(context.resolvedRefName).toBe('stable/2.x');
+    expect(context.safeRefName).toBe('stable-2.x');
+  });
+
+  it('uses the triggering branch for workflow_dispatch events', () => {
+    const context = createGitHubContext(
+      {
+        GITHUB_EVENT_NAME: 'workflow_dispatch',
+        GITHUB_REF: 'refs/heads/release/2026.03',
+        GITHUB_REPOSITORY: 'apache/buildish',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+      },
+      {
+        repository: { default_branch: 'main' },
+      },
+    );
+
+    expect(context.isPullRequest).toBe(false);
+    expect(context.resolvedRefName).toBe('release/2026.03');
+    expect(context.safeRefName).toBe('release-2026.03');
+  });
+
   it('normalizes runner metadata into cache-safe values', () => {
     const context = createGitHubContext(
       {

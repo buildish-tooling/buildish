@@ -94,6 +94,46 @@ describe('normalizeActionConfig', () => {
     expect(config.readOnly).toBe(true);
   });
 
+  it('defaults to read-only on pull_request_target events', () => {
+    const config = normalizeActionConfig(readActionInputs(emptyInputProvider()), {
+      phase: 'main',
+      ciContext: { ...baseCiContext, eventName: 'pull_request_target', isPullRequest: true },
+      env: {},
+    });
+
+    expect(config.readOnly).toBe(true);
+  });
+
+  it('keeps workflow_dispatch writable by default', () => {
+    const config = normalizeActionConfig(readActionInputs(emptyInputProvider()), {
+      phase: 'main',
+      ciContext: {
+        ...baseCiContext,
+        eventName: 'workflow_dispatch',
+        resolvedRefName: 'release/2026.03',
+        safeRefName: 'release-2026.03',
+      },
+      env: {},
+    });
+
+    expect(config.readOnly).toBe(false);
+  });
+
+  it('keeps schedule runs writable by default', () => {
+    const config = normalizeActionConfig(readActionInputs(emptyInputProvider()), {
+      phase: 'main',
+      ciContext: {
+        ...baseCiContext,
+        eventName: 'schedule',
+        resolvedRefName: 'main',
+        safeRefName: 'main',
+      },
+      env: {},
+    });
+
+    expect(config.readOnly).toBe(false);
+  });
+
   it('normalizes explicit wrapper file paths under the configured base directory', () => {
     const config = normalizeActionConfig(
       readActionInputs(

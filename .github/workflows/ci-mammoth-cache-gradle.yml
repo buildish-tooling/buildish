@@ -15,15 +15,26 @@
 
 name: CI Mammoth Cache for Gradle
 
+# Single entry workflow for local verification plus real GitHub integration scenarios.
+#
+# Event routing:
+# - push / workflow_dispatch / schedule -> trusted writable integration scenario suite
+# - pull_request -> fork-safe read-only integration scenario suite
+
 on:
   push:
     paths:
       - "actions/mammoth-cache/gradle/**"
       - ".github/workflows/ci-mammoth-cache-gradle.yml"
+      - ".github/workflows/it-mammoth-cache-gradle-reusable.yml"
   pull_request:
     paths:
       - "actions/mammoth-cache/gradle/**"
       - ".github/workflows/ci-mammoth-cache-gradle.yml"
+      - ".github/workflows/it-mammoth-cache-gradle-reusable.yml"
+  # Run once daily off-peak rather than at the top of the hour.
+  schedule:
+    - cron: "17 5 * * *"
   workflow_dispatch:
 
 permissions:
@@ -127,10 +138,51 @@ jobs:
         with:
           base-directory: actions/mammoth-cache/gradle/build/smoke-fixture
 
-  required_check:
-    name: Summary
-    needs: [check, rat-check, smoke-test]
+  integration-trusted:
+    name: Trusted GitHub integration scenarios
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/it-mammoth-cache-gradle-reusable.yml
+    with:
+      run-pr-scenarios: false
+      run-writable-scenarios: true
+      run-cross-platform: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.ref_name == github.event.repository.default_branch }}
+
+  integration-pr:
+    name: Pull request GitHub integration scenarios
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/it-mammoth-cache-gradle-reusable.yml
+    with:
+      run-pr-scenarios: true
+      run-writable-scenarios: false
+      run-cross-platform: false
+
+  required_checks:
+    name: Required Checks
+    if: ${{ always() }}
+    needs: [check, rat-check, smoke-test, integration-trusted, integration-pr]
     runs-on: ubuntu-latest
     steps:
-      - name: Noop
-        run: echo "Noop"
+      - name: Assert all required jobs succeeded or were intentionally skipped
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+          RAT_RESULT: ${{ needs.rat-check.result }}
+          SMOKE_TEST_RESULT: ${{ needs.smoke-test.result }}
+          INTEGRATION_TRUSTED_RESULT: ${{ needs.integration-trusted.result }}
+          INTEGRATION_PR_RESULT: ${{ needs.integration-pr.result }}
+        run: |
+          for result in \
+            "$CHECK_RESULT" \
+            "$RAT_RESULT" \
+            "$SMOKE_TEST_RESULT" \
+            "$INTEGRATION_TRUSTED_RESULT" \
+            "$INTEGRATION_PR_RESULT"; do
+            case "$result" in
+              success|skipped) ;;
+              *)
+                echo "Unexpected dependency result: $result"
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "All required jobs succeeded for this event."

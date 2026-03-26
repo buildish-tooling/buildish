@@ -335,9 +335,22 @@ implementable design.
       - A subset of the the Linux based workflows above should be sufficient to exercise the macOS and Windows
         specific behaviors.
       - Do not copy the Linux workflows. Instead make those Matrix jobs
-22. Cleanup job summary
-23. Cleanup the code base
-24. Documentation
+22. GH integration test workflows permissions
+    - We can only expect read-only permissions, especially for PRs againt the project.
+    - The workflows must not fail in such cases.
+    - We should also ensure that multiple CI jobs running in parallel or sequentially do not interfere with each
+      other and cause flaky test runs or any other side effects or other issues.
+23. Prepare for releases
+    - Ensure LICENSE and NOTICE are present and up-to-date in the release artifacts. Those MUST be ASF compliant,
+      if possible, generate those from the contents of the package-lock.json? Is that enough even for the NOTICE file?
+    - All dependencies that are contained in (or "distributed with") the action MUST be listed in the LICENSE/NOTICE
+      files.
+    - Hint: Only Apache-License projects' NOTICE file content is to be included in the distribution's NOTICE file.
+      Other licenses that require attribution (e.g., MIT, BSD, etc.) do not go into the NOTICE file.
+      They are to be included in the LICENSE file.
+24. Cleanup job summary
+25. Cleanup the code base
+26. Documentation
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
     - Explicitly document the Gradle wrapper jar download and verification process in the docs/ directory.
     - Explicitly document the cache key generation process in the docs/ directory.
@@ -345,8 +358,7 @@ implementable design.
     - Explicitly document the CI abstraction layer in the docs/ directory.
     - Explicitly document the bootstrap process in the docs/ directory.
     - All types and functions must have JSDoc comments.
-25. Add release workflows
-    - Ensure LICENSE and NOTICE are present and up-to-date in the release artifacts.
+27. Add release workflows
     - Support version tags, but only immutable tags, no "moving" tags like 'v1' or so.
 
 ## Deferred / explicitly out of scope for v1
@@ -362,3 +374,7 @@ implementable design.
   - the stock setup-java entrypoint always writes Maven auth/toolchain files after installing Java.
   - invoking upstream setup-java as a raw child process would not update this action’s current process environment by itself
   - the upstream entrypoint also emits a Java problem matcher and writes Maven settings/toolchains by default
+- Multi-level aggregation (TO BE THOUGHT THROUGH / DOES IT MAKE REAL SENSE?)
+  - Currently, the action only supports a set of jobs and exactly one aggregator.
+  - It should be possible to have multiple levels of aggregation. In other words, an aggregator could just
+    aggregate the input deltas and produce a new, combined delta consumed by another aggregator.
