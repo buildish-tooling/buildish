@@ -98,6 +98,29 @@ describe('createGitHubContext', () => {
     expect(context.safeRefName).toBe('release-2026.03');
   });
 
+  it('honors caller-context overrides for reusable workflow runs', () => {
+    const context = createGitHubContext(
+      {
+        GITHUB_EVENT_NAME: 'workflow_call',
+        GITHUB_REPOSITORY: 'apache/buildish',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+        BUILDISH_MAMMOTH_CACHE_GITHUB_EVENT_NAME_OVERRIDE: 'pull_request',
+        BUILDISH_MAMMOTH_CACHE_GITHUB_RESOLVED_REF_NAME_OVERRIDE: 'release/1.1',
+        BUILDISH_MAMMOTH_CACHE_GITHUB_DEFAULT_BRANCH_OVERRIDE: 'main',
+      },
+      {
+        repository: { default_branch: 'ignored-default' },
+      },
+    );
+
+    expect(context.eventName).toBe('pull_request');
+    expect(context.isPullRequest).toBe(true);
+    expect(context.defaultBranch).toBe('main');
+    expect(context.resolvedRefName).toBe('release/1.1');
+    expect(context.safeRefName).toBe('release-1.1');
+  });
+
   it('normalizes runner metadata into cache-safe values', () => {
     const context = createGitHubContext(
       {

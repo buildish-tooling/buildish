@@ -143,6 +143,9 @@ jobs:
     if: github.event_name != 'pull_request'
     uses: ./.github/workflows/it-mammoth-cache-gradle-reusable.yml
     with:
+      caller-event-name: ${{ github.event_name }}
+      caller-resolved-ref-name: ${{ github.event_name == 'schedule' && github.event.repository.default_branch || github.ref_name }}
+      caller-default-branch: ${{ github.event.repository.default_branch }}
       run-pr-scenarios: false
       run-writable-scenarios: true
       run-cross-platform: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.ref_name == github.event.repository.default_branch }}
@@ -152,6 +155,9 @@ jobs:
     if: github.event_name == 'pull_request'
     uses: ./.github/workflows/it-mammoth-cache-gradle-reusable.yml
     with:
+      caller-event-name: ${{ github.event_name }}
+      caller-resolved-ref-name: ${{ github.base_ref }}
+      caller-default-branch: ${{ github.event.repository.default_branch }}
       run-pr-scenarios: true
       run-writable-scenarios: false
       run-cross-platform: false

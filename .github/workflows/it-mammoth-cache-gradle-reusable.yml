@@ -18,8 +18,9 @@ name: IT Mammoth Cache for Gradle (Reusable)
 # Real GitHub integration scenario graph for Mammoth Cache for Gradle.
 #
 # Scenario layout:
-# - standalone_seed -> standalone_restore exercises a writable Linux cache round-trip using one
-#   cache namespace shared only within the current workflow run.
+# - standalone_round_trip exercises a writable Linux cache round-trip by capturing the
+#   action-generated cache key, saving a cache snapshot immediately, wiping Gradle user home,
+#   restoring that exact key, and proving the fixture resolves offline.
 # - worker_a + worker_b -> aggregator exercises distributed worker delta publication plus
 #   same-run aggregator download/merge/apply using deterministic worker job names.
 # - duplicate_invocation_guard proves duplicate same-job action usage is rejected.
@@ -38,6 +39,24 @@ name: IT Mammoth Cache for Gradle (Reusable)
 on:
   workflow_call:
     inputs:
+      caller-event-name:
+        description: >-
+          Original caller workflow event name. Reusable workflows execute as `workflow_call`, so
+          the action needs the caller event to preserve event-based read-only and ref behavior.
+        required: true
+        type: string
+      caller-resolved-ref-name:
+        description: >-
+          Logical ref name from the caller workflow that the action should treat as the effective
+          branch for cache partitioning and summaries.
+        required: true
+        type: string
+      caller-default-branch:
+        description: >-
+          Repository default branch from the caller workflow so reusable runs do not depend on the
+          callee's `workflow_call` payload shape.
+        required: true
+        type: string
       run-pr-scenarios:
         description: >-
           Run the fork-safe pull-request scenario that verifies PR events stay read-only by
@@ -66,11 +85,15 @@ permissions:
 env:
   ACTION_DIRECTORY: actions/mammoth-cache/gradle
   FIXTURE_SOURCE_DIRECTORY: actions/mammoth-cache/gradle/test/fixtures/integration/gradle-project
+  BUILDISH_MAMMOTH_CACHE_GITHUB_EVENT_NAME_OVERRIDE: ${{ inputs.caller-event-name }}
+  BUILDISH_MAMMOTH_CACHE_GITHUB_RESOLVED_REF_NAME_OVERRIDE: ${{ inputs.caller-resolved-ref-name }}
+  BUILDISH_MAMMOTH_CACHE_GITHUB_DEFAULT_BRANCH_OVERRIDE: ${{ inputs.caller-default-branch }}
 
 jobs:
-  # Seeds one unique per-run standalone base cache that the next job must restore offline.
-  standalone_seed:
-    name: Linux standalone seed (prime writable cache)
+  # Performs a deterministic same-job save -> wipe -> restore cycle using the action-generated
+  # cache key, which avoids relying on post-job cache propagation timing between separate jobs.
+  standalone_round_trip:
+    name: Linux standalone round-trip (offline exact restore)
     if: inputs.run-writable-scenarios
     runs-on: ubuntu-latest
     defaults:
@@ -103,7 +126,7 @@ jobs:
 
       - name: Stage standalone fixture
         run: |
-          fixture_dir="${ACTION_DIRECTORY}/build/integration-fixtures/standalone-seed"
+          fixture_dir="${ACTION_DIRECTORY}/build/integration-fixtures/standalone-round-trip"
           rm -rf "$fixture_dir"
           mkdir -p "$fixture_dir"
           cp -R "$FIXTURE_SOURCE_DIRECTORY"/. "$fixture_dir"
@@ -112,68 +135,49 @@ jobs:
       - name: Prepare Mammoth Cache for Gradle
         uses: ./actions/mammoth-cache/gradle
         with:
-          base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-seed
+          base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-round-trip
           cache-key-prefix: it-standalone-${{ github.run_id }}-${{ github.run_attempt }}-
 
       - name: Resolve standalone dependencies online
-        working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-seed
+        working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-round-trip
         run: ./gradlew --no-daemon resolveStandalone
 
-  # Reuses the standalone cache namespace from standalone_seed and verifies an exact offline hit.
-  standalone_restore:
-    name: Linux standalone restore (offline exact-hit check)
-    if: inputs.run-writable-scenarios
-    needs: standalone_seed
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
-
-      - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
-        with:
-          node-version-file: actions/mammoth-cache/gradle/.nvmrc
-          cache: npm
-          cache-dependency-path: actions/mammoth-cache/gradle/package-lock.json
-
-      - name: Install action dependencies
-        working-directory: ${{ env.ACTION_DIRECTORY }}
-        run: npm ci
-
-      - name: Bundle the action
-        working-directory: ${{ env.ACTION_DIRECTORY }}
-        run: npm run bundle
-
-      - name: Set up Java 21
-        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Stage standalone fixture
+      - name: Capture action cache key
+        id: capture_cache_key
         run: |
-          fixture_dir="${ACTION_DIRECTORY}/build/integration-fixtures/standalone-restore"
-          rm -rf "$fixture_dir"
-          mkdir -p "$fixture_dir"
-          cp -R "$FIXTURE_SOURCE_DIRECTORY"/. "$fixture_dir"
-          chmod +x "$fixture_dir/gradlew"
+          cache_key="$(grep -F -- '- Cache key:' "$GITHUB_STEP_SUMMARY" | tail -n 1 | sed 's/^- Cache key: //')"
+          test -n "$cache_key"
+          printf 'cache_key=%s\n' "$cache_key" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare Mammoth Cache for Gradle
-        uses: ./actions/mammoth-cache/gradle
+      - name: Save exact standalone cache snapshot
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
-          base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-restore
-          cache-key-prefix: it-standalone-${{ github.run_id }}-${{ github.run_attempt }}-
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ steps.capture_cache_key.outputs.cache_key }}
+
+      - name: Wipe Gradle user home to prove restore
+        run: |
+          rm -rf "$HOME/.gradle"
+          mkdir -p "$HOME/.gradle"
+
+      - name: Restore exact standalone cache snapshot
+        id: restore_standalone_cache
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ steps.capture_cache_key.outputs.cache_key }}
 
       - name: Verify the saved cache restores offline
-        working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-restore
+        working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-round-trip
         run: ./gradlew --offline --no-daemon resolveStandalone
 
       - name: Assert exact cache reuse
         run: |
-          grep -F -- '- Base cache restore: exact-hit' "$GITHUB_STEP_SUMMARY"
+          test "${{ steps.restore_standalone_cache.outputs.cache-hit }}" = 'true'
 
   # Worker A publishes one same-run delta artifact for the distributed aggregator scenario.
   worker_a:

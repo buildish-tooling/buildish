@@ -30,6 +30,10 @@ const GITHUB_API_VERSION = '2022-11-28';
 const GITHUB_API_ACCEPT = 'application/vnd.github.raw';
 const ACTION_USER_AGENT = 'apache-buildish-mammoth-cache-gradle-action';
 const EMPTY_HTTP_HEADERS_BY_HOST: HttpHeadersByHost = new Map();
+const GITHUB_EVENT_NAME_OVERRIDE_ENV = 'BUILDISH_MAMMOTH_CACHE_GITHUB_EVENT_NAME_OVERRIDE';
+const GITHUB_RESOLVED_REF_NAME_OVERRIDE_ENV =
+  'BUILDISH_MAMMOTH_CACHE_GITHUB_RESOLVED_REF_NAME_OVERRIDE';
+const GITHUB_DEFAULT_BRANCH_OVERRIDE_ENV = 'BUILDISH_MAMMOTH_CACHE_GITHUB_DEFAULT_BRANCH_OVERRIDE';
 
 /**
  * Optional overrides used to build a deterministic GitHub adapter in tests.
@@ -100,13 +104,18 @@ export function createGitHubContext(
   env: NodeJS.ProcessEnv,
   eventPayload: Record<string, unknown>,
 ): CiJobContext {
-  const eventName = env.GITHUB_EVENT_NAME?.trim() || 'unknown';
+  const eventName =
+    (readNonEmptyEnvValue(env, GITHUB_EVENT_NAME_OVERRIDE_ENV) ?? env.GITHUB_EVENT_NAME?.trim()) ||
+    'unknown';
   const defaultBranch =
+    readNonEmptyEnvValue(env, GITHUB_DEFAULT_BRANCH_OVERRIDE_ENV) ||
     readNestedString(eventPayload, ['repository', 'default_branch']) ||
     env.GITHUB_BASE_REF?.trim() ||
     env.GITHUB_REF_NAME?.trim() ||
     'main';
-  const resolvedRefName = resolveGitHubRefName(eventName, env, eventPayload, defaultBranch);
+  const resolvedRefName =
+    readNonEmptyEnvValue(env, GITHUB_RESOLVED_REF_NAME_OVERRIDE_ENV) ||
+    resolveGitHubRefName(eventName, env, eventPayload, defaultBranch);
 
   return {
     platform: 'github',
@@ -200,6 +209,11 @@ function extractBranchRefName(
 
   const trimmedFallback = fallbackRefName?.trim();
   return trimmedFallback && !trimmedFallback.startsWith('refs/') ? trimmedFallback : null;
+}
+
+function readNonEmptyEnvValue(env: NodeJS.ProcessEnv, variableName: string): string | null {
+  const value = env[variableName]?.trim();
+  return value && value.length > 0 ? value : null;
 }
 
 /**
