@@ -17,8 +17,14 @@
 import * as core from '@actions/core';
 
 import { executeMainAction } from './main-flow';
+import { claimSingleRunJobInvocation } from './runtime/job-single-run';
 
 export async function runMain(): Promise<void> {
+  const singleRunClaim = await claimSingleRunJobInvocation();
+  if (!singleRunClaim.accepted) {
+    throw new Error(singleRunClaim.message);
+  }
+
   const status = await executeMainAction();
   if (status.bootstrap.baseCacheResult) {
     core.info(status.bootstrap.baseCacheResult.message);
