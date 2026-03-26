@@ -103,9 +103,25 @@ interface CompletedCommand {
   readonly stdout: string;
 }
 
-const DEFAULT_GPG_COMMAND = process.platform === 'win32' ? 'gpg.exe' : 'gpg';
-
 let gradleTrustedPublicKeysPromise: Promise<readonly TrustedOpenPgpPublicKey[]> | undefined;
+
+/**
+ * Resolves the GnuPG executable used for detached-signature verification.
+ *
+ * Windows CI may need to force a non-default `gpg.exe` path because Git for
+ * Windows can expose multiple binaries with different path semantics.
+ */
+export function resolveDefaultGpgCommand(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const override = env.BUILDISH_MAMMOTH_CACHE_GRADLE_GPG_COMMAND?.trim();
+  if (override) {
+    return override;
+  }
+
+  return platform === 'win32' ? 'gpg.exe' : 'gpg';
+}
 
 export async function loadTrustedOpenPgpPublicKeys(
   trustedKeyAllowlist: readonly TrustedOpenPgpPublicKey[],
@@ -286,7 +302,7 @@ async function runCommand(
   command: string | undefined,
   args: readonly string[],
 ): Promise<CompletedCommand> {
-  const resolvedCommand = command?.trim() || DEFAULT_GPG_COMMAND;
+  const resolvedCommand = command?.trim() || resolveDefaultGpgCommand();
 
   return await new Promise((resolve, reject) => {
     const child = spawn(resolvedCommand, [...args], {

@@ -381,7 +381,8 @@ exercise_installer_missing_properties_failure() {
       ;;
   esac
 
-  assert_last_output_contains 'Gradle wrapper properties file was not found' "$installer_kind installer failure output did not mention the missing gradle-wrapper.properties file."
+  assert_last_output_contains 'Gradle wrapper properties file' "$installer_kind installer failure output did not mention the missing gradle-wrapper.properties file."
+  assert_last_output_contains 'was not found' "$installer_kind installer failure output did not mention that gradle-wrapper.properties was missing."
 }
 
 exercise_wrapper_update_to_version() {

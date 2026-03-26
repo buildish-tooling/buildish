@@ -24,6 +24,7 @@ import { describe, expect, it } from 'vitest';
 import {
   GRADLE_TRUSTED_SIGNING_KEY_ALLOWLIST,
   loadTrustedOpenPgpPublicKeys,
+  resolveDefaultGpgCommand,
   verifyDetachedOpenPgpSignature,
   type TrustedOpenPgpPublicKey,
 } from '../../src/wrapper/signature';
@@ -62,6 +63,21 @@ describe('loadTrustedOpenPgpPublicKeys', () => {
         command: 'definitely-missing-gpg-command',
       }),
     ).rejects.toThrow(/required for Gradle wrapper detached-signature verification/);
+  });
+});
+
+describe('resolveDefaultGpgCommand', () => {
+  it('prefers an explicit environment override when provided', () => {
+    expect(
+      resolveDefaultGpgCommand('win32', {
+        BUILDISH_MAMMOTH_CACHE_GRADLE_GPG_COMMAND: ' C:\\tools\\gnupg\\bin\\gpg.exe ',
+      }),
+    ).toBe('C:\\tools\\gnupg\\bin\\gpg.exe');
+  });
+
+  it('falls back to platform defaults when no override is set', () => {
+    expect(resolveDefaultGpgCommand('win32', {})).toBe('gpg.exe');
+    expect(resolveDefaultGpgCommand('linux', {})).toBe('gpg');
   });
 });
 
