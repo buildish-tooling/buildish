@@ -27,6 +27,9 @@ on:
       - "actions/mammoth-cache/gradle/**"
       - ".github/workflows/ci-mammoth-cache-gradle.yml"
       - ".github/workflows/it-mammoth-cache-gradle-reusable.yml"
+    branches:
+      - main
+      - release/**
   pull_request:
     paths:
       - "actions/mammoth-cache/gradle/**"
