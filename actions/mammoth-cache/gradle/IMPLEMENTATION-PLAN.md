@@ -465,11 +465,12 @@ implementable design.
         - the size of the pulled base cache
         - the size of the delta artifact (or "n/a" if not applicable)
         - the size of the uploaded base cache (or "n/a" if not applicable)
-34. Review the mammoth action and ensure the CI abstraction is enforced everywhere.
+34. The "raw details" that were in the job summary before, should be logged from the main/post action phases.
+35. Review the mammoth action and ensure the CI abstraction is enforced everywhere.
     - Especially the gradle scripts to capture build results and build scans are GitHub specific.
     - Also the summary code could be GitHub specific.
     - We need that code to be CI agnostic.
-35. Documentation for the mammoth action
+36. Documentation for the mammoth action
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
     - Explicitly document the Gradle wrapper jar download and verification process in the docs/ directory.
       Also explain how it related to the "buildish helper tool".
@@ -479,8 +480,8 @@ implementable design.
     - Explicitly document the bootstrap process in the docs/ directory.
     - If diagrams help, use Mermaid
     - All types and functions must have JSDoc comments.
-36. Add the "buildish helper tool" to the top-level README
-37. Add release workflows
+37. Add the "buildish helper tool" to the top-level README
+38. Add release workflows
     - Use version tags. "full" version tags like v1.2.3 become actual GitHub releases.
       We can provide "moving" tags like v1, v1.2 as well. Those would then point to the latest release in their
       respective series.
@@ -488,16 +489,16 @@ implementable design.
       See https://docs.github.com/en/actions/how-tos/create-and-publish-actions/using-immutable-releases-and-tags-to-manage-your-actions-releases
     - As the action's `dist/` folder is .gitignore'd, we need to ensure that the release workflow ensure that the
       `dist/` folder is included in the Git commit for the release tag.
-38. Cleanup the code base
+39. Cleanup the code base
     - MANUALLY inspect all files
     - Check validate*() functions for duplicates
-39. Site + logo!
+40. Site + logo!
     - We need a logo for the project!
     - Leverage the work done in Polaris, use Hugo.
     - But come up with better Docker builds for the site.
     - Respect that different plugins/actions/tools have different release cadences.
     - Also respect that different plugins/actions/tools have different documentation needs.
-40. Validate that the action build-results (INIT_SCRIPT_CONTENTS + SERVICE_PLUGIN_CONTENTS in actions/mammoth-cache/gradle/src/gradle/build-results.ts)
+41. Validate that the action build-results (INIT_SCRIPT_CONTENTS + SERVICE_PLUGIN_CONTENTS in actions/mammoth-cache/gradle/src/gradle/build-results.ts)
     are not too close to the Gradle action's code.
     - The scripts look a bit GitHub CI specific, using `RUNNER_TEMP` and `GITHUB_ACTION` system properties.
     - Why are those not env vars?
