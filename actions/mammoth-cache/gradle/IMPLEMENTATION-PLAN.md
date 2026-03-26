@@ -352,12 +352,28 @@ implementable design.
     - Hint: Only Apache-License projects' NOTICE file content is to be included in the distribution's NOTICE file.
       Other licenses that require attribution (e.g., MIT, BSD, etc.) do not go into the NOTICE file.
       They are to be included in the LICENSE file.
-26. Cleanup job summary
+26. Problematic licenses
+    - openpgp (LGPL-3.0+) https://www.npmjs.com/package/openpgp
+      - Remove the openpgp dependency and replace it with invocations of the gpg binary, is should be presenton
+        Linux and macOS GitHub runners.
+      - If the gpg binary is not present, the action shall fail with an actionable error message (aka on Windows?).
+    - buffers (no license) https://www.npmjs.com/package/buffers
+      - Have to mention this specially, as the package information doesn't include any license information.
+      - Special mention text:
+        """
+        This package is licensed under the MIT/X11 license, as indicated by the commit of the original author here
+        (on a fork) https://github.com/bitpay/node-buffers/commit/1b745ee35d33eb166e15ef1866073a07c6d7de87.
+        The original source repository https://github.com/substack/node-buffers no longer exists,
+        the dependency has been published to npmjs 14 years ago and is since then unmaintained.
+        """
+      - License Type: MIT / X11
+      - No license URL
+27. Cleanup job summary
     - Can we get the cache partition statistics from the cache manifest into the summary? Like number of files and
       total size for each partition.
-27. Cleanup the code base
+28. Cleanup the code base
     - Check validate*() functions for duplicates
-28. Documentation
+29. Documentation
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
     - Explicitly document the Gradle wrapper jar download and verification process in the docs/ directory.
     - Explicitly document the cache key generation process in the docs/ directory.
@@ -365,7 +381,7 @@ implementable design.
     - Explicitly document the CI abstraction layer in the docs/ directory.
     - Explicitly document the bootstrap process in the docs/ directory.
     - All types and functions must have JSDoc comments.
-29. Add release workflows
+30. Add release workflows
     - Use version tags. "full" version tags like v1.2.3 become actual GitHub releases.
       We can provide "moving" tags like v1, v1.2 as well. Those would then point to the latest release in their
       respective series.
