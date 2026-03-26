@@ -288,6 +288,8 @@ implementable design.
 15. Make sure the delta artifacts are either deleted after the aggregator job has finished or after 12 hours.
 16. Add a safeguard to prevent the action from run more than once per job.
 17. Built-in invocation of `actions/setup-java`
+    - Just to install Java for a particular version using a particular distribution
+    - Using the same defaults as `actions/setup-java` for the version and distribution (value pass-through)
 18. Support macOS and Windows runners
 19. Integration workflow suite
     - Those workflows are not part of the action itself, but required to run integration tests.
