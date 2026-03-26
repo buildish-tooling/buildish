@@ -78,6 +78,28 @@ describe('captureCacheManifest', () => {
     });
   });
 
+  it('preserves the pre-read access time when hashing updates atime', async () => {
+    await withGradleUserHome(async (gradleUserHome) => {
+      const relativePath = 'caches/modules-2/files-2.1/example.jar';
+      const expectedAtime = new Date('2026-03-25T11:59:58.000Z');
+      const expectedMtime = new Date('2026-03-25T12:00:00.000Z');
+      const absolutePath = path.join(gradleUserHome, relativePath);
+
+      await writeTrackedFile(gradleUserHome, relativePath, 'module');
+      await utimes(absolutePath, expectedAtime, expectedMtime);
+
+      const manifest = await captureCacheManifest(createTestCacheModel(gradleUserHome));
+      const entry = manifest.partitions.find((partition) => partition.partitionId === 'modules')
+        ?.entries[0];
+
+      expect(entry).toMatchObject({
+        relativePath,
+        atimeMs: expectedAtime.getTime(),
+        mtimeMs: expectedMtime.getTime(),
+      });
+    });
+  });
+
   it('fails when the same file matches multiple cache partitions', async () => {
     await withGradleUserHome(async (gradleUserHome) => {
       await writeTrackedFile(gradleUserHome, 'shared/example.bin', 'shared');

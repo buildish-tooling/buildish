@@ -381,7 +381,7 @@ async function captureStableFileEntry(
         contentSha256,
         size: afterStat.size,
         mode: afterStat.mode,
-        atimeMs: afterStat.atimeMs,
+        atimeMs: beforeStat.atimeMs,
         mtimeMs: afterStat.mtimeMs,
       };
     }
