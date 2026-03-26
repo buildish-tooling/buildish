@@ -111,8 +111,28 @@ inputs:
 outputs:
   cache-key:
     description: Effective base cache key resolved during the main phase, or an empty string when caching is disabled.
+  base-cache-restore-status:
+    description: Main-phase base cache restore classification (`feature-unavailable`, `miss`, `exact-hit`, `partial-hit`), or an empty string when caching is disabled.
+  java-major:
+    description: Detected Java major version used in the effective cache model, or an empty string when caching is disabled.
+  job-mode:
+    description: Effective normalized job mode for the current run (`standalone`, `distributed-worker`, or `distributed-aggregator`).
   read-only:
     description: Effective read-only mode after applying event-based defaults and any explicit override.
+  wrapper-count:
+    description: Number of Gradle wrapper properties selections successfully provisioned during the main phase.
+  gradle-versions:
+    description: Comma-separated sorted unique Gradle versions represented by the provisioned wrapper set for the main phase.
+  wrapper-downloaded-count:
+    description: Number of trusted wrapper JARs downloaded during the main phase.
+  wrapper-reused-count:
+    description: Number of already-correct trusted wrapper JARs reused during the main phase.
+  resolved-ref-name:
+    description: Effective human-readable ref name used by the action for cache partitioning and summaries.
+  safe-ref-name:
+    description: Cache-safe ref slug derived from the resolved ref name.
+  dependent-jobs-count:
+    description: Number of configured dependent jobs for distributed aggregation during the main phase.
   downloaded-dependent-artifact-count:
     description: Number of dependent distributed delta artifacts downloaded during the main phase.
   job-name:

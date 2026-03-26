@@ -361,7 +361,13 @@ implementable design.
     - Explicitly document the bootstrap process in the docs/ directory.
     - All types and functions must have JSDoc comments.
 27. Add release workflows
-    - Support version tags, but only immutable tags, no "moving" tags like 'v1' or so.
+    - Use version tags. "full" version tags like v1.2.3 become actual GitHub releases.
+      We can provide "moving" tags like v1, v1.2 as well. Those would then point to the latest release in their
+      respective series.
+    - The plan is to use GitHub's immutable release feature.
+      See https://docs.github.com/en/actions/how-tos/create-and-publish-actions/using-immutable-releases-and-tags-to-manage-your-actions-releases
+    - As the action's `dist/` folder is .gitignore'd, we need to ensure that the release workflow ensure that the
+      `dist/` folder is included in the Git commit for the release tag.
 
 ## Deferred / explicitly out of scope for v1
 

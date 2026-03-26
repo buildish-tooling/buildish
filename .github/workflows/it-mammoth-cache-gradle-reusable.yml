@@ -141,6 +141,26 @@ jobs:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-round-trip
           cache-key-prefix: it-standalone-${{ github.run_id }}-${{ github.run_attempt }}-
 
+      - name: Assert standalone prepare outputs
+        env:
+          ACTION_BASE_CACHE_RESTORE_STATUS: ${{ steps.prepare_standalone_cache.outputs.base-cache-restore-status }}
+          ACTION_JAVA_MAJOR: ${{ steps.prepare_standalone_cache.outputs.java-major }}
+          ACTION_JOB_MODE: ${{ steps.prepare_standalone_cache.outputs.job-mode }}
+          ACTION_GRADLE_VERSIONS: ${{ steps.prepare_standalone_cache.outputs.gradle-versions }}
+          ACTION_RESOLVED_REF_NAME: ${{ steps.prepare_standalone_cache.outputs.resolved-ref-name }}
+          ACTION_SAFE_REF_NAME: ${{ steps.prepare_standalone_cache.outputs.safe-ref-name }}
+          ACTION_DEPENDENT_JOBS_COUNT: ${{ steps.prepare_standalone_cache.outputs.dependent-jobs-count }}
+          CALLER_RESOLVED_REF_NAME: ${{ inputs.caller-resolved-ref-name }}
+        run: |
+          expected_safe_ref_name="$(printf '%s' "$CALLER_RESOLVED_REF_NAME" | sed -E 's/[ /]+/-/g; s/[^A-Za-z0-9._-]/-/g; s/-+/-/g; s/^-+|-+$//g')"
+          test "$ACTION_BASE_CACHE_RESTORE_STATUS" = 'miss'
+          test "$ACTION_JAVA_MAJOR" = '21'
+          test "$ACTION_JOB_MODE" = 'standalone'
+          test "$ACTION_GRADLE_VERSIONS" = '8.14.0'
+          test "$ACTION_RESOLVED_REF_NAME" = "$CALLER_RESOLVED_REF_NAME"
+          test "$ACTION_SAFE_REF_NAME" = "$expected_safe_ref_name"
+          test "$ACTION_DEPENDENT_JOBS_COUNT" = '0'
+
       - name: Resolve standalone dependencies online
         working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-round-trip
         run: ./gradlew --no-daemon resolveStandalone
@@ -343,8 +363,26 @@ jobs:
         run: ./gradlew --offline --no-daemon resolveWorkerA resolveWorkerB
 
       - name: Assert both worker artifacts were consumed
+        env:
+          ACTION_BASE_CACHE_RESTORE_STATUS: ${{ steps.prepare_aggregator_cache.outputs.base-cache-restore-status }}
+          ACTION_JAVA_MAJOR: ${{ steps.prepare_aggregator_cache.outputs.java-major }}
+          ACTION_JOB_MODE: ${{ steps.prepare_aggregator_cache.outputs.job-mode }}
+          ACTION_GRADLE_VERSIONS: ${{ steps.prepare_aggregator_cache.outputs.gradle-versions }}
+          ACTION_RESOLVED_REF_NAME: ${{ steps.prepare_aggregator_cache.outputs.resolved-ref-name }}
+          ACTION_SAFE_REF_NAME: ${{ steps.prepare_aggregator_cache.outputs.safe-ref-name }}
+          ACTION_DEPENDENT_JOBS_COUNT: ${{ steps.prepare_aggregator_cache.outputs.dependent-jobs-count }}
+          ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT: ${{ steps.prepare_aggregator_cache.outputs.downloaded-dependent-artifact-count }}
+          CALLER_RESOLVED_REF_NAME: ${{ inputs.caller-resolved-ref-name }}
         run: |
-          test "${{ steps.prepare_aggregator_cache.outputs.downloaded-dependent-artifact-count }}" = '2'
+          expected_safe_ref_name="$(printf '%s' "$CALLER_RESOLVED_REF_NAME" | sed -E 's/[ /]+/-/g; s/[^A-Za-z0-9._-]/-/g; s/-+/-/g; s/^-+|-+$//g')"
+          test "$ACTION_BASE_CACHE_RESTORE_STATUS" = 'miss'
+          test "$ACTION_JAVA_MAJOR" = '21'
+          test "$ACTION_JOB_MODE" = 'distributed-aggregator'
+          test "$ACTION_GRADLE_VERSIONS" = '8.14.0'
+          test "$ACTION_RESOLVED_REF_NAME" = "$CALLER_RESOLVED_REF_NAME"
+          test "$ACTION_SAFE_REF_NAME" = "$expected_safe_ref_name"
+          test "$ACTION_DEPENDENT_JOBS_COUNT" = '2'
+          test "$ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT" = '2'
 
   # Proves that two action invocations in the same GitHub job cannot race or double-run post-work.
   duplicate_invocation_guard:
@@ -468,8 +506,26 @@ jobs:
         run: ./gradlew --no-daemon resolveStandalone
 
       - name: Assert the PR default stayed read-only
+        env:
+          ACTION_BASE_CACHE_RESTORE_STATUS: ${{ steps.prepare_pull_request_cache.outputs.base-cache-restore-status }}
+          ACTION_JAVA_MAJOR: ${{ steps.prepare_pull_request_cache.outputs.java-major }}
+          ACTION_JOB_MODE: ${{ steps.prepare_pull_request_cache.outputs.job-mode }}
+          ACTION_GRADLE_VERSIONS: ${{ steps.prepare_pull_request_cache.outputs.gradle-versions }}
+          ACTION_READ_ONLY: ${{ steps.prepare_pull_request_cache.outputs.read-only }}
+          ACTION_RESOLVED_REF_NAME: ${{ steps.prepare_pull_request_cache.outputs.resolved-ref-name }}
+          ACTION_SAFE_REF_NAME: ${{ steps.prepare_pull_request_cache.outputs.safe-ref-name }}
+          ACTION_DEPENDENT_JOBS_COUNT: ${{ steps.prepare_pull_request_cache.outputs.dependent-jobs-count }}
+          CALLER_RESOLVED_REF_NAME: ${{ inputs.caller-resolved-ref-name }}
         run: |
-          test "${{ steps.prepare_pull_request_cache.outputs.read-only }}" = 'true'
+          expected_safe_ref_name="$(printf '%s' "$CALLER_RESOLVED_REF_NAME" | sed -E 's/[ /]+/-/g; s/[^A-Za-z0-9._-]/-/g; s/-+/-/g; s/^-+|-+$//g')"
+          test "$ACTION_BASE_CACHE_RESTORE_STATUS" = 'miss'
+          test "$ACTION_JAVA_MAJOR" = '21'
+          test "$ACTION_JOB_MODE" = 'standalone'
+          test "$ACTION_GRADLE_VERSIONS" = '8.14.0'
+          test "$ACTION_READ_ONLY" = 'true'
+          test "$ACTION_RESOLVED_REF_NAME" = "$CALLER_RESOLVED_REF_NAME"
+          test "$ACTION_SAFE_REF_NAME" = "$expected_safe_ref_name"
+          test "$ACTION_DEPENDENT_JOBS_COUNT" = '0'
 
   # Lightweight macOS/Windows smoke coverage only. This runs under bash on both platforms and uses
   # `./gradlew`, so the fixture intentionally relies on the POSIX launcher rather than `gradlew.bat`.

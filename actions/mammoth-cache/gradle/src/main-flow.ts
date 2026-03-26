@@ -210,9 +210,33 @@ export function createMainActionSummaryLines(status: MainActionStatus): readonly
 }
 
 export function createMainActionOutputs(status: MainActionStatus): Record<string, string> {
+  const gradleVersions = [
+    ...new Set(status.bootstrap.provisionedWrappers.map((wrapper) => wrapper.wrapperSourceVersion)),
+  ]
+    .sort()
+    .join(',');
+  const wrapperDownloadedCount = status.bootstrap.provisionedWrappers.filter(
+    (wrapper) => wrapper.wasDownloaded,
+  ).length;
+
   return {
     'cache-key': status.bootstrap.cacheModel?.cacheKey ?? '',
+    'base-cache-restore-status':
+      status.bootstrap.baseCacheResult?.operation === 'restore'
+        ? status.bootstrap.baseCacheResult.status
+        : '',
+    'java-major': status.bootstrap.cacheModel?.javaMajor?.toString() ?? '',
+    'job-mode': status.bootstrap.config.jobMode,
     'read-only': String(status.bootstrap.config.readOnly),
+    'wrapper-count': String(status.bootstrap.provisionedWrappers.length),
+    'gradle-versions': gradleVersions,
+    'wrapper-downloaded-count': String(wrapperDownloadedCount),
+    'wrapper-reused-count': String(
+      status.bootstrap.provisionedWrappers.length - wrapperDownloadedCount,
+    ),
+    'resolved-ref-name': status.bootstrap.ciContext.resolvedRefName,
+    'safe-ref-name': status.bootstrap.ciContext.safeRefName,
+    'dependent-jobs-count': String(status.bootstrap.config.dependentJobs.length),
     'downloaded-dependent-artifact-count': String(
       status.dependentDeltaResult?.appliedArtifactCount ?? 0,
     ),

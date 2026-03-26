@@ -175,7 +175,17 @@ describe('executeMainAction', () => {
       );
       expect(createMainActionOutputs(status)).toEqual({
         'cache-key': 'gradle-cache-1-21-linux-x64-main',
+        'base-cache-restore-status': 'miss',
+        'java-major': '21',
+        'job-mode': 'distributed-aggregator',
         'read-only': 'false',
+        'wrapper-count': '1',
+        'gradle-versions': '8.14.0',
+        'wrapper-downloaded-count': '0',
+        'wrapper-reused-count': '1',
+        'resolved-ref-name': 'main',
+        'safe-ref-name': 'main',
+        'dependent-jobs-count': '1',
         'downloaded-dependent-artifact-count': '1',
         'job-name': 'aggregate',
       });
@@ -265,6 +275,22 @@ describe('executeMainAction', () => {
           '- Pre-build manifest persisted: yes',
         ]),
       );
+      expect(createMainActionOutputs(status)).toEqual({
+        'cache-key': 'gradle-cache-1-21-linux-x64-main',
+        'base-cache-restore-status': 'miss',
+        'java-major': '21',
+        'job-mode': 'standalone',
+        'read-only': 'false',
+        'wrapper-count': '1',
+        'gradle-versions': '8.14.0',
+        'wrapper-downloaded-count': '0',
+        'wrapper-reused-count': '1',
+        'resolved-ref-name': 'main',
+        'safe-ref-name': 'main',
+        'dependent-jobs-count': '0',
+        'downloaded-dependent-artifact-count': '0',
+        'job-name': 'build',
+      });
       expect(summary.writeCalls).toBe(2);
     });
   });
