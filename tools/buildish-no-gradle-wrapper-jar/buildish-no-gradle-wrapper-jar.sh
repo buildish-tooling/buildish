@@ -217,7 +217,7 @@ distribution_line=$(sed -n '/^distributionUrl=/{p;q;}' "$BUILDISH_HELPER_PROPERT
   buildish_no_gradle_wrapper_jar_fail "Gradle wrapper properties file is missing a distributionUrl entry."
 
 distribution_url=$(printf '%s' "$distribution_line" | sed 's/^distributionUrl=//; s/\\:/:/g')
-BUILDISH_HELPER_DIST_VERSION=$(printf '%s' "$distribution_url" | sed -n 's#^https://services\.gradle\.org/distributions/gradle-\([0-9][0-9]*\(\.[0-9][0-9]*\)\{1,2\}\)-[A-Za-z][A-Za-z0-9-]*\.zip$#\1#p')
+BUILDISH_HELPER_DIST_VERSION=$(printf '%s' "$distribution_url" | sed -n 's#^https://services\.gradle\.org/distributions/gradle-\([0-9][0-9]*\(\.[0-9][0-9]*\)\{1,2\}\)-\(bin\|all\)\.zip$#\1#p')
 
 [ -n "$BUILDISH_HELPER_DIST_VERSION" ] ||
   buildish_no_gradle_wrapper_jar_fail "distributionUrl must be a canonical HTTPS services.gradle.org URL ending in gradle-<version>-bin.zip or gradle-<version>-all.zip."

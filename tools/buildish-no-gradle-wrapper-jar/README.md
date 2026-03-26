@@ -34,6 +34,45 @@ same include-style approach used by `gradle-wrapper-no-jar`.
 
 The helpers are standalone on purpose. They do not import this repository's TypeScript runtime.
 
+## Automatic installation scripts
+
+This repository also ships installer entrypoints that download the helper files, patch existing
+`gradlew` / `gradlew.bat`, and add the retained wrapper metadata patterns to `.gitignore`.
+
+### POSIX / bash
+
+Run from the target project root:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/apache/buildish/main/install.sh | bash
+```
+
+To target a different directory:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/apache/buildish/main/install.sh | bash -s -- /path/to/project
+```
+
+### Windows / PowerShell
+
+Run from the target project root:
+
+```powershell
+Invoke-RestMethod https://raw.githubusercontent.com/apache/buildish/main/install.ps1 | Invoke-Expression
+```
+
+Or run it against a specific directory after downloading/cloning this repository locally:
+
+```powershell
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 C:\path\to\project
+```
+
+### Security note
+
+The `curl | bash` and `Invoke-RestMethod | Invoke-Expression` forms execute remote script content.
+Prefer pinning to a reviewed tag or commit, or download the installer first and inspect it before
+execution if your environment requires stricter supply-chain controls.
+
 ## What the helpers do
 
 The helpers read `gradle/wrapper/gradle-wrapper.properties`, derive the configured Gradle version,
@@ -77,6 +116,9 @@ written files are not left behind if a download or verification step fails.
 ## How projects adopt the helper
 
 ### 1. Copy the helper files into the target project
+
+If you use the automatic installer above, it performs this copy step and the launcher/
+`.gitignore` updates for you.
 
 Copy:
 

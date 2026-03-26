@@ -1,0 +1,204 @@
+#!/bin/sh
+#
+# Copyright 2026 The Apache Software Foundation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -eu
+
+BUILDISH_TOOL_NAME='buildish-no-gradle-wrapper-jar'
+BUILDISH_DEFAULT_BASE_URL='https://raw.githubusercontent.com/apache/buildish/main/tools/buildish-no-gradle-wrapper-jar'
+BUILDISH_BASE_URL=${BUILDISH_NO_GRADLE_WRAPPER_JAR_BASE_URL:-$BUILDISH_DEFAULT_BASE_URL}
+BUILDISH_CR=$(printf '\r')
+TARGET_DIR=${1:-.}
+
+buildish_install_fail() {
+  echo "${BUILDISH_TOOL_NAME} install: $*" >&2
+  exit 1
+}
+
+buildish_install_warn() {
+  echo "${BUILDISH_TOOL_NAME} install: $*" >&2
+}
+
+buildish_install_require_command() {
+  command -v "$1" >/dev/null 2>&1 || buildish_install_fail "Required command '$1' was not found on PATH."
+}
+
+buildish_install_assert_not_symlink() {
+  [ ! -L "$1" ] || buildish_install_fail "$2 must not be a symbolic link: '$1'."
+}
+
+buildish_install_make_temp() {
+  mktemp "$1/.buildish-no-gradle-wrapper-jar-install.XXXXXX"
+}
+
+buildish_install_download_to() {
+  target_path=$1
+  url=$2
+  label=$3
+
+  buildish_install_assert_not_symlink "$target_path" "$label"
+  temp_path=$(buildish_install_make_temp "$GRADLE_DIR") || buildish_install_fail "Unable to create a temporary file for $label."
+
+  if ! curl --fail --location --silent --show-error --output "$temp_path" "$url"; then
+    rm -f "$temp_path"
+    buildish_install_fail "Unable to download $label from '$url'."
+  fi
+
+  if ! mv -f "$temp_path" "$target_path"; then
+    rm -f "$temp_path"
+    buildish_install_fail "Unable to move $label into '$target_path'."
+  fi
+}
+
+buildish_install_patch_after_line() {
+  target_path=$1
+  anchor_line=$2
+  inserted_line=$3
+  label=$4
+
+  if [ ! -f "$target_path" ]; then
+    buildish_install_warn "Skipping missing $label at '$target_path'."
+    return 0
+  fi
+
+  buildish_install_assert_not_symlink "$target_path" "$label"
+
+  if grep -Fqx "$inserted_line" "$target_path"; then
+    return 0
+  fi
+
+  temp_path=$(buildish_install_make_temp "$TARGET_DIR_ABSOLUTE") ||
+    buildish_install_fail "Unable to create a temporary file while patching $label."
+  was_executable=0
+  [ -x "$target_path" ] && was_executable=1
+  found_anchor=0
+
+  while IFS= read -r current_line || [ -n "$current_line" ]; do
+    normalized_line=$current_line
+    case $normalized_line in
+      *"$BUILDISH_CR") normalized_line=${normalized_line%"$BUILDISH_CR"} ;;
+    esac
+
+    printf '%s\n' "$current_line" >> "$temp_path"
+    if [ "$normalized_line" = "$anchor_line" ]; then
+      found_anchor=1
+      case $current_line in
+        *"$BUILDISH_CR") printf '%s\r\n' "$inserted_line" >> "$temp_path" ;;
+        *) printf '%s\n' "$inserted_line" >> "$temp_path" ;;
+      esac
+    fi
+  done < "$target_path"
+
+  if [ "$found_anchor" -ne 1 ]; then
+    rm -f "$temp_path"
+    buildish_install_fail "Unable to find the expected insertion point in $label at '$target_path'."
+  fi
+
+  if [ "$was_executable" -eq 1 ]; then
+    chmod +x "$temp_path"
+  fi
+
+  if ! mv -f "$temp_path" "$target_path"; then
+    rm -f "$temp_path"
+    buildish_install_fail "Unable to replace patched $label at '$target_path'."
+  fi
+}
+
+buildish_install_update_gitignore() {
+  gitignore_path=$TARGET_DIR_ABSOLUTE/.gitignore
+  entry_sha='gradle/wrapper/gradle-wrapper-*.sha256'
+  entry_asc='gradle/wrapper/gradle-wrapper-*.asc'
+  comment_line='# Added by buildish-no-gradle-wrapper-jar'
+
+  if [ -e "$gitignore_path" ]; then
+    buildish_install_assert_not_symlink "$gitignore_path" '.gitignore'
+    grep -Fqx "$entry_sha" "$gitignore_path" && has_sha=1 || has_sha=0
+    grep -Fqx "$entry_asc" "$gitignore_path" && has_asc=1 || has_asc=0
+    grep -Fqx "$comment_line" "$gitignore_path" && has_comment=1 || has_comment=0
+  else
+    has_sha=0
+    has_asc=0
+    has_comment=0
+  fi
+
+  if [ "$has_sha" -eq 1 ] && [ "$has_asc" -eq 1 ]; then
+    return 0
+  fi
+
+  temp_path=$(buildish_install_make_temp "$TARGET_DIR_ABSOLUTE") ||
+    buildish_install_fail "Unable to create a temporary file while updating .gitignore."
+
+  if [ -f "$gitignore_path" ]; then
+    cat "$gitignore_path" > "$temp_path"
+    printf '\n' >> "$temp_path"
+  fi
+  if [ "$has_comment" -eq 0 ]; then
+    printf '%s\n' "$comment_line" >> "$temp_path"
+  fi
+  if [ "$has_sha" -eq 0 ]; then
+    printf '%s\n' "$entry_sha" >> "$temp_path"
+  fi
+  if [ "$has_asc" -eq 0 ]; then
+    printf '%s\n' "$entry_asc" >> "$temp_path"
+  fi
+
+  if ! mv -f "$temp_path" "$gitignore_path"; then
+    rm -f "$temp_path"
+    buildish_install_fail "Unable to update '$gitignore_path'."
+  fi
+}
+
+buildish_install_require_command curl
+buildish_install_require_command mktemp
+
+[ "$#" -le 1 ] || buildish_install_fail 'Expected zero or one positional argument: the target project directory.'
+[ -d "$TARGET_DIR" ] || buildish_install_fail "Target directory does not exist: '$TARGET_DIR'."
+
+TARGET_DIR_ABSOLUTE=$(cd "$TARGET_DIR" >/dev/null 2>&1 && pwd) ||
+  buildish_install_fail "Unable to resolve target directory '$TARGET_DIR'."
+GRADLE_DIR=$TARGET_DIR_ABSOLUTE/gradle
+WRAPPER_DIR=$GRADLE_DIR/wrapper
+PROPERTIES_PATH=$WRAPPER_DIR/gradle-wrapper.properties
+GRADLEW_PATH=$TARGET_DIR_ABSOLUTE/gradlew
+GRADLEW_BAT_PATH=$TARGET_DIR_ABSOLUTE/gradlew.bat
+HELPER_SH_PATH=$GRADLE_DIR/buildish-no-gradle-wrapper-jar.sh
+HELPER_PS1_PATH=$GRADLE_DIR/buildish-no-gradle-wrapper-jar.ps1
+
+[ -f "$PROPERTIES_PATH" ] ||
+  buildish_install_fail "Gradle wrapper properties file was not found at '$PROPERTIES_PATH'. Run this installer from a Gradle project root or pass that directory as the only argument."
+buildish_install_assert_not_symlink "$PROPERTIES_PATH" 'gradle-wrapper.properties'
+
+buildish_install_download_to \
+  "$HELPER_SH_PATH" \
+  "$BUILDISH_BASE_URL/buildish-no-gradle-wrapper-jar.sh" \
+  'POSIX helper script'
+buildish_install_download_to \
+  "$HELPER_PS1_PATH" \
+  "$BUILDISH_BASE_URL/buildish-no-gradle-wrapper-jar.ps1" \
+  'PowerShell helper script'
+
+buildish_install_patch_after_line \
+  "$GRADLEW_PATH" \
+  'APP_HOME=$( cd -P "${APP_HOME:-./}" > /dev/null && printf '\''%s\n'\'' "$PWD" ) || exit' \
+  '. "${APP_HOME}/gradle/buildish-no-gradle-wrapper-jar.sh"' \
+  'gradlew'
+buildish_install_patch_after_line \
+  "$GRADLEW_BAT_PATH" \
+  'for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi' \
+  'powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%APP_HOME%\gradle\buildish-no-gradle-wrapper-jar.ps1"' \
+  'gradlew.bat'
+buildish_install_update_gitignore
+
+echo "${BUILDISH_TOOL_NAME} install: Installed helper files into '$GRADLE_DIR' and updated launcher scripts in '$TARGET_DIR_ABSOLUTE'."

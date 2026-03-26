@@ -94,6 +94,15 @@ function New-BuildishNoGradleWrapperJarTempPath {
   return [System.IO.Path]::Combine($Directory, ".buildish-no-gradle-wrapper-jar.$([System.IO.Path]::GetRandomFileName())")
 }
 
+function Write-BuildishNoGradleWrapperJarAsciiFile {
+  param(
+    [string]$Path,
+    [string]$Content
+  )
+
+  [System.IO.File]::WriteAllText($Path, $Content, [System.Text.Encoding]::ASCII)
+}
+
 function Get-BuildishNoGradleWrapperJarExpectedSha256 {
   param([string]$Path)
 
@@ -101,7 +110,7 @@ function Get-BuildishNoGradleWrapperJarExpectedSha256 {
   if ($checksum -notmatch '^[0-9a-f]{64}$') {
     throw "Wrapper checksum file '$Path' did not contain a valid SHA-256 value."
   }
-  Set-Content -LiteralPath $Path -Value "$checksum`n" -NoNewline
+  Write-BuildishNoGradleWrapperJarAsciiFile -Path $Path -Content "$checksum`n"
   return $checksum
 }
 
@@ -179,7 +188,7 @@ function Test-BuildishNoGradleWrapperJarDetachedSignature {
 
   try {
     New-Item -ItemType Directory -Path $gpgHome -Force | Out-Null
-    Set-Content -LiteralPath $trustedKeyPath -Value $TrustedGradlePublicKey -NoNewline
+    Write-BuildishNoGradleWrapperJarAsciiFile -Path $trustedKeyPath -Content $TrustedGradlePublicKey
 
     $fingerprintOutput = (& $GpgCommand --homedir $gpgHome --batch --no-options --show-keys --with-colons --fingerprint $trustedKeyPath 2>&1 | Out-String)
     if ($LASTEXITCODE -ne 0) {
@@ -234,7 +243,7 @@ try {
   }
 
   $distributionUrl = $distributionLine.Substring('distributionUrl='.Length).Replace('\:', ':')
-  $distributionMatch = [regex]::Match($distributionUrl, '^https://services\.gradle\.org/distributions/gradle-([0-9]+(?:\.[0-9]+){1,2})-[A-Za-z][A-Za-z0-9-]*\.zip$')
+  $distributionMatch = [regex]::Match($distributionUrl, '^https://services\.gradle\.org/distributions/gradle-([0-9]+(?:\.[0-9]+){1,2})-(?:bin|all)\.zip$')
   if (-not $distributionMatch.Success) {
     throw 'distributionUrl must be a canonical HTTPS services.gradle.org URL ending in gradle-<version>-bin.zip or gradle-<version>-all.zip.'
   }
