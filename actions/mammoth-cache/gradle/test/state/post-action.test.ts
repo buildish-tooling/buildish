@@ -21,11 +21,15 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { CACHE_MANIFEST_SCHEMA_VERSION, type CacheManifest } from '../../src/cache/manifest';
+import type { BaseCacheRestoreResult } from '../../src/cache/service';
 import {
+  BASE_CACHE_RESTORE_RESULT_STATE,
   CONSUMED_DELTA_ARTIFACT_NAMES_STATE,
+  getPersistedBaseCacheRestoreResult,
   getPersistedConsumedDeltaArtifactNames,
   getPersistedPreBuildCacheManifestPath,
   loadPersistedPreBuildCacheManifest,
+  persistBaseCacheRestoreResult,
   persistConsumedDeltaArtifactNames,
   persistPreBuildCacheManifest,
   PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
@@ -101,11 +105,34 @@ describe('post-action state helpers', () => {
     ).toEqual(['artifact-a', 'artifact-b']);
   });
 
+  it('persists and reloads the base cache restore result', () => {
+    const savedState = new Map<string, string>();
+
+    persistBaseCacheRestoreResult(
+      SAMPLE_BASE_CACHE_RESTORE_RESULT,
+      savedState.set.bind(savedState),
+    );
+
+    expect(savedState.get(BASE_CACHE_RESTORE_RESULT_STATE)).toContain('exact-hit');
+    expect(
+      getPersistedBaseCacheRestoreResult((name: string) => savedState.get(name) ?? ''),
+    ).toEqual(SAMPLE_BASE_CACHE_RESTORE_RESULT);
+  });
+
   it('rejects malformed consumed delta artifact state', () => {
     expect(() => getPersistedConsumedDeltaArtifactNames(() => 'not-json')).toThrow(/valid JSON/u);
     expect(() => getPersistedConsumedDeltaArtifactNames(() => '[""]')).toThrow(
       /must not be blank/u,
     );
+  });
+
+  it('rejects unsupported base cache restore result state', () => {
+    expect(() =>
+      getPersistedBaseCacheRestoreResult(
+        () =>
+          '{"operation":"restore","status":"saved","cacheKey":"cache-key","matchedKey":null,"restoreKeys":[],"paths":["/tmp/.gradle"],"message":"bad"}',
+      ),
+    ).toThrow(/Unsupported base cache restore result status/u);
   });
 });
 
@@ -127,6 +154,16 @@ const SAMPLE_MANIFEST: CacheManifest = {
       ],
     },
   ],
+};
+
+const SAMPLE_BASE_CACHE_RESTORE_RESULT: BaseCacheRestoreResult = {
+  operation: 'restore',
+  status: 'exact-hit',
+  cacheKey: 'buildish-cache-main-linux',
+  matchedKey: 'buildish-cache-main-linux',
+  restoreKeys: ['buildish-cache-main-linux', 'buildish-cache-main'],
+  paths: ['/tmp/workspace/.gradle/caches'],
+  message: 'Restored cache using exact key hit.',
 };
 
 async function withWorkspace(testBody: (workspace: string) => Promise<void>): Promise<void> {

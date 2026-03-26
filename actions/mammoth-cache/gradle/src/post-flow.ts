@@ -23,15 +23,18 @@ import {
   type WorkflowArtifactApi,
 } from './artifacts/service';
 import { bootstrapPhase, type BootstrapDependencies, type BootstrapStatus } from './bootstrap';
+import type { CacheDeltaManifest, CacheManifest } from './cache/manifest';
 import { captureCacheManifest, computeCacheDelta } from './cache/manifest';
+import type { CacheModel } from './cache/model';
+import type { BaseCacheRestoreResult } from './cache/service';
 import {
   cleanupGradleBuildResultCapture,
-  createGradleBuildSummaryLines,
   loadGradleBuildReport,
   type GradleBuildReport,
 } from './gradle/build-results';
-import { appendJobSummary } from './logging/summary';
+import { replaceJobSummary } from './logging/summary';
 import {
+  getPersistedBaseCacheRestoreResult,
   getPersistedDeltaArtifactProducerIdentity,
   getPersistedConsumedDeltaArtifactNames,
   loadPersistedPreBuildCacheManifest,
@@ -52,14 +55,34 @@ export interface PostDeltaArtifactResult {
   readonly totalChangedCount: number;
   readonly artifactName: string | null;
   readonly artifactId: number | null;
+  readonly artifactSizeBytes: number | null;
   readonly message: string;
+}
+
+interface PostCacheStatisticCell {
+  fileCount: number;
+  totalSizeBytes: number;
+}
+
+interface PostCacheStatisticRow {
+  readonly label: string;
+  readonly total: PostCacheStatisticCell | null;
+  readonly partitions: readonly (PostCacheStatisticCell | null)[];
+}
+
+interface PostCacheStatistics {
+  readonly partitionDisplayNames: readonly string[];
+  readonly rows: readonly PostCacheStatisticRow[];
 }
 
 export interface PostActionStatus {
   readonly bootstrap: BootstrapStatus;
+  readonly baseCacheRestoreResult: BaseCacheRestoreResult | null;
+  readonly cacheStatistics: PostCacheStatistics | null;
   readonly consumedDeltaCleanupResult: PostConsumedDeltaCleanupResult | null;
   readonly deltaArtifactResult: PostDeltaArtifactResult | null;
   readonly gradleBuildReport: GradleBuildReport;
+  readonly workflowRunUrl: string | null;
   readonly message: string;
 }
 
@@ -78,6 +101,10 @@ export async function executePostAction(
   dependencies: PostActionDependencies = {},
 ): Promise<PostActionStatus> {
   const bootstrap = await bootstrapPhase('post', dependencies);
+  const workflowRunUrl = createWorkflowRunUrl(dependencies.env ?? process.env, bootstrap);
+  const baseCacheRestoreResult = getPersistedBaseCacheRestoreResult(
+    dependencies.getState ?? (() => ''),
+  );
   const consumedDeltaCleanupResult = await cleanupConsumedDeltaArtifacts(bootstrap, dependencies);
   const gradleBuildReport = await loadGradleBuildReport(dependencies.env ?? process.env);
   const cleanupWarnings = await cleanupGradleBuildResultCapture(bootstrap.config.gradleUserHome);
@@ -89,12 +116,15 @@ export async function executePostAction(
   if (!bootstrap.cacheModel) {
     const status = {
       bootstrap,
+      baseCacheRestoreResult,
+      cacheStatistics: null,
       consumedDeltaCleanupResult,
       deltaArtifactResult: null,
       gradleBuildReport: combinedGradleBuildReport,
+      workflowRunUrl,
       message: 'Post action flow completed without cache orchestration.',
     } satisfies PostActionStatus;
-    await appendJobSummary(dependencies, createPostActionSummaryLines(status));
+    await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
     return status;
   }
 
@@ -104,6 +134,8 @@ export async function executePostAction(
   if (!preBuildManifest) {
     const status = {
       bootstrap,
+      baseCacheRestoreResult,
+      cacheStatistics: null,
       consumedDeltaCleanupResult,
       deltaArtifactResult: {
         status: 'missing-pre-build-manifest',
@@ -113,13 +145,15 @@ export async function executePostAction(
         totalChangedCount: 0,
         artifactName: null,
         artifactId: null,
+        artifactSizeBytes: null,
         message:
           'Delta artifact upload skipped because no persisted pre-build cache manifest was found in post-action state.',
       },
       gradleBuildReport: combinedGradleBuildReport,
+      workflowRunUrl,
       message: 'Post action flow completed without a persisted pre-build cache manifest.',
     } satisfies PostActionStatus;
-    await appendJobSummary(dependencies, createPostActionSummaryLines(status));
+    await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
     return status;
   }
 
@@ -129,13 +163,24 @@ export async function executePostAction(
 
   const status = {
     bootstrap,
+    baseCacheRestoreResult,
+    cacheStatistics: createPostCacheStatistics(
+      bootstrap.cacheModel,
+      preBuildManifest,
+      currentManifest,
+      deltaManifest,
+      baseCacheRestoreResult,
+      deltaArtifactResult,
+      bootstrap.baseCacheResult,
+    ),
     consumedDeltaCleanupResult,
     deltaArtifactResult,
     gradleBuildReport: combinedGradleBuildReport,
+    workflowRunUrl,
     message: createPostActionMessage(deltaArtifactResult),
   } satisfies PostActionStatus;
 
-  await appendJobSummary(dependencies, createPostActionSummaryLines(status));
+  await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
 
   return status;
 }
@@ -152,6 +197,7 @@ async function uploadPostDeltaArtifact(
       status: 'not-distributed-worker',
       artifactName: null,
       artifactId: null,
+      artifactSizeBytes: null,
       ...counts,
       message: `Delta artifact upload skipped because only distributed-worker jobs publish delta artifacts; current mode is '${bootstrap.config.jobMode}'.`,
     };
@@ -162,6 +208,7 @@ async function uploadPostDeltaArtifact(
       status: 'read-only',
       artifactName: null,
       artifactId: null,
+      artifactSizeBytes: null,
       ...counts,
       message: 'Delta artifact upload skipped because read-only mode is enabled.',
     };
@@ -172,6 +219,7 @@ async function uploadPostDeltaArtifact(
       status: 'no-changes',
       artifactName: null,
       artifactId: null,
+      artifactSizeBytes: null,
       ...counts,
       message:
         'Delta artifact upload skipped because no cache changes were detected after the build.',
@@ -204,6 +252,7 @@ async function uploadPostDeltaArtifact(
       status: 'uploaded',
       artifactName: uploadedPackage.artifact.name,
       artifactId: uploadedPackage.artifact.id,
+      artifactSizeBytes: uploadedPackage.artifact.size,
       ...counts,
       message:
         `Uploaded delta artifact '${uploadedPackage.artifact.name}' ` +
@@ -318,43 +367,503 @@ function createPostActionMessage(deltaArtifactResult: PostDeltaArtifactResult): 
 }
 
 export function createPostActionSummaryLines(status: PostActionStatus): readonly string[] {
-  if (!status.deltaArtifactResult) {
-    return [
-      '## Apache Buildish post action',
-      ...createGradleBuildSummaryLines(status.gradleBuildReport),
-      ...createConsumedDeltaCleanupSummaryLines(status.consumedDeltaCleanupResult),
-      '- Delta artifact upload: not evaluated.',
-    ];
+  const buildSummary = summarizeGradleBuildReport(status.gradleBuildReport);
+  const summaryIssues = collectPostActionSummaryIssues(status, buildSummary);
+  const overallStatus = determineOverallSummaryStatus(summaryIssues);
+  const lines = [
+    '## Apache Buildish Mammoth Cache for Gradle',
+    `${getSummaryStatusIcon(overallStatus)} Overall status: ${getSummaryStatusLabel(overallStatus)}`,
+  ];
+
+  if (summaryIssues.errors.length > 0) {
+    lines.push('', '### Errors');
+    for (const error of summaryIssues.errors) {
+      lines.push(`- ❌ ${escapeSummaryText(error)}`);
+    }
   }
 
-  const result = status.deltaArtifactResult;
-  return [
-    '## Apache Buildish post action',
-    ...createGradleBuildSummaryLines(status.gradleBuildReport),
-    ...createConsumedDeltaCleanupSummaryLines(status.consumedDeltaCleanupResult),
-    `- Delta artifact result: ${result.status}`,
-    `- Post-build cache delta: ${result.addedCount} added, ${result.modifiedCount} modified, ${result.deletedCount} deleted.`,
-    ...(result.artifactName
-      ? [
-          `- Uploaded artifact name: ${result.artifactName}`,
-          `- Uploaded artifact ID: ${result.artifactId ?? 'unknown'}`,
-        ]
-      : []),
-    `- Detail: ${result.message}`,
-  ];
+  if (summaryIssues.warnings.length > 0) {
+    lines.push('', '### Warnings');
+    for (const warning of summaryIssues.warnings) {
+      lines.push(`- ⚠️ ${escapeSummaryText(warning)}`);
+    }
+  }
+
+  lines.push('', '### Gradle builds', ...createGradleBuildOverviewLines(status, buildSummary));
+
+  const cacheDetails = createCacheDetailsSectionLines(status);
+  if (cacheDetails.length > 0) {
+    lines.push('', ...cacheDetails);
+  }
+
+  lines.push('', ...createExecutionContextSectionLines(status));
+
+  return lines;
 }
 
-function createConsumedDeltaCleanupSummaryLines(
-  cleanupResult: PostConsumedDeltaCleanupResult | null,
+function summarizeGradleBuildReport(report: GradleBuildReport): {
+  readonly capturedBuildCount: number;
+  readonly successfulBuildCount: number;
+  readonly failedBuildCount: number;
+  readonly publishedBuildScanCount: number;
+  readonly failedBuildScanCount: number;
+  readonly buildScanNotAttemptedCount: number;
+} {
+  const successfulBuildCount = report.builds.filter((build) => !build.buildFailed).length;
+  const failedBuildCount = report.builds.length - successfulBuildCount;
+  const publishedBuildScanCount = report.builds.filter(
+    (build) => build.buildScanUri !== null,
+  ).length;
+  const failedBuildScanCount = report.builds.filter((build) => build.buildScanFailed).length;
+  const buildScanNotAttemptedCount =
+    report.builds.length - publishedBuildScanCount - failedBuildScanCount;
+
+  return {
+    capturedBuildCount: report.builds.length,
+    successfulBuildCount,
+    failedBuildCount,
+    publishedBuildScanCount,
+    failedBuildScanCount,
+    buildScanNotAttemptedCount,
+  };
+}
+
+function collectPostActionSummaryIssues(
+  status: PostActionStatus,
+  buildSummary: ReturnType<typeof summarizeGradleBuildReport>,
+): {
+  readonly errors: readonly string[];
+  readonly warnings: readonly string[];
+} {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (buildSummary.failedBuildCount > 0) {
+    errors.push(
+      `${buildSummary.failedBuildCount} captured Gradle ${pluralize('build', buildSummary.failedBuildCount)} failed.`,
+    );
+  }
+
+  if (status.deltaArtifactResult?.status === 'missing-pre-build-manifest') {
+    errors.push(status.deltaArtifactResult.message);
+  }
+
+  if (buildSummary.failedBuildScanCount > 0) {
+    warnings.push(
+      `Build Scans failed for ${buildSummary.failedBuildScanCount} captured ${pluralize('build', buildSummary.failedBuildScanCount)}.`,
+    );
+  }
+
+  warnings.push(...status.gradleBuildReport.warnings);
+  warnings.push(...(status.consumedDeltaCleanupResult?.warnings ?? []));
+
+  const restoreWarning = getBaseCacheWarning(status.baseCacheRestoreResult);
+  if (restoreWarning) {
+    warnings.push(restoreWarning);
+  }
+
+  const saveWarning = getBaseCacheWarning(status.bootstrap.baseCacheResult);
+  if (saveWarning) {
+    warnings.push(saveWarning);
+  }
+
+  return {
+    errors,
+    warnings,
+  };
+}
+
+function determineOverallSummaryStatus(summaryIssues: {
+  readonly errors: readonly string[];
+  readonly warnings: readonly string[];
+}): 'success' | 'warning' | 'error' {
+  if (summaryIssues.errors.length > 0) {
+    return 'error';
+  }
+  if (summaryIssues.warnings.length > 0) {
+    return 'warning';
+  }
+  return 'success';
+}
+
+function getSummaryStatusIcon(status: 'success' | 'warning' | 'error'): string {
+  if (status === 'error') {
+    return '❌';
+  }
+  if (status === 'warning') {
+    return '⚠️';
+  }
+  return '✅';
+}
+
+function getSummaryStatusLabel(status: 'success' | 'warning' | 'error'): string {
+  if (status === 'error') {
+    return 'issues detected';
+  }
+  if (status === 'warning') {
+    return 'completed with warnings';
+  }
+  return 'success';
+}
+
+function createGradleBuildOverviewLines(
+  status: PostActionStatus,
+  buildSummary: ReturnType<typeof summarizeGradleBuildReport>,
 ): readonly string[] {
-  if (!cleanupResult) {
+  const lines = [
+    `- Captured builds: ${buildSummary.capturedBuildCount}`,
+    `- Outcomes: ${buildSummary.successfulBuildCount} succeeded, ${buildSummary.failedBuildCount} failed`,
+    `- Build Scans: ${buildSummary.publishedBuildScanCount} published, ${buildSummary.failedBuildScanCount} failed, ${buildSummary.buildScanNotAttemptedCount} not attempted`,
+  ];
+
+  if (status.workflowRunUrl) {
+    const workflowLabel = [
+      status.bootstrap.ciContext.workflowName,
+      status.bootstrap.ciContext.jobName,
+    ]
+      .filter((value) => value.trim().length > 0)
+      .join(' / ');
+    lines.push(
+      `- Workflow logs: [${escapeSummaryText(workflowLabel || 'Workflow run')}](${status.workflowRunUrl})`,
+    );
+  }
+
+  if (status.gradleBuildReport.builds.length === 0) {
+    lines.push('- No Gradle builds were captured in this job.');
+    return lines;
+  }
+
+  for (const [index, build] of status.gradleBuildReport.builds.entries()) {
+    const buildIcon = build.buildFailed ? '❌' : '✅';
+    lines.push(
+      `- ${buildIcon} Build ${index + 1}: ${escapeSummaryText(build.rootProjectName)} — ${escapeSummaryText(build.requestedTasks)}`,
+    );
+
+    const buildDetailParts = [
+      `Gradle ${escapeSummaryText(build.gradleVersion)}`,
+      `configuration cache reused: ${build.configCacheHit ? 'yes' : 'no'}`,
+      `Build Scan: ${formatBuildScanDetail(build.buildScanFailed, build.buildScanUri)}`,
+    ];
+    lines.push(`  - ${buildDetailParts.join('; ')}`);
+  }
+
+  return lines;
+}
+
+function createCacheDetailsSectionLines(status: PostActionStatus): readonly string[] {
+  if (!status.bootstrap.cacheModel) {
     return [];
   }
 
-  return [
-    `- Consumed delta cleanup attempted: ${cleanupResult.attemptedArtifactNames.length}`,
-    `- Consumed delta cleanup deleted: ${cleanupResult.deletedArtifactNames.length}`,
-    `- Consumed delta cleanup warnings: ${cleanupResult.warnings.length}`,
-    ...cleanupResult.warnings.map((warning) => `- Warning: ${warning}`),
+  const lines = [
+    ...createDetailsSection(
+      'Cache details',
+      [
+        `- Base cache restore: ${escapeSummaryText(status.baseCacheRestoreResult?.status ?? 'not evaluated')}`,
+        `- Base cache save: ${escapeSummaryText(status.bootstrap.baseCacheResult?.status ?? 'not evaluated')}`,
+        `- Delta artifact: ${escapeSummaryText(status.deltaArtifactResult?.status ?? 'not evaluated')}`,
+        ...(status.deltaArtifactResult
+          ? [
+              `- Post-build cache delta: ${status.deltaArtifactResult.addedCount} added, ${status.deltaArtifactResult.modifiedCount} modified, ${status.deltaArtifactResult.deletedCount} deleted`,
+            ]
+          : []),
+        ...(status.deltaArtifactResult?.artifactName
+          ? [
+              `- Uploaded delta artifact: ${escapeSummaryText(status.deltaArtifactResult.artifactName)} (ID ${status.deltaArtifactResult.artifactId ?? 'unknown'})`,
+              ...(status.deltaArtifactResult.artifactSizeBytes === null
+                ? []
+                : [
+                    `- Uploaded delta artifact archive size: ${formatByteCount(status.deltaArtifactResult.artifactSizeBytes)}`,
+                  ]),
+            ]
+          : []),
+        ...(status.consumedDeltaCleanupResult
+          ? [
+              `- Consumed delta cleanup: deleted ${status.consumedDeltaCleanupResult.deletedArtifactNames.length} of ${status.consumedDeltaCleanupResult.attemptedArtifactNames.length}`,
+            ]
+          : []),
+        ...(status.cacheStatistics ? createCacheStatisticsTableLines(status.cacheStatistics) : []),
+      ].flat(),
+    ),
   ];
+
+  return lines;
+}
+
+function createExecutionContextSectionLines(status: PostActionStatus): readonly string[] {
+  return createDetailsSection('Execution context', [
+    `- Workflow: ${escapeSummaryText(status.bootstrap.ciContext.workflowName)}`,
+    `- Job: ${escapeSummaryText(status.bootstrap.ciContext.jobName)}`,
+    `- Event: ${escapeSummaryText(status.bootstrap.ciContext.eventName)}`,
+    `- Ref: ${escapeSummaryText(status.bootstrap.ciContext.resolvedRefName)}`,
+    `- Job mode: ${escapeSummaryText(status.bootstrap.config.jobMode)}`,
+    `- Read only: ${status.bootstrap.config.readOnly ? 'yes' : 'no'}`,
+    `- Base cache enabled: ${status.bootstrap.cacheModel ? 'yes' : 'no'}`,
+    ...(status.bootstrap.cacheModel
+      ? [`- Cache key: ${escapeSummaryText(status.bootstrap.cacheModel.cacheKey)}`]
+      : []),
+    `- Detail: ${escapeSummaryText(status.message)}`,
+  ]);
+}
+
+function createCacheStatisticsTableLines(cacheStatistics: PostCacheStatistics): readonly string[] {
+  const hasAvailableRow = cacheStatistics.rows.some((row) => row.total !== null);
+  if (!hasAvailableRow) {
+    return [];
+  }
+
+  const headerCells = ['Snapshot', 'Total', ...cacheStatistics.partitionDisplayNames].map(
+    (label) => `<th>${escapeHtml(label)}</th>`,
+  );
+  const rowLines = cacheStatistics.rows.map((row) => {
+    const cells = [
+      row.label,
+      formatCacheStatisticCell(row.total),
+      ...row.partitions.map(formatCacheStatisticCell),
+    ];
+    return `    <tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`;
+  });
+
+  return [
+    '- Cache partition statistics (manifest-derived, uncompressed content sizes):',
+    '<table>',
+    `  <thead><tr>${headerCells.join('')}</tr></thead>`,
+    '  <tbody>',
+    ...rowLines,
+    '  </tbody>',
+    '</table>',
+    '- Note: base-cache rows reflect cache-manifest snapshots, not the compressed size of the backend cache entry.',
+  ];
+}
+
+function createPostCacheStatistics(
+  cacheModel: CacheModel,
+  preBuildManifest: CacheManifest,
+  currentManifest: CacheManifest,
+  deltaManifest: CacheDeltaManifest,
+  baseCacheRestoreResult: BaseCacheRestoreResult | null,
+  deltaArtifactResult: PostDeltaArtifactResult,
+  baseCacheSaveResult: BootstrapStatus['baseCacheResult'],
+): PostCacheStatistics {
+  const pulledBaseCache =
+    baseCacheRestoreResult?.status === 'exact-hit' ||
+    baseCacheRestoreResult?.status === 'partial-hit'
+      ? summarizeManifest(cacheModel, preBuildManifest)
+      : null;
+  const deltaArtifact =
+    deltaArtifactResult.status === 'uploaded' || deltaArtifactResult.status === 'no-changes'
+      ? summarizeDeltaPayload(cacheModel, deltaManifest)
+      : null;
+  const uploadedBaseCache =
+    baseCacheSaveResult?.operation === 'save' && baseCacheSaveResult.status === 'saved'
+      ? summarizeManifest(cacheModel, currentManifest)
+      : null;
+
+  return {
+    partitionDisplayNames: cacheModel.partitions.map((partition) => partition.displayName),
+    rows: [
+      createCacheStatisticRow('Pulled base cache', cacheModel, pulledBaseCache),
+      createCacheStatisticRow('Delta artifact', cacheModel, deltaArtifact),
+      createCacheStatisticRow('Uploaded base cache', cacheModel, uploadedBaseCache),
+    ],
+  };
+}
+
+function createCacheStatisticRow(
+  label: string,
+  cacheModel: CacheModel,
+  statistics: ReadonlyMap<string, PostCacheStatisticCell> | null,
+): PostCacheStatisticRow {
+  const total = statistics ? summarizeStatisticCells(Array.from(statistics.values())) : null;
+  return {
+    label,
+    total,
+    partitions: cacheModel.partitions.map((partition) => statistics?.get(partition.id) ?? null),
+  };
+}
+
+function summarizeManifest(
+  cacheModel: CacheModel,
+  manifest: CacheManifest,
+): ReadonlyMap<string, PostCacheStatisticCell> {
+  const statistics = initializeCacheStatistics(cacheModel);
+  for (const partition of manifest.partitions) {
+    const cell = statistics.get(partition.partitionId);
+    if (!cell) {
+      continue;
+    }
+    for (const entry of partition.entries) {
+      cell.fileCount += 1;
+      cell.totalSizeBytes += entry.size;
+    }
+  }
+  return finalizeCacheStatistics(statistics);
+}
+
+function summarizeDeltaPayload(
+  cacheModel: CacheModel,
+  manifest: CacheDeltaManifest,
+): ReadonlyMap<string, PostCacheStatisticCell> {
+  const statistics = initializeCacheStatistics(cacheModel);
+  for (const partition of manifest.partitions) {
+    const cell = statistics.get(partition.partitionId);
+    if (!cell) {
+      continue;
+    }
+    for (const entry of partition.entries) {
+      if (!entry.current) {
+        continue;
+      }
+      cell.fileCount += 1;
+      cell.totalSizeBytes += entry.current.size;
+    }
+  }
+  return finalizeCacheStatistics(statistics);
+}
+
+function initializeCacheStatistics(cacheModel: CacheModel): Map<string, PostCacheStatisticCell> {
+  return new Map(
+    cacheModel.partitions.map((partition) => [
+      partition.id,
+      { fileCount: 0, totalSizeBytes: 0 } satisfies PostCacheStatisticCell,
+    ]),
+  );
+}
+
+function finalizeCacheStatistics(
+  statistics: Map<string, PostCacheStatisticCell>,
+): ReadonlyMap<string, PostCacheStatisticCell> {
+  return new Map(
+    Array.from(statistics.entries()).map(([partitionId, cell]) => [partitionId, { ...cell }]),
+  );
+}
+
+function summarizeStatisticCells(cells: readonly PostCacheStatisticCell[]): PostCacheStatisticCell {
+  return cells.reduce<PostCacheStatisticCell>(
+    (summary, cell) => ({
+      fileCount: summary.fileCount + cell.fileCount,
+      totalSizeBytes: summary.totalSizeBytes + cell.totalSizeBytes,
+    }),
+    { fileCount: 0, totalSizeBytes: 0 },
+  );
+}
+
+function formatCacheStatisticCell(cell: PostCacheStatisticCell | null): string {
+  if (!cell) {
+    return 'n/a';
+  }
+  return `${cell.fileCount} ${pluralize('file', cell.fileCount)} / ${formatByteCount(cell.totalSizeBytes)}`;
+}
+
+function getBaseCacheWarning(
+  result: BaseCacheRestoreResult | BootstrapStatus['baseCacheResult'] | null,
+): string | null {
+  if (!result) {
+    return null;
+  }
+
+  if (result.operation === 'restore') {
+    if (result.status === 'feature-unavailable') {
+      return result.message;
+    }
+    return null;
+  }
+
+  if (
+    result.status === 'feature-unavailable' ||
+    result.status === 'missing-paths' ||
+    result.status === 'not-armed' ||
+    result.status === 'not-saved'
+  ) {
+    return result.message;
+  }
+
+  return null;
+}
+
+function createDetailsSection(title: string, bodyLines: readonly string[]): readonly string[] {
+  return [
+    '<details>',
+    `<summary>${escapeHtml(title)}</summary>`,
+    '',
+    ...bodyLines,
+    '',
+    '</details>',
+  ];
+}
+
+function formatBuildScanDetail(buildScanFailed: boolean, buildScanUri: string | null): string {
+  if (buildScanUri) {
+    return `[open](${buildScanUri})`;
+  }
+  if (buildScanFailed) {
+    return 'failed';
+  }
+  return 'not attempted';
+}
+
+function createWorkflowRunUrl(env: NodeJS.ProcessEnv, bootstrap: BootstrapStatus): string | null {
+  const runId = bootstrap.ciContext.runId;
+  if (runId === null) {
+    return null;
+  }
+
+  const repository = bootstrap.ciContext.repository.trim();
+  if (repository.length === 0) {
+    return null;
+  }
+
+  const attemptSegment =
+    bootstrap.ciContext.runAttempt === null ? '' : `/attempts/${bootstrap.ciContext.runAttempt}`;
+  const serverUrl = normalizeServerUrl(env.GITHUB_SERVER_URL);
+  return `${serverUrl}/${repository}/actions/runs/${runId}${attemptSegment}`;
+}
+
+function normalizeServerUrl(value: string | undefined): string {
+  const trimmedValue = value?.trim();
+  if (!trimmedValue) {
+    return 'https://github.com';
+  }
+
+  try {
+    const parsed = new URL(trimmedValue);
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    return 'https://github.com';
+  }
+}
+
+function formatByteCount(value: number): string {
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  const units = ['KiB', 'MiB', 'GiB', 'TiB'];
+  let size = value;
+  let unitIndex = -1;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${size >= 10 ? size.toFixed(1) : size.toFixed(2)} ${units[unitIndex]}`;
+}
+
+function pluralize(word: string, count: number): string {
+  return count === 1 ? word : `${word}s`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function escapeSummaryText(value: string): string {
+  return value.replaceAll(/[\\`*_{}[\]()#+.!|-]/g, '\\$&');
 }

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import { writeFile } from 'node:fs/promises';
+
 import { createGitHubPlatform, type GitHubPlatformOptions } from '../ci/github';
 
 /**
@@ -32,4 +34,28 @@ export async function appendJobSummary(
 
   const platform = createGitHubPlatform(options);
   await platform.publishSummary(lines);
+}
+
+/**
+ * Replaces the current GitHub step summary when the runner exposes `GITHUB_STEP_SUMMARY`, falling
+ * back to appending via the normal summary writer in environments that do not provide that file.
+ */
+export async function replaceJobSummary(
+  options: Pick<
+    GitHubPlatformOptions,
+    'env' | 'eventPayload' | 'eventPayloadReader' | 'summaryWriter'
+  >,
+  lines: readonly string[],
+): Promise<void> {
+  if (lines.length === 0) {
+    return;
+  }
+
+  const summaryPath = options.env?.GITHUB_STEP_SUMMARY?.trim();
+  if (!summaryPath) {
+    await appendJobSummary(options, lines);
+    return;
+  }
+
+  await writeFile(summaryPath, `${lines.join('\n')}\n`, 'utf8');
 }

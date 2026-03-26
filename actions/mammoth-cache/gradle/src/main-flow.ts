@@ -34,6 +34,7 @@ import {
 import { captureCacheManifest } from './cache/manifest';
 import { restoreBaseCache } from './cache/service';
 import {
+  persistBaseCacheRestoreResult,
   persistConsumedDeltaArtifactNames,
   persistDeltaArtifactProducerIdentity,
   persistPreBuildCacheManifest,
@@ -93,6 +94,12 @@ export async function executeMainAction(
   if (dependentDeltaResult) {
     persistConsumedDeltaArtifactNames(
       dependentDeltaResult.downloadedArtifactNames,
+      dependencies.saveState ?? core.saveState,
+    );
+  }
+  if (bootstrap.baseCacheResult?.operation === 'restore') {
+    persistBaseCacheRestoreResult(
+      bootstrap.baseCacheResult,
       dependencies.saveState ?? core.saveState,
     );
   }

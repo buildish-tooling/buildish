@@ -23,6 +23,7 @@ import {
   serializeCacheManifest,
   type CacheManifest,
 } from '../cache/manifest';
+import type { BaseCacheRestoreResult } from '../cache/service';
 import type { CiJobContext } from '../ci/types';
 import {
   parseSerializedJsonObject,
@@ -37,6 +38,14 @@ export const CONSUMED_DELTA_ARTIFACT_NAMES_STATE =
   'buildish-mammoth-cache-gradle-consumed-delta-artifact-names';
 export const DELTA_ARTIFACT_PRODUCER_IDENTITY_STATE =
   'buildish-mammoth-cache-gradle-delta-artifact-producer-identity';
+export const BASE_CACHE_RESTORE_RESULT_STATE =
+  'buildish-mammoth-cache-gradle-base-cache-restore-result';
+const BASE_CACHE_RESTORE_STATUSES = [
+  'feature-unavailable',
+  'miss',
+  'exact-hit',
+  'partial-hit',
+] as const;
 const PRE_BUILD_CACHE_MANIFEST_FILE = 'pre-build-cache-manifest.json';
 
 export interface PersistedDeltaArtifactProducerIdentity {
@@ -115,6 +124,13 @@ export function persistDeltaArtifactProducerIdentity(
   saveState(DELTA_ARTIFACT_PRODUCER_IDENTITY_STATE, `${JSON.stringify(identity)}\n`);
 }
 
+export function persistBaseCacheRestoreResult(
+  result: BaseCacheRestoreResult,
+  saveState: (name: string, value: string) => void,
+): void {
+  saveState(BASE_CACHE_RESTORE_RESULT_STATE, `${JSON.stringify(result)}\n`);
+}
+
 export function getPersistedDeltaArtifactProducerIdentity(
   getState: (name: string) => string,
 ): PersistedDeltaArtifactProducerIdentity | null {
@@ -138,6 +154,58 @@ export function getPersistedDeltaArtifactProducerIdentity(
       'delta artifact producer identity runAttempt',
     ),
   };
+}
+
+export function getPersistedBaseCacheRestoreResult(
+  getState: (name: string) => string,
+): BaseCacheRestoreResult | null {
+  const serializedResult = getState(BASE_CACHE_RESTORE_RESULT_STATE).trim();
+  if (serializedResult.length === 0) {
+    return null;
+  }
+
+  const parsedResult = parseSerializedJsonObject(
+    serializedResult,
+    'base cache restore result state',
+  );
+  const operation = validateNonEmptyStateString(
+    parsedResult.operation,
+    'base cache restore result operation',
+  );
+  if (operation !== 'restore') {
+    throw new Error(
+      `base cache restore result operation must be 'restore', received '${operation}'.`,
+    );
+  }
+
+  const status = validateNonEmptyStateString(
+    parsedResult.status,
+    'base cache restore result status',
+  );
+  if (
+    !BASE_CACHE_RESTORE_STATUSES.includes(status as (typeof BASE_CACHE_RESTORE_STATUSES)[number])
+  ) {
+    throw new Error(`Unsupported base cache restore result status '${status}'.`);
+  }
+
+  return {
+    operation: 'restore',
+    status: status as BaseCacheRestoreResult['status'],
+    cacheKey: validateNonEmptyStateString(
+      parsedResult.cacheKey,
+      'base cache restore result cacheKey',
+    ),
+    matchedKey: validateNullableStateString(
+      parsedResult.matchedKey,
+      'base cache restore result matchedKey',
+    ),
+    restoreKeys: validateStateStringArray(
+      parsedResult.restoreKeys,
+      'base cache restore result restoreKeys',
+    ),
+    paths: validateStateStringArray(parsedResult.paths, 'base cache restore result paths'),
+    message: validateNonEmptyStateString(parsedResult.message, 'base cache restore result message'),
+  } satisfies BaseCacheRestoreResult;
 }
 
 export function getPersistedConsumedDeltaArtifactNames(
@@ -202,4 +270,17 @@ function validateNullableInteger(value: unknown, label: string): number | null {
     return null;
   }
   return validateNonNegativeInteger(value, label);
+}
+
+function validateNullableStateString(value: unknown, label: string): string | null {
+  if (value === null) {
+    return null;
+  }
+  return validateNonEmptyStateString(value, label);
+}
+
+function validateStateStringArray(value: unknown, label: string): readonly string[] {
+  return validateArray(value, label).map((entry, index) =>
+    validateNonEmptyStateString(entry, `${label} entry ${index}`),
+  );
 }
