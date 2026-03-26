@@ -405,10 +405,37 @@ implementable design.
 31. Followup for the "buildish helper tool" - Integration and other tests
     - Add a Makefile to the `tools/buildish-no-gradle-wrapper-jar/` directory acting as a trampoline to run tests,
       RAT, and release verification tasks.
-    - RAT check - share the RAT setup across all tools.
-    - License check
-    - LICENSE/NOTICE (just symlinks to the root)
-32. Need to add information performed Gradle builds.
+    - Place tests for `tools/buildish-no-gradle-wrapper-jar/` into `tools/buildish-no-gradle-wrapper-jar/tests/`
+    - RAT check: use the same RAT download mechanism as for the action: place it in `build/rat/` and download it
+      from its original download URL (see `actions/mammoth-cache/gradle/scripts/rat-check.mjs`). This should however
+      just use `curl`, but can be its own bash script - keep that script simple.
+    - License check is not needed, we don't distribute anything.
+    - LICENSE/NOTICE are just symlinks to the root, already there.
+    - We need integration tests to validate the helper tool works as expected.
+      - As a prerequisite for the integration tests, we can expect `gradle` to be installed and available on the `$PATH`.
+      - The integration tests can be written as bash scripts, if that's suitable.
+      - Test cases (add more or update if necessary):
+        - Clean setup with a temporary test directory having a `gradle/wrapper/gradle-wrapper.properties` file.
+          - The temp directory can be populated with a "fresh" Gradle setup via
+            `gradle init --dsl groovy --type java-library --use-defaults`
+          - Then run the installer script against that directory. Might need to enhance the installer script 
+            to use a local directory as the source for the `tools/buildish-no-gradle-wrapper-jar/buildish-no-gradle-wrapper-jar.*`
+            files.
+          - Verify that the `gradlew[.bat]` files are correctly patched.
+          - Verify that the `gradle/wrapper/gradle-wrapper.jar` has been removed (the install script should do that!
+            Might need to change the installer scripts.).
+          - Verify that the helper scripts are in the right place.
+          - Run a Gradle build via the wrapper and verify that it works.
+          - Verify that the `gradle/wrapper/gradle-wrapper-<version>.sha256` and
+            `gradle/wrapper/gradle-wrapper-<version>.asc` files are present and correct.
+          - Then do what Renovate would do: Change the Gradle version.
+            This can be done by running `./gradlew wrapper --gradle-version 8.14.0 --distribution-type bin`.
+          - Verify that the `gradle-wrapper.properties` file has been updated.
+          - Verify that the `gradlew[.bat]` files are correctly patched.
+          - Run Gradle with any task again.
+          - Verify that the `gradle/wrapper/gradle-wrapper-<version>.sha256` and
+            `gradle/wrapper/gradle-wrapper-<version>.asc` files have been updated.
+32. Need to add information about the performed Gradle builds.
     - Similar to the information published on this workflow run: https://github.com/apache/polaris/actions/runs/23577520926
     - Probably worth to look into https://github.com/gradle/actions/tree/v5/sources/src/ and use a similar approach
       to capture Gradle build runs, their outcome and whether build scans were attempted, whether they were
