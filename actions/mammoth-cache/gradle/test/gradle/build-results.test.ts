@@ -20,7 +20,10 @@ import path from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createGradleBuildSummaryLines, loadGradleBuildReport } from '../../src/gradle/build-results';
+import {
+  createGradleBuildSummaryLines,
+  loadGradleBuildReport,
+} from '../../src/gradle/build-results';
 
 describe('Gradle build reporting', () => {
   const temporaryDirectories: string[] = [];
@@ -151,7 +154,8 @@ describe('Gradle build reporting', () => {
     expect(lines.some((line) => line.includes('build') && line.includes('scan'))).toBe(true);
     expect(
       lines.some(
-        (line) => line === '  - Build Scan: published (https://scans.gradle.com/s/local-it-published)',
+        (line) =>
+          line === '  - Build Scan: published (https://scans.gradle.com/s/local-it-published)',
       ),
     ).toBe(true);
     expect(lines.some((line) => line.startsWith('- Build 2: demo'))).toBe(true);

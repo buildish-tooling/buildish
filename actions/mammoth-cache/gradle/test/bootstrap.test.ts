@@ -18,7 +18,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   bootstrapPhase,
@@ -469,6 +469,62 @@ describe('bootstrap helpers', () => {
         expect(status.baseCacheResult).toBeNull();
       },
     );
+  });
+
+  it('falls back to process.env when resolving gradle user home during bundled entrypoint execution', async () => {
+    const summaryWriter: SummaryWriter = {
+      addRaw(): SummaryWriter {
+        return this;
+      },
+      async write(): Promise<void> {
+        // no-op
+      },
+    };
+
+    await withWorkspace({}, async (workspace) => {
+      const customGradleUserHome = path.join(workspace, 'custom-gradle-home');
+
+      vi.stubEnv('GITHUB_EVENT_NAME', 'push');
+      vi.stubEnv('GITHUB_REF', 'refs/heads/main');
+      vi.stubEnv('GITHUB_REPOSITORY', 'apache/buildish');
+      vi.stubEnv('GITHUB_WORKFLOW', 'CI');
+      vi.stubEnv('GITHUB_JOB', 'check');
+      vi.stubEnv('GITHUB_WORKSPACE', workspace);
+      vi.stubEnv('RUNNER_OS', 'Linux');
+      vi.stubEnv('RUNNER_ARCH', 'X64');
+      vi.stubEnv('GRADLE_USER_HOME', customGradleUserHome);
+
+      try {
+        const status = await bootstrapPhase('post', {
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          captureCommandOutput: async (): Promise<string> =>
+            'openjdk version "21.0.4" 2024-07-16\n',
+          cacheApi: {
+            isFeatureAvailable(): boolean {
+              throw new Error('cacheApi should not be touched when caching is disabled');
+            },
+            async restoreCache(): Promise<string | undefined> {
+              throw new Error('restoreCache should not be called when caching is disabled');
+            },
+            async saveCache(): Promise<number> {
+              throw new Error('saveCache should not be called when caching is disabled');
+            },
+          },
+          inputProvider: {
+            getInput(name: string): string {
+              return name === 'cache-enabled' ? 'false' : '';
+            },
+          },
+          summaryWriter,
+        });
+
+        expect(status.config.gradleUserHome).toBe(customGradleUserHome);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
   });
 });
 

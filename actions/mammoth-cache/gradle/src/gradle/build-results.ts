@@ -17,7 +17,11 @@
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { parseSerializedJsonObject, validateNonNegativeNumber, validateString } from '../validation';
+import {
+  parseSerializedJsonObject,
+  validateNonNegativeNumber,
+  validateString,
+} from '../validation';
 
 const CAPTURE_DIRECTORY_NAME = '.buildish-mammoth-cache-gradle';
 const BUILD_RESULTS_SUBDIRECTORY = 'build-results';
@@ -90,7 +94,9 @@ export async function cleanupGradleBuildResultCapture(
   return warnings;
 }
 
-export async function loadGradleBuildReport(env: NodeJS.ProcessEnv = process.env): Promise<GradleBuildReport> {
+export async function loadGradleBuildReport(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<GradleBuildReport> {
   const warnings: string[] = [];
   const resultsRoot = resolveCaptureRoot(env);
   if (!resultsRoot) {
@@ -174,10 +180,7 @@ export function createGradleBuildSummaryLines(report: GradleBuildReport): readon
   ];
 }
 
-function createBuildSummaryLines(
-  build: CapturedGradleBuild,
-  index: number,
-): readonly string[] {
+function createBuildSummaryLines(build: CapturedGradleBuild, index: number): readonly string[] {
   const title = `${displayText(build.rootProjectName, '(unnamed root project)')} — ${displayText(build.requestedTasks, '(default tasks)')}`;
   const buildScanSummaryLine = build.buildScanUri
     ? `  - Build Scan: published (${build.buildScanUri})`

@@ -478,6 +478,8 @@ implementable design.
       `dist/` folder is included in the Git commit for the release tag.
 38. Validate that the action build-results (INIT_SCRIPT_CONTENTS + SERVICE_PLUGIN_CONTENTS in actions/mammoth-cache/gradle/src/gradle/build-results.ts)
     are not too close to the Gradle action's code.
+    - The scripts look a bit GitHub CI specific, using `RUNNER_TEMP` and `GITHUB_ACTION` system properties.
+    - Why are those not env vars?
 
 ## Deferred / explicitly out of scope for v1
 

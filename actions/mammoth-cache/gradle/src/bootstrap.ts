@@ -148,6 +148,7 @@ export async function bootstrapPhase(
   phase: BootstrapPhase,
   dependencies: BootstrapDependencies = {},
 ): Promise<BootstrapStatus> {
+  const runtimeEnv = dependencies.env ?? process.env;
   const directInputs = readActionInputs(dependencies.inputProvider);
   const platform = createGitHubPlatform({
     ...dependencies,
@@ -159,12 +160,12 @@ export async function bootstrapPhase(
   const config = normalizeActionConfig(rawInputs, {
     phase,
     ciContext: platform.context,
-    env: dependencies.env,
+    env: runtimeEnv,
   });
   const cacheModel = config.cacheEnabled
     ? await createCacheModel(config, platform.context, {
         captureCommandOutput: dependencies.captureCommandOutput,
-        env: dependencies.env,
+        env: runtimeEnv,
       })
     : null;
   const validatedWrappers =

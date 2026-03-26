@@ -87,15 +87,25 @@ async function main(): Promise<void> {
     });
 
     assert.equal(postStatus.gradleBuildReport.builds.length, 3);
-    assert.equal(postStatus.gradleBuildReport.builds.filter((build) => !build.buildFailed).length, 2);
-    assert.equal(postStatus.gradleBuildReport.builds.filter((build) => build.buildFailed).length, 1);
+    assert.equal(
+      postStatus.gradleBuildReport.builds.filter((build) => !build.buildFailed).length,
+      2,
+    );
+    assert.equal(
+      postStatus.gradleBuildReport.builds.filter((build) => build.buildFailed).length,
+      1,
+    );
     assert.ok(
       postStatus.gradleBuildReport.builds.some(
         (build) => build.buildScanUri === 'https://scans.gradle.com/s/fake-published-scan',
       ),
     );
     assert.ok(postStatus.gradleBuildReport.builds.some((build) => build.buildScanFailed));
-    assert.ok(postStatus.gradleBuildReport.builds.some((build) => build.requestedTasks === 'failingVerification'));
+    assert.ok(
+      postStatus.gradleBuildReport.builds.some(
+        (build) => build.requestedTasks === 'failingVerification',
+      ),
+    );
 
     const postSummary = summary.flushes.find((flush) =>
       flush.some((line) => line === '## Apache Buildish post action'),
@@ -105,7 +115,8 @@ async function main(): Promise<void> {
     assert.ok(postSummary.some((line) => line === '- Captured Gradle builds: 3'));
     assert.ok(
       postSummary.some(
-        (line) => line === '  - Build Scan: published (https://scans.gradle.com/s/fake-published-scan)',
+        (line) =>
+          line === '  - Build Scan: published (https://scans.gradle.com/s/fake-published-scan)',
       ),
     );
     assert.ok(postSummary.some((line) => line.includes('Build Scan: attempted but failed')));
@@ -148,7 +159,10 @@ interface LocalRuntime {
   readonly state: Map<string, string>;
 }
 
-async function stageProject(stagedRoot: string, fixtureSourceDirectory: string): Promise<LocalRuntime> {
+async function stageProject(
+  stagedRoot: string,
+  fixtureSourceDirectory: string,
+): Promise<LocalRuntime> {
   const projectDirectory = path.join(stagedRoot, 'project');
   const gradleUserHome = path.join(stagedRoot, 'gradle-home');
   await cp(fixtureSourceDirectory, projectDirectory, { recursive: true });
@@ -195,10 +209,15 @@ async function writeFixtureProject(projectDirectory: string): Promise<void> {
   );
 
   const buildSrcDirectory = path.join(projectDirectory, 'buildSrc');
-  await mkdir(path.join(buildSrcDirectory, 'src', 'main', 'groovy', 'fixture'), { recursive: true });
-  await mkdir(path.join(buildSrcDirectory, 'src', 'main', 'resources', 'META-INF', 'gradle-plugins'), {
+  await mkdir(path.join(buildSrcDirectory, 'src', 'main', 'groovy', 'fixture'), {
     recursive: true,
   });
+  await mkdir(
+    path.join(buildSrcDirectory, 'src', 'main', 'resources', 'META-INF', 'gradle-plugins'),
+    {
+      recursive: true,
+    },
+  );
   await writeFile(
     path.join(buildSrcDirectory, 'build.gradle'),
     `plugins {\n  id 'groovy-gradle-plugin'\n}\n`,
