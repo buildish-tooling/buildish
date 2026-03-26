@@ -20,13 +20,17 @@ import { executePostAction } from './post-flow';
 import { decideSingleRunPostExecution } from './runtime/job-single-run';
 
 export async function runPost(): Promise<void> {
-  const postDecision = decideSingleRunPostExecution();
+  const postDecision = decideSingleRunPostExecution({
+    getState: core.getState,
+  });
   if (!postDecision.shouldRun) {
     core.info(postDecision.message);
     return;
   }
 
-  const status = await executePostAction();
+  const status = await executePostAction({
+    getState: core.getState,
+  });
   if (status.bootstrap.baseCacheResult) {
     core.info(status.bootstrap.baseCacheResult.message);
   }
