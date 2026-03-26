@@ -120,6 +120,18 @@ describe('provisionWrapperJars', () => {
         await expect(
           readFile(path.join(path.dirname(wrapper.absolutePath), 'gradle-wrapper.jar')),
         ).resolves.toEqual(jarBytes);
+        await expect(
+          readFile(
+            path.join(path.dirname(wrapper.absolutePath), 'gradle-wrapper-8.14.sha256'),
+            'utf8',
+          ),
+        ).resolves.toBe(`${jarSha256}\n`);
+        await expect(
+          readFile(
+            path.join(path.dirname(wrapper.absolutePath), 'gradle-wrapper-8.14.asc'),
+            'utf8',
+          ),
+        ).resolves.toBe(TEST_SIGNATURE_ARMORED);
       },
     );
   });
@@ -224,6 +236,18 @@ describe('provisionWrapperJars', () => {
         expect(verifiedPlan).toEqual(
           expect.objectContaining({ relativePath: wrapper.relativePath }),
         );
+        await expect(
+          readFile(
+            path.join(path.dirname(wrapper.absolutePath), 'gradle-wrapper-8.14.sha256'),
+            'utf8',
+          ),
+        ).resolves.toBe(`${jarSha256}\n`);
+        await expect(
+          readFile(
+            path.join(path.dirname(wrapper.absolutePath), 'gradle-wrapper-8.14.asc'),
+            'utf8',
+          ),
+        ).resolves.toBe(TEST_SIGNATURE_ARMORED);
       },
     );
   });

@@ -221,6 +221,13 @@ export async function provisionWrapperJars(
       wasDownloaded = true;
     }
 
+    await retainWrapperMetadataFiles(
+      wrapper.absolutePath,
+      plan.distributionVersion,
+      expectedWrapperJarSha256,
+      wrapperJarSignature,
+    );
+
     results.push({
       ...plan,
       wrapperJarRelativePath: wrapper.wrapperJarRelativePath,
@@ -534,23 +541,53 @@ async function placeWrapperJarAtomically(
   wrapperJarAbsolutePath: string,
   jarBytes: Uint8Array,
 ): Promise<void> {
-  const directory = path.dirname(wrapperJarAbsolutePath);
-  const temporaryPath = path.join(directory, `.gradle-wrapper.${randomUUID()}.tmp`);
+  await placeFileAtomically(wrapperJarAbsolutePath, jarBytes, '.gradle-wrapper');
+}
+
+async function retainWrapperMetadataFiles(
+  wrapperPropertiesAbsolutePath: string,
+  distributionVersion: string,
+  expectedWrapperJarSha256: string,
+  wrapperJarSignature: string,
+): Promise<void> {
+  const wrapperDirectory = path.dirname(wrapperPropertiesAbsolutePath);
+
+  await Promise.all([
+    placeFileAtomically(
+      path.join(wrapperDirectory, `gradle-wrapper-${distributionVersion}.sha256`),
+      `${expectedWrapperJarSha256}\n`,
+      '.gradle-wrapper-sha256',
+    ),
+    placeFileAtomically(
+      path.join(wrapperDirectory, `gradle-wrapper-${distributionVersion}.asc`),
+      wrapperJarSignature,
+      '.gradle-wrapper-signature',
+    ),
+  ]);
+}
+
+async function placeFileAtomically(
+  targetAbsolutePath: string,
+  contents: Uint8Array | string,
+  temporaryPrefix: string,
+): Promise<void> {
+  const directory = path.dirname(targetAbsolutePath);
+  const temporaryPath = path.join(directory, `${temporaryPrefix}.${randomUUID()}.tmp`);
 
   await mkdir(directory, { recursive: true });
 
   try {
-    await writeFile(temporaryPath, jarBytes, { flag: 'wx' });
+    await writeFile(temporaryPath, contents, { flag: 'wx' });
 
     try {
-      await rename(temporaryPath, wrapperJarAbsolutePath);
+      await rename(temporaryPath, targetAbsolutePath);
     } catch (error) {
       if (!isReplaceTargetError(error)) {
         throw error;
       }
 
-      await rm(wrapperJarAbsolutePath, { force: true });
-      await rename(temporaryPath, wrapperJarAbsolutePath);
+      await rm(targetAbsolutePath, { force: true });
+      await rename(temporaryPath, targetAbsolutePath);
     }
   } finally {
     await rm(temporaryPath, { force: true });
