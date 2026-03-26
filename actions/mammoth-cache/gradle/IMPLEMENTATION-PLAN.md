@@ -47,8 +47,8 @@ implementable design.
 
 - `action.yml`
   - `runs.using: node20`
-  - `main: dist/main.js`
-  - `post: dist/post.js`
+  - `main: dist/github/main.js`
+  - `post: dist/github/post.js`
 - `src/main.ts`
   - parse inputs
   - validate configuration and environment

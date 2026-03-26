@@ -30,6 +30,7 @@ import { createCacheModel, type CacheModel, type CommandOutputCapture } from './
 import {
   normalizeActionConfig,
   readActionInputs,
+  resolveActionInputsFromConfigFile,
   type InputProvider,
 } from './config/action-config';
 import type { NormalizedActionConfig } from './config/types';
@@ -147,10 +148,13 @@ export async function bootstrapPhase(
   phase: BootstrapPhase,
   dependencies: BootstrapDependencies = {},
 ): Promise<BootstrapStatus> {
-  const rawInputs = readActionInputs(dependencies.inputProvider);
+  const directInputs = readActionInputs(dependencies.inputProvider);
   const platform = createGitHubPlatform({
     ...dependencies,
-    githubToken: dependencies.githubToken ?? rawInputs.githubToken,
+    githubToken: dependencies.githubToken ?? directInputs.githubToken,
+  });
+  const rawInputs = await resolveActionInputsFromConfigFile(directInputs, {
+    workspace: platform.context.workspace,
   });
   const config = normalizeActionConfig(rawInputs, {
     phase,

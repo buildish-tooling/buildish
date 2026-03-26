@@ -14,11 +14,15 @@
  * limitations under the License.
  */
 
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
   normalizeActionConfig,
   readActionInputs,
+  resolveActionInputsFromConfigFile,
   type InputProvider,
 } from '../../src/config/action-config';
 import type { CiJobContext } from '../../src/ci/types';
@@ -56,11 +60,154 @@ describe('readActionInputs', () => {
     };
 
     expect(readActionInputs(inputProvider)).toMatchObject({
+      configFile: '',
       baseDirectory: 'subdir',
       cacheEnabled: 'false',
       jobMode: 'distributed-worker',
       githubToken: '',
     });
+  });
+});
+
+describe('resolveActionInputsFromConfigFile', () => {
+  it('loads YAML config and lets direct action inputs override file values', async () => {
+    await withWorkspace(
+      {
+        '.github/buildish-mammoth-cache.yml': [
+          'base-directory: project',
+          'cache-enabled: false',
+          'job-mode: distributed-aggregator',
+          'dependent-jobs:',
+          '  - worker_a',
+          '  - worker_b',
+          'cache-partitions:',
+          '  - id: modules',
+          '    includes:',
+          '      - caches/modules-*/files-*/**',
+          '    excludes:',
+          '      - caches/modules-*/metadata-*/**',
+          '',
+        ].join('\n'),
+      },
+      async (workspace) => {
+        const rawInputs = await resolveActionInputsFromConfigFile(
+          readActionInputs(
+            createInputProvider({
+              'config-file': '.github/buildish-mammoth-cache.yml',
+              'cache-enabled': 'true',
+              'dependent-jobs': 'aggregator',
+            }),
+          ),
+          { workspace },
+        );
+
+        expect(rawInputs).toMatchObject({
+          configFile: '.github/buildish-mammoth-cache.yml',
+          baseDirectory: 'project',
+          cacheEnabled: 'true',
+          jobMode: 'distributed-aggregator',
+          dependentJobs: 'aggregator',
+        });
+
+        const config = normalizeActionConfig(rawInputs, {
+          phase: 'main',
+          ciContext: { ...baseCiContext, workspace, actionPath: workspace },
+          env: {},
+        });
+
+        expect(config).toMatchObject({
+          baseDirectory: 'project',
+          cacheEnabled: true,
+          jobMode: 'distributed-aggregator',
+          dependentJobs: ['aggregator'],
+          cachePartitions: [
+            {
+              id: 'modules',
+              includes: ['caches/modules-*/files-*/**'],
+              excludes: ['caches/modules-*/metadata-*/**'],
+            },
+          ],
+        });
+      },
+    );
+  });
+
+  it('loads JSON config files', async () => {
+    await withWorkspace(
+      {
+        '.github/buildish-mammoth-cache.json': JSON.stringify({
+          'base-directory': 'project',
+          'process-all-wrapper-files': true,
+        }),
+      },
+      async (workspace) => {
+        const rawInputs = await resolveActionInputsFromConfigFile(
+          readActionInputs(
+            createInputProvider({
+              'config-file': '.github/buildish-mammoth-cache.json',
+            }),
+          ),
+          { workspace },
+        );
+
+        expect(rawInputs).toMatchObject({
+          baseDirectory: 'project',
+          processAllWrapperFiles: 'true',
+        });
+      },
+    );
+  });
+
+  it('rejects github-token in config files', async () => {
+    await withWorkspace(
+      {
+        '.github/buildish-mammoth-cache.yml': ['github-token: should-not-be-here', ''].join('\n'),
+      },
+      async (workspace) => {
+        await expect(
+          resolveActionInputsFromConfigFile(
+            readActionInputs(
+              createInputProvider({
+                'config-file': '.github/buildish-mammoth-cache.yml',
+              }),
+            ),
+            { workspace },
+          ),
+        ).rejects.toThrow(/must not contain github-token/u);
+      },
+    );
+  });
+
+  it('rejects config files that escape the workspace via symlinks', async () => {
+    if (process.platform === 'win32') {
+      return;
+    }
+
+    const outsideDirectory = await mkdtemp(
+      path.join(os.tmpdir(), 'buildish-mammoth-cache-gradle-config-outside-'),
+    );
+
+    try {
+      const outsideConfigPath = path.join(outsideDirectory, 'outside.yml');
+      await writeFile(outsideConfigPath, 'cache-enabled: false\n', 'utf8');
+
+      await withWorkspace({}, async (workspace) => {
+        await symlink(outsideConfigPath, path.join(workspace, 'escaped.yml'));
+
+        await expect(
+          resolveActionInputsFromConfigFile(
+            readActionInputs(
+              createInputProvider({
+                'config-file': 'escaped.yml',
+              }),
+            ),
+            { workspace },
+          ),
+        ).rejects.toThrow(/must stay within the repository workspace after symlink resolution/u);
+      });
+    } finally {
+      await rm(outsideDirectory, { recursive: true, force: true });
+    }
   });
 });
 
@@ -380,4 +527,25 @@ function createInputProvider(values: Record<string, string>): InputProvider {
       return values[name] ?? '';
     },
   };
+}
+
+async function withWorkspace(
+  files: Record<string, string>,
+  testBody: (workspace: string) => Promise<void>,
+): Promise<void> {
+  const workspace = await mkdtemp(
+    path.join(os.tmpdir(), 'buildish-mammoth-cache-gradle-action-config-'),
+  );
+
+  try {
+    for (const [relativePath, contents] of Object.entries(files)) {
+      const absolutePath = path.join(workspace, relativePath);
+      await mkdir(path.dirname(absolutePath), { recursive: true });
+      await writeFile(absolutePath, contents, 'utf8');
+    }
+
+    await testBody(workspace);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 }

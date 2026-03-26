@@ -22,7 +22,7 @@ import { spawn } from 'node:child_process';
 
 async function main() {
   const repoRoot = process.cwd();
-  const bundlePath = path.join(repoRoot, 'dist', 'main', 'index.cjs');
+  const bundlePath = path.join(repoRoot, 'dist', 'github', 'main', 'index.cjs');
   const fixturePath = path.join(repoRoot, 'test', 'fixtures', 'smoke');
   const committedJarPath = path.join(fixturePath, 'gradle', 'wrapper', 'gradle-wrapper.jar');
 
@@ -40,10 +40,12 @@ async function main() {
 
   const stagedRoot = await mkdtemp(path.join(buildRoot, 'smoke-fixture-'));
   const fixtureCopyPath = path.join(stagedRoot, 'smoke');
+  const runnerTempPath = path.join(stagedRoot, 'runner-temp');
   const summaryFile = path.join(stagedRoot, 'step-summary.md');
 
   try {
     await cp(fixturePath, fixtureCopyPath, { recursive: true });
+    await mkdir(runnerTempPath, { recursive: true });
     await writeFile(summaryFile, '', 'utf8');
 
     const baseDirectory = toPosixPath(path.relative(repoRoot, fixtureCopyPath));
@@ -57,6 +59,7 @@ async function main() {
         GITHUB_WORKFLOW: 'Local Smoke Test',
         GITHUB_JOB: 'smoke',
         GITHUB_WORKSPACE: repoRoot,
+        RUNNER_TEMP: runnerTempPath,
         GITHUB_STEP_SUMMARY: summaryFile,
         'INPUT_BASE-DIRECTORY': baseDirectory,
       },

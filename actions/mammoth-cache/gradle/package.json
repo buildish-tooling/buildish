@@ -5,9 +5,10 @@
     "test": "vitest run",
     "clean": "node -e \"for (const path of [\\\"dist\\\",\\\"coverage\\\"]) { require(\\\"fs\\\").rmSync(path, { recursive: true, force: true }); }\"",
     "compile": "tsc -p tsconfig.json --noEmit",
-    "bundle": "npm run bundle:main && npm run bundle:post",
-    "bundle:main": "esbuild src/main.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/main/index.cjs",
-    "bundle:post": "esbuild src/post.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/post/index.cjs",
+    "bundle": "npm run bundle:github",
+    "bundle:github": "npm run bundle:github:main && npm run bundle:github:post",
+    "bundle:github:main": "esbuild src/main.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/github/main/index.cjs",
+    "bundle:github:post": "esbuild src/post.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/github/post/index.cjs",
     "build": "npm run compile && npm run bundle",
     "rebuild": "npm run clean && npm run build",
     "smoke-test": "node scripts/smoke-test.mjs",
@@ -33,7 +34,8 @@
     "@actions/artifact": "6.2.1",
     "@actions/cache": "6.0.0",
     "@actions/core": "3.0.0",
-    "openpgp": "6.3.0"
+    "openpgp": "6.3.0",
+    "yaml": "2.8.3"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -15,8 +15,10 @@
  */
 
 import * as core from '@actions/core';
+import { readFile, realpath } from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { parse as parseYaml } from 'yaml';
 
 import type { CiJobContext } from '../ci/types';
 import {
@@ -91,10 +93,23 @@ export interface NormalizeActionConfigOptions {
 }
 
 /**
+ * Options for loading file-backed action configuration.
+ */
+export interface ResolveActionInputsFromConfigFileOptions {
+  /** Repository workspace root used to resolve the optional `config-file` input. */
+  readonly workspace: string;
+  /** Optional file-reader override for focused tests. */
+  readonly readFileImpl?: typeof readFile;
+  /** Optional realpath override for focused tests. */
+  readonly realpathImpl?: typeof realpath;
+}
+
+/**
  * Reads every supported action input exactly once and returns the raw string values.
  */
 export function readActionInputs(inputProvider: InputProvider = core): RawActionInputs {
   return {
+    configFile: inputProvider.getInput('config-file', { trimWhitespace: true }),
     baseDirectory: inputProvider.getInput('base-directory', { trimWhitespace: true }),
     cacheEnabled: inputProvider.getInput('cache-enabled', { trimWhitespace: true }),
     readOnly: inputProvider.getInput('read-only', { trimWhitespace: true }),
@@ -122,6 +137,42 @@ export function readActionInputs(inputProvider: InputProvider = core): RawAction
     setupJava: inputProvider.getInput('setup-java', { trimWhitespace: true }),
     githubToken: inputProvider.getInput('github-token', { trimWhitespace: true }),
   };
+}
+
+/**
+ * Loads the optional workspace-relative config file and overlays it with explicit action inputs.
+ *
+ * Direct action inputs always win over file-backed values so workflows can keep local defaults in a
+ * committed config file while retaining per-job overrides in workflow YAML.
+ */
+export async function resolveActionInputsFromConfigFile(
+  directInputs: RawActionInputs,
+  options: ResolveActionInputsFromConfigFileOptions,
+): Promise<RawActionInputs> {
+  const configFile = directInputs.configFile.trim();
+  if (configFile.length === 0) {
+    return directInputs;
+  }
+
+  const normalizedConfigFile = normalizeRelativePath(configFile, 'config-file');
+  if (normalizedConfigFile === '.') {
+    throw new Error(
+      'config-file must point to a .json, .yml, or .yaml file inside the repository workspace.',
+    );
+  }
+
+  const configFilePath = await resolveConfigFilePath(
+    options.workspace,
+    normalizedConfigFile,
+    options,
+  );
+  const contents = await readConfigFileContents(configFilePath, normalizedConfigFile, options);
+  const fileInputs = serializeConfigFileInputs(
+    parseConfigFileContents(contents, normalizedConfigFile),
+    normalizedConfigFile,
+  );
+
+  return overlayConfiguredInputs(fileInputs, directInputs);
 }
 
 /**
@@ -210,6 +261,270 @@ export function normalizeActionConfig(
     restoreCleanupMode,
     gradleUserHome,
   };
+}
+
+function createEmptyRawActionInputs(): RawActionInputs {
+  return {
+    configFile: '',
+    baseDirectory: '',
+    cacheEnabled: '',
+    readOnly: '',
+    jobMode: '',
+    dependentJobs: '',
+    allowDuplicateDependentDeltaPaths: '',
+    cacheKeyPrefix: '',
+    cacheKeyTemplate: '',
+    cachePartitions: '',
+    processAllWrapperFiles: '',
+    wrapperPropertiesGlob: '',
+    wrapperPropertiesFiles: '',
+    cleanupEnabled: '',
+    restoreCleanupMode: '',
+    gradleUserHome: '',
+    setupJava: '',
+    githubToken: '',
+  };
+}
+
+async function resolveConfigFilePath(
+  workspace: string,
+  normalizedConfigFile: string,
+  options: ResolveActionInputsFromConfigFileOptions,
+): Promise<string> {
+  const realpathImpl = options.realpathImpl ?? realpath;
+  const workspaceRealPath = await resolveRealPath(realpathImpl, workspace, 'workspace');
+  const candidatePath = path.resolve(workspaceRealPath, normalizedConfigFile);
+  const configFileRealPath = await resolveRealPath(
+    realpathImpl,
+    candidatePath,
+    `config-file '${normalizedConfigFile}'`,
+  );
+
+  if (!isPathInside(workspaceRealPath, configFileRealPath)) {
+    throw new Error(
+      `config-file '${normalizedConfigFile}' must stay within the repository workspace after symlink resolution.`,
+    );
+  }
+
+  return configFileRealPath;
+}
+
+async function resolveRealPath(
+  realpathImpl: typeof realpath,
+  targetPath: string,
+  label: string,
+): Promise<string> {
+  try {
+    return await realpathImpl(targetPath);
+  } catch (error: unknown) {
+    throw new Error(
+      `Could not resolve ${label}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+}
+
+async function readConfigFileContents(
+  configFilePath: string,
+  normalizedConfigFile: string,
+  options: ResolveActionInputsFromConfigFileOptions,
+): Promise<string> {
+  const readFileImpl = options.readFileImpl ?? readFile;
+
+  try {
+    const contents = await readFileImpl(configFilePath, 'utf8');
+    return contents.replace(/^\uFEFF/u, '');
+  } catch (error: unknown) {
+    throw new Error(
+      `Could not read config-file '${normalizedConfigFile}': ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+}
+
+function parseConfigFileContents(
+  contents: string,
+  normalizedConfigFile: string,
+): Record<string, unknown> {
+  const extension = path.posix.extname(normalizedConfigFile).toLowerCase();
+  let parsed: unknown;
+
+  switch (extension) {
+    case '.json':
+      parsed = parseSerializedJson(contents, `config-file '${normalizedConfigFile}'`);
+      break;
+    case '.yaml':
+    case '.yml':
+      try {
+        parsed = parseYaml(contents, {
+          strict: true,
+          stringKeys: true,
+          uniqueKeys: true,
+          merge: false,
+          maxAliasCount: 0,
+          prettyErrors: true,
+        });
+      } catch (error: unknown) {
+        throw new Error(
+          `Could not parse config-file '${normalizedConfigFile}': ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
+        );
+      }
+      break;
+    default:
+      throw new Error(
+        `config-file '${normalizedConfigFile}' must use a .json, .yml, or .yaml extension.`,
+      );
+  }
+
+  return validateRecord(parsed, `config-file '${normalizedConfigFile}'`);
+}
+
+function serializeConfigFileInputs(
+  values: Record<string, unknown>,
+  normalizedConfigFile: string,
+): RawActionInputs {
+  const inputs: Record<keyof RawActionInputs, string> = createEmptyRawActionInputs();
+
+  for (const [key, value] of Object.entries(values)) {
+    switch (key) {
+      case 'config-file':
+        throw new Error(
+          `config-file '${normalizedConfigFile}' must not contain nested config-file entries.`,
+        );
+      case 'base-directory':
+        inputs.baseDirectory = serializeStringConfigValue(value, key);
+        break;
+      case 'cache-enabled':
+        inputs.cacheEnabled = serializeBooleanLikeConfigValue(value, key);
+        break;
+      case 'read-only':
+        inputs.readOnly = serializeBooleanLikeConfigValue(value, key);
+        break;
+      case 'job-mode':
+        inputs.jobMode = serializeStringConfigValue(value, key);
+        break;
+      case 'dependent-jobs':
+        inputs.dependentJobs = serializeListLikeConfigValue(value, key);
+        break;
+      case 'allow-duplicate-dependent-delta-paths':
+        inputs.allowDuplicateDependentDeltaPaths = serializeBooleanLikeConfigValue(value, key);
+        break;
+      case 'cache-key-prefix':
+        inputs.cacheKeyPrefix = serializeStringConfigValue(value, key);
+        break;
+      case 'cache-key-template':
+        inputs.cacheKeyTemplate = serializeStringConfigValue(value, key);
+        break;
+      case 'cache-partitions':
+        inputs.cachePartitions = serializeStructuredConfigValue(value, key);
+        break;
+      case 'process-all-wrapper-files':
+        inputs.processAllWrapperFiles = serializeBooleanLikeConfigValue(value, key);
+        break;
+      case 'wrapper-properties-glob':
+        inputs.wrapperPropertiesGlob = serializeStringConfigValue(value, key);
+        break;
+      case 'wrapper-properties-files':
+        inputs.wrapperPropertiesFiles = serializeListLikeConfigValue(value, key);
+        break;
+      case 'cleanup-enabled':
+        inputs.cleanupEnabled = serializeBooleanLikeConfigValue(value, key);
+        break;
+      case 'restore-cleanup-mode':
+        inputs.restoreCleanupMode = serializeStringConfigValue(value, key);
+        break;
+      case 'gradle-user-home':
+        inputs.gradleUserHome = serializeStringConfigValue(value, key);
+        break;
+      case 'setup-java':
+        inputs.setupJava = serializeBooleanLikeConfigValue(value, key);
+        break;
+      case 'github-token':
+        throw new Error(
+          `config-file '${normalizedConfigFile}' must not contain github-token. Pass it directly as an action input or environment secret instead.`,
+        );
+      default:
+        throw new Error(
+          `config-file '${normalizedConfigFile}' contains unsupported key '${key}'. Use the same kebab-case names as action inputs.`,
+        );
+    }
+  }
+
+  return inputs;
+}
+
+function serializeStringConfigValue(value: unknown, label: string): string {
+  return validateString(value, label).trim();
+}
+
+function serializeBooleanLikeConfigValue(value: unknown, label: string): string {
+  if (typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return serializeStringConfigValue(value, label);
+}
+
+function serializeListLikeConfigValue(value: unknown, label: string): string {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+
+  return validateArray(value, label)
+    .map((entry, index) => validateString(entry, `${label} entry ${index}`).trim())
+    .filter((entry) => entry.length > 0)
+    .join('\n');
+}
+
+function serializeStructuredConfigValue(value: unknown, label: string): string {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch (error: unknown) {
+    throw new Error(
+      `Could not serialize ${label} from config-file: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+}
+
+function overlayConfiguredInputs(
+  fileInputs: RawActionInputs,
+  directInputs: RawActionInputs,
+): RawActionInputs {
+  return {
+    configFile: directInputs.configFile,
+    baseDirectory: directInputs.baseDirectory || fileInputs.baseDirectory,
+    cacheEnabled: directInputs.cacheEnabled || fileInputs.cacheEnabled,
+    readOnly: directInputs.readOnly || fileInputs.readOnly,
+    jobMode: directInputs.jobMode || fileInputs.jobMode,
+    dependentJobs: directInputs.dependentJobs || fileInputs.dependentJobs,
+    allowDuplicateDependentDeltaPaths:
+      directInputs.allowDuplicateDependentDeltaPaths ||
+      fileInputs.allowDuplicateDependentDeltaPaths,
+    cacheKeyPrefix: directInputs.cacheKeyPrefix || fileInputs.cacheKeyPrefix,
+    cacheKeyTemplate: directInputs.cacheKeyTemplate || fileInputs.cacheKeyTemplate,
+    cachePartitions: directInputs.cachePartitions || fileInputs.cachePartitions,
+    processAllWrapperFiles:
+      directInputs.processAllWrapperFiles || fileInputs.processAllWrapperFiles,
+    wrapperPropertiesGlob: directInputs.wrapperPropertiesGlob || fileInputs.wrapperPropertiesGlob,
+    wrapperPropertiesFiles:
+      directInputs.wrapperPropertiesFiles || fileInputs.wrapperPropertiesFiles,
+    cleanupEnabled: directInputs.cleanupEnabled || fileInputs.cleanupEnabled,
+    restoreCleanupMode: directInputs.restoreCleanupMode || fileInputs.restoreCleanupMode,
+    gradleUserHome: directInputs.gradleUserHome || fileInputs.gradleUserHome,
+    setupJava: directInputs.setupJava || fileInputs.setupJava,
+    githubToken: directInputs.githubToken,
+  };
+}
+
+function isPathInside(parentPath: string, childPath: string): boolean {
+  const relativePath = path.relative(parentPath, childPath);
+  return relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
 }
 
 /**

@@ -389,6 +389,87 @@ describe('bootstrap helpers', () => {
       expect(writeCalls).toBe(1);
     });
   });
+
+  it('loads optional config-file values during bootstrap while allowing direct overrides', async () => {
+    const summaryLines: string[] = [];
+    const cacheApi: BaseCacheApi = {
+      isFeatureAvailable(): boolean {
+        throw new Error('cacheApi should not be touched when config-file disables caching');
+      },
+      async restoreCache(): Promise<string | undefined> {
+        throw new Error('restoreCache should not be called when caching is disabled');
+      },
+      async saveCache(): Promise<number> {
+        throw new Error('saveCache should not be called when caching is disabled');
+      },
+    };
+    const summaryWriter: SummaryWriter = {
+      addRaw(text: string, _addEol?: boolean): SummaryWriter {
+        summaryLines.push(text);
+        return this;
+      },
+      async write(): Promise<void> {
+        // no-op
+      },
+    };
+
+    await withWorkspace(
+      {
+        '.github/buildish-mammoth-cache.yml': [
+          'cache-enabled: false',
+          'read-only: true',
+          'job-mode: distributed-aggregator',
+          'dependent-jobs:',
+          '  - worker_a',
+          '  - worker_b',
+          '',
+        ].join('\n'),
+      },
+      async (workspace) => {
+        const status = await bootstrapPhase('post', {
+          env: {
+            GITHUB_EVENT_NAME: 'push',
+            GITHUB_REF: 'refs/heads/main',
+            GITHUB_REPOSITORY: 'apache/buildish',
+            GITHUB_WORKFLOW: 'CI',
+            GITHUB_JOB: 'check',
+            GITHUB_WORKSPACE: workspace,
+            RUNNER_OS: 'Linux',
+            RUNNER_ARCH: 'X64',
+          },
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          captureCommandOutput: async (): Promise<string> =>
+            'openjdk version "21.0.4" 2024-07-16\n',
+          cacheApi,
+          inputProvider: {
+            getInput(name: string): string {
+              if (name === 'config-file') {
+                return '.github/buildish-mammoth-cache.yml';
+              }
+
+              if (name === 'read-only') {
+                return 'false';
+              }
+
+              return '';
+            },
+          },
+          summaryWriter,
+        });
+
+        expect(status.config).toMatchObject({
+          cacheEnabled: false,
+          readOnly: false,
+          jobMode: 'distributed-aggregator',
+          dependentJobs: ['worker_a', 'worker_b'],
+        });
+        expect(status.cacheModel).toBeNull();
+        expect(status.baseCacheResult).toBeNull();
+      },
+    );
+  });
 });
 
 async function withWorkspaceWithWrapper(

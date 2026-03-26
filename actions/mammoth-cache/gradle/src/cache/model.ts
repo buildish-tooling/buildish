@@ -188,6 +188,12 @@ interface BuiltInCachePartitionPreset {
   readonly relativeExcludeGlobs: readonly string[];
 }
 
+/**
+ * Built-in partition presets in their stable resolution order.
+ *
+ * This order is user-visible because active built-ins are emitted first, custom partitions are
+ * appended afterwards, and the resulting ordered layout contributes to `partitionFingerprint`.
+ */
 const BUILT_IN_CACHE_PARTITION_PRESETS: readonly BuiltInCachePartitionPreset[] = [
   {
     id: 'modules',
@@ -331,6 +337,12 @@ export function parseJavaMajor(versionOutput: string): number {
 
 /**
  * Computes the Gradle user home partitions used by cache restore/save and delta tracking.
+ *
+ * Rules:
+ * - built-ins are considered in stable preset order
+ * - built-in overrides replace the preset include/exclude lists entirely
+ * - built-ins with empty effective includes are disabled
+ * - custom partitions are appended in declaration order and must keep at least one include glob
  */
 export function createCachePartitions(
   gradleUserHome: string,
@@ -476,6 +488,8 @@ function createPartition(
 }
 
 function createPartitionFingerprint(partitions: readonly CachePartitionDefinition[]): string {
+  // Include the hard excludes and fully resolved ordered partition layout so cache keys diverge
+  // whenever the managed cache surface changes.
   const serializedLayout = JSON.stringify({
     hardExcludes: HARD_CACHE_EXCLUDE_GLOBS,
     partitions: partitions.map((partition) => ({

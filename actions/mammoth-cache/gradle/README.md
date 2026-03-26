@@ -65,6 +65,17 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 
 ## Inputs
 
+### `config-file`
+
+- Default: unset
+- Optional workspace-relative `.json`, `.yml`, or `.yaml` file containing a top-level object.
+- Config-file keys use the same kebab-case names as the action inputs.
+- Direct action inputs override values loaded from the file.
+- `dependent-jobs` and `wrapper-properties-files` may be either strings or arrays in the file.
+- `cache-partitions` may be expressed as a native YAML/JSON array in the file instead of a serialized JSON string.
+- `github-token` is intentionally rejected in config files; pass secrets directly via action inputs or environment variables.
+- The resolved file must remain inside the workspace after symlink resolution.
+
 ### `base-directory`
 
 - Default: `.`
@@ -126,6 +137,7 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 
 - Default: empty
 - Optional JSON array of cache partition overrides and custom partitions.
+- In `config-file`, this may also be a native YAML/JSON array instead of a serialized string.
 - Each object must contain:
   - `id`: lowercase letters, numbers, and `-` only
   - `includes`: array of Gradle-user-home-relative include globs
@@ -213,6 +225,8 @@ The action resolves the Gradle user home into ordered logical partitions:
 
 Built-ins keep a deterministic order. Custom partitions are appended after the active built-ins in the order supplied by `cache-partitions`.
 
+The resolved partition order plus each partition's include/exclude set is hashed into `partitionFingerprint`, which is part of the base cache key. Changing the active partition layout therefore produces a different base cache lineage instead of reusing an incompatible one.
+
 ### Include and exclude semantics
 
 - Includes define the files the action manages for a partition.
@@ -283,6 +297,7 @@ That example:
 - overrides `modules`
 - disables the built-in `kotlin-dsl` partition
 - adds a custom partition named `custom-generated-jars`
+- changes `partitionFingerprint`, so it uses a different base cache key than the default layout
 
 ### Restore cleanup behavior
 
@@ -293,6 +308,7 @@ That example:
 - After pruning, it restores the matched base cache again before the build starts.
 - It does not delete unmanaged files elsewhere in `GRADLE_USER_HOME`.
 - If you disable a partition, files from that now-disabled partition are no longer considered action-managed and are left untouched.
+- If the follow-up restore misses after pruning, the action fails instead of continuing with a partially pruned managed cache space.
 
 This is intentionally narrower than “delete everything outside the include patterns” because the action does not own all of `GRADLE_USER_HOME`, especially on long-lived self-hosted runners.
 

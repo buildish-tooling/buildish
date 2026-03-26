@@ -93,6 +93,8 @@ export const CACHE_KEY_TEMPLATE_PLACEHOLDERS = [
  * normalization layer applies defaults, validation, and derived values.
  */
 export interface RawActionInputs {
+  /** Raw optional workspace-relative config file path. Empty string means no file-backed config. */
+  readonly configFile: string;
   /** Raw `base-directory` input. Empty string means the repository root and later defaults to `.`. */
   readonly baseDirectory: string;
   /** Raw `cache-enabled` input. Empty string later defaults to `'true'`. */

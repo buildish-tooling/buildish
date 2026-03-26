@@ -204,6 +204,34 @@ describe('createCacheModel', () => {
     );
   });
 
+  it('changes the partition fingerprint and cache key when the partition layout changes', async () => {
+    const captureCommandOutput = async () => 'openjdk version "21.0.4" 2024-07-16\n';
+
+    const defaultModel = await createCacheModel(baseConfig, baseCiContext, {
+      captureCommandOutput,
+    });
+    const customizedModel = await createCacheModel(
+      {
+        ...baseConfig,
+        cachePartitions: [
+          {
+            id: 'transforms-metadata',
+            includes: ['caches/transforms-*/**'],
+            excludes: [],
+          },
+        ],
+      },
+      baseCiContext,
+      { captureCommandOutput },
+    );
+
+    expect(customizedModel.partitions.map((partition) => partition.id)).toContain(
+      'transforms-metadata',
+    );
+    expect(customizedModel.partitionFingerprint).not.toBe(defaultModel.partitionFingerprint);
+    expect(customizedModel.cacheKey).not.toBe(defaultModel.cacheKey);
+  });
+
   it('fails hard with an actionable message when no Java runtime is available', async () => {
     await expect(
       createCacheModel(baseConfig, baseCiContext, {

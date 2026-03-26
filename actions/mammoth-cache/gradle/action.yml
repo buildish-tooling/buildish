@@ -17,6 +17,14 @@ name: Apache Buildish Mammoth Cache Action for Gradle
 description: Secure Gradle wrapper provisioning plus local and distributed cache management for Gradle builds in GitHub Actions.
 author: Apache Buildish
 inputs:
+  config-file:
+    description: >-
+      Optional workspace-relative `.json`, `.yml`, or `.yaml` configuration file.
+      The file must contain a top-level object whose keys use the same kebab-case
+      names as this action's inputs. Direct action inputs override values loaded
+      from the file. `github-token` is intentionally rejected in config files;
+      pass secrets directly as action inputs or environment variables instead.
+    required: false
   base-directory:
     description: >-
       Repository-relative base directory used for Gradle wrapper discovery and any
@@ -84,7 +92,11 @@ inputs:
       built-in partition an empty `includes` array disables it. Custom partitions
       must have at least one include. Hard safety excludes such as
       `**/*.lock`, `**/configuration-cache/**`, `caches/*/cc-keystore`, and
-      `caches/journal-1/**` are always enforced.
+      `caches/journal-1/**` are always enforced. Active built-ins keep a
+      deterministic order, custom partitions are appended after them, and if two
+      partitions match the same file the manifest capture fails. The resolved
+      layout feeds `${partitionFingerprint}`, so changing partition layout also
+      changes the base cache key.
     required: false
   process-all-wrapper-files:
     description: >-
@@ -122,7 +134,9 @@ inputs:
       base-cache hit: it deletes files currently matched by the active cache
       partitions, then restores the matched base cache again so the managed
       partition space reflects only restored content. It never deletes files
-      outside the action-managed partition space.
+      outside the action-managed partition space. If the follow-up restore does
+      not hit again, the action fails closed rather than continue with a partially
+      pruned managed cache space.
     required: false
     default: none
   gradle-user-home:
@@ -174,5 +188,5 @@ outputs:
     description: Effective CI job identity seen by the action after any supported reusable-workflow override.
 runs:
   using: node24
-  main: dist/main/index.cjs
-  post: dist/post/index.cjs
+  main: dist/github/main/index.cjs
+  post: dist/github/post/index.cjs
