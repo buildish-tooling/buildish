@@ -74,6 +74,9 @@ jobs:
       - name: Build the project
         run: make build
 
+      - name: Run bundled Category X license gate
+        run: make release-legal-category-x-check
+
       - name: Run unit tests
         run: make test
 

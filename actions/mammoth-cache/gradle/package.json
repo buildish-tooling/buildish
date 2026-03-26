@@ -18,7 +18,10 @@
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "rat-check": "node scripts/rat-check.mjs",
-    "verify": "npm run lint && npm run format && npm run test && npm run rebuild"
+    "release-legal:check": "node scripts/release-legal.mjs --check",
+    "release-legal:check-category-x": "node scripts/release-legal.mjs --check-category-x",
+    "release-legal:write": "node scripts/release-legal.mjs --write",
+    "verify": "npm run lint && npm run format && npm run test && npm run rebuild && npm run release-legal:check-category-x"
   },
   "keywords": [],
   "author": "Apache Buildish",

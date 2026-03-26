@@ -326,16 +326,25 @@ Common commands:
 - `make integration-test-distributed-reuse`
 - `make test`
 - `make lint-check`
+- `make release-legal-category-x-check`
 - `make rat-check`
+- `make release-legal-check`
 - `make check`
 
 Equivalent npm script:
 
 - `npm run rat-check`
+- `npm run release-legal:check-category-x`
+- `npm run release-legal:check`
+- `npm run release-legal:write`
 - `npm run smoke-test`
 - `npm run integration-test:distributed-reuse`
 
 The Makefile verifies the expected `node` and `npm` versions before running user-facing targets.
+
+`npm run release-legal:write` refreshes `legal/github/LICENSE` and `legal/github/NOTICE` for the bundled GitHub action distribution. Those files are separate from the repository-root `LICENSE` / `NOTICE`, which remain the ASF project legal files.
+
+See [`docs/release-legal.md`](docs/release-legal.md) for the release-legal workflow, generation/check commands, formatting rules, and current known blockers.
 
 ### Dependency warning note
 
@@ -358,8 +367,10 @@ stack moves off the older `glob` release.
 Full local verification:
 
 - `npm run verify`
+- `make release-legal-category-x-check`
 - `make smoke-test`
 - `make rat-check`
+- `make release-legal-check`
 - `make check`
 
 This runs:
@@ -368,7 +379,10 @@ This runs:
 - formatting checks
 - unit tests
 - a fresh rebuild
-- Apache RAT license-header verification (`make check`)
+- bundled Category X license verification (`npm run verify`, `make release-legal-category-x-check`, `make check`, and the regular CI check job)
+- Apache RAT license-header verification (`make check` / `make rat-check`)
+
+`make release-legal-check` / `npm run release-legal:check` remains the broader release-preparation audit. It verifies `legal/github/LICENSE` and `legal/github/NOTICE` against the actual esbuild bundle and fails closed on unresolved legal blockers such as missing third-party attribution data.
 
 `make smoke-test` / `npm run smoke-test` performs a lightweight bundled-action smoke run against a temporary copy of `test/fixtures/smoke`, so it does not modify committed fixture files.
 

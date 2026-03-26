@@ -21,7 +21,7 @@ BUILD_STAMP := dist/.buildish-mammoth-cache-gradle-built
 BUILD_INPUTS := action.yml package.json tsconfig.json $(shell find src -type f 2>/dev/null)
 HELP_TARGETS := $(MAKEFILE_LIST)
 
-.PHONY: build check clean clean-all help integration-test-distributed-reuse lint-check lint-fix rat-check rebuild sanity-check smoke-test test
+.PHONY: build check clean clean-all help integration-test-distributed-reuse lint-check lint-fix rat-check rebuild release-legal-category-x-check release-legal-check sanity-check smoke-test test
 
 help: ## Show available Make targets.
 	@awk 'BEGIN {FS = ":.*## "; printf "Available targets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(HELP_TARGETS)
@@ -82,15 +82,22 @@ lint-fix: sanity-check $(NODE_MODULES_STAMP) ## Automatically fix lint issues an
 rat-check: sanity-check ## Run Apache RAT license-header verification (requires Java 21+).
 	$(NPM) run rat-check
 
+release-legal-category-x-check: sanity-check $(NODE_MODULES_STAMP) ## Fail if the bundled GitHub action distribution contains a Category X license.
+	$(NPM) run release-legal:check-category-x
+
+release-legal-check: sanity-check $(NODE_MODULES_STAMP) ## Verify legal/github/LICENSE and legal/github/NOTICE for the GitHub action distribution.
+	$(NPM) run release-legal:check
+
 smoke-test: build ## Run the bundled-action smoke test against a staged fixture copy.
 	$(NPM) run smoke-test
 
 integration-test-distributed-reuse: sanity-check $(NODE_MODULES_STAMP) ## Run the local worker/aggregator distributed reuse integration test.
 	$(NPM) run integration-test:distributed-reuse
 
-check: ## Run a full clean verification: clean-all, build, test, lint-check, and rat-check.
+check: ## Run a full clean verification: clean-all, build, test, lint-check, release-legal-category-x-check, and rat-check.
 	$(MAKE) clean-all
 	$(MAKE) build
 	$(MAKE) test
 	$(MAKE) lint-check
+	$(MAKE) release-legal-category-x-check
 	$(MAKE) rat-check
