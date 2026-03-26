@@ -57,7 +57,7 @@ If there is nothing to append to a generated file, the output is just the reposi
   - copyright text
   - project home page
   - license link or SPDX-style identifier
-- Licenses with attribution requirements (for example MIT, BSD, ISC) must include the preserved attribution/license text.
+- Licenses with attribution requirements (for example, MIT, BSD, ISC) must include the preserved attribution/license text.
 
 ## NOTICE handling
 
@@ -67,7 +67,7 @@ If no bundled dependency contributes NOTICE text, `legal/github/NOTICE` is ident
 
 ## Policy checks
 
-The full release audit fails closed for:
+The full release audit fails hard for:
 
 - Category X licenses under Apache release policy
 - missing license declarations in bundled npm metadata

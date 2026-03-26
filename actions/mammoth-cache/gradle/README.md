@@ -16,11 +16,13 @@ limitations under the License.
 
 # Apache Buildish Mammoth Cache for Gradle
 
-Apache Buildish Mammoth Cache for Gradle provides secure Gradle wrapper provisioning plus local and distributed cache management for GitHub Actions.
+Apache Buildish Mammoth Cache for Gradle provides secure Gradle wrapper provisioning plus local and distributed cache
+management for GitHub Actions.
 
 Use it in workflows as `apache/buildish/actions/mammoth-cache/gradle@<ref>`.
 
-This action lives in `actions/mammoth-cache/gradle/` so the `actions/mammoth-cache/` family can grow with sibling actions for other build tools over time.
+This action lives in `actions/mammoth-cache/gradle/` so the `actions/mammoth-cache/` family can grow with sibling
+actions for other build tools over time.
 
 ## Current status
 
@@ -40,7 +42,8 @@ Not implemented yet:
 - cache restore/save orchestration
 - distributed worker / aggregator data exchange
 
-The action metadata and configuration surface are ready, but the core Gradle execution and cache-management behavior is still being built.
+The action metadata and configuration surface are ready, but the core Gradle execution and cache-management behavior are
+still being built.
 
 ## Usage in workflows
 
@@ -61,7 +64,8 @@ steps:
 
 The repository pins these versions so local development, CI, and the published action runtime stay aligned.
 
-For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/). Install at least Java 21 before running the RAT checks locally.
+For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/). Install at least Java 21 before running
+the RAT checks locally.
 
 ## Inputs
 
@@ -73,7 +77,8 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 - Direct action inputs override values loaded from the file.
 - `dependent-jobs` and `wrapper-properties-files` may be either strings or arrays in the file.
 - `cache-partitions` may be expressed as a native YAML/JSON array in the file instead of a serialized JSON string.
-- `github-token` is intentionally rejected in config files; pass secrets directly via action inputs or environment variables.
+- `github-token` is intentionally rejected in config files; pass secrets directly via action inputs or environment
+  variables.
 - The resolved file must remain inside the workspace after symlink resolution.
 
 ### `base-directory`
@@ -102,9 +107,9 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 
 - Default: `standalone`
 - Supported values:
-  - `standalone`
-  - `distributed-worker`
-  - `distributed-aggregator`
+    - `standalone`
+    - `distributed-worker`
+    - `distributed-aggregator`
 - Controls cache coordination behavior.
 
 ### `dependent-jobs`
@@ -124,14 +129,15 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 - Default: unset
 - Optional restricted template for cache key generation.
 - Supported placeholders:
-  - `${cacheKeyPrefix}`
-  - `${schemaVersion}`
-  - `${partitionFingerprint}`
-  - `${javaMajor}`
-  - `${runnerOs}`
-  - `${runnerArch}`
-  - `${refName}`
-- Custom templates must include `${partitionFingerprint}` so different cache partition layouts do not share the same base cache key.
+    - `${cacheKeyPrefix}`
+    - `${schemaVersion}`
+    - `${partitionFingerprint}`
+    - `${javaMajor}`
+    - `${runnerOs}`
+    - `${runnerArch}`
+    - `${refName}`
+- Custom templates must include `${partitionFingerprint}` so different cache partition layouts do not share the same
+  base cache key.
 
 ### `cache-partitions`
 
@@ -139,12 +145,12 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 - Optional JSON array of cache partition overrides and custom partitions.
 - In `config-file`, this may also be a native YAML/JSON array instead of a serialized string.
 - Each object must contain:
-  - `id`: lowercase letters, numbers, and `-` only
-  - `includes`: array of Gradle-user-home-relative include globs
-  - `excludes`: optional array of Gradle-user-home-relative exclude globs
+    - `id`: lowercase letters, numbers, and `-` only
+    - `includes`: array of Gradle-user-home-relative include globs
+    - `excludes`: optional array of Gradle-user-home-relative exclude globs
 - Overriding a built-in partition replaces its built-in include/exclude lists.
 - Setting `includes: []` disables a built-in partition.
-- Custom partitions must have at least one include glob.
+- Custom partitions must have at least include one glob.
 - Hard safety excludes are always enforced even when a partition is overridden.
 
 ### `process-all-wrapper-files`
@@ -180,12 +186,12 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 
 - Default: `none`
 - Supported values:
-  - `none`
-  - `prune-managed`
+    - `none`
+    - `prune-managed`
 - `prune-managed` only acts after a base-cache hit.
 - It deletes files currently matched by the active managed partitions, then restores the matched base cache again.
 - It never deletes files outside the action-managed partition space.
-- It is intentionally opt-in because it is more destructive and may increase restore time.
+- It is intentionally an opt-in because it is more destructive and may increase restore time.
 
 ### `gradle-user-home`
 
@@ -223,9 +229,12 @@ The action resolves the Gradle user home into ordered logical partitions:
 - `build-cache` — the local Gradle build cache
 - `wrapper-dists` — wrapper-downloaded Gradle distributions
 
-Built-ins keep a deterministic order. Custom partitions are appended after the active built-ins in the order supplied by `cache-partitions`.
+Built-ins keep a deterministic order. Custom partitions are appended after the active built-ins in the order supplied by
+`cache-partitions`.
 
-The resolved partition order plus each partition's include/exclude set is hashed into `partitionFingerprint`, which is part of the base cache key. Changing the active partition layout therefore produces a different base cache lineage instead of reusing an incompatible one.
+The resolved partition order plus each partition's include/exclude set is hashed into `partitionFingerprint`, which is
+part of the base cache key. Changing the active partition layout therefore produces a different base cache lineage
+instead of reusing an incompatible one.
 
 ### Include and exclude semantics
 
@@ -253,8 +262,8 @@ All partition globs are relative to the supported Gradle user home.
 - `..` traversal is rejected.
 - Negated globs are rejected.
 - Supported wildcards are:
-  - `*` within a single path segment
-  - `**` as a whole path segment
+    - `*` within a single path segment
+    - `**` as a whole path segment
 - Include globs must end in `/**`.
 - Include globs may not use `**` anywhere except the final segment.
 - Exclude globs may use `**` as a whole path segment anywhere in the pattern.
@@ -277,8 +286,13 @@ Use `cache-partitions` as JSON. Example:
 [
   {
     "id": "modules",
-    "includes": ["caches/modules-*/files-*/**", "caches/jars-*/**"],
-    "excludes": ["caches/modules-*/metadata-*/**"]
+    "includes": [
+      "caches/modules-*/files-*/**",
+      "caches/jars-*/**"
+    ],
+    "excludes": [
+      "caches/modules-*/metadata-*/**"
+    ]
   },
   {
     "id": "kotlin-dsl",
@@ -286,7 +300,9 @@ Use `cache-partitions` as JSON. Example:
   },
   {
     "id": "custom-generated-jars",
-    "includes": ["caches/*/generated-gradle-jars/**"],
+    "includes": [
+      "caches/*/generated-gradle-jars/**"
+    ],
     "excludes": []
   }
 ]
@@ -307,10 +323,13 @@ That example:
 - It only deletes files currently matched by the active managed partitions.
 - After pruning, it restores the matched base cache again before the build starts.
 - It does not delete unmanaged files elsewhere in `GRADLE_USER_HOME`.
-- If you disable a partition, files from that now-disabled partition are no longer considered action-managed and are left untouched.
-- If the follow-up restore misses after pruning, the action fails instead of continuing with a partially pruned managed cache space.
+- If you disable a partition, files from that now-disabled partition are no longer considered action-managed and are
+  left untouched.
+- If the follow-up restore misses after pruning, the action fails instead of continuing with a partially pruned managed
+  cache space.
 
-This is intentionally narrower than “delete everything outside the include patterns” because the action does not own all of `GRADLE_USER_HOME`, especially on long-lived self-hosted runners.
+This is intentionally narrower than “delete everything outside the include patterns” because the action does not own all
+of `GRADLE_USER_HOME`, especially on long-lived self-hosted runners.
 
 ## Development
 
@@ -342,9 +361,12 @@ Equivalent npm script:
 
 The Makefile verifies the expected `node` and `npm` versions before running user-facing targets.
 
-`npm run release-legal:write` refreshes `legal/github/LICENSE` and `legal/github/NOTICE` for the bundled GitHub action distribution. Those files are separate from the repository-root `LICENSE` / `NOTICE`, which remain the ASF project legal files.
+`npm run release-legal:write` refreshes `legal/github/LICENSE` and `legal/github/NOTICE` for the bundled GitHub action
+distribution. Those files are separate from the repository-root `LICENSE` / `NOTICE`, which remain the ASF project legal
+files.
 
-See [`docs/release-legal.md`](docs/release-legal.md) for the release-legal workflow, generation/check commands, formatting rules, and current legal-audit status.
+See [`docs/release-legal.md`](docs/release-legal.md) for the release-legal workflow, generation/check commands,
+formatting rules, and current legal-audit status.
 
 ### Dependency warning note
 
@@ -379,20 +401,27 @@ This runs:
 - formatting checks
 - unit tests
 - a fresh rebuild
-- bundled Category X license verification (`npm run verify`, `make release-legal-category-x-check`, `make check`, and the regular CI check job)
+- bundled Category X license verification (`npm run verify`, `make release-legal-category-x-check`, `make check`, and
+  the regular CI check job)
 - Apache RAT license-header verification (`make check` / `make rat-check`)
 
-`make release-legal-check` / `npm run release-legal:check` remains the broader release-preparation audit. It verifies `legal/github/LICENSE` and `legal/github/NOTICE` against the actual esbuild bundle and fails closed on unresolved legal blockers such as missing third-party attribution data.
+`make release-legal-check` / `npm run release-legal:check` remains the broader release-preparation audit. It verifies
+`legal/github/LICENSE` and `legal/github/NOTICE` against the actual esbuild bundle and fails closed on unresolved legal
+blockers such as missing third-party attribution data.
 
-`make smoke-test` / `npm run smoke-test` performs a lightweight bundled-action smoke run against a temporary copy of `test/fixtures/smoke`, so it does not modify committed fixture files.
+`make smoke-test` / `npm run smoke-test` performs a lightweight bundled-action smoke run against a temporary copy of
+`test/fixtures/smoke`, so it does not modify committed fixture files.
 
-`make integration-test-distributed-reuse` / `npm run integration-test:distributed-reuse` stages three temporary copies of `test/fixtures/integration/gradle-project`, runs the real worker-A → worker-B → aggregator flow locally, and asserts that the aggregator resolves the expected jars without re-downloading those jar files. This scenario requires:
+`make integration-test-distributed-reuse` / `npm run integration-test:distributed-reuse` stages three temporary copies
+of `test/fixtures/integration/gradle-project`, runs the real worker-A → worker-B → aggregator flow locally, and asserts
+that the aggregator resolves the expected jars without re-downloading those jar files. This scenario requires:
 
 - Java 21+
 - network access for the initial wrapper/dependency downloads
 - a POSIX-style shell environment (`gradlew` is used, not `gradlew.bat`)
 
-On failure, the staged temporary directory is preserved and printed so you can inspect the generated Gradle homes, summaries, and aggregator log locally.
+On failure, the staged temporary directory is preserved and printed so you can inspect the generated Gradle homes,
+summaries, and aggregator log locally.
 
 ## License
 
@@ -412,8 +441,11 @@ Project governance and community docs:
 
 ## Incubation status
 
-Apache Buildish is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator PMC.
+Apache Buildish is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache
+Incubator PMC.
 
-Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects.
+Incubation is required of all newly accepted projects until a further review indicates that the infrastructure,
+communications, and decision-making process have stabilized in a manner consistent with other successful ASF projects.
 
-While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.
+While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate
+that the project has yet to be fully endorsed by the ASF.

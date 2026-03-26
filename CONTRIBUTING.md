@@ -21,7 +21,7 @@ Thank you for considering a contribution to Apache Buildish.
 ## Before opening a pull request
 
 - Check whether an existing issue or pull request already covers the change.
-- For larger changes, start a short design discussion in an issue before investing heavily in implementation.
+- For larger changes, start a short design discussion on a GitHub issue before investing heavily in implementation.
 - Keep pull requests focused; split unrelated work into separate changes.
 
 ## Pull request expectations

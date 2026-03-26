@@ -73,7 +73,7 @@ Each staged package is a directory uploaded as one artifact.
 The original cache-relative paths are stored only in JSON metadata, not as archive paths. This is intentional:
 
 - it prevents path traversal through payload filenames
-- it keeps extraction layout deterministic
+- it keeps the extraction layout deterministic
 - it avoids deep directory trees with many repeated path segments
 - it makes validation straightforward: every payload must live under `payload/`
 
@@ -89,7 +89,7 @@ This avoids leaking worker-local filesystem paths into exchanged artifacts while
 
 ## Integrity and security model
 
-Verification happens at multiple layers.
+Verification happens in multiple layers.
 
 ### 1. GitHub artifact digest
 
@@ -122,7 +122,7 @@ For every added/modified delta entry:
 
 ### 5. Unexpected file rejection
 
-The verifier walks the extracted directory and rejects any file outside the documented package layout.
+The verifier walks over the extracted directory and rejects any file outside the documented package layout.
 
 ## Source-race protection during staging
 
@@ -140,13 +140,13 @@ If any of those checks fail, staging aborts and instructs the caller to recomput
 
 The implementation is designed to stay conservative with memory:
 
-- payloads are copied directly from Gradle user home into a temporary staging directory
+- payloads are copied directly from the Gradle user home into a temporary staging directory
 - metadata is compact JSON with a trailing newline
 - upload uses one artifact per worker job and a low compression level by default (`1`)
 
 This keeps the implementation aligned with the earlier benchmark result that JSON manifests compress well, while not spending unnecessary CPU on aggressively recompressing already-compressed Gradle cache blobs.
 
-## Current scope vs later work
+## Current scope vs. later work
 
 Implemented here:
 
