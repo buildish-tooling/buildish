@@ -192,6 +192,22 @@ Equivalent npm script:
 
 The Makefile verifies the expected `node` and `npm` versions before running user-facing targets.
 
+### Dependency warning note
+
+If `npm install` / `npm ci` prints a deprecation warning for `glob@10.5.0`, that warning is currently
+transitive and does **not** mean this project depends on `glob` directly.
+
+Current chain:
+
+- `@actions/artifact`
+- `archiver`
+- `archiver-utils`
+- `glob@10.5.0`
+
+This repository already tracks GitHub's current `@actions/artifact` release line. The warning comes from
+that upstream dependency graph, and we will pick up or evaluate a cleaner fix when GitHub's dependency
+stack moves off the older `glob` release.
+
 ## Local verification
 
 Full local verification:
