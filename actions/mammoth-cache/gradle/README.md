@@ -107,9 +107,9 @@ the RAT checks locally.
 
 - Default: `standalone`
 - Supported values:
-    - `standalone`
-    - `distributed-worker`
-    - `distributed-aggregator`
+  - `standalone`
+  - `distributed-worker`
+  - `distributed-aggregator`
 - Controls cache coordination behavior.
 
 ### `dependent-jobs`
@@ -129,13 +129,13 @@ the RAT checks locally.
 - Default: unset
 - Optional restricted template for cache key generation.
 - Supported placeholders:
-    - `${cacheKeyPrefix}`
-    - `${schemaVersion}`
-    - `${partitionFingerprint}`
-    - `${javaMajor}`
-    - `${runnerOs}`
-    - `${runnerArch}`
-    - `${refName}`
+  - `${cacheKeyPrefix}`
+  - `${schemaVersion}`
+  - `${partitionFingerprint}`
+  - `${javaMajor}`
+  - `${runnerOs}`
+  - `${runnerArch}`
+  - `${refName}`
 - Custom templates must include `${partitionFingerprint}` so different cache partition layouts do not share the same
   base cache key.
 
@@ -145,9 +145,9 @@ the RAT checks locally.
 - Optional JSON array of cache partition overrides and custom partitions.
 - In `config-file`, this may also be a native YAML/JSON array instead of a serialized string.
 - Each object must contain:
-    - `id`: lowercase letters, numbers, and `-` only
-    - `includes`: array of Gradle-user-home-relative include globs
-    - `excludes`: optional array of Gradle-user-home-relative exclude globs
+  - `id`: lowercase letters, numbers, and `-` only
+  - `includes`: array of Gradle-user-home-relative include globs
+  - `excludes`: optional array of Gradle-user-home-relative exclude globs
 - Overriding a built-in partition replaces its built-in include/exclude lists.
 - Setting `includes: []` disables a built-in partition.
 - Custom partitions must have at least include one glob.
@@ -186,8 +186,8 @@ the RAT checks locally.
 
 - Default: `none`
 - Supported values:
-    - `none`
-    - `prune-managed`
+  - `none`
+  - `prune-managed`
 - `prune-managed` only acts after a base-cache hit.
 - It deletes files currently matched by the active managed partitions, then restores the matched base cache again.
 - It never deletes files outside the action-managed partition space.
@@ -262,8 +262,8 @@ All partition globs are relative to the supported Gradle user home.
 - `..` traversal is rejected.
 - Negated globs are rejected.
 - Supported wildcards are:
-    - `*` within a single path segment
-    - `**` as a whole path segment
+  - `*` within a single path segment
+  - `**` as a whole path segment
 - Include globs must end in `/**`.
 - Include globs may not use `**` anywhere except the final segment.
 - Exclude globs may use `**` as a whole path segment anywhere in the pattern.
@@ -286,13 +286,8 @@ Use `cache-partitions` as JSON. Example:
 [
   {
     "id": "modules",
-    "includes": [
-      "caches/modules-*/files-*/**",
-      "caches/jars-*/**"
-    ],
-    "excludes": [
-      "caches/modules-*/metadata-*/**"
-    ]
+    "includes": ["caches/modules-*/files-*/**", "caches/jars-*/**"],
+    "excludes": ["caches/modules-*/metadata-*/**"]
   },
   {
     "id": "kotlin-dsl",
@@ -300,9 +295,7 @@ Use `cache-partitions` as JSON. Example:
   },
   {
     "id": "custom-generated-jars",
-    "includes": [
-      "caches/*/generated-gradle-jars/**"
-    ],
+    "includes": ["caches/*/generated-gradle-jars/**"],
     "excludes": []
   }
 ]
