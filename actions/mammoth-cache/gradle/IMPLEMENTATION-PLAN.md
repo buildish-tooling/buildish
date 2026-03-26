@@ -452,20 +452,32 @@ implementable design.
     - Can we get the cache partition statistics from the cache manifest into the summary? Like number of files and
       total size for each partition.
     - The level of detail is great, it's just not very readable.
+    - Whether the whole job succeeded or not is the most important information.
+      - Next important is a summary about the individual builds
     - Worth to consider: Collapsed sections, see https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections
     - Should use "green checkmarks" (UTF-8 icon) and a brief summary, if everything worked fine. Hide the details in collapsed sections.
     - Should use "red crosses" (UTF-8 icon) for each error. Place errors right at the top.
     - Should use "yellow warning signs" (UTF-8 icon) for each warning. Place warnings right after errors.
     - Do not emit duplicate information.
-34. Cleanup the code base
-    - Check validate*() functions for duplicates
-35. Documentation for the action
+    - If possible, provide clickable links to the actual Workflow logs where the builds were executed.
+    - Cache statistics details should always be hidden. It good to have, but not important at first glance.
+      - In the details we can provide size statistics in a table. Have the totals and per partition info on the X axis, and rows for:
+        - the size of the pulled base cache
+        - the size of the delta artifact (or "n/a" if not applicable)
+        - the size of the uploaded base cache (or "n/a" if not applicable)
+34. Review the mammoth action and ensure the CI abstraction is enforced everywhere.
+    - Especially the gradle scripts to capture build results and build scans are GitHub specific.
+    - Also the summary code could be GitHub specific.
+    - We need that code to be CI agnostic.
+35. Documentation for the mammoth action
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
     - Explicitly document the Gradle wrapper jar download and verification process in the docs/ directory.
+      Also explain how it related to the "buildish helper tool".
     - Explicitly document the cache key generation process in the docs/ directory.
     - Explicitly document the base cache design in the docs/ directory.
     - Explicitly document the CI abstraction layer in the docs/ directory.
     - Explicitly document the bootstrap process in the docs/ directory.
+    - If diagrams help, use Mermaid
     - All types and functions must have JSDoc comments.
 36. Add the "buildish helper tool" to the top-level README
 37. Add release workflows
@@ -476,7 +488,16 @@ implementable design.
       See https://docs.github.com/en/actions/how-tos/create-and-publish-actions/using-immutable-releases-and-tags-to-manage-your-actions-releases
     - As the action's `dist/` folder is .gitignore'd, we need to ensure that the release workflow ensure that the
       `dist/` folder is included in the Git commit for the release tag.
-38. Validate that the action build-results (INIT_SCRIPT_CONTENTS + SERVICE_PLUGIN_CONTENTS in actions/mammoth-cache/gradle/src/gradle/build-results.ts)
+38. Cleanup the code base
+    - MANUALLY inspect all files
+    - Check validate*() functions for duplicates
+39. Site + logo!
+    - We need a logo for the project!
+    - Leverage the work done in Polaris, use Hugo.
+    - But come up with better Docker builds for the site.
+    - Respect that different plugins/actions/tools have different release cadences.
+    - Also respect that different plugins/actions/tools have different documentation needs.
+40. Validate that the action build-results (INIT_SCRIPT_CONTENTS + SERVICE_PLUGIN_CONTENTS in actions/mammoth-cache/gradle/src/gradle/build-results.ts)
     are not too close to the Gradle action's code.
     - The scripts look a bit GitHub CI specific, using `RUNNER_TEMP` and `GITHUB_ACTION` system properties.
     - Why are those not env vars?
