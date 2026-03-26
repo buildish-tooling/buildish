@@ -325,7 +325,7 @@ function truncateSummaryText(value: string, maxLength: number): string {
 }
 
 function escapeSummaryText(value: string): string {
-  return value.replace(/[\\`*_{}\[\]()#+\-.!<>|]/g, '\\$&');
+  return value.replace(/[\\`*_{}[\]()#+.!<>|-]/g, '\\$&');
 }
 
 function isMissingPathError(error: unknown): boolean {
@@ -455,7 +455,7 @@ class ResultsWriter {
                 buildResultsFile << groovy.json.JsonOutput.toJson(content)
             }
         } catch (Exception e) {
-            println "\nbuildish/mammoth-cache/gradle failed to write build-results file. Will continue.\n> ${'$'}{e.getLocalizedMessage()}"
+            println "buildish/mammoth-cache/gradle failed to write build-results file. Will continue. > ${'$'}{e.getLocalizedMessage()}"
         }
     }
 }
@@ -535,7 +535,7 @@ abstract class BuildResultsRecorder implements BuildService<BuildResultsRecorder
                 buildResultsFile << groovy.json.JsonOutput.toJson(buildResults)
             }
         } catch (Exception e) {
-            println "\nbuildish/mammoth-cache/gradle failed to write build-results file. Will continue.\n> ${'$'}{e.getLocalizedMessage()}"
+            println "buildish/mammoth-cache/gradle failed to write build-results file. Will continue. > ${'$'}{e.getLocalizedMessage()}"
         }
     }
 }

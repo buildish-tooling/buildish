@@ -17,7 +17,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
 import type { SummaryWriter } from '../src/ci/types';
