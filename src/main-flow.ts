@@ -119,11 +119,33 @@ async function applyDependentJobDeltas(
   );
 
   try {
+    assertCompatibleDependentDeltaArtifacts(downloadedPackages, bootstrap);
     const plan = mergeDeltaArtifactPackages(downloadedPackages);
     const applied = await applyMergedDeltaPlan(plan, bootstrap.config.gradleUserHome);
     return createMainDependentDeltaResult(requestedJobs, downloadedPackages, applied);
   } finally {
     await cleanupDownloadedPackages(downloadedPackages);
+  }
+}
+
+function assertCompatibleDependentDeltaArtifacts(
+  downloadedPackages: readonly DownloadedDeltaArtifactPackage[],
+  bootstrap: BootstrapStatus,
+): void {
+  const currentRunner = `${bootstrap.ciContext.runnerOs}/${bootstrap.ciContext.runnerArch}`;
+
+  for (const artifactPackage of downloadedPackages) {
+    const producer = artifactPackage.metadata.producer;
+    if (
+      producer.runnerOs === bootstrap.ciContext.runnerOs &&
+      producer.runnerArch === bootstrap.ciContext.runnerArch
+    ) {
+      continue;
+    }
+
+    throw new Error(
+      `Dependent delta artifact '${artifactPackage.artifact.name}' from job '${producer.jobName}' targets runner ${producer.runnerOs}/${producer.runnerArch}, but the current job runs on ${currentRunner}. Cross-runner dependent delta reuse is not supported; keep distributed jobs on the same runner OS and architecture.`,
+    );
   }
 }
 

@@ -19,6 +19,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import type { CiJobContext } from '../ci/types';
+import { normalizeUserSuppliedRelativePath } from '../validation';
 import {
   CACHE_KEY_TEMPLATE_PLACEHOLDERS,
   JOB_MODES,
@@ -367,23 +368,7 @@ function normalizeRelativePath(input: string, inputName: string): string {
     throw new Error(`${inputName} must not use home-directory expansion.`);
   }
 
-  const unixPath = trimmed.replaceAll('\\', '/');
-
-  if (path.posix.isAbsolute(unixPath)) {
-    throw new Error(`${inputName} must be a relative path.`);
-  }
-
-  const normalizedPath = path.posix.normalize(unixPath);
-
-  if (
-    normalizedPath === '..' ||
-    normalizedPath.startsWith('../') ||
-    normalizedPath.includes('/../')
-  ) {
-    throw new Error(`${inputName} must stay within the repository workspace.`);
-  }
-
-  return normalizedPath === '' ? '.' : normalizedPath.replace(/\/$/, '') || '.';
+  return normalizeUserSuppliedRelativePath(trimmed, inputName);
 }
 
 /**

@@ -65,6 +65,8 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 
 - Default: `.`
 - Repository-relative base directory for wrapper discovery and other project-relative paths.
+- Windows-style relative paths using `\` are accepted and normalized to internal POSIX-style paths.
+- Absolute/rooted paths are rejected, including `C:\repo`, `\Windows\System32`, and `\\server\share`.
 - Must remain inside the repository workspace.
 
 ### `cache-enabled`
@@ -125,12 +127,16 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 
 - Default: `**/gradle/wrapper/gradle-wrapper.properties`
 - Repository-relative discovery glob used beneath `base-directory`.
+- Windows-style relative paths using `\` are accepted and normalized before evaluation.
+- Absolute/rooted paths are rejected, including drive-prefixed, rooted, and UNC paths.
 
 ### `wrapper-properties-files`
 
 - Default: empty
 - Comma- or newline-separated explicit `gradle-wrapper.properties` files.
 - Paths are relative to `base-directory`.
+- Windows-style relative paths using `\` are accepted and normalized to internal POSIX-style paths.
+- Absolute/rooted paths are rejected, including drive-prefixed, rooted, and UNC paths.
 - Entries must be explicit file paths, not globs.
 
 ### `cleanup-enabled`

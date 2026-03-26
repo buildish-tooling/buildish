@@ -17,6 +17,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  normalizeUserSuppliedRelativePath,
   parseSerializedJsonObject,
   validateLowercaseSha256,
   validateNormalizedRelativePosixPath,
@@ -39,6 +40,39 @@ describe('validation helpers', () => {
     );
     expect(() => validateNormalizedRelativePosixPath('../escape', 'path', 'the package')).toThrow(
       /normalized relative POSIX path inside the package/u,
+    );
+    expect(() =>
+      validateNormalizedRelativePosixPath('payload\\000001.bin', 'path', 'the package'),
+    ).toThrow(/normalized relative POSIX path inside the package/u);
+    expect(() => validateNormalizedRelativePosixPath('\\escape', 'path', 'the package')).toThrow(
+      /normalized relative POSIX path inside the package/u,
+    );
+    expect(() =>
+      validateNormalizedRelativePosixPath('\\\\server\\share\\payload.bin', 'path', 'the package'),
+    ).toThrow(/normalized relative POSIX path inside the package/u);
+    expect(() => validateNormalizedRelativePosixPath('C:/escape', 'path', 'the package')).toThrow(
+      /normalized relative POSIX path inside the package/u,
+    );
+  });
+
+  it('normalizes user-supplied relative paths to canonical POSIX form', () => {
+    expect(normalizeUserSuppliedRelativePath('tools\\app\\gradle', 'path')).toBe(
+      'tools/app/gradle',
+    );
+    expect(normalizeUserSuppliedRelativePath('tools/./app\\gradle/', 'path')).toBe(
+      'tools/app/gradle',
+    );
+    expect(() => normalizeUserSuppliedRelativePath('\\Windows\\Blah', 'path')).toThrow(
+      /must be a relative path/u,
+    );
+    expect(() => normalizeUserSuppliedRelativePath('\\\\server\\share\\repo', 'path')).toThrow(
+      /must be a relative path/u,
+    );
+    expect(() => normalizeUserSuppliedRelativePath('C:\\repo', 'path')).toThrow(
+      /must be a relative path/u,
+    );
+    expect(() => normalizeUserSuppliedRelativePath('../repo', 'path')).toThrow(
+      /must stay within the repository workspace/u,
     );
   });
 });

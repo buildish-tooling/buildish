@@ -17,6 +17,7 @@
 import path from 'node:path';
 
 const LOWERCASE_SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+const WINDOWS_DRIVE_PREFIX_PATTERN = /^[A-Za-z]:/u;
 
 /**
  * Narrow utility for guarding JSON values before object property access.
@@ -122,6 +123,44 @@ export function validateLowercaseSha256(value: unknown, label: string): string {
 }
 
 /**
+ * Treats POSIX-absolute and Windows-rooted inputs as non-relative paths.
+ *
+ * Windows drive prefixes are rejected even without a separator (for example `C:tmp`) because
+ * they are not safe portable relative paths.
+ */
+export function isAbsolutePosixOrWindowsPath(value: string): boolean {
+  return (
+    path.posix.isAbsolute(value) ||
+    WINDOWS_DRIVE_PREFIX_PATTERN.test(value) ||
+    value.startsWith('\\')
+  );
+}
+
+/**
+ * Normalizes a user-supplied repository-relative path to canonical POSIX form.
+ *
+ * Windows separator characters are accepted for usability, but Windows drive-prefixed,
+ * UNC, and rooted paths are rejected before normalization.
+ */
+export function normalizeUserSuppliedRelativePath(value: string, label: string): string {
+  if (isAbsolutePosixOrWindowsPath(value)) {
+    throw new Error(`${label} must be a relative path.`);
+  }
+
+  const normalizedPath = path.posix.normalize(value.replaceAll('\\', '/'));
+
+  if (
+    normalizedPath === '..' ||
+    normalizedPath.startsWith('../') ||
+    normalizedPath.includes('/../')
+  ) {
+    throw new Error(`${label} must stay within the repository workspace.`);
+  }
+
+  return normalizedPath === '' ? '.' : normalizedPath.replace(/\/$/, '') || '.';
+}
+
+/**
  * Requires a normalized relative POSIX path rooted beneath a caller-defined location.
  */
 export function validateNormalizedRelativePosixPath(
@@ -135,7 +174,8 @@ export function validateNormalizedRelativePosixPath(
   if (
     relativePath.length === 0 ||
     relativePath === '.' ||
-    path.posix.isAbsolute(relativePath) ||
+    relativePath.includes('\\') ||
+    isAbsolutePosixOrWindowsPath(relativePath) ||
     normalizedPath !== relativePath ||
     normalizedPath === '..' ||
     normalizedPath.startsWith('../')

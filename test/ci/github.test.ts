@@ -80,6 +80,26 @@ describe('createGitHubContext', () => {
     expect(context.runnerArch).toBe('x64');
   });
 
+  it('normalizes Windows runner metadata into cache-safe values', () => {
+    const context = createGitHubContext(
+      {
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+        RUNNER_OS: 'Windows',
+        RUNNER_ARCH: 'ARM64',
+      },
+      {
+        repository: { default_branch: 'main' },
+      },
+    );
+
+    expect(context.runnerOs).toBe('windows');
+    expect(context.runnerArch).toBe('arm64');
+  });
+
   it('falls back to the repository default branch for unsupported events', () => {
     const context = createGitHubContext(
       {

@@ -260,6 +260,96 @@ describe('executeMainAction', () => {
       expect(summary.writeCalls).toBe(2);
     });
   });
+
+  it('rejects dependent deltas produced for a different runner OS or architecture', async () => {
+    await withWorkspace(async (workspace) => {
+      const gradleUserHome = path.join(workspace, '.gradle');
+      const wrapperJarBytes = Buffer.from('existing-wrapper-jar');
+      const wrapperJarSha256 = sha256Hex(wrapperJarBytes);
+
+      await mkdir(path.join(workspace, 'gradle', 'wrapper'), { recursive: true });
+      await mkdir(gradleUserHome, { recursive: true });
+      await writeFile(
+        path.join(workspace, 'gradle', 'wrapper', 'gradle-wrapper.jar'),
+        wrapperJarBytes,
+      );
+      await writeFile(
+        path.join(workspace, 'gradle', 'wrapper', 'gradle-wrapper.properties'),
+        [
+          'distributionBase=GRADLE_USER_HOME',
+          'distributionPath=wrapper/dists',
+          'distributionSha256Sum=61ad310d3c7d3e5da131b76bbf22b5a4c0786e9d892dae8c1658d4b484de3caa',
+          'distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14-bin.zip',
+          'validateDistributionUrl=true',
+          'zipStoreBase=GRADLE_USER_HOME',
+          'zipStorePath=wrapper/dists',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+
+      const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
+      await stageWorkerDeltaArtifact(artifactApi, workspace, {
+        jobName: 'windows-worker',
+        runId: 101,
+        runAttempt: 2,
+        relativePath: 'caches/modules-2/files-2.1/example/module.bin',
+        contents: 'from-worker-delta',
+        runnerOs: 'windows',
+      });
+
+      await expect(
+        executeMainAction({
+          artifactApi,
+          cacheApi: createCacheApi(),
+          captureCommandOutput: async (): Promise<string> =>
+            'openjdk version "21.0.4" 2024-07-16\n',
+          env: {
+            GITHUB_EVENT_NAME: 'push',
+            GITHUB_REF: 'refs/heads/main',
+            GITHUB_REPOSITORY: 'projectnessie/cache-gradle',
+            GITHUB_WORKFLOW: 'CI',
+            GITHUB_JOB: 'aggregate',
+            GITHUB_RUN_ID: '101',
+            GITHUB_RUN_ATTEMPT: '2',
+            GITHUB_WORKSPACE: workspace,
+            GRADLE_USER_HOME: gradleUserHome,
+            HOME: workspace,
+            RUNNER_OS: 'Linux',
+            RUNNER_ARCH: 'X64',
+            RUNNER_TEMP: path.join(workspace, 'runner-temp'),
+          },
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          fetchImpl: async (input: string | URL | Request): Promise<Response> => {
+            const url = String(input);
+            if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
+              return new Response(`${wrapperJarSha256}\n`, { status: 200 });
+            }
+            if (url.endsWith('gradle-8.14-wrapper.jar.asc')) {
+              return new Response(TEST_SIGNATURE_ARMORED, { status: 200 });
+            }
+            throw new Error(`Unexpected fetch URL: ${url}`);
+          },
+          inputProvider: {
+            getInput(name: string): string {
+              switch (name) {
+                case 'job-mode':
+                  return 'distributed-aggregator';
+                case 'dependent-jobs':
+                  return 'windows-worker';
+                default:
+                  return '';
+              }
+            },
+          },
+          summaryWriter: createSummaryCapture().writer,
+          verifyWrapperSignature: async () => {},
+        }),
+      ).rejects.toThrow(/Cross-runner dependent delta reuse is not supported/u);
+    });
+  });
 });
 
 async function stageWorkerDeltaArtifact(
@@ -271,18 +361,31 @@ async function stageWorkerDeltaArtifact(
     readonly runAttempt: number;
     readonly relativePath: string;
     readonly contents: string;
+    readonly runnerOs?: string;
+    readonly runnerArch?: string;
   },
 ): Promise<void> {
   const workerGradleHome = path.join(workspace, `${options.jobName}-gradle-home`);
   await mkdir(path.dirname(path.join(workerGradleHome, options.relativePath)), { recursive: true });
 
-  const cacheModel = createTestCacheModel(workerGradleHome);
+  const cacheModel = createTestCacheModel(
+    workerGradleHome,
+    options.runnerOs ?? 'linux',
+    options.runnerArch ?? 'x64',
+  );
   const previousManifest = await captureCacheManifest(cacheModel);
   await writeFile(path.join(workerGradleHome, options.relativePath), options.contents, 'utf8');
   const currentManifest = await captureCacheManifest(cacheModel);
   const deltaManifest = computeCacheDelta(previousManifest, currentManifest);
   const stagedPackage = await stageDeltaArtifactPackage(
-    createCiContext(options.jobName, workspace, options.runId, options.runAttempt),
+    createCiContext(
+      options.jobName,
+      workspace,
+      options.runId,
+      options.runAttempt,
+      options.runnerOs ?? 'linux',
+      options.runnerArch ?? 'x64',
+    ),
     cacheModel,
     deltaManifest,
   );
@@ -294,13 +397,17 @@ async function stageWorkerDeltaArtifact(
   );
 }
 
-function createTestCacheModel(gradleUserHome: string): CacheModel {
+function createTestCacheModel(
+  gradleUserHome: string,
+  runnerOs = 'linux',
+  runnerArch = 'x64',
+): CacheModel {
   const partitions = createCachePartitions(gradleUserHome);
   return {
-    cacheKey: 'gradle-cache-1-21-linux-x64-main',
+    cacheKey: `gradle-cache-1-21-${runnerOs}-${runnerArch}-main`,
     javaMajor: 21,
-    runnerOs: 'linux',
-    runnerArch: 'x64',
+    runnerOs,
+    runnerArch,
     safeRefName: 'main',
     partitions,
     includePaths: partitions.flatMap((partition) => partition.absoluteIncludeGlobs),
@@ -313,14 +420,16 @@ function createCiContext(
   workspace: string,
   runId: number,
   runAttempt: number,
+  runnerOs = 'linux',
+  runnerArch = 'x64',
 ): CiJobContext {
   return {
     platform: 'github',
     eventName: 'push',
     resolvedRefName: 'main',
     safeRefName: 'main',
-    runnerOs: 'linux',
-    runnerArch: 'x64',
+    runnerOs,
+    runnerArch,
     defaultBranch: 'main',
     isPullRequest: false,
     repository: 'projectnessie/cache-gradle',

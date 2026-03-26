@@ -115,6 +115,27 @@ describe('normalizeActionConfig', () => {
     ]);
   });
 
+  it('accepts Windows-style relative config paths and normalizes them to POSIX', () => {
+    const config = normalizeActionConfig(
+      readActionInputs(
+        createInputProvider({
+          'base-directory': 'tools\\nested',
+          'wrapper-properties-files': 'app\\gradle\\wrapper\\gradle-wrapper.properties',
+        }),
+      ),
+      {
+        phase: 'main',
+        ciContext: baseCiContext,
+        env: {},
+      },
+    );
+
+    expect(config.baseDirectory).toBe('tools/nested');
+    expect(config.wrapperPropertiesFiles).toEqual([
+      'tools/nested/app/gradle/wrapper/gradle-wrapper.properties',
+    ]);
+  });
+
   it('rejects conflicting wrapper selection configuration', () => {
     expect(() =>
       normalizeActionConfig(
@@ -131,6 +152,32 @@ describe('normalizeActionConfig', () => {
         },
       ),
     ).toThrow(/cannot be combined/);
+  });
+
+  it('rejects Windows absolute paths for repository-relative inputs', () => {
+    expect(() =>
+      normalizeActionConfig(
+        readActionInputs(createInputProvider({ 'base-directory': 'C:\\workspace' })),
+        {
+          phase: 'main',
+          ciContext: baseCiContext,
+          env: {},
+        },
+      ),
+    ).toThrow(/base-directory must be a relative path/u);
+  });
+
+  it('rejects rooted Windows paths for repository-relative inputs', () => {
+    expect(() =>
+      normalizeActionConfig(
+        readActionInputs(createInputProvider({ 'base-directory': '\\Windows\\System32' })),
+        {
+          phase: 'main',
+          ciContext: baseCiContext,
+          env: {},
+        },
+      ),
+    ).toThrow(/base-directory must be a relative path/u);
   });
 
   it('rejects unsupported setup-java usage in v1', () => {

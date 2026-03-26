@@ -20,7 +20,9 @@ inputs:
   base-directory:
     description: >-
       Repository-relative base directory used for Gradle wrapper discovery and any
-      project-relative paths. Must stay inside the workspace. Default: `.`.
+      project-relative paths. Windows-style relative paths using `\` are accepted
+      and normalized internally, but drive-prefixed, rooted, and UNC paths are
+      rejected. Must stay inside the workspace. Default: `.`.
     required: false
     default: .
   cache-enabled:
@@ -69,15 +71,18 @@ inputs:
   wrapper-properties-glob:
     description: >-
       Repository-relative glob used to discover Gradle wrapper properties beneath
-      `base-directory`. Default:
+      `base-directory`. Windows-style relative paths using `\` are accepted and
+      normalized internally, but drive-prefixed, rooted, and UNC paths are rejected.
+      Default:
       `**/gradle/wrapper/gradle-wrapper.properties`.
     required: false
     default: '**/gradle/wrapper/gradle-wrapper.properties'
   wrapper-properties-files:
     description: >-
       Comma- or newline-separated explicit `gradle-wrapper.properties` files,
-      relative to `base-directory`. Entries must be explicit file paths, not
-      glob patterns.
+      relative to `base-directory`. Windows-style relative paths using `\` are
+      accepted and normalized internally, but drive-prefixed, rooted, and UNC
+      paths are rejected. Entries must be explicit file paths, not glob patterns.
     required: false
   cleanup-enabled:
     description: >-
