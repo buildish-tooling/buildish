@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-import type { Key } from 'openpgp';
-// Use the Node-targeted CJS build so esbuild bundles a __filename-based createRequire(...)
-// path instead of the package ESM entrypoint's import.meta.url variant.
-// prettier-ignore
-// @ts-ignore -- this deep runtime import is intentional for bundling compatibility.
-import { createMessage, readKey, readSignature, verify } from '../../node_modules/openpgp/dist/node/openpgp.cjs';
+import { spawn } from 'node:child_process';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 export interface TrustedOpenPgpPublicKey {
   /** ASCII-armored OpenPGP public key block. */
@@ -95,11 +93,24 @@ f7TkwC6aybc=
   },
 ];
 
-let gradleTrustedPublicKeysPromise: Promise<readonly Key[]> | undefined;
+interface GpgCommandOptions {
+  readonly command?: string;
+}
+
+interface CompletedCommand {
+  readonly exitCode: number;
+  readonly stderr: string;
+  readonly stdout: string;
+}
+
+const DEFAULT_GPG_COMMAND = process.platform === 'win32' ? 'gpg.exe' : 'gpg';
+
+let gradleTrustedPublicKeysPromise: Promise<readonly TrustedOpenPgpPublicKey[]> | undefined;
 
 export async function loadTrustedOpenPgpPublicKeys(
   trustedKeyAllowlist: readonly TrustedOpenPgpPublicKey[],
-): Promise<readonly Key[]> {
+  options: GpgCommandOptions = {},
+): Promise<readonly TrustedOpenPgpPublicKey[]> {
   if (trustedKeyAllowlist.length === 0) {
     throw new Error('At least one trusted OpenPGP public key must be configured.');
   }
@@ -113,8 +124,10 @@ export async function loadTrustedOpenPgpPublicKeys(
         throw new Error(`Trusted OpenPGP key ${index + 1} has an invalid expected fingerprint.`);
       }
 
-      const parsedKey = await readKey({ armoredKey: trustedKey.armoredKey });
-      const actualFingerprint = normalizeFingerprint(parsedKey.getFingerprint());
+      const actualFingerprint = await readArmoredKeyFingerprint(
+        trustedKey.armoredKey,
+        options.command,
+      );
 
       if (actualFingerprint !== expectedFingerprint) {
         throw new Error(
@@ -129,7 +142,10 @@ export async function loadTrustedOpenPgpPublicKeys(
       }
 
       fingerprints.add(actualFingerprint);
-      return parsedKey;
+      return {
+        armoredKey: trustedKey.armoredKey,
+        expectedFingerprint: trustedKey.expectedFingerprint,
+      };
     }),
   );
 }
@@ -137,39 +153,61 @@ export async function loadTrustedOpenPgpPublicKeys(
 export async function verifyDetachedOpenPgpSignature(
   payload: Uint8Array,
   armoredSignature: string,
-  verificationKeys: readonly Key[],
+  verificationKeys: readonly TrustedOpenPgpPublicKey[],
   resourceDescription: string,
+  options: GpgCommandOptions = {},
 ): Promise<void> {
   if (verificationKeys.length === 0) {
     throw new Error('At least one verification key is required for detached signature checks.');
   }
 
-  const verificationResult = await verify({
-    message: await createMessage({ binary: payload }),
-    signature: await readSignature({ armoredSignature }),
-    verificationKeys: [...verificationKeys],
-  });
+  await withTemporaryGpgHome(async (gpgHome) => {
+    const trustedKeysPath = path.join(gpgHome, 'trusted-keys.asc');
+    const payloadPath = path.join(gpgHome, 'payload.bin');
+    const signaturePath = path.join(gpgHome, 'payload.asc');
 
-  if (verificationResult.signatures.length === 0) {
-    throw new Error(
-      `Detached signature verification for ${resourceDescription} returned no signatures.`,
-    );
-  }
+    // Use a fresh GPG home per verification so wrapper checks do not share mutable
+    // keyring/trustdb state across calls or concurrent action invocations.
+    await Promise.all([
+      writeFile(
+        trustedKeysPath,
+        `${verificationKeys.map((key) => key.armoredKey.trim()).join('\n\n')}\n`,
+        { encoding: 'utf8', flag: 'wx' },
+      ),
+      writeFile(payloadPath, payload, { flag: 'wx' }),
+      writeFile(signaturePath, `${armoredSignature.trim()}\n`, { encoding: 'utf8', flag: 'wx' }),
+    ]);
 
-  let lastError: Error | null = null;
-
-  for (const result of verificationResult.signatures) {
-    try {
-      await result.verified;
-      return;
-    } catch (error: unknown) {
-      lastError = error instanceof Error ? error : new Error(String(error));
+    const importResult = await runCommand(options.command, [
+      '--homedir',
+      gpgHome,
+      '--batch',
+      '--no-options',
+      '--import',
+      trustedKeysPath,
+    ]);
+    if (importResult.exitCode !== 0) {
+      throw new Error(
+        `Unable to import trusted OpenPGP public keys: ${formatCommandDiagnostics(importResult, 'import failed.')}`,
+      );
     }
-  }
 
-  throw new Error(
-    `Detached signature verification failed for ${resourceDescription}: ${lastError?.message ?? 'signature was not valid.'}`,
-  );
+    const verificationResult = await runCommand(options.command, [
+      '--homedir',
+      gpgHome,
+      '--batch',
+      '--no-options',
+      '--no-auto-key-retrieve',
+      '--verify',
+      signaturePath,
+      payloadPath,
+    ]);
+    if (verificationResult.exitCode !== 0) {
+      throw new Error(
+        `Detached signature verification failed for ${resourceDescription}: ${formatCommandDiagnostics(verificationResult, 'signature was not valid.')}`,
+      );
+    }
+  });
 }
 
 export async function verifyGradleDetachedSignature(
@@ -191,4 +229,116 @@ export async function verifyGradleDetachedSignature(
 
 function normalizeFingerprint(value: string): string {
   return value.replaceAll(/[^A-Fa-f0-9]/g, '').toLowerCase();
+}
+
+async function readArmoredKeyFingerprint(
+  armoredKey: string,
+  command: string | undefined,
+): Promise<string> {
+  return await withTemporaryGpgHome(async (gpgHome) => {
+    const keyPath = path.join(gpgHome, 'trusted-key.asc');
+    await writeFile(keyPath, `${armoredKey.trim()}\n`, { encoding: 'utf8', flag: 'wx' });
+
+    const result = await runCommand(command, [
+      '--homedir',
+      gpgHome,
+      '--batch',
+      '--no-options',
+      '--show-keys',
+      '--with-colons',
+      '--fingerprint',
+      keyPath,
+    ]);
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Unable to inspect trusted OpenPGP key material: ${formatCommandDiagnostics(result, 'fingerprint extraction failed.')}`,
+      );
+    }
+
+    const primaryFingerprint = result.stdout
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .find((line) => line.startsWith('fpr:'));
+    if (!primaryFingerprint) {
+      throw new Error('Trusted OpenPGP key material did not contain a primary fingerprint.');
+    }
+
+    const fingerprint = normalizeFingerprint(primaryFingerprint.split(':')[9] ?? '');
+    if (fingerprint.length !== 40) {
+      throw new Error('Trusted OpenPGP key material did not expose a valid primary fingerprint.');
+    }
+    return fingerprint;
+  });
+}
+
+async function withTemporaryGpgHome<T>(callback: (gpgHome: string) => Promise<T>): Promise<T> {
+  const parentDirectory = process.env.RUNNER_TEMP?.trim() || os.tmpdir();
+  const gpgHome = await mkdtemp(path.join(parentDirectory, 'buildish-mammoth-cache-gradle-gpg-'));
+
+  try {
+    return await callback(gpgHome);
+  } finally {
+    await rm(gpgHome, { recursive: true, force: true });
+  }
+}
+
+async function runCommand(
+  command: string | undefined,
+  args: readonly string[],
+): Promise<CompletedCommand> {
+  const resolvedCommand = command?.trim() || DEFAULT_GPG_COMMAND;
+
+  return await new Promise((resolve, reject) => {
+    const child = spawn(resolvedCommand, [...args], {
+      env: { ...process.env, LANG: 'C', LC_ALL: 'C' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
+    child.on('error', (error) => {
+      const commandError = error as NodeJS.ErrnoException;
+      if (commandError.code === 'ENOENT') {
+        reject(
+          new Error(
+            `GnuPG command '${resolvedCommand}' is required for Gradle wrapper detached-signature verification but was not found on PATH. Install GnuPG and ensure '${resolvedCommand}' is available before running this action.`,
+          ),
+        );
+        return;
+      }
+
+      reject(
+        new Error(
+          `Unable to execute '${resolvedCommand} ${args.join(' ')}': ${commandError.message}`,
+        ),
+      );
+    });
+    child.on('close', (code, signal) => {
+      if (signal) {
+        reject(new Error(`'${resolvedCommand} ${args.join(' ')}' terminated by signal ${signal}.`));
+        return;
+      }
+
+      resolve({
+        exitCode: code ?? 1,
+        stderr,
+        stdout,
+      });
+    });
+  });
+}
+
+function formatCommandDiagnostics(result: CompletedCommand, fallback: string): string {
+  const diagnostic = `${result.stderr}\n${result.stdout}`
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(' ');
+  return diagnostic || fallback;
 }

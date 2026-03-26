@@ -2215,17 +2215,6 @@ License: MIT - https://spdx.org/licenses/MIT.html
 
 --------------------------------------------------------------------------------
 
-This product bundles packages from the source project at https://github.com/openpgpjs/openpgpjs.
-
-* npm package IDs:
-  * openpgp@6.3.0
-
-Copyright: Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
-Home page: https://github.com/openpgpjs/openpgpjs
-License: LGPL-3.0+
-
---------------------------------------------------------------------------------
-
 This product bundles packages from the source project at https://github.com/SGrondin/bottleneck.
 
 * npm package IDs:

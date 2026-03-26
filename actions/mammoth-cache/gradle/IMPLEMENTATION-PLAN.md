@@ -368,12 +368,35 @@ implementable design.
         """
       - License Type: MIT / X11
       - No license URL
-27. Cleanup job summary
+27. Having the Gradle wrapper verification and automatic download in CI is great, but that does not help
+    developers that need to run Gradle on their local machine, because the `gradlew[.bat]` scripts expect
+    the wrapper JAR to be present.
+    - As a generic solution, I created this approach: https://github.com/snazy/gradle-wrapper-no-jar
+    - We should replace or adapt that approach, and pull it as a separate tool into this repository.
+    - The action and the "local tool" need to work well together, or better: in the same way.
+    - As we do not have a running Gradle, we cannot put it into any Gradle build or init script, so we
+      have to rely on shell script / powershell "magic" to get it working.
+    - In a local dev environment we can however retain the downloaded SHA256 and GPG signatures of the wrapper jar,
+      keeping those in the gradle/wrapper/ directory as `gradle-wrapper-<version-number>.sha256` and
+      `gradle-wrapper-<version-number>.asc` files.
+28. Need to add information performed Gradle builds.
+    - Similar to the information published on this workflow run: https://github.com/apache/polaris/actions/runs/23577520926
+    - Probably worth to look into https://github.com/gradle/actions/tree/v5/sources/src/ and use a similar approach
+      to capture Gradle build runs, their outcome and whether build scans were attempted, whether they were
+      successful and where those are published (link those).
+    - Should have a local integration test for this instead of only validating it in the CI workflows.
+29. Cleanup job summary
     - Can we get the cache partition statistics from the cache manifest into the summary? Like number of files and
       total size for each partition.
-28. Cleanup the code base
+    - The level of detail is great, it's just not very readable.
+    - Worth to consider: Collapsed sections, see https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/organizing-information-with-collapsed-sections
+    - Should use "green checkmarks" (UTF-8 icon) and a brief summary, if everything worked fine. Hide the details in collapsed sections.
+    - Should use "red crosses" (UTF-8 icon) for each error. Place errors right at the top.
+    - Should use "yellow warning signs" (UTF-8 icon) for each warning. Place warnings right after errors.
+    - Do not emit duplicate information.
+30. Cleanup the code base
     - Check validate*() functions for duplicates
-29. Documentation
+31. Documentation
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
     - Explicitly document the Gradle wrapper jar download and verification process in the docs/ directory.
     - Explicitly document the cache key generation process in the docs/ directory.
@@ -381,7 +404,7 @@ implementable design.
     - Explicitly document the CI abstraction layer in the docs/ directory.
     - Explicitly document the bootstrap process in the docs/ directory.
     - All types and functions must have JSDoc comments.
-30. Add release workflows
+32. Add release workflows
     - Use version tags. "full" version tags like v1.2.3 become actual GitHub releases.
       We can provide "moving" tags like v1, v1.2 as well. Those would then point to the latest release in their
       respective series.

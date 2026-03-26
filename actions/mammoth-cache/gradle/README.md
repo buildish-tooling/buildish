@@ -344,7 +344,7 @@ The Makefile verifies the expected `node` and `npm` versions before running user
 
 `npm run release-legal:write` refreshes `legal/github/LICENSE` and `legal/github/NOTICE` for the bundled GitHub action distribution. Those files are separate from the repository-root `LICENSE` / `NOTICE`, which remain the ASF project legal files.
 
-See [`docs/release-legal.md`](docs/release-legal.md) for the release-legal workflow, generation/check commands, formatting rules, and current known blockers.
+See [`docs/release-legal.md`](docs/release-legal.md) for the release-legal workflow, generation/check commands, formatting rules, and current legal-audit status.
 
 ### Dependency warning note
 

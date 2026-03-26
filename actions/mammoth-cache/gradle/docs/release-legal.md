@@ -76,10 +76,8 @@ The full release audit fails closed for:
 
 The narrower Category X gate checks only the first item above. It exists so regular CI can reject forbidden licenses immediately without waiting for the broader release-preparation audit to be green.
 
-## Current known blockers
+## Current status
 
-- `openpgp@6.3.0` (`LGPL-3.0+`, Category X)
-
-Because `openpgp@6.3.0` is currently bundled, the regular Category X CI gate is expected to fail until that dependency is removed or replaced.
+There are no known release-legal blockers in the current bundled dependency set.
 
 `buffers@0.1.1` is handled explicitly in `scripts/release-legal.mjs` because the published npm tarball omits its license declaration even though upstream provenance indicates `MIT/X11`.

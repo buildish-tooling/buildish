@@ -37,7 +37,6 @@
     "@actions/artifact": "6.2.1",
     "@actions/cache": "6.0.0",
     "@actions/core": "3.0.0",
-    "openpgp": "6.3.0",
     "yaml": "2.8.3"
   },
   "devDependencies": {
