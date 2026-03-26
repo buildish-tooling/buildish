@@ -755,18 +755,17 @@ jobs:
           foreach ($candidate in @(
             'C:\Program Files\GnuPG\bin\gpg.exe',
             'C:\Program Files (x86)\GnuPG\bin\gpg.exe',
-            'C:\Program Files\Git\mingw64\bin\gpg.exe'
+            'C:\Program Files\Git\mingw64\bin\gpg.exe',
+            'C:\Program Files\Git\usr\bin\gpg.exe'
           )) {
             $candidates.Add($candidate)
           }
 
           $gpgPath = $candidates |
-            Where-Object {
-              (Test-Path -LiteralPath $_) -and ($_ -notmatch '[\\/]usr[\\/]bin[\\/]gpg\.exe$')
-            } |
+            Where-Object { Test-Path -LiteralPath $_ } |
             Select-Object -Unique -First 1
           if ([string]::IsNullOrWhiteSpace($gpgPath)) {
-            throw 'No supported gpg.exe was found on the Windows runner. Git-for-Windows usr\\bin\\gpg.exe is intentionally skipped because it misinterprets Windows temp paths for detached-signature verification.'
+            throw 'No gpg.exe was found on the Windows runner in the expected Git or GnuPG locations.'
           }
 
           Split-Path -Parent $gpgPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append

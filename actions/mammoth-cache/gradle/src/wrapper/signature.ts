@@ -103,6 +103,8 @@ interface CompletedCommand {
   readonly stdout: string;
 }
 
+const WINDOWS_ABSOLUTE_PATH_PATTERN = /^([A-Za-z]):[\\/](.*)$/u;
+
 let gradleTrustedPublicKeysPromise: Promise<readonly TrustedOpenPgpPublicKey[]> | undefined;
 
 /**
@@ -121,6 +123,34 @@ export function resolveDefaultGpgCommand(
   }
 
   return platform === 'win32' ? 'gpg.exe' : 'gpg';
+}
+
+/**
+ * Git-for-Windows `usr/bin/gpg.exe` is an MSYS build that expects `/c/...`
+ * style paths. Convert Windows absolute paths only for that binary.
+ */
+export function normalizePathForGpgCommand(
+  filePath: string,
+  command: string | undefined,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform !== 'win32') {
+    return filePath;
+  }
+
+  const resolvedCommand = command?.trim() || resolveDefaultGpgCommand(platform);
+  const normalizedCommand = resolvedCommand.replaceAll('\\', '/').toLowerCase();
+  if (!normalizedCommand.endsWith('/usr/bin/gpg.exe')) {
+    return filePath;
+  }
+
+  const windowsPathMatch = filePath.match(WINDOWS_ABSOLUTE_PATH_PATTERN);
+  if (!windowsPathMatch) {
+    return filePath.replaceAll('\\', '/');
+  }
+
+  const [, driveLetter, remainder] = windowsPathMatch;
+  return `/${driveLetter.toLowerCase()}/${remainder.replaceAll('\\', '/')}`;
 }
 
 export async function loadTrustedOpenPgpPublicKeys(
@@ -181,6 +211,7 @@ export async function verifyDetachedOpenPgpSignature(
     const trustedKeysPath = path.join(gpgHome, 'trusted-keys.asc');
     const payloadPath = path.join(gpgHome, 'payload.bin');
     const signaturePath = path.join(gpgHome, 'payload.asc');
+    const resolvedCommand = options.command?.trim() || resolveDefaultGpgCommand();
 
     // Use a fresh GPG home per verification so wrapper checks do not share mutable
     // keyring/trustdb state across calls or concurrent action invocations.
@@ -196,11 +227,11 @@ export async function verifyDetachedOpenPgpSignature(
 
     const importResult = await runCommand(options.command, [
       '--homedir',
-      gpgHome,
+      normalizePathForGpgCommand(gpgHome, resolvedCommand),
       '--batch',
       '--no-options',
       '--import',
-      trustedKeysPath,
+      normalizePathForGpgCommand(trustedKeysPath, resolvedCommand),
     ]);
     if (importResult.exitCode !== 0) {
       throw new Error(
@@ -210,13 +241,13 @@ export async function verifyDetachedOpenPgpSignature(
 
     const verificationResult = await runCommand(options.command, [
       '--homedir',
-      gpgHome,
+      normalizePathForGpgCommand(gpgHome, resolvedCommand),
       '--batch',
       '--no-options',
       '--no-auto-key-retrieve',
       '--verify',
-      signaturePath,
-      payloadPath,
+      normalizePathForGpgCommand(signaturePath, resolvedCommand),
+      normalizePathForGpgCommand(payloadPath, resolvedCommand),
     ]);
     if (verificationResult.exitCode !== 0) {
       throw new Error(
@@ -253,17 +284,18 @@ async function readArmoredKeyFingerprint(
 ): Promise<string> {
   return await withTemporaryGpgHome(async (gpgHome) => {
     const keyPath = path.join(gpgHome, 'trusted-key.asc');
+    const resolvedCommand = command?.trim() || resolveDefaultGpgCommand();
     await writeFile(keyPath, `${armoredKey.trim()}\n`, { encoding: 'utf8', flag: 'wx' });
 
     const result = await runCommand(command, [
       '--homedir',
-      gpgHome,
+      normalizePathForGpgCommand(gpgHome, resolvedCommand),
       '--batch',
       '--no-options',
       '--show-keys',
       '--with-colons',
       '--fingerprint',
-      keyPath,
+      normalizePathForGpgCommand(keyPath, resolvedCommand),
     ]);
     if (result.exitCode !== 0) {
       throw new Error(

@@ -24,6 +24,7 @@ import { describe, expect, it } from 'vitest';
 import {
   GRADLE_TRUSTED_SIGNING_KEY_ALLOWLIST,
   loadTrustedOpenPgpPublicKeys,
+  normalizePathForGpgCommand,
   resolveDefaultGpgCommand,
   verifyDetachedOpenPgpSignature,
   type TrustedOpenPgpPublicKey,
@@ -78,6 +79,28 @@ describe('resolveDefaultGpgCommand', () => {
   it('falls back to platform defaults when no override is set', () => {
     expect(resolveDefaultGpgCommand('win32', {})).toBe('gpg.exe');
     expect(resolveDefaultGpgCommand('linux', {})).toBe('gpg');
+  });
+});
+
+describe('normalizePathForGpgCommand', () => {
+  it('converts Windows absolute paths for Git-for-Windows usr/bin gpg.exe', () => {
+    expect(
+      normalizePathForGpgCommand(
+        'D:\\a\\_temp\\buildish-mammoth-cache-gradle-gpg-1234\\payload.asc',
+        'C:\\Program Files\\Git\\usr\\bin\\gpg.exe',
+        'win32',
+      ),
+    ).toBe('/d/a/_temp/buildish-mammoth-cache-gradle-gpg-1234/payload.asc');
+  });
+
+  it('leaves paths unchanged for non-MSYS gpg executables', () => {
+    expect(
+      normalizePathForGpgCommand(
+        'D:\\a\\_temp\\buildish-mammoth-cache-gradle-gpg-1234\\payload.asc',
+        'C:\\Program Files\\Git\\mingw64\\bin\\gpg.exe',
+        'win32',
+      ),
+    ).toBe('D:\\a\\_temp\\buildish-mammoth-cache-gradle-gpg-1234\\payload.asc');
   });
 });
 
