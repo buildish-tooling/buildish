@@ -69,8 +69,22 @@ inputs:
   cache-key-template:
     description: >-
       Optional restricted cache key template. Supported placeholders:
-      `${cacheKeyPrefix}`, `${schemaVersion}`, `${javaMajor}`, `${runnerOs}`,
-      `${runnerArch}`, and `${refName}`.
+      `${cacheKeyPrefix}`, `${schemaVersion}`, `${partitionFingerprint}`,
+      `${javaMajor}`, `${runnerOs}`, `${runnerArch}`, and `${refName}`.
+      Custom templates must include `${partitionFingerprint}` so different cache
+      partition layouts do not share the same cache key.
+    required: false
+  cache-partitions:
+    description: >-
+      Optional JSON array of cache partition overrides and custom partitions.
+      Each object must contain `id`, `includes`, and optional `excludes`, all
+      relative to the supported Gradle user home. Include globs must end in
+      `/**`; excludes may use `*` within a segment and `**` as a whole segment.
+      Overriding a built-in partition replaces its include/exclude lists. Giving a
+      built-in partition an empty `includes` array disables it. Custom partitions
+      must have at least one include. Hard safety excludes such as
+      `**/*.lock`, `**/configuration-cache/**`, `caches/*/cc-keystore`, and
+      `caches/journal-1/**` are always enforced.
     required: false
   process-all-wrapper-files:
     description: >-
@@ -101,6 +115,16 @@ inputs:
       `true` or `false`. Default: `true`.
     required: false
     default: 'true'
+  restore-cleanup-mode:
+    description: >-
+      Optional restore-time cleanup policy. Supported values: `none` or
+      `prune-managed`. Default: `none`. `prune-managed` applies only after a
+      base-cache hit: it deletes files currently matched by the active cache
+      partitions, then restores the matched base cache again so the managed
+      partition space reflects only restored content. It never deletes files
+      outside the action-managed partition space.
+    required: false
+    default: none
   gradle-user-home:
     description: >-
       Optional Gradle user home path. In v1 only the default location is supported:

@@ -31,12 +31,12 @@ migration and those that must be omitted to avoid non-deterministic failures.
 ## **Taxonomy of the Gradle User Home and Caches Hierarchy**
 
 The Gradle User Home is typically established at \~/.gradle on Unix-based systems or %USERPROFILE%\\.gradle on Windows
-environments, though its location can be overridden via the GRADLE\_USER\_HOME environment variable or the \-g
-command-line flag.1 This directory is distinct from the installation directory, often termed GRADLE\_HOME, and is
+environments, though its location can be overridden via the GRADLE_USER_HOME environment variable or the \-g
+command-line flag.1 This directory is distinct from the installation directory, often termed GRADLE_HOME, and is
 structured to support multi-version concurrency and global data sharing across disparate projects.
 
 | Directory Level | Primary Function                                         | Persistence Recommended for CI |
-|:----------------|:---------------------------------------------------------|:-------------------------------|
+| :-------------- | :------------------------------------------------------- | :----------------------------- |
 | caches/         | Central repository for all cached resources.             | Yes (Selective) 3              |
 | daemon/         | Registry and logs for the long-running Gradle processes. | No 1                           |
 | wrapper/        | Downloaded distributions and related metadata.           | Yes 5                          |
@@ -54,7 +54,7 @@ evaluates the age and utility of specific files. Resources that are "downloaded"
 longer retention periods compared to "created" resources that can be computed locally.
 
 | Resource Category      | Directory Pattern | Default Retention (Unused) | Origin Type                      |
-|:-----------------------|:------------------|:---------------------------|:---------------------------------|
+| :--------------------- | :---------------- | :------------------------- | :------------------------------- |
 | Downloaded Resources   | modules-2/        | 30 Days                    | External (Remote Repositories) 6 |
 | Created Resources      | transforms-x/     | 7 Days                     | Internal (Computed locally) 6    |
 | Build Cache            | build-cache-1/    | 7 Days                     | Internal (Task outputs) 6        |
@@ -99,7 +99,7 @@ of binary descriptors and indexes that map dynamic versions (like 1.+) to concre
 repository lookups.
 
 | Metadata Component   | Description                                           | Portability Risk                 |
-|:---------------------|:------------------------------------------------------|:---------------------------------|
+| :------------------- | :---------------------------------------------------- | :------------------------------- |
 | descriptors/         | Binary representations of POM and Ivy files.          | High (Contains absolute paths) 8 |
 | module-versions.bin  | Map of resolved dynamic version numbers.              | Low (Regenerated quickly) 11     |
 | module-artifacts.bin | Map of module versions to their constituent files.    | High (Absolute path pointers) 8  |
@@ -168,13 +168,13 @@ directly into the project workspace.23
 The portability of the build cache is governed by the PathSensitivity setting of the task's inputs.21 If a task is
 configured with PathSensitivity.ABSOLUTE, the cache key will change if the project is moved to a different directory,
 rendering the cache entry useless on another machine.21 However, when using PathSensitivity.RELATIVE or
-PathSensitivity.NAME\_ONLY, the build cache becomes highly portable.
+PathSensitivity.NAME_ONLY, the build cache becomes highly portable.
 
 | Sensitivity Level | Key Dependency                                          | Portability |
-|:------------------|:--------------------------------------------------------|:------------|
+| :---------------- | :------------------------------------------------------ | :---------- |
 | ABSOLUTE          | Full file path (e.g., /Users/dev/project/src/Main.java) | Low         |
 | RELATIVE          | Path relative to project root (e.g., src/Main.java)     | High        |
-| NAME\_ONLY        | Just the filename (e.g., Main.java)                     | High        |
+| NAME_ONLY         | Just the filename (e.g., Main.java)                     | High        |
 | NONE              | Only the file content                                   | Highest     |
 
 The build cache is designed to be shared. In fact, many organizations utilize a Remote Build Cache (via HTTP) to bridge
@@ -190,7 +190,7 @@ locally computed data that is not intended for transfer between machines.
 ### **Execution History and File Hashes**
 
 The execution-history/ subdirectory is the most significant component of these version-specific folders. It contains a
-persistent record of every task's inputs and outputs from the last time it ran *on that specific machine*.25 This data
+persistent record of every task's inputs and outputs from the last time it ran _on that specific machine_.25 This data
 supports "up-to-date" checks, allowing Gradle to skip tasks without even looking at the build cache.  
 The files within execution-history/ are inherently non-portable because they:
 
@@ -209,7 +209,7 @@ the build scripts.23 While these could theoretically be shared, they are often t
 compiler and the classpath of the build, making them fragile and prone to verification errors if migrated.
 
 | Pattern to Omit                       | Description                        | Reason for Omission                       |
-|:--------------------------------------|:-----------------------------------|:------------------------------------------|
+| :------------------------------------ | :--------------------------------- | :---------------------------------------- |
 | caches/\[version\]/execution-history/ | Task state for incremental builds. | Absolute paths and local timestamps.25    |
 | caches/\[version\]/file-hashes/       | Index of file content signatures.  | Keyed by absolute local paths.27          |
 | caches/\[version\]/kotlin-dsl/        | Compiled build script binaries.    | Sensitive to classpath and JVM version.23 |
@@ -274,7 +274,7 @@ The following directories contain immutable or content-addressable data that is 
 between machines.
 
 | Pattern                         | Functional Role                  | Implications of Persistence                                    |
-|:--------------------------------|:---------------------------------|:---------------------------------------------------------------|
+| :------------------------------ | :------------------------------- | :------------------------------------------------------------- |
 | caches/modules-2/files-2.1/\*\* | External artifacts (JARs, POMs). | Eliminates redundant downloads; essential for offline builds.8 |
 | caches/build-cache-1/\*\*       | Task output snapshots.           | Enables cross-machine task reuse (e.g., CI to Dev).21          |
 | wrapper/dists/\*\*              | Gradle distributions.            | Avoids re-downloading the build tool itself.5                  |
@@ -286,7 +286,7 @@ The following patterns represent data that is either unique to the local file sy
 migration, or contains absolute paths that will break on other machines.
 
 | Pattern                                       | Category        | Technical Reason for Omission                                    |
-|:----------------------------------------------|:----------------|:-----------------------------------------------------------------|
+| :-------------------------------------------- | :-------------- | :--------------------------------------------------------------- |
 | caches/\*\*/\*.lock                           | Synchronization | Prevents "Timeout waiting to lock" hangs.31                      |
 | caches/journal-1/\*\*                         | Maintenance     | Prevents corruption; journal is unique to local disk activity.20 |
 | caches/transforms-\*/\*\*                     | Transforms      | Likely contains absolute paths to the original GUH location.17   |
@@ -339,7 +339,7 @@ build's persistent state.
 #### **Works cited**
 
 1. Anatomy of a Gradle Build, accessed March 26,
-   2026, [https://docs.gradle.org/current/userguide/gradle\_directories\_intermediate.html](https://docs.gradle.org/current/userguide/gradle_directories_intermediate.html)
+   2026, [https://docs.gradle.org/current/userguide/gradle_directories_intermediate.html](https://docs.gradle.org/current/userguide/gradle_directories_intermediate.html)
 2. Allow the location of the Gradle cache to be specified independent of the user configuration files \#1319 \- GitHub,
    accessed March 26, 2026, [https://github.com/gradle/gradle/issues/1319](https://github.com/gradle/gradle/issues/1319)
 3. Mastering Gradle Caching and Incremental Builds | by Fedor Korotkov \- Medium, accessed March 26,
@@ -347,14 +347,14 @@ build's persistent state.
 4. General \- The Gradle Blog, accessed March 26,
    2026, [https://blog.gradle.org/category/general](https://blog.gradle.org/category/general)
 5. Gradle Wrapper \- Gradle User Manual, accessed March 26,
-   2026, [https://docs.gradle.org/current/userguide/gradle\_wrapper.html](https://docs.gradle.org/current/userguide/gradle_wrapper.html)
+   2026, [https://docs.gradle.org/current/userguide/gradle_wrapper.html](https://docs.gradle.org/current/userguide/gradle_wrapper.html)
 6. Gradle-managed Directories \- Gradle User Manual, accessed March 26,
-   2026, [https://docs.gradle.org/current/userguide/directory\_layout.html](https://docs.gradle.org/current/userguide/directory_layout.html)
+   2026, [https://docs.gradle.org/current/userguide/directory_layout.html](https://docs.gradle.org/current/userguide/directory_layout.html)
 7. Parallel workflows containing jobs with the same name use the same cache key, resulting in "Failed to save cache
    entry" · Issue \#699 · gradle/gradle-build-action \- GitHub, accessed March 26,
    2026, [https://github.com/gradle/gradle-build-action/issues/699](https://github.com/gradle/gradle-build-action/issues/699)
 8. Dependency Caching \- Gradle User Manual, accessed March 26,
-   2026, [https://docs.gradle.org/current/userguide/dependency\_caching.html](https://docs.gradle.org/current/userguide/dependency_caching.html)
+   2026, [https://docs.gradle.org/current/userguide/dependency_caching.html](https://docs.gradle.org/current/userguide/dependency_caching.html)
 9. How to make Gradle repository point to local directory \- Stack Overflow, accessed March 26,
    2026, [https://stackoverflow.com/questions/25965901/how-to-make-gradle-repository-point-to-local-directory](https://stackoverflow.com/questions/25965901/how-to-make-gradle-repository-point-to-local-directory)
 10. .classpath · GitHub, accessed March 26,
@@ -382,26 +382,26 @@ build's persistent state.
     /Users/macuser/.gradle/caches/journal-1/file-access.bin' \- Stack Overflow, accessed March 26,
     2026, [https://stackoverflow.com/questions/55801823/corruptedcacheexception-corrupted-indexblock-298298-found-in-cache-users-macu](https://stackoverflow.com/questions/55801823/corruptedcacheexception-corrupted-indexblock-298298-found-in-cache-users-macu)
 21. Build Cache \- Gradle User Manual, accessed March 26,
-    2026, [https://docs.gradle.org/current/userguide/build\_cache.html](https://docs.gradle.org/current/userguide/build_cache.html)
+    2026, [https://docs.gradle.org/current/userguide/build_cache.html](https://docs.gradle.org/current/userguide/build_cache.html)
 22. Gradle Build Cache Basics | Baeldung, accessed March 26,
     2026, [https://www.baeldung.com/gradle-build-cache](https://www.baeldung.com/gradle-build-cache)
 23. Popular Gradle mistakes (and how to avoid them) \- part 2 \- Allegro Tech Blog, accessed March 26,
     2026, [https://blog.allegro.tech/2025/05/popular-gradle-mistakes-and-how-to-avoid-them-part2.html](https://blog.allegro.tech/2025/05/popular-gradle-mistakes-and-how-to-avoid-them-part2.html)
 24. Use cases for the build cache \- Gradle User Manual, accessed March 26,
-    2026, [https://docs.gradle.org/current/userguide/build\_cache\_use\_cases.html](https://docs.gradle.org/current/userguide/build_cache_use_cases.html)
+    2026, [https://docs.gradle.org/current/userguide/build_cache_use_cases.html](https://docs.gradle.org/current/userguide/build_cache_use_cases.html)
 25. Use snapshots instead of fingerprints for work outputs · Issue \#9034 · gradle/gradle \- GitHub, accessed March 26,
     2026, [https://github.com/gradle/gradle/issues/9034](https://github.com/gradle/gradle/issues/9034)
 26. punkpeye/awesome-mcp-servers at nocodeopensource.io \- GitHub, accessed March 26,
     2026, [https://github.com/punkpeye/awesome-mcp-servers?ref=nocodeopensource.io](https://github.com/punkpeye/awesome-mcp-servers?ref=nocodeopensource.io)
 27. Remember to check your Gradle (Cache) folder\! : r/androiddev \- Reddit, accessed March 26,
-    2026, [https://www.reddit.com/r/androiddev/comments/1ax7bxh/remember\_to\_check\_your\_gradle\_cache\_folder/](https://www.reddit.com/r/androiddev/comments/1ax7bxh/remember_to_check_your_gradle_cache_folder/)
+    2026, [https://www.reddit.com/r/androiddev/comments/1ax7bxh/remember_to_check_your_gradle_cache_folder/](https://www.reddit.com/r/androiddev/comments/1ax7bxh/remember_to_check_your_gradle_cache_folder/)
 28. Configuration cache should be shareable between machines · Issue \#13510 \- GitHub, accessed March 26,
     2026, [https://github.com/gradle/gradle/issues/13510](https://github.com/gradle/gradle/issues/13510)
 29. Can't Run Two Gradle Things Simultaneously \- "Gradle could not start your build. Cannot create service of type
     BuildSessionActionExecutor", accessed March 26,
     2026, [https://intellij-support.jetbrains.com/hc/en-us/community/posts/25197295440658-Can-t-Run-Two-Gradle-Things-Simultaneously-Gradle-could-not-start-your-build-Cannot-create-service-of-type-BuildSessionActionExecutor](https://intellij-support.jetbrains.com/hc/en-us/community/posts/25197295440658-Can-t-Run-Two-Gradle-Things-Simultaneously-Gradle-could-not-start-your-build-Cannot-create-service-of-type-BuildSessionActionExecutor)
 30. I'm struggling to develop a mobile application with Flutter. : r/CodingTR \- Reddit, accessed March 26,
-    2026, [https://www.reddit.com/r/CodingTR/comments/1ixtevx/flutter\_ile\_mobil\_uygulama\_geli%C5%9Ftirmeye/?tl=en](https://www.reddit.com/r/CodingTR/comments/1ixtevx/flutter_ile_mobil_uygulama_geli%C5%9Ftirmeye/?tl=en)
+    2026, [https://www.reddit.com/r/CodingTR/comments/1ixtevx/flutter_ile_mobil_uygulama_geli%C5%9Ftirmeye/?tl=en](https://www.reddit.com/r/CodingTR/comments/1ixtevx/flutter_ile_mobil_uygulama_geli%C5%9Ftirmeye/?tl=en)
 31. Timeout waiting to lock journal cache. It is currently in use by another Gradle instance, accessed March 26,
     2026, [https://stackoverflow.com/questions/75671382/timeout-waiting-to-lock-journal-cache-it-is-currently-in-use-by-another-gradle](https://stackoverflow.com/questions/75671382/timeout-waiting-to-lock-journal-cache-it-is-currently-in-use-by-another-gradle)
 32. Timeout waiting to lock journal cache with gradle? \- Stack Overflow, accessed March 26,

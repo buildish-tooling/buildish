@@ -359,6 +359,7 @@ function renderCacheKeyTemplate(
   const placeholderValues: Record<string, string> = {
     cacheKeyPrefix: config.cacheKeyPrefix,
     schemaVersion: String(config.cacheSchemaVersion),
+    partitionFingerprint: cacheModel.partitionFingerprint,
     javaMajor: String(cacheModel.javaMajor),
     runnerOs: cacheModel.runnerOs,
     runnerArch: cacheModel.runnerArch,

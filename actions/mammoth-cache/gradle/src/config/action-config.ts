@@ -19,10 +19,19 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import type { CiJobContext } from '../ci/types';
-import { normalizeUserSuppliedRelativePath } from '../validation';
+import {
+  isAbsolutePosixOrWindowsPath,
+  normalizeUserSuppliedRelativePath,
+  parseSerializedJson,
+  validateArray,
+  validateRecord,
+  validateString,
+} from '../validation';
 import {
   CACHE_KEY_TEMPLATE_PLACEHOLDERS,
   JOB_MODES,
+  RESTORE_CLEANUP_MODES,
+  type ConfiguredCachePartitionInput,
   type NormalizedActionConfig,
   type RawActionInputs,
   type WrapperSelectionMode,
@@ -30,9 +39,11 @@ import {
 
 const NAME_PATTERN = /^[A-Za-z0-9._ -]{1,100}$/;
 const CACHE_KEY_PREFIX_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+const CACHE_PARTITION_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/u;
 const EXPLICIT_PATH_GLOB_PATTERN = /[*?[\]{}!]/;
 const MAX_TEMPLATE_LENGTH = 200;
-const CACHE_SCHEMA_VERSION = 1;
+const UNSUPPORTED_GLOB_TOKENS_PATTERN = /[?[\]{}!]/u;
+const CACHE_SCHEMA_VERSION = 2;
 
 /**
  * Minimal abstraction over the GitHub Actions input API.
@@ -95,6 +106,7 @@ export function readActionInputs(inputProvider: InputProvider = core): RawAction
     ),
     cacheKeyPrefix: inputProvider.getInput('cache-key-prefix', { trimWhitespace: true }),
     cacheKeyTemplate: inputProvider.getInput('cache-key-template', { trimWhitespace: true }),
+    cachePartitions: inputProvider.getInput('cache-partitions', { trimWhitespace: true }),
     processAllWrapperFiles: inputProvider.getInput('process-all-wrapper-files', {
       trimWhitespace: true,
     }),
@@ -105,6 +117,7 @@ export function readActionInputs(inputProvider: InputProvider = core): RawAction
       trimWhitespace: true,
     }),
     cleanupEnabled: inputProvider.getInput('cleanup-enabled', { trimWhitespace: true }),
+    restoreCleanupMode: inputProvider.getInput('restore-cleanup-mode', { trimWhitespace: true }),
     gradleUserHome: inputProvider.getInput('gradle-user-home', { trimWhitespace: true }),
     setupJava: inputProvider.getInput('setup-java', { trimWhitespace: true }),
     githubToken: inputProvider.getInput('github-token', { trimWhitespace: true }),
@@ -135,6 +148,7 @@ export function normalizeActionConfig(
   );
   const cacheKeyPrefix = validateCacheKeyPrefix(rawInputs.cacheKeyPrefix || 'gradle-cache-');
   const cacheKeyTemplate = validateCacheKeyTemplate(rawInputs.cacheKeyTemplate);
+  const cachePartitions = parseCachePartitionsInput(rawInputs.cachePartitions);
   const processAllWrapperFiles = parseBooleanInput(
     rawInputs.processAllWrapperFiles || 'false',
     'process-all-wrapper-files',
@@ -151,6 +165,11 @@ export function normalizeActionConfig(
     rawInputs.wrapperPropertiesGlob || '**/gradle/wrapper/gradle-wrapper.properties',
   );
   const cleanupEnabled = parseBooleanInput(rawInputs.cleanupEnabled || 'true', 'cleanup-enabled');
+  const restoreCleanupMode = parseEnumInput(
+    rawInputs.restoreCleanupMode || 'none',
+    RESTORE_CLEANUP_MODES,
+    'restore-cleanup-mode',
+  );
   const readOnly =
     rawInputs.readOnly.length > 0
       ? parseBooleanInput(rawInputs.readOnly, 'read-only')
@@ -178,6 +197,7 @@ export function normalizeActionConfig(
     allowDuplicateDependentDeltaPaths,
     cacheKeyPrefix,
     cacheKeyTemplate,
+    cachePartitions,
     cacheSchemaVersion: CACHE_SCHEMA_VERSION,
     wrapperSelectionMode,
     wrapperPropertiesGlob,
@@ -187,6 +207,7 @@ export function normalizeActionConfig(
     ),
     wrapperPropertiesFiles: explicitWrapperPropertiesFiles,
     cleanupEnabled,
+    restoreCleanupMode,
     gradleUserHome,
   };
 }
@@ -294,7 +315,147 @@ function validateCacheKeyTemplate(input: string): string | null {
     );
   }
 
+  if (!trimmed.includes('${partitionFingerprint}')) {
+    throw new Error(
+      'cache-key-template must include ${partitionFingerprint} so different cache partition layouts do not share the same cache key.',
+    );
+  }
+
   return trimmed;
+}
+
+/**
+ * Parses the optional JSON partition configuration input.
+ *
+ * The input must be a JSON array of objects with `id`, `includes`, and optional `excludes` fields.
+ * Includes use a restricted Gradle-user-home-relative glob subset and built-in partitions may be
+ * disabled by supplying an empty include list.
+ */
+function parseCachePartitionsInput(input: string): readonly ConfiguredCachePartitionInput[] {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) {
+    return [];
+  }
+
+  const parsed = parseSerializedJson(trimmed, 'cache-partitions');
+  const partitionValues = validateArray(parsed, 'cache-partitions');
+  const seenIds = new Set<string>();
+
+  return partitionValues.map((partitionValue, index) => {
+    const partition = validateRecord(partitionValue, `cache-partitions entry ${index}`);
+    const id = validateCachePartitionId(partition.id, `cache-partitions entry ${index} id`);
+    if (seenIds.has(id)) {
+      throw new Error(`cache-partitions contains duplicate partition id '${id}'.`);
+    }
+    seenIds.add(id);
+
+    return {
+      id,
+      includes: validateCachePartitionGlobList(
+        partition.includes,
+        `cache-partitions entry '${id}' includes`,
+        'include',
+      ),
+      excludes: validateCachePartitionGlobList(
+        partition.excludes ?? [],
+        `cache-partitions entry '${id}' excludes`,
+        'exclude',
+      ),
+    } satisfies ConfiguredCachePartitionInput;
+  });
+}
+
+function validateCachePartitionId(value: unknown, label: string): string {
+  const id = validateString(value, label).trim();
+  if (!CACHE_PARTITION_ID_PATTERN.test(id)) {
+    throw new Error(
+      `${label} must match ${CACHE_PARTITION_ID_PATTERN} using lowercase letters, numbers, and dashes only.`,
+    );
+  }
+
+  return id;
+}
+
+function validateCachePartitionGlobList(
+  value: unknown,
+  label: string,
+  kind: 'include' | 'exclude',
+): readonly string[] {
+  const entries = validateArray(value, label);
+  return entries.map((entryValue, index) =>
+    normalizeCachePartitionGlob(entryValue, `${label} entry ${index}`, kind),
+  );
+}
+
+function normalizeCachePartitionGlob(
+  value: unknown,
+  label: string,
+  kind: 'include' | 'exclude',
+): string {
+  const raw = validateString(value, label).trim();
+  if (raw.length === 0) {
+    throw new Error(`${label} must not be blank.`);
+  }
+
+  if (raw.startsWith('~')) {
+    throw new Error(`${label} must not use home-directory expansion.`);
+  }
+
+  const posixRaw = raw.replaceAll('\\', '/');
+  const rawSegments = posixRaw.split('/');
+  if (rawSegments.includes('..')) {
+    throw new Error(`${label} must not use '..' path traversal segments.`);
+  }
+  if (rawSegments.includes('.')) {
+    throw new Error(`${label} must not contain '.' path segments.`);
+  }
+
+  const normalized = path.posix.normalize(posixRaw);
+  if (
+    normalized.length === 0 ||
+    normalized === '.' ||
+    isAbsolutePosixOrWindowsPath(normalized) ||
+    normalized === '..' ||
+    normalized.startsWith('../') ||
+    normalized.includes('/../')
+  ) {
+    throw new Error(`${label} must be a Gradle-user-home-relative glob.`);
+  }
+
+  if (normalized.startsWith('!/')) {
+    throw new Error(`${label} must not be a negated glob.`);
+  }
+
+  if (normalized.startsWith('!')) {
+    throw new Error(`${label} must not be a negated glob.`);
+  }
+
+  if (UNSUPPORTED_GLOB_TOKENS_PATTERN.test(normalized)) {
+    throw new Error(
+      `${label} uses unsupported glob syntax. Supported wildcards are '*' within a segment and '**' as a whole path segment.`,
+    );
+  }
+
+  const segments = normalized.split('/');
+  for (const segment of segments) {
+    if (segment.length === 0) {
+      throw new Error(`${label} must not contain empty path segments.`);
+    }
+    if (segment.includes('**') && segment !== '**') {
+      throw new Error(`${label} may only use '**' as a complete path segment.`);
+    }
+  }
+
+  if (kind === 'include') {
+    if (segments.at(-1) !== '**') {
+      throw new Error(`${label} must end with '/**'.`);
+    }
+    if (segments.slice(0, -1).includes('**')) {
+      throw new Error(`${label} may only use '**' as the final path segment.`);
+    }
+  }
+
+  return normalized;
 }
 
 /**

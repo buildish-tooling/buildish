@@ -40,12 +40,14 @@ const config = {
   allowDuplicateDependentDeltaPaths: false,
   cacheKeyPrefix: 'gradle-cache-',
   cacheKeyTemplate: null,
-  cacheSchemaVersion: 1,
+  cachePartitions: [],
+  cacheSchemaVersion: 2,
   wrapperSelectionMode: 'default',
   wrapperPropertiesGlob: '**/gradle/wrapper/gradle-wrapper.properties',
   defaultWrapperPropertiesFile: 'gradle/wrapper/gradle-wrapper.properties',
   wrapperPropertiesFiles: [],
   cleanupEnabled: true,
+  restoreCleanupMode: 'none',
   gradleUserHome: '/home/runner/.gradle',
 } as const;
 
@@ -84,12 +86,13 @@ const validatedWrappers: readonly ValidatedWrapperPropertiesFile[] = [
 ] as const;
 
 const cacheModel: CacheModel = {
-  cacheKey: 'gradle-cache-1-21-linux-x64-main',
+  cacheKey: 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
   javaMajor: 21,
   runnerOs: 'linux',
   runnerArch: 'x64',
   safeRefName: 'main',
-  includePaths: ['/home/runner/.gradle/caches/modules-*/**'],
+  partitionFingerprint: 'feedcafe1234abcd',
+  includePaths: ['/home/runner/.gradle/caches/modules-*/files-*/**'],
   excludePaths: [
     '/home/runner/.gradle/**/configuration-cache/**',
     '/home/runner/.gradle/**/*.lock',
@@ -101,14 +104,14 @@ const cacheModel: CacheModel = {
       id: 'modules',
       displayName: 'Dependency modules',
       description: 'Downloaded dependency metadata and artifact stores shared across builds.',
-      relativeIncludeGlobs: ['caches/modules-*/**'],
+      relativeIncludeGlobs: ['caches/modules-*/files-*/**'],
       relativeExcludeGlobs: [
         '**/configuration-cache/**',
         '**/*.lock',
         'caches/*/cc-keystore',
         'caches/modules-*/metadata-*/**',
       ],
-      absoluteIncludeGlobs: ['/home/runner/.gradle/caches/modules-*/**'],
+      absoluteIncludeGlobs: ['/home/runner/.gradle/caches/modules-*/files-*/**'],
       absoluteExcludeGlobs: [
         '/home/runner/.gradle/**/configuration-cache/**',
         '/home/runner/.gradle/**/*.lock',
@@ -122,17 +125,17 @@ const cacheModel: CacheModel = {
 const restoreResult: BaseCacheRestoreResult = {
   operation: 'restore',
   status: 'exact-hit',
-  cacheKey: 'gradle-cache-1-21-linux-x64-main',
-  matchedKey: 'gradle-cache-1-21-linux-x64-main',
-  restoreKeys: ['gradle-cache-1-21-linux-x64-'],
+  cacheKey: 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
+  matchedKey: 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
+  restoreKeys: ['gradle-cache-2-21-linux-x64-feedcafe1234abcd-'],
   paths: [
-    '/home/runner/.gradle/caches/modules-*/**',
+    '/home/runner/.gradle/caches/modules-*/files-*/**',
     '!/home/runner/.gradle/**/configuration-cache/**',
     '!/home/runner/.gradle/**/*.lock',
     '!/home/runner/.gradle/caches/*/cc-keystore',
     '!/home/runner/.gradle/caches/modules-*/metadata-*/**',
   ],
-  message: "Base cache restore hit exact key 'gradle-cache-1-21-linux-x64-main'.",
+  message: "Base cache restore hit exact key 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-main'.",
 };
 
 const provisionedWrappers: readonly ProvisionedWrapperJar[] = [
@@ -191,7 +194,7 @@ describe('bootstrap helpers', () => {
     ).toEqual(
       expect.arrayContaining([
         '- Base cache restore: exact-hit',
-        '- Cache key: gradle-cache-1-21-linux-x64-main',
+        '- Cache key: gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
         '- Cache partitions: 1',
         '- Job mode: standalone',
         '## Wrapper provisioning',
@@ -212,8 +215,8 @@ describe('bootstrap helpers', () => {
       isFeatureAvailable(): boolean {
         return true;
       },
-      async restoreCache(): Promise<string | undefined> {
-        return 'gradle-cache-1-21-linux-x64-main';
+      async restoreCache(_paths: string[], primaryKey: string): Promise<string | undefined> {
+        return primaryKey;
       },
       async saveCache(): Promise<number> {
         throw new Error('saveCache should not be called during main bootstrap');
@@ -286,7 +289,9 @@ describe('bootstrap helpers', () => {
       });
 
       expect(status.message).toBe('Prepared main phase for push on main in standalone mode.');
-      expect(status.cacheModel?.cacheKey).toBe('gradle-cache-1-21-linux-x64-main');
+      expect(status.cacheModel?.cacheKey).toMatch(
+        /^gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/,
+      );
       expect(status.baseCacheResult?.status).toBe('exact-hit');
       expect(status.validatedWrappers).toHaveLength(1);
       expect(status.provisionedWrappers).toHaveLength(1);
@@ -294,7 +299,7 @@ describe('bootstrap helpers', () => {
         expect.arrayContaining([
           '## Apache Buildish bootstrap',
           '- Base cache restore: exact-hit',
-          '- Cache key: gradle-cache-1-21-linux-x64-main',
+          expect.stringMatching(/^- Cache key: gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/),
           '- Java major: 21',
           '## Wrapper provisioning',
           '- Wrapper files: 1',
@@ -367,14 +372,16 @@ describe('bootstrap helpers', () => {
         expect.objectContaining({
           operation: 'save',
           status: 'saved',
-          cacheKey: 'gradle-cache-1-21-linux-x64-main',
+          cacheKey: expect.stringMatching(/^gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/),
           cacheId: 42,
         }),
       );
       expect(summaryLines).toEqual(
         expect.arrayContaining([
           '- Base cache save: saved',
-          "- Base cache detail: Base cache saved under key 'gradle-cache-1-21-linux-x64-main' (cache ID 42).",
+          expect.stringMatching(
+            /^- Base cache detail: Base cache saved under key 'gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main' \(cache ID 42\)\.$/,
+          ),
           '## Wrapper provisioning',
           '- Wrapper provisioning skipped during post phase.',
         ]),

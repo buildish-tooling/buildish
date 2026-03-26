@@ -31,19 +31,9 @@ import {
 } from '../validation';
 import type { CacheModel, CachePartitionDefinition } from './model';
 
-export const CACHE_MANIFEST_SCHEMA_VERSION = 1;
+export const CACHE_MANIFEST_SCHEMA_VERSION = 2;
 const STABLE_ENTRY_CAPTURE_ATTEMPTS = 3;
-const CACHE_PARTITION_ORDER: readonly CachePartitionDefinition['id'][] = [
-  'modules',
-  'transforms-metadata',
-  'kotlin-dsl',
-  'build-cache',
-  'wrapper-dists',
-];
-const CACHE_PARTITION_IDS = new Set<CachePartitionDefinition['id']>(CACHE_PARTITION_ORDER);
-const CACHE_PARTITION_RANKS = new Map(
-  CACHE_PARTITION_ORDER.map((partitionId, index) => [partitionId, index]),
-);
+const CACHE_PARTITION_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/u;
 
 interface CompiledGlobPattern {
   readonly source: string;
@@ -97,11 +87,11 @@ export interface CachePartitionManifest {
  * Full pre- or post-build cache manifest for all configured Gradle cache partitions.
  */
 export interface CacheManifest {
-  /** Schema version for on-disk manifest serialization. Currently always `1`. */
+  /** Schema version for on-disk manifest serialization. */
   readonly schemaVersion: typeof CACHE_MANIFEST_SCHEMA_VERSION;
   /** Absolute Gradle user home path the manifest was captured from. */
   readonly gradleUserHome: string;
-  /** Ordered partition manifests following the cache model partition order. */
+  /** Ordered partition manifests following the resolved cache model partition order. */
   readonly partitions: readonly CachePartitionManifest[];
 }
 
@@ -137,11 +127,11 @@ export interface CachePartitionDelta {
  * Full delta manifest between two cache manifests.
  */
 export interface CacheDeltaManifest {
-  /** Schema version for on-disk delta serialization. Currently, always `1`. */
+  /** Schema version for on-disk delta serialization. */
   readonly schemaVersion: typeof CACHE_MANIFEST_SCHEMA_VERSION;
   /** Absolute Gradle user home path shared by the compared manifests. */
   readonly gradleUserHome: string;
-  /** Ordered partition deltas following the cache model partition order. */
+  /** Ordered partition deltas following the resolved cache model partition order. */
   readonly partitions: readonly CachePartitionDelta[];
 }
 
@@ -717,7 +707,7 @@ function isMissingPathError(error: unknown): boolean {
 
 function validateManifestPartitions(value: unknown): readonly CachePartitionManifest[] {
   const partitions = validateArray(value, 'cache manifest partitions');
-  let previousPartitionRank = -1;
+  const seenPartitionIds = new Set<string>();
 
   return partitions.map((partitionValue, index) => {
     const partition = validateRecord(partitionValue, `cache manifest partition at index ${index}`);
@@ -725,12 +715,11 @@ function validateManifestPartitions(value: unknown): readonly CachePartitionMani
       partition.partitionId,
       `cache manifest partition ${index}`,
     );
-    const partitionRank = getPartitionRank(partitionId);
 
-    if (previousPartitionRank >= partitionRank) {
-      throw new Error('Cache manifest partitions must follow the cache model partition order.');
+    if (seenPartitionIds.has(partitionId)) {
+      throw new Error(`Cache manifest partitions contain duplicate partition id '${partitionId}'.`);
     }
-    previousPartitionRank = partitionRank;
+    seenPartitionIds.add(partitionId);
 
     return {
       partitionId,
@@ -744,7 +733,7 @@ function validateManifestPartitions(value: unknown): readonly CachePartitionMani
 
 function validateDeltaPartitions(value: unknown): readonly CachePartitionDelta[] {
   const partitions = validateArray(value, 'cache delta manifest partitions');
-  let previousPartitionRank = -1;
+  const seenPartitionIds = new Set<string>();
 
   return partitions.map((partitionValue, index) => {
     const partition = validateRecord(partitionValue, `cache delta partition at index ${index}`);
@@ -752,14 +741,13 @@ function validateDeltaPartitions(value: unknown): readonly CachePartitionDelta[]
       partition.partitionId,
       `cache delta partition ${index}`,
     );
-    const partitionRank = getPartitionRank(partitionId);
 
-    if (previousPartitionRank >= partitionRank) {
+    if (seenPartitionIds.has(partitionId)) {
       throw new Error(
-        'Cache delta manifest partitions must follow the cache model partition order.',
+        `Cache delta manifest partitions contain duplicate partition id '${partitionId}'.`,
       );
     }
-    previousPartitionRank = partitionRank;
+    seenPartitionIds.add(partitionId);
 
     return {
       partitionId,
@@ -884,23 +872,11 @@ function validateSchemaVersion(
 }
 
 function validatePartitionId(value: unknown, label: string): CachePartitionDefinition['id'] {
-  if (
-    typeof value !== 'string' ||
-    !CACHE_PARTITION_IDS.has(value as CachePartitionDefinition['id'])
-  ) {
+  if (typeof value !== 'string' || !CACHE_PARTITION_ID_PATTERN.test(value)) {
     throw new Error(`${label} contains unsupported partition identifier '${String(value)}'.`);
   }
 
   return value as CachePartitionDefinition['id'];
-}
-
-function getPartitionRank(partitionId: CachePartitionDefinition['id']): number {
-  const partitionRank = CACHE_PARTITION_RANKS.get(partitionId);
-  if (partitionRank === undefined) {
-    throw new Error(`Unsupported cache partition identifier '${partitionId}'.`);
-  }
-
-  return partitionRank;
 }
 
 function validateDeltaChangeType(value: unknown, label: string): CacheDeltaEntry['changeType'] {

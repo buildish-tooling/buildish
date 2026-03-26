@@ -16,6 +16,7 @@
 
 import * as core from '@actions/core';
 import { rm } from 'node:fs/promises';
+import path from 'node:path';
 
 import {
   createGitHubArtifactApi,
@@ -31,6 +32,7 @@ import {
   type DeltaApplyResult,
 } from './cache/delta';
 import { captureCacheManifest } from './cache/manifest';
+import { restoreBaseCache } from './cache/service';
 import {
   persistConsumedDeltaArtifactNames,
   persistDeltaArtifactProducerIdentity,
@@ -48,8 +50,16 @@ export interface MainDependentDeltaResult extends DeltaApplyResult {
 
 export interface MainActionStatus {
   readonly bootstrap: BootstrapStatus;
+  readonly restoreCleanupResult: RestoreCleanupResult | null;
   readonly dependentDeltaResult: MainDependentDeltaResult | null;
   readonly preBuildManifestState: PersistedPreBuildCacheManifestState | null;
+  readonly message: string;
+}
+
+export interface RestoreCleanupResult {
+  readonly mode: 'prune-managed';
+  readonly status: 'skipped-no-hit' | 'pruned';
+  readonly deletedFileCount: number;
   readonly message: string;
 }
 
@@ -65,12 +75,14 @@ export async function executeMainAction(
   if (!bootstrap.cacheModel) {
     return {
       bootstrap,
+      restoreCleanupResult: null,
       dependentDeltaResult: null,
       preBuildManifestState: null,
       message: 'Main action flow completed without cache orchestration.',
     };
   }
 
+  const restoreCleanupResult = await maybePruneManagedFilesAfterRestore(bootstrap, dependencies);
   const dependentDeltaResult = await applyDependentJobDeltas(bootstrap, dependencies);
   if (dependentDeltaResult) {
     persistConsumedDeltaArtifactNames(
@@ -91,6 +103,7 @@ export async function executeMainAction(
 
   const status = {
     bootstrap,
+    restoreCleanupResult,
     dependentDeltaResult,
     preBuildManifestState,
     message: createMainActionMessage(dependentDeltaResult),
@@ -139,6 +152,7 @@ function assertCompatibleDependentDeltaArtifacts(
   downloadedPackages: readonly DownloadedDeltaArtifactPackage[],
   bootstrap: BootstrapStatus,
 ): void {
+  const currentCacheKey = bootstrap.cacheModel?.cacheKey;
   const currentRunner = `${bootstrap.ciContext.runnerOs}/${bootstrap.ciContext.runnerArch}`;
 
   for (const artifactPackage of downloadedPackages) {
@@ -147,6 +161,11 @@ function assertCompatibleDependentDeltaArtifacts(
       producer.runnerOs === bootstrap.ciContext.runnerOs &&
       producer.runnerArch === bootstrap.ciContext.runnerArch
     ) {
+      if (currentCacheKey && producer.cacheKey !== currentCacheKey) {
+        throw new Error(
+          `Dependent delta artifact '${artifactPackage.artifact.name}' from job '${producer.jobName}' targets cache key '${producer.cacheKey}', but the current job expects '${currentCacheKey}'. Distributed delta reuse requires identical cache key inputs, partition layout, and runner selection.`,
+        );
+      }
       continue;
     }
 
@@ -154,6 +173,57 @@ function assertCompatibleDependentDeltaArtifacts(
       `Dependent delta artifact '${artifactPackage.artifact.name}' from job '${producer.jobName}' targets runner ${producer.runnerOs}/${producer.runnerArch}, but the current job runs on ${currentRunner}. Cross-runner dependent delta reuse is not supported; keep distributed jobs on the same runner OS and architecture.`,
     );
   }
+}
+
+async function maybePruneManagedFilesAfterRestore(
+  bootstrap: BootstrapStatus,
+  dependencies: MainActionDependencies,
+): Promise<RestoreCleanupResult | null> {
+  if (bootstrap.config.restoreCleanupMode === 'none' || !bootstrap.cacheModel) {
+    return null;
+  }
+
+  const baseCacheResult = bootstrap.baseCacheResult;
+  if (
+    !baseCacheResult ||
+    baseCacheResult.operation !== 'restore' ||
+    (baseCacheResult.status !== 'exact-hit' && baseCacheResult.status !== 'partial-hit')
+  ) {
+    return {
+      mode: 'prune-managed',
+      status: 'skipped-no-hit',
+      deletedFileCount: 0,
+      message:
+        'Restore cleanup skipped because no base cache hit was available to re-apply after pruning managed files.',
+    };
+  }
+
+  const manifest = await captureCacheManifest(bootstrap.cacheModel);
+  const relativePaths = manifest.partitions.flatMap((partition) =>
+    partition.entries.map((entry) => entry.relativePath),
+  );
+  await Promise.all(
+    relativePaths.map(async (relativePath) => {
+      await rm(path.join(bootstrap.config.gradleUserHome, relativePath), { force: true });
+    }),
+  );
+
+  const reRestore = await restoreBaseCache(bootstrap.config, bootstrap.cacheModel, dependencies);
+  if (
+    reRestore.operation !== 'restore' ||
+    (reRestore.status !== 'exact-hit' && reRestore.status !== 'partial-hit')
+  ) {
+    throw new Error(
+      `restore-cleanup-mode=prune-managed deleted ${relativePaths.length} managed file(s), but the follow-up base cache restore did not hit again. Refusing to continue with a partially pruned Gradle user home.`,
+    );
+  }
+
+  return {
+    mode: 'prune-managed',
+    status: 'pruned',
+    deletedFileCount: relativePaths.length,
+    message: `Pruned ${relativePaths.length} managed file(s) from the active cache partitions and re-restored base cache '${reRestore.matchedKey ?? reRestore.cacheKey}'.`,
+  };
 }
 
 function createMainDependentDeltaResult(
@@ -196,6 +266,13 @@ function createMainActionMessage(dependentDeltaResult: MainDependentDeltaResult 
 export function createMainActionSummaryLines(status: MainActionStatus): readonly string[] {
   return [
     '## Apache Buildish main action',
+    ...(status.restoreCleanupResult
+      ? [
+          `- Restore cleanup mode: ${status.restoreCleanupResult.mode}`,
+          `- Restore cleanup status: ${status.restoreCleanupResult.status}`,
+          `- Restore cleanup deleted files: ${status.restoreCleanupResult.deletedFileCount}`,
+        ]
+      : ['- Restore cleanup mode: none']),
     ...(status.dependentDeltaResult
       ? [
           `- Dependent jobs requested: ${formatSummaryList(status.dependentDeltaResult.requestedJobs)}`,

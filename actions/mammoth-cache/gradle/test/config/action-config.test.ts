@@ -80,9 +80,134 @@ describe('normalizeActionConfig', () => {
       jobMode: 'standalone',
       allowDuplicateDependentDeltaPaths: false,
       cacheKeyPrefix: 'gradle-cache-',
+      cachePartitions: [],
+      restoreCleanupMode: 'none',
       wrapperSelectionMode: 'default',
       defaultWrapperPropertiesFile: 'gradle/wrapper/gradle-wrapper.properties',
     });
+  });
+
+  it('parses cache partition overrides and restore cleanup mode', () => {
+    const config = normalizeActionConfig(
+      readActionInputs(
+        createInputProvider({
+          'cache-partitions': JSON.stringify([
+            {
+              id: 'modules',
+              includes: ['caches/modules-*/files-*/**'],
+              excludes: ['caches/modules-*/metadata-*/**'],
+            },
+            {
+              id: 'custom-generated-jars',
+              includes: ['caches/*/generated-gradle-jars/**'],
+              excludes: [],
+            },
+          ]),
+          'restore-cleanup-mode': 'prune-managed',
+        }),
+      ),
+      {
+        phase: 'main',
+        ciContext: baseCiContext,
+        env: {},
+      },
+    );
+
+    expect(config.cachePartitions).toEqual([
+      {
+        id: 'modules',
+        includes: ['caches/modules-*/files-*/**'],
+        excludes: ['caches/modules-*/metadata-*/**'],
+      },
+      {
+        id: 'custom-generated-jars',
+        includes: ['caches/*/generated-gradle-jars/**'],
+        excludes: [],
+      },
+    ]);
+    expect(config.restoreCleanupMode).toBe('prune-managed');
+  });
+
+  it('rejects custom cache-key templates without partitionFingerprint', () => {
+    expect(() =>
+      normalizeActionConfig(
+        readActionInputs(
+          createInputProvider({
+            'cache-key-template': '${cacheKeyPrefix}${schemaVersion}-${javaMajor}-${refName}',
+          }),
+        ),
+        {
+          phase: 'main',
+          ciContext: baseCiContext,
+          env: {},
+        },
+      ),
+    ).toThrow(/must include \$\{partitionFingerprint}/);
+  });
+
+  it('rejects cache partition include globs that do not end in /**', () => {
+    expect(() =>
+      normalizeActionConfig(
+        readActionInputs(
+          createInputProvider({
+            'cache-partitions': JSON.stringify([
+              {
+                id: 'modules',
+                includes: ['caches/modules-*/files-*'],
+              },
+            ]),
+          }),
+        ),
+        {
+          phase: 'main',
+          ciContext: baseCiContext,
+          env: {},
+        },
+      ),
+    ).toThrow(/must end with '\/\*\*'/);
+  });
+
+  it('rejects cache partition globs that attempt traversal or unsupported syntax', () => {
+    expect(() =>
+      normalizeActionConfig(
+        readActionInputs(
+          createInputProvider({
+            'cache-partitions': JSON.stringify([
+              {
+                id: 'modules',
+                includes: ['../outside/**'],
+              },
+            ]),
+          }),
+        ),
+        {
+          phase: 'main',
+          ciContext: baseCiContext,
+          env: {},
+        },
+      ),
+    ).toThrow(/must not use '\.\.' path traversal segments/);
+
+    expect(() =>
+      normalizeActionConfig(
+        readActionInputs(
+          createInputProvider({
+            'cache-partitions': JSON.stringify([
+              {
+                id: 'modules',
+                includes: ['caches/modules-*/files-*/**'],
+                excludes: ['!caches/foo/**'],
+              },
+            ]),
+          }),
+        ),
+        {
+          phase: 'main',
+          ciContext: baseCiContext,
+          env: {},
+        },
+      ),
+    ).toThrow(/must not be a negated glob/);
   });
 
   it('parses allow-duplicate-dependent-delta-paths explicitly', () => {

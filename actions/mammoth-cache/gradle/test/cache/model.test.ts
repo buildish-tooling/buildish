@@ -35,12 +35,14 @@ const baseConfig: NormalizedActionConfig = {
   allowDuplicateDependentDeltaPaths: false,
   cacheKeyPrefix: 'gradle-cache-',
   cacheKeyTemplate: null,
-  cacheSchemaVersion: 1,
+  cachePartitions: [],
+  cacheSchemaVersion: 2,
   wrapperSelectionMode: 'default',
   wrapperPropertiesGlob: '**/gradle/wrapper/gradle-wrapper.properties',
   defaultWrapperPropertiesFile: 'gradle/wrapper/gradle-wrapper.properties',
   wrapperPropertiesFiles: [],
   cleanupEnabled: true,
+  restoreCleanupMode: 'none',
   gradleUserHome: '/home/runner/.gradle',
 };
 
@@ -78,8 +80,8 @@ describe('parseJavaMajor', () => {
 
 describe('renderCacheKey', () => {
   it('renders the default cache key using the safe ref name', () => {
-    expect(renderCacheKey(baseConfig, baseCiContext, 21)).toBe(
-      'gradle-cache-1-21-linux-x64-feature-cache-model',
+    expect(renderCacheKey(baseConfig, baseCiContext, 21, 'feedcafe1234abcd')).toBe(
+      'gradle-cache-2-21-linux-x64-feedcafe1234abcd-feature-cache-model',
     );
   });
 
@@ -88,22 +90,23 @@ describe('renderCacheKey', () => {
       renderCacheKey(
         {
           ...baseConfig,
-          cacheKeyTemplate: '${cacheKeyPrefix}${runnerOs}:${runnerArch}:${javaMajor}:${refName}',
+          cacheKeyTemplate:
+            '${cacheKeyPrefix}${runnerOs}:${runnerArch}:${javaMajor}:${partitionFingerprint}:${refName}',
         },
         baseCiContext,
         17,
+        'feedcafe1234abcd',
       ),
-    ).toBe('gradle-cache-linux:x64:17:feature-cache-model');
+    ).toBe('gradle-cache-linux:x64:17:feedcafe1234abcd:feature-cache-model');
   });
 });
 
 describe('createCachePartitions', () => {
-  it('defines the expected Gradle user home partitions and excludes configuration cache and lock files', () => {
+  it('defines the default active partitions and enforces hard excludes', () => {
     const partitions = createCachePartitions('/home/runner/.gradle');
 
     expect(partitions.map((partition) => partition.id)).toEqual([
       'modules',
-      'transforms-metadata',
       'kotlin-dsl',
       'build-cache',
       'wrapper-dists',
@@ -122,12 +125,10 @@ describe('createCachePartitions', () => {
       ),
     ).toBe(true);
     expect(
-      partitions.every((partition) =>
-        partition.relativeExcludeGlobs.includes('caches/modules-*/metadata-*/**'),
-      ),
-    ).toBe(true);
+      partitions.find((partition) => partition.id === 'modules')?.relativeExcludeGlobs,
+    ).toContain('caches/modules-*/metadata-*/**');
     expect(partitions[0]?.absoluteIncludeGlobs).toContain(
-      '/home/runner/.gradle/caches/modules-*/**',
+      '/home/runner/.gradle/caches/modules-*/files-*/**',
     );
     expect(partitions[0]?.absoluteExcludeGlobs).toContain('/home/runner/.gradle/**/*.lock');
     expect(partitions[0]?.absoluteExcludeGlobs).toContain(
@@ -136,7 +137,49 @@ describe('createCachePartitions', () => {
     expect(partitions[0]?.absoluteExcludeGlobs).toContain(
       '/home/runner/.gradle/caches/modules-*/metadata-*/**',
     );
-    expect(partitions[1]?.relativeIncludeGlobs).toEqual(['caches/transforms-*/**']);
+  });
+
+  it('supports built-in overrides, opt-in transforms, and custom partitions', () => {
+    const partitions = createCachePartitions('/home/runner/.gradle', [
+      {
+        id: 'modules',
+        includes: ['caches/modules-*/files-*/**'],
+        excludes: [],
+      },
+      {
+        id: 'transforms-metadata',
+        includes: ['caches/transforms-*/**'],
+        excludes: [],
+      },
+      {
+        id: 'kotlin-dsl',
+        includes: [],
+        excludes: [],
+      },
+      {
+        id: 'custom-generated-jars',
+        includes: ['caches/*/generated-gradle-jars/**'],
+        excludes: [],
+      },
+    ]);
+
+    expect(partitions.map((partition) => partition.id)).toEqual([
+      'modules',
+      'transforms-metadata',
+      'build-cache',
+      'wrapper-dists',
+      'custom-generated-jars',
+    ]);
+    expect(partitions[0]?.relativeIncludeGlobs).toEqual(['caches/modules-*/files-*/**']);
+    expect(partitions[4]?.relativeIncludeGlobs).toEqual(['caches/*/generated-gradle-jars/**']);
+  });
+
+  it('rejects empty custom partitions', () => {
+    expect(() =>
+      createCachePartitions('/home/runner/.gradle', [
+        { id: 'custom-empty', includes: [], excludes: [] },
+      ]),
+    ).toThrow(/must declare at least one include glob/);
   });
 });
 
@@ -146,9 +189,12 @@ describe('createCacheModel', () => {
       captureCommandOutput: async () => 'openjdk version "21.0.4" 2024-07-16\n',
     });
 
-    expect(cacheModel.cacheKey).toBe('gradle-cache-1-21-linux-x64-feature-cache-model');
+    expect(cacheModel.cacheKey).toMatch(
+      /^gradle-cache-2-21-linux-x64-[a-f0-9]{16}-feature-cache-model$/,
+    );
     expect(cacheModel.javaMajor).toBe(21);
-    expect(cacheModel.partitions).toHaveLength(5);
+    expect(cacheModel.partitionFingerprint).toMatch(/^[a-f0-9]{16}$/);
+    expect(cacheModel.partitions).toHaveLength(4);
     expect(cacheModel.includePaths).toContain('/home/runner/.gradle/wrapper/dists/**');
     expect(cacheModel.excludePaths).toContain('/home/runner/.gradle/**/configuration-cache/**');
     expect(cacheModel.excludePaths).toContain('/home/runner/.gradle/**/*.lock');

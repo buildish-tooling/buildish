@@ -115,10 +115,25 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 - Supported placeholders:
   - `${cacheKeyPrefix}`
   - `${schemaVersion}`
+  - `${partitionFingerprint}`
   - `${javaMajor}`
   - `${runnerOs}`
   - `${runnerArch}`
   - `${refName}`
+- Custom templates must include `${partitionFingerprint}` so different cache partition layouts do not share the same base cache key.
+
+### `cache-partitions`
+
+- Default: empty
+- Optional JSON array of cache partition overrides and custom partitions.
+- Each object must contain:
+  - `id`: lowercase letters, numbers, and `-` only
+  - `includes`: array of Gradle-user-home-relative include globs
+  - `excludes`: optional array of Gradle-user-home-relative exclude globs
+- Overriding a built-in partition replaces its built-in include/exclude lists.
+- Setting `includes: []` disables a built-in partition.
+- Custom partitions must have at least one include glob.
+- Hard safety excludes are always enforced even when a partition is overridden.
 
 ### `process-all-wrapper-files`
 
@@ -149,6 +164,17 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 - Accepted values: `true`, `false`
 - Enables the later cleanup-trigger flow used by cache management.
 
+### `restore-cleanup-mode`
+
+- Default: `none`
+- Supported values:
+  - `none`
+  - `prune-managed`
+- `prune-managed` only acts after a base-cache hit.
+- It deletes files currently matched by the active managed partitions, then restores the matched base cache again.
+- It never deletes files outside the action-managed partition space.
+- It is intentionally opt-in because it is more destructive and may increase restore time.
+
 ### `gradle-user-home`
 
 - Default: `$GRADLE_USER_HOME` when set, otherwise `$HOME/.gradle`
@@ -172,6 +198,103 @@ For Java installation and switching, we recommend [SDKMAN!](https://sdkman.io/).
 - Downloaded wrapper JARs are accepted only after detached-signature and SHA-256 verification.
 - Gradle signing keys are pinned in-source as an allowlist so old and new keys can overlap during rotation.
 - Never written to summaries or persisted post-action state.
+
+## Cache partitions and restore cleanup
+
+### Built-in partitions
+
+The action resolves the Gradle user home into ordered logical partitions:
+
+- `modules` — dependency artifacts, jars, and resource stores
+- `transforms-metadata` — artifact transforms and related metadata; disabled by default
+- `kotlin-dsl` — compiled Kotlin DSL scripts and generated Gradle API jars; enabled by default
+- `build-cache` — the local Gradle build cache
+- `wrapper-dists` — wrapper-downloaded Gradle distributions
+
+Built-ins keep a deterministic order. Custom partitions are appended after the active built-ins in the order supplied by `cache-partitions`.
+
+### Include and exclude semantics
+
+- Includes define the files the action manages for a partition.
+- Excludes remove files from that partition after includes are matched.
+- Overriding a built-in replaces its built-in include/exclude lists.
+- Built-in overrides with `includes: []` disable that built-in.
+- Custom partitions with `includes: []` are rejected.
+- If the same file matches more than one active partition, manifest capture fails instead of guessing an owner.
+
+Hard safety excludes are always applied to every active partition and cannot be removed:
+
+- `**/configuration-cache/**`
+- `**/*.lock`
+- `caches/*/cc-keystore`
+- `caches/journal-1/**`
+
+These exclusions are intentional safety rails for volatile or security-sensitive content.
+
+### Supported glob subset
+
+All partition globs are relative to the supported Gradle user home.
+
+- Absolute paths are rejected.
+- `..` traversal is rejected.
+- Negated globs are rejected.
+- Supported wildcards are:
+  - `*` within a single path segment
+  - `**` as a whole path segment
+- Include globs must end in `/**`.
+- Include globs may not use `**` anywhere except the final segment.
+- Exclude globs may use `**` as a whole path segment anywhere in the pattern.
+- Other glob operators such as `?`, character classes, braces, and extglobs are rejected.
+
+Examples:
+
+- valid include: `caches/*/kotlin-dsl/**`
+- valid exclude: `caches/modules-*/metadata-*/**`
+- valid exclude: `**/*.lock`
+- invalid include: `/home/runner/.gradle/caches/**`
+- invalid include: `caches/**/tmp/**`
+- invalid exclude: `!caches/foo/**`
+
+### Partition customization example
+
+Use `cache-partitions` as JSON. Example:
+
+```json
+[
+  {
+    "id": "modules",
+    "includes": ["caches/modules-*/files-*/**", "caches/jars-*/**"],
+    "excludes": ["caches/modules-*/metadata-*/**"]
+  },
+  {
+    "id": "kotlin-dsl",
+    "includes": []
+  },
+  {
+    "id": "custom-generated-jars",
+    "includes": ["caches/*/generated-gradle-jars/**"],
+    "excludes": []
+  }
+]
+```
+
+That example:
+
+- overrides `modules`
+- disables the built-in `kotlin-dsl` partition
+- adds a custom partition named `custom-generated-jars`
+
+### Restore cleanup behavior
+
+`restore-cleanup-mode=prune-managed` is the safe, narrow cleanup mode supported today.
+
+- It only runs after a base-cache hit.
+- It only deletes files currently matched by the active managed partitions.
+- After pruning, it restores the matched base cache again before the build starts.
+- It does not delete unmanaged files elsewhere in `GRADLE_USER_HOME`.
+- If you disable a partition, files from that now-disabled partition are no longer considered action-managed and are left untouched.
+
+This is intentionally narrower than “delete everything outside the include patterns” because the action does not own all of `GRADLE_USER_HOME`, especially on long-lived self-hosted runners.
 
 ## Development
 

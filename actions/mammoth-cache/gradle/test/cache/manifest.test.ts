@@ -70,7 +70,6 @@ describe('captureCacheManifest', () => {
       ]);
       expect(manifest.partitions.map((partition) => partition.partitionId)).toEqual([
         'modules',
-        'transforms-metadata',
         'kotlin-dsl',
         'build-cache',
         'wrapper-dists',
@@ -80,7 +79,25 @@ describe('captureCacheManifest', () => {
       )?.entries[0];
       expect(wrapperEntry).toBeDefined();
       expect(wrapperEntry!.mode & 0o777).toBe(0o755);
-      expect(serializeCacheManifest(manifest)).toContain('"schemaVersion":1');
+      expect(serializeCacheManifest(manifest)).toContain('"schemaVersion":2');
+    });
+  });
+
+  it('supports opting into the transforms partition explicitly', async () => {
+    await withGradleUserHome(async (gradleUserHome) => {
+      await writeTrackedFile(gradleUserHome, 'caches/transforms-4/example/transform.bin', 'xform');
+
+      const partitions = createCachePartitions(gradleUserHome, [
+        { id: 'transforms-metadata', includes: ['caches/transforms-*/**'], excludes: [] },
+      ]);
+      const manifest = await captureCacheManifest(createTestCacheModel(gradleUserHome, partitions));
+
+      expect(
+        manifest.partitions.find((partition) => partition.partitionId === 'transforms-metadata')
+          ?.entries,
+      ).toEqual([
+        expect.objectContaining({ relativePath: 'caches/transforms-4/example/transform.bin' }),
+      ]);
     });
   });
 
@@ -167,12 +184,12 @@ describe('computeCacheDelta', () => {
 
   it('rejects manifests from different Gradle user homes', () => {
     const previousManifest: CacheManifest = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       gradleUserHome: '/tmp/one',
       partitions: [{ partitionId: 'modules', entries: [] }],
     };
     const currentManifest: CacheManifest = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       gradleUserHome: '/tmp/two',
       partitions: [{ partitionId: 'modules', entries: [] }],
     };
@@ -227,15 +244,17 @@ async function writeTrackedFile(
   await utimes(absolutePath, timestamp, timestamp);
 }
 
-function createTestCacheModel(gradleUserHome: string): CacheModel {
-  const partitions = createCachePartitions(gradleUserHome);
-
+function createTestCacheModel(
+  gradleUserHome: string,
+  partitions = createCachePartitions(gradleUserHome),
+): CacheModel {
   return {
-    cacheKey: 'gradle-cache-1-21-linux-x64-main',
+    cacheKey: 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
     javaMajor: 21,
     runnerOs: 'linux',
     runnerArch: 'x64',
     safeRefName: 'main',
+    partitionFingerprint: 'feedcafe1234abcd',
     partitions,
     includePaths: partitions.flatMap((partition) => partition.absoluteIncludeGlobs),
     excludePaths: [...new Set(partitions.flatMap((partition) => partition.absoluteExcludeGlobs))],
@@ -254,6 +273,7 @@ function createOverlappingCacheModel(gradleUserHome: string): CacheModel {
     runnerOs: 'linux',
     runnerArch: 'x64',
     safeRefName: 'main',
+    partitionFingerprint: 'overlapfingerprint',
     partitions,
     includePaths: partitions.flatMap((partition) => partition.absoluteIncludeGlobs),
     excludePaths: [],

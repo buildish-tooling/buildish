@@ -340,6 +340,7 @@ function createFixtureCacheModel(gradleUserHome: string): CacheModel {
     runnerOs: 'linux',
     runnerArch: 'x64',
     safeRefName: 'main',
+    partitionFingerprint: 'fixture-partitions',
     partitions,
     includePaths: partitions.flatMap((partition) => partition.absoluteIncludeGlobs),
     excludePaths: [...new Set(partitions.flatMap((partition) => partition.absoluteExcludeGlobs))],

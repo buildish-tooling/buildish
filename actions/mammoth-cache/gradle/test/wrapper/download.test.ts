@@ -448,12 +448,14 @@ const baseConfig: NormalizedActionConfig = {
   allowDuplicateDependentDeltaPaths: false,
   cacheKeyPrefix: 'gradle-cache-',
   cacheKeyTemplate: null,
-  cacheSchemaVersion: 1,
+  cachePartitions: [],
+  cacheSchemaVersion: 2,
   wrapperSelectionMode: 'default',
   wrapperPropertiesGlob: '**/gradle/wrapper/gradle-wrapper.properties',
   defaultWrapperPropertiesFile: 'gradle/wrapper/gradle-wrapper.properties',
   wrapperPropertiesFiles: [],
   cleanupEnabled: true,
+  restoreCleanupMode: 'none',
   gradleUserHome: '/home/runner/.gradle',
 };
 

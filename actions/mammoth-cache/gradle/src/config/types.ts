@@ -46,6 +46,31 @@ export const WRAPPER_SELECTION_MODES = ['default', 'all', 'explicit'] as const;
 export type WrapperSelectionMode = (typeof WRAPPER_SELECTION_MODES)[number];
 
 /**
+ * Supported restore-time cleanup policies.
+ *
+ * - `none`: never delete managed cache content during restore
+ * - `prune-managed`: on a cache hit, delete the currently active managed files and then restore the
+ *   matched base cache again so the managed partition space reflects only the restored cache content
+ */
+export const RESTORE_CLEANUP_MODES = ['none', 'prune-managed'] as const;
+export type RestoreCleanupMode = (typeof RESTORE_CLEANUP_MODES)[number];
+
+/**
+ * Normalized user-supplied cache partition override or custom partition definition.
+ *
+ * Partition IDs that match a built-in partition override that built-in's include/exclude lists.
+ * New IDs create custom partitions appended after the built-ins in declaration order.
+ */
+export interface ConfiguredCachePartitionInput {
+  /** Stable machine-readable partition identifier. */
+  readonly id: string;
+  /** Gradle-user-home-relative include globs for this partition. */
+  readonly includes: readonly string[];
+  /** Gradle-user-home-relative exclude globs for this partition. */
+  readonly excludes: readonly string[];
+}
+
+/**
  * Restricted placeholder names accepted by the cache key template input.
  *
  * Keeping this list centralized makes it harder to accidentally widen the user-facing
@@ -54,6 +79,7 @@ export type WrapperSelectionMode = (typeof WRAPPER_SELECTION_MODES)[number];
 export const CACHE_KEY_TEMPLATE_PLACEHOLDERS = [
   'cacheKeyPrefix',
   'schemaVersion',
+  'partitionFingerprint',
   'javaMajor',
   'runnerOs',
   'runnerArch',
@@ -87,6 +113,8 @@ export interface RawActionInputs {
   readonly cacheKeyPrefix: string;
   /** Raw `cache-key-template` input. Empty string later means “use the built-in template”. */
   readonly cacheKeyTemplate: string;
+  /** Raw JSON array of built-in partition overrides and custom partition definitions. */
+  readonly cachePartitions: string;
   /** Raw `process-all-wrapper-files` input. Empty string later defaults to `'false'`. */
   readonly processAllWrapperFiles: string;
   /**
@@ -99,6 +127,8 @@ export interface RawActionInputs {
   readonly wrapperPropertiesFiles: string;
   /** Raw `cleanup-enabled` input. Empty string later defaults to `'true'`. */
   readonly cleanupEnabled: string;
+  /** Raw restore cleanup mode. Empty string later defaults to `'none'`. */
+  readonly restoreCleanupMode: string;
   /** Raw `gradle-user-home` input. Empty string later defaults to the supported runner default. */
   readonly gradleUserHome: string;
   /** Raw `setup-java` input. Empty string later defaults to `'false'`; `true` is currently rejected. */
@@ -159,9 +189,17 @@ export interface NormalizedActionConfig {
   /**
    * Optional custom cache-key template.
    *
-   * Defaults to `null`, which means the built-in default template is used.
+   * Defaults to `null`, which means the built-in default template is used. Custom templates must
+   * include `${partitionFingerprint}` so cache keys do not collide across different cache layouts.
    */
   readonly cacheKeyTemplate: string | null;
+
+  /**
+   * Normalized built-in partition overrides and custom partition definitions.
+   *
+   * Defaults to an empty list, which means only the built-in partition defaults are used.
+   */
+  readonly cachePartitions: readonly ConfiguredCachePartitionInput[];
   /**
    * Internal cache schema version.
    *
@@ -191,6 +229,8 @@ export interface NormalizedActionConfig {
   readonly wrapperPropertiesFiles: readonly string[];
   /** Whether post-build cleanup behavior is enabled. Defaults to `true`. */
   readonly cleanupEnabled: boolean;
+  /** Restore-time cleanup mode applied before the build starts. Defaults to `none`. */
+  readonly restoreCleanupMode: RestoreCleanupMode;
   /**
    * Absolute supported Gradle user home.
    *

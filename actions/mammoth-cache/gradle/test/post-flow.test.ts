@@ -473,11 +473,12 @@ function createSummaryCapture(): {
 function createTestCacheModel(gradleUserHome: string): CacheModel {
   const partitions = createCachePartitions(gradleUserHome);
   return {
-    cacheKey: 'gradle-cache-1-21-linux-x64-main',
+    cacheKey: 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
     javaMajor: 21,
     runnerOs: 'linux',
     runnerArch: 'x64',
     safeRefName: 'main',
+    partitionFingerprint: 'feedcafe1234abcd',
     partitions,
     includePaths: partitions.flatMap((partition) => partition.absoluteIncludeGlobs),
     excludePaths: [...new Set(partitions.flatMap((partition) => partition.absoluteExcludeGlobs))],
