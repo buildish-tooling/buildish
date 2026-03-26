@@ -341,7 +341,10 @@ implementable design.
     - We should also ensure that multiple CI jobs running in parallel or sequentially do not interfere with each
       other and cause flaky test runs or any other side effects or other issues.
 23. As the action shall be CI platform agnostic, the GH action should be placed in `dist/github/`, not just `dist/`.
-24. Prepare for releases
+24. There are lot of configuration options now.
+    - We should allow reading the configuration from a file in YAML or JSON format.
+    - Configuration values on the action override those from a file.
+25. Prepare for releases
     - Ensure LICENSE and NOTICE are present and up-to-date in the release artifacts. Those MUST be ASF compliant,
       if possible, generate those from the contents of the package-lock.json? Is that enough even for the NOTICE file?
     - All dependencies that are contained in (or "distributed with") the action MUST be listed in the LICENSE/NOTICE
@@ -349,12 +352,12 @@ implementable design.
     - Hint: Only Apache-License projects' NOTICE file content is to be included in the distribution's NOTICE file.
       Other licenses that require attribution (e.g., MIT, BSD, etc.) do not go into the NOTICE file.
       They are to be included in the LICENSE file.
-25. Cleanup job summary
+26. Cleanup job summary
     - Can we get the cache partition statistics from the cache manifest into the summary? Like number of files and
       total size for each partition.
-26. Cleanup the code base
+27. Cleanup the code base
     - Check validate*() functions for duplicates
-27. Documentation
+28. Documentation
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
     - Explicitly document the Gradle wrapper jar download and verification process in the docs/ directory.
     - Explicitly document the cache key generation process in the docs/ directory.
@@ -362,7 +365,7 @@ implementable design.
     - Explicitly document the CI abstraction layer in the docs/ directory.
     - Explicitly document the bootstrap process in the docs/ directory.
     - All types and functions must have JSDoc comments.
-28. Add release workflows
+29. Add release workflows
     - Use version tags. "full" version tags like v1.2.3 become actual GitHub releases.
       We can provide "moving" tags like v1, v1.2 as well. Those would then point to the latest release in their
       respective series.

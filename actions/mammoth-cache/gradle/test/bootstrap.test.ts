@@ -103,7 +103,7 @@ const cacheModel: CacheModel = {
     {
       id: 'modules',
       displayName: 'Dependency modules',
-      description: 'Downloaded dependency metadata and artifact stores shared across builds.',
+      description: 'Downloaded dependency artifacts and artifact stores shared across builds.',
       relativeIncludeGlobs: ['caches/modules-*/files-*/**'],
       relativeExcludeGlobs: [
         '**/configuration-cache/**',

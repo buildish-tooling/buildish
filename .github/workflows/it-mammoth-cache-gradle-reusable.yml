@@ -141,6 +141,39 @@ jobs:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-round-trip
           cache-key-prefix: it-standalone-${{ github.run_id }}-${{ github.run_attempt }}-
 
+      - name: Emit standalone prepare outputs
+        env:
+          ACTION_CACHE_KEY: ${{ steps.prepare_standalone_cache.outputs.cache-key }}
+          ACTION_BASE_CACHE_RESTORE_STATUS: ${{ steps.prepare_standalone_cache.outputs.base-cache-restore-status }}
+          ACTION_JAVA_MAJOR: ${{ steps.prepare_standalone_cache.outputs.java-major }}
+          ACTION_JOB_MODE: ${{ steps.prepare_standalone_cache.outputs.job-mode }}
+          ACTION_READ_ONLY: ${{ steps.prepare_standalone_cache.outputs.read-only }}
+          ACTION_WRAPPER_COUNT: ${{ steps.prepare_standalone_cache.outputs.wrapper-count }}
+          ACTION_GRADLE_VERSIONS: ${{ steps.prepare_standalone_cache.outputs.gradle-versions }}
+          ACTION_WRAPPER_DOWNLOADED_COUNT: ${{ steps.prepare_standalone_cache.outputs.wrapper-downloaded-count }}
+          ACTION_WRAPPER_REUSED_COUNT: ${{ steps.prepare_standalone_cache.outputs.wrapper-reused-count }}
+          ACTION_RESOLVED_REF_NAME: ${{ steps.prepare_standalone_cache.outputs.resolved-ref-name }}
+          ACTION_SAFE_REF_NAME: ${{ steps.prepare_standalone_cache.outputs.safe-ref-name }}
+          ACTION_DEPENDENT_JOBS_COUNT: ${{ steps.prepare_standalone_cache.outputs.dependent-jobs-count }}
+          ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT: ${{ steps.prepare_standalone_cache.outputs.downloaded-dependent-artifact-count }}
+          ACTION_JOB_NAME: ${{ steps.prepare_standalone_cache.outputs.job-name }}
+        run: |
+          printf '%s\n' \
+            "cache-key=$ACTION_CACHE_KEY" \
+            "base-cache-restore-status=$ACTION_BASE_CACHE_RESTORE_STATUS" \
+            "java-major=$ACTION_JAVA_MAJOR" \
+            "job-mode=$ACTION_JOB_MODE" \
+            "read-only=$ACTION_READ_ONLY" \
+            "wrapper-count=$ACTION_WRAPPER_COUNT" \
+            "gradle-versions=$ACTION_GRADLE_VERSIONS" \
+            "wrapper-downloaded-count=$ACTION_WRAPPER_DOWNLOADED_COUNT" \
+            "wrapper-reused-count=$ACTION_WRAPPER_REUSED_COUNT" \
+            "resolved-ref-name=$ACTION_RESOLVED_REF_NAME" \
+            "safe-ref-name=$ACTION_SAFE_REF_NAME" \
+            "dependent-jobs-count=$ACTION_DEPENDENT_JOBS_COUNT" \
+            "downloaded-dependent-artifact-count=$ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT" \
+            "job-name=$ACTION_JOB_NAME"
+
       - name: Assert standalone prepare outputs
         env:
           ACTION_BASE_CACHE_RESTORE_STATUS: ${{ steps.prepare_standalone_cache.outputs.base-cache-restore-status }}
@@ -239,11 +272,45 @@ jobs:
           chmod +x "$fixture_dir/gradlew"
 
       - name: Prepare Mammoth Cache for Gradle
+        id: prepare_worker_a_cache
         uses: ./actions/mammoth-cache/gradle
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/worker-a
           job-mode: distributed-worker
           cache-key-prefix: it-distributed-${{ github.run_id }}-${{ github.run_attempt }}-
+
+      - name: Emit worker A prepare outputs
+        env:
+          ACTION_CACHE_KEY: ${{ steps.prepare_worker_a_cache.outputs.cache-key }}
+          ACTION_BASE_CACHE_RESTORE_STATUS: ${{ steps.prepare_worker_a_cache.outputs.base-cache-restore-status }}
+          ACTION_JAVA_MAJOR: ${{ steps.prepare_worker_a_cache.outputs.java-major }}
+          ACTION_JOB_MODE: ${{ steps.prepare_worker_a_cache.outputs.job-mode }}
+          ACTION_READ_ONLY: ${{ steps.prepare_worker_a_cache.outputs.read-only }}
+          ACTION_WRAPPER_COUNT: ${{ steps.prepare_worker_a_cache.outputs.wrapper-count }}
+          ACTION_GRADLE_VERSIONS: ${{ steps.prepare_worker_a_cache.outputs.gradle-versions }}
+          ACTION_WRAPPER_DOWNLOADED_COUNT: ${{ steps.prepare_worker_a_cache.outputs.wrapper-downloaded-count }}
+          ACTION_WRAPPER_REUSED_COUNT: ${{ steps.prepare_worker_a_cache.outputs.wrapper-reused-count }}
+          ACTION_RESOLVED_REF_NAME: ${{ steps.prepare_worker_a_cache.outputs.resolved-ref-name }}
+          ACTION_SAFE_REF_NAME: ${{ steps.prepare_worker_a_cache.outputs.safe-ref-name }}
+          ACTION_DEPENDENT_JOBS_COUNT: ${{ steps.prepare_worker_a_cache.outputs.dependent-jobs-count }}
+          ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT: ${{ steps.prepare_worker_a_cache.outputs.downloaded-dependent-artifact-count }}
+          ACTION_JOB_NAME: ${{ steps.prepare_worker_a_cache.outputs.job-name }}
+        run: |
+          printf '%s\n' \
+            "cache-key=$ACTION_CACHE_KEY" \
+            "base-cache-restore-status=$ACTION_BASE_CACHE_RESTORE_STATUS" \
+            "java-major=$ACTION_JAVA_MAJOR" \
+            "job-mode=$ACTION_JOB_MODE" \
+            "read-only=$ACTION_READ_ONLY" \
+            "wrapper-count=$ACTION_WRAPPER_COUNT" \
+            "gradle-versions=$ACTION_GRADLE_VERSIONS" \
+            "wrapper-downloaded-count=$ACTION_WRAPPER_DOWNLOADED_COUNT" \
+            "wrapper-reused-count=$ACTION_WRAPPER_REUSED_COUNT" \
+            "resolved-ref-name=$ACTION_RESOLVED_REF_NAME" \
+            "safe-ref-name=$ACTION_SAFE_REF_NAME" \
+            "dependent-jobs-count=$ACTION_DEPENDENT_JOBS_COUNT" \
+            "downloaded-dependent-artifact-count=$ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT" \
+            "job-name=$ACTION_JOB_NAME"
 
       - name: Produce worker A cache delta
         working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/worker-a
@@ -293,19 +360,53 @@ jobs:
           chmod +x "$fixture_dir/gradlew"
 
       - name: Prepare Mammoth Cache for Gradle
+        id: prepare_worker_b_cache
         uses: ./actions/mammoth-cache/gradle
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/worker-b
           job-mode: distributed-worker
           cache-key-prefix: it-distributed-${{ github.run_id }}-${{ github.run_attempt }}-
 
+      - name: Emit worker B prepare outputs
+        env:
+          ACTION_CACHE_KEY: ${{ steps.prepare_worker_b_cache.outputs.cache-key }}
+          ACTION_BASE_CACHE_RESTORE_STATUS: ${{ steps.prepare_worker_b_cache.outputs.base-cache-restore-status }}
+          ACTION_JAVA_MAJOR: ${{ steps.prepare_worker_b_cache.outputs.java-major }}
+          ACTION_JOB_MODE: ${{ steps.prepare_worker_b_cache.outputs.job-mode }}
+          ACTION_READ_ONLY: ${{ steps.prepare_worker_b_cache.outputs.read-only }}
+          ACTION_WRAPPER_COUNT: ${{ steps.prepare_worker_b_cache.outputs.wrapper-count }}
+          ACTION_GRADLE_VERSIONS: ${{ steps.prepare_worker_b_cache.outputs.gradle-versions }}
+          ACTION_WRAPPER_DOWNLOADED_COUNT: ${{ steps.prepare_worker_b_cache.outputs.wrapper-downloaded-count }}
+          ACTION_WRAPPER_REUSED_COUNT: ${{ steps.prepare_worker_b_cache.outputs.wrapper-reused-count }}
+          ACTION_RESOLVED_REF_NAME: ${{ steps.prepare_worker_b_cache.outputs.resolved-ref-name }}
+          ACTION_SAFE_REF_NAME: ${{ steps.prepare_worker_b_cache.outputs.safe-ref-name }}
+          ACTION_DEPENDENT_JOBS_COUNT: ${{ steps.prepare_worker_b_cache.outputs.dependent-jobs-count }}
+          ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT: ${{ steps.prepare_worker_b_cache.outputs.downloaded-dependent-artifact-count }}
+          ACTION_JOB_NAME: ${{ steps.prepare_worker_b_cache.outputs.job-name }}
+        run: |
+          printf '%s\n' \
+            "cache-key=$ACTION_CACHE_KEY" \
+            "base-cache-restore-status=$ACTION_BASE_CACHE_RESTORE_STATUS" \
+            "java-major=$ACTION_JAVA_MAJOR" \
+            "job-mode=$ACTION_JOB_MODE" \
+            "read-only=$ACTION_READ_ONLY" \
+            "wrapper-count=$ACTION_WRAPPER_COUNT" \
+            "gradle-versions=$ACTION_GRADLE_VERSIONS" \
+            "wrapper-downloaded-count=$ACTION_WRAPPER_DOWNLOADED_COUNT" \
+            "wrapper-reused-count=$ACTION_WRAPPER_REUSED_COUNT" \
+            "resolved-ref-name=$ACTION_RESOLVED_REF_NAME" \
+            "safe-ref-name=$ACTION_SAFE_REF_NAME" \
+            "dependent-jobs-count=$ACTION_DEPENDENT_JOBS_COUNT" \
+            "downloaded-dependent-artifact-count=$ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT" \
+            "job-name=$ACTION_JOB_NAME"
+
       - name: Produce worker B cache delta
         working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/worker-b
         run: ./gradlew --info --no-daemon resolveWorkerB
 
   # Aggregator waits for both workers, downloads their current-run artifacts, applies both deltas,
-  # and confirms the combined result works offline before post-action cleanup removes consumed
-  # worker artifacts.
+  # and confirms the restored dependency jars are reused without being downloaded again before
+  # post-action cleanup removes consumed worker artifacts.
   aggregator:
     name: Linux distributed aggregator (download+merge worker deltas)
     if: inputs.run-writable-scenarios
@@ -358,9 +459,49 @@ jobs:
           dependent-jobs: worker_a,worker_b
           cache-key-prefix: it-distributed-${{ github.run_id }}-${{ github.run_attempt }}-
 
-      - name: Verify dependent worker deltas restore offline
+      - name: Emit aggregator prepare outputs
+        env:
+          ACTION_CACHE_KEY: ${{ steps.prepare_aggregator_cache.outputs.cache-key }}
+          ACTION_BASE_CACHE_RESTORE_STATUS: ${{ steps.prepare_aggregator_cache.outputs.base-cache-restore-status }}
+          ACTION_JAVA_MAJOR: ${{ steps.prepare_aggregator_cache.outputs.java-major }}
+          ACTION_JOB_MODE: ${{ steps.prepare_aggregator_cache.outputs.job-mode }}
+          ACTION_READ_ONLY: ${{ steps.prepare_aggregator_cache.outputs.read-only }}
+          ACTION_WRAPPER_COUNT: ${{ steps.prepare_aggregator_cache.outputs.wrapper-count }}
+          ACTION_GRADLE_VERSIONS: ${{ steps.prepare_aggregator_cache.outputs.gradle-versions }}
+          ACTION_WRAPPER_DOWNLOADED_COUNT: ${{ steps.prepare_aggregator_cache.outputs.wrapper-downloaded-count }}
+          ACTION_WRAPPER_REUSED_COUNT: ${{ steps.prepare_aggregator_cache.outputs.wrapper-reused-count }}
+          ACTION_RESOLVED_REF_NAME: ${{ steps.prepare_aggregator_cache.outputs.resolved-ref-name }}
+          ACTION_SAFE_REF_NAME: ${{ steps.prepare_aggregator_cache.outputs.safe-ref-name }}
+          ACTION_DEPENDENT_JOBS_COUNT: ${{ steps.prepare_aggregator_cache.outputs.dependent-jobs-count }}
+          ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT: ${{ steps.prepare_aggregator_cache.outputs.downloaded-dependent-artifact-count }}
+          ACTION_JOB_NAME: ${{ steps.prepare_aggregator_cache.outputs.job-name }}
+        run: |
+          printf '%s\n' \
+            "cache-key=$ACTION_CACHE_KEY" \
+            "base-cache-restore-status=$ACTION_BASE_CACHE_RESTORE_STATUS" \
+            "java-major=$ACTION_JAVA_MAJOR" \
+            "job-mode=$ACTION_JOB_MODE" \
+            "read-only=$ACTION_READ_ONLY" \
+            "wrapper-count=$ACTION_WRAPPER_COUNT" \
+            "gradle-versions=$ACTION_GRADLE_VERSIONS" \
+            "wrapper-downloaded-count=$ACTION_WRAPPER_DOWNLOADED_COUNT" \
+            "wrapper-reused-count=$ACTION_WRAPPER_REUSED_COUNT" \
+            "resolved-ref-name=$ACTION_RESOLVED_REF_NAME" \
+            "safe-ref-name=$ACTION_SAFE_REF_NAME" \
+            "dependent-jobs-count=$ACTION_DEPENDENT_JOBS_COUNT" \
+            "downloaded-dependent-artifact-count=$ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT" \
+            "job-name=$ACTION_JOB_NAME"
+
+      - name: Verify dependent worker delta jars are reused without re-download
         working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/aggregator
-        run: ./gradlew --info --offline --no-daemon resolveWorkerA resolveWorkerB
+        run: |
+          ./gradlew --info --no-daemon --continue resolveWorkerA resolveWorkerB 2>&1 | tee aggregator-gradle.log
+          grep -F 'resolved workerA: guava-33.4.8-jre.jar' aggregator-gradle.log
+          grep -F 'resolved workerB: commons-io-2.18.0.jar' aggregator-gradle.log
+          if grep -Eq '(Downloading|Downloaded).*(guava-33\.4\.8-jre|commons-io-2\.18\.0)\.jar' aggregator-gradle.log; then
+            echo 'Expected restored worker dependency jars to be reused, but Gradle downloaded them again.' >&2
+            exit 1
+          fi
 
       - name: Assert both worker artifacts were consumed
         env:
@@ -501,6 +642,39 @@ jobs:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/pull-request
           cache-key-prefix: it-pr-${{ github.run_id }}-${{ github.run_attempt }}-
 
+      - name: Emit pull-request prepare outputs
+        env:
+          ACTION_CACHE_KEY: ${{ steps.prepare_pull_request_cache.outputs.cache-key }}
+          ACTION_BASE_CACHE_RESTORE_STATUS: ${{ steps.prepare_pull_request_cache.outputs.base-cache-restore-status }}
+          ACTION_JAVA_MAJOR: ${{ steps.prepare_pull_request_cache.outputs.java-major }}
+          ACTION_JOB_MODE: ${{ steps.prepare_pull_request_cache.outputs.job-mode }}
+          ACTION_READ_ONLY: ${{ steps.prepare_pull_request_cache.outputs.read-only }}
+          ACTION_WRAPPER_COUNT: ${{ steps.prepare_pull_request_cache.outputs.wrapper-count }}
+          ACTION_GRADLE_VERSIONS: ${{ steps.prepare_pull_request_cache.outputs.gradle-versions }}
+          ACTION_WRAPPER_DOWNLOADED_COUNT: ${{ steps.prepare_pull_request_cache.outputs.wrapper-downloaded-count }}
+          ACTION_WRAPPER_REUSED_COUNT: ${{ steps.prepare_pull_request_cache.outputs.wrapper-reused-count }}
+          ACTION_RESOLVED_REF_NAME: ${{ steps.prepare_pull_request_cache.outputs.resolved-ref-name }}
+          ACTION_SAFE_REF_NAME: ${{ steps.prepare_pull_request_cache.outputs.safe-ref-name }}
+          ACTION_DEPENDENT_JOBS_COUNT: ${{ steps.prepare_pull_request_cache.outputs.dependent-jobs-count }}
+          ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT: ${{ steps.prepare_pull_request_cache.outputs.downloaded-dependent-artifact-count }}
+          ACTION_JOB_NAME: ${{ steps.prepare_pull_request_cache.outputs.job-name }}
+        run: |
+          printf '%s\n' \
+            "cache-key=$ACTION_CACHE_KEY" \
+            "base-cache-restore-status=$ACTION_BASE_CACHE_RESTORE_STATUS" \
+            "java-major=$ACTION_JAVA_MAJOR" \
+            "job-mode=$ACTION_JOB_MODE" \
+            "read-only=$ACTION_READ_ONLY" \
+            "wrapper-count=$ACTION_WRAPPER_COUNT" \
+            "gradle-versions=$ACTION_GRADLE_VERSIONS" \
+            "wrapper-downloaded-count=$ACTION_WRAPPER_DOWNLOADED_COUNT" \
+            "wrapper-reused-count=$ACTION_WRAPPER_REUSED_COUNT" \
+            "resolved-ref-name=$ACTION_RESOLVED_REF_NAME" \
+            "safe-ref-name=$ACTION_SAFE_REF_NAME" \
+            "dependent-jobs-count=$ACTION_DEPENDENT_JOBS_COUNT" \
+            "downloaded-dependent-artifact-count=$ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT" \
+            "job-name=$ACTION_JOB_NAME"
+
       - name: Run a read-only PR build
         working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/pull-request
         run: ./gradlew --info --no-daemon resolveStandalone
@@ -576,11 +750,45 @@ jobs:
           chmod +x "$fixture_dir/gradlew"
 
       - name: Prepare Mammoth Cache for Gradle
+        id: prepare_cross_platform_cache
         uses: ./actions/mammoth-cache/gradle
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/cross-platform-${{ matrix.os }}
           cache-key-prefix: it-cross-platform-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}-
           read-only: true
+
+      - name: Emit cross-platform prepare outputs
+        env:
+          ACTION_CACHE_KEY: ${{ steps.prepare_cross_platform_cache.outputs.cache-key }}
+          ACTION_BASE_CACHE_RESTORE_STATUS: ${{ steps.prepare_cross_platform_cache.outputs.base-cache-restore-status }}
+          ACTION_JAVA_MAJOR: ${{ steps.prepare_cross_platform_cache.outputs.java-major }}
+          ACTION_JOB_MODE: ${{ steps.prepare_cross_platform_cache.outputs.job-mode }}
+          ACTION_READ_ONLY: ${{ steps.prepare_cross_platform_cache.outputs.read-only }}
+          ACTION_WRAPPER_COUNT: ${{ steps.prepare_cross_platform_cache.outputs.wrapper-count }}
+          ACTION_GRADLE_VERSIONS: ${{ steps.prepare_cross_platform_cache.outputs.gradle-versions }}
+          ACTION_WRAPPER_DOWNLOADED_COUNT: ${{ steps.prepare_cross_platform_cache.outputs.wrapper-downloaded-count }}
+          ACTION_WRAPPER_REUSED_COUNT: ${{ steps.prepare_cross_platform_cache.outputs.wrapper-reused-count }}
+          ACTION_RESOLVED_REF_NAME: ${{ steps.prepare_cross_platform_cache.outputs.resolved-ref-name }}
+          ACTION_SAFE_REF_NAME: ${{ steps.prepare_cross_platform_cache.outputs.safe-ref-name }}
+          ACTION_DEPENDENT_JOBS_COUNT: ${{ steps.prepare_cross_platform_cache.outputs.dependent-jobs-count }}
+          ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT: ${{ steps.prepare_cross_platform_cache.outputs.downloaded-dependent-artifact-count }}
+          ACTION_JOB_NAME: ${{ steps.prepare_cross_platform_cache.outputs.job-name }}
+        run: |
+          printf '%s\n' \
+            "cache-key=$ACTION_CACHE_KEY" \
+            "base-cache-restore-status=$ACTION_BASE_CACHE_RESTORE_STATUS" \
+            "java-major=$ACTION_JAVA_MAJOR" \
+            "job-mode=$ACTION_JOB_MODE" \
+            "read-only=$ACTION_READ_ONLY" \
+            "wrapper-count=$ACTION_WRAPPER_COUNT" \
+            "gradle-versions=$ACTION_GRADLE_VERSIONS" \
+            "wrapper-downloaded-count=$ACTION_WRAPPER_DOWNLOADED_COUNT" \
+            "wrapper-reused-count=$ACTION_WRAPPER_REUSED_COUNT" \
+            "resolved-ref-name=$ACTION_RESOLVED_REF_NAME" \
+            "safe-ref-name=$ACTION_SAFE_REF_NAME" \
+            "dependent-jobs-count=$ACTION_DEPENDENT_JOBS_COUNT" \
+            "downloaded-dependent-artifact-count=$ACTION_DOWNLOADED_DEPENDENT_ARTIFACT_COUNT" \
+            "job-name=$ACTION_JOB_NAME"
 
       - name: Verify Gradle runs on this runner
         working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/cross-platform-${{ matrix.os }}
