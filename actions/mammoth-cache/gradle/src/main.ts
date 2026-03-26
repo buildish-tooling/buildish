@@ -20,7 +20,9 @@ import { createMainActionOutputs, executeMainAction } from './main-flow';
 import { claimSingleRunJobInvocation } from './runtime/job-single-run';
 
 export async function runMain(): Promise<void> {
-  const singleRunClaim = await claimSingleRunJobInvocation();
+  const singleRunClaim = await claimSingleRunJobInvocation({
+    saveState: core.saveState,
+  });
   if (!singleRunClaim.accepted) {
     throw new Error(singleRunClaim.message);
   }

@@ -33,6 +33,7 @@ import {
 import { captureCacheManifest } from './cache/manifest';
 import {
   persistConsumedDeltaArtifactNames,
+  persistDeltaArtifactProducerIdentity,
   persistPreBuildCacheManifest,
   type PersistedPreBuildCacheManifestState,
 } from './state/post-action';
@@ -77,6 +78,10 @@ export async function executeMainAction(
       dependencies.saveState ?? core.saveState,
     );
   }
+  persistDeltaArtifactProducerIdentity(
+    bootstrap.ciContext,
+    dependencies.saveState ?? core.saveState,
+  );
   const manifest = await captureCacheManifest(bootstrap.cacheModel);
   const preBuildManifestState = await persistPreBuildCacheManifest(
     manifest,

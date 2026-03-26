@@ -33,8 +33,10 @@ import type { BaseCacheApi } from '../src/cache/service';
 import type { SummaryWriter } from '../src/ci/types';
 import { executePostAction } from '../src/post-flow';
 import {
+  DELTA_ARTIFACT_PRODUCER_IDENTITY_STATE,
   persistPreBuildCacheManifest,
   PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
+  persistDeltaArtifactProducerIdentity,
   persistConsumedDeltaArtifactNames,
 } from '../src/state/post-action';
 
@@ -109,6 +111,72 @@ describe('executePostAction', () => {
         ]),
       );
       expect(summary.writeCalls).toBe(2);
+      await rm(downloaded.downloadDirectory, { recursive: true, force: true });
+    });
+  });
+
+  it('reuses the persisted main-phase producer identity when post-phase job metadata drifts', async () => {
+    await withWorkspace(async (workspace) => {
+      const gradleUserHome = path.join(workspace, '.gradle');
+      const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
+      const savedState = new Map<string, string>();
+      const summary = createSummaryCapture();
+
+      await writeGradleFile(
+        gradleUserHome,
+        'caches/modules-2/files-2.1/org/example/module.bin',
+        'before',
+      );
+      await persistPreBuildState(gradleUserHome, savedState, workspace);
+      persistDeltaArtifactProducerIdentity(
+        {
+          ...createTestCiContext(workspace),
+          jobName: 'worker_a',
+          runId: 101,
+          runAttempt: 2,
+        },
+        (name: string, value: string) => savedState.set(name, value),
+      );
+      expect(savedState.get(DELTA_ARTIFACT_PRODUCER_IDENTITY_STATE)).toBeTruthy();
+      await writeGradleFile(
+        gradleUserHome,
+        'caches/modules-2/files-2.1/org/example/module.bin',
+        'after',
+      );
+
+      const status = await executePostAction({
+        artifactApi,
+        cacheApi: createCacheApi({ saveCache: async () => 0 }),
+        captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
+        env: createTestEnv(workspace, gradleUserHome, 'post-phase-job-name'),
+        eventPayload: {
+          repository: { default_branch: 'main' },
+        },
+        getState(name: string): string {
+          if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
+            return 'true';
+          }
+          return savedState.get(name) ?? '';
+        },
+        inputProvider: createInputProvider('distributed-worker'),
+        summaryWriter: summary.writer,
+      });
+
+      expect(status.deltaArtifactResult).toEqual(
+        expect.objectContaining({
+          status: 'uploaded',
+          artifactName: expect.stringMatching(
+            /^buildish-mammoth-cache-gradle-delta-worker_a-run-101-attempt-2-/u,
+          ),
+        }),
+      );
+
+      const artifacts = await artifactApi.listArtifacts();
+      expect(artifacts).toHaveLength(1);
+      const downloaded = await downloadAndVerifyDeltaArtifactPackage(artifactApi, artifacts[0]);
+      expect(downloaded.metadata.producer.jobName).toBe('worker_a');
+      expect(downloaded.metadata.producer.runId).toBe(101);
+      expect(downloaded.metadata.producer.runAttempt).toBe(2);
       await rm(downloaded.downloadDirectory, { recursive: true, force: true });
     });
   });
@@ -331,6 +399,26 @@ function createTestEnv(
     RUNNER_OS: 'Linux',
     RUNNER_ARCH: 'X64',
     RUNNER_TEMP: path.join(workspace, 'runner-temp'),
+  };
+}
+
+function createTestCiContext(workspace: string) {
+  return {
+    platform: 'github' as const,
+    eventName: 'push',
+    resolvedRefName: 'main',
+    safeRefName: 'main',
+    runnerOs: 'linux',
+    runnerArch: 'x64',
+    defaultBranch: 'main',
+    isPullRequest: false,
+    repository: 'apache/buildish',
+    workflowName: 'CI',
+    jobName: 'worker-build',
+    runId: 101,
+    runAttempt: 2,
+    workspace,
+    actionPath: null,
   };
 }
 

@@ -352,6 +352,7 @@ implementable design.
     - Can we get the cache partition statistics from the cache manifest into the summary? Like number of files and
       total size for each partition.
 25. Cleanup the code base
+    - Check validate*() functions for duplicates
 26. Documentation
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
     - Explicitly document the Gradle wrapper jar download and verification process in the docs/ directory.

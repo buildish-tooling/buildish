@@ -26,6 +26,7 @@ import { bootstrapPhase, type BootstrapDependencies, type BootstrapStatus } from
 import { captureCacheManifest, computeCacheDelta } from './cache/manifest';
 import { appendJobSummary } from './logging/summary';
 import {
+  getPersistedDeltaArtifactProducerIdentity,
   getPersistedConsumedDeltaArtifactNames,
   loadPersistedPreBuildCacheManifest,
 } from './state/post-action';
@@ -158,8 +159,19 @@ async function uploadPostDeltaArtifact(
   }
 
   const artifactApi = dependencies.artifactApi ?? createGitHubArtifactApi();
+  const persistedProducerIdentity = getPersistedDeltaArtifactProducerIdentity(
+    dependencies.getState ?? (() => ''),
+  );
+  const deltaArtifactProducerContext = persistedProducerIdentity
+    ? {
+        ...bootstrap.ciContext,
+        jobName: persistedProducerIdentity.jobName,
+        runId: persistedProducerIdentity.runId,
+        runAttempt: persistedProducerIdentity.runAttempt,
+      }
+    : bootstrap.ciContext;
   const stagedPackage = await stageDeltaArtifactPackage(
-    bootstrap.ciContext,
+    deltaArtifactProducerContext,
     bootstrap.cacheModel!,
     deltaManifest,
   );
