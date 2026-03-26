@@ -39,6 +39,33 @@ log() {
   echo "integration-test: $*"
 }
 
+CAPTURED_OUTPUT=''
+CAPTURED_STATUS=0
+
+run_and_capture() {
+  output_file=$(mktemp "${TMPDIR:-/tmp}/buildish-no-gradle-wrapper-jar-test.XXXXXX")
+  set +e
+  "$@" >"$output_file" 2>&1
+  CAPTURED_STATUS=$?
+  set -e
+  CAPTURED_OUTPUT=$(cat "$output_file")
+  rm -f "$output_file"
+}
+
+assert_last_command_succeeded() {
+  [ "$CAPTURED_STATUS" -eq 0 ] || fail "$1 (exit status=$CAPTURED_STATUS, output=$CAPTURED_OUTPUT)"
+}
+
+assert_last_command_failed() {
+  [ "$CAPTURED_STATUS" -ne 0 ] || fail "$1"
+}
+
+assert_last_output_contains() {
+  expected_text=$1
+  failure_message=$2
+  printf '%s' "$CAPTURED_OUTPUT" | grep -Fq "$expected_text" || fail "$failure_message (output=$CAPTURED_OUTPUT)"
+}
+
 source_sdkman_gradle() {
   if [ -s "$HOME/.sdkman/bin/sdkman-init.sh" ] && ! command -v sdk >/dev/null 2>&1; then
     set +u
@@ -150,6 +177,46 @@ raise SystemExit(0 if sys.argv[2] in text else 1)
 PY
 }
 
+set_wrapper_property() {
+  file_path=$1
+  property_name=$2
+  property_value=$3
+  python3 - <<'PY' "$file_path" "$property_name" "$property_value"
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+name = sys.argv[2]
+value = sys.argv[3]
+lines = path.read_text().splitlines()
+updated = []
+replaced = False
+for line in lines:
+    if line.startswith(f"{name}="):
+        updated.append(f"{name}={value}")
+        replaced = True
+    else:
+        updated.append(line)
+if not replaced:
+    updated.append(f"{name}={value}")
+path.write_text("\n".join(updated) + "\n")
+PY
+}
+
+remove_wrapper_property() {
+  file_path=$1
+  property_name=$2
+  python3 - <<'PY' "$file_path" "$property_name"
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+name = sys.argv[2]
+lines = [line for line in path.read_text().splitlines() if not line.startswith(f"{name}=")]
+path.write_text("\n".join(lines) + "\n")
+PY
+}
+
 assert_launcher_patches() {
   project_dir=$1
   file_has_exact_line "$project_dir/gradlew" '. "${APP_HOME}/gradle/buildish-no-gradle-wrapper-jar.sh"' || fail 'gradlew was not patched with the helper include.'
@@ -187,6 +254,135 @@ run_wrapper() {
   (cd "$project_dir" && GRADLE_USER_HOME=$(gradle_user_home "$project_dir") ./gradlew --no-daemon "$@" >/dev/null)
 }
 
+run_wrapper_capture() {
+  project_dir=$1
+  shift
+  output_file=$(mktemp "${TMPDIR:-/tmp}/buildish-no-gradle-wrapper-jar-test.XXXXXX")
+  log "running ./gradlew $* in '$project_dir' (GRADLE_USER_HOME='$(gradle_user_home "$project_dir")')"
+  set +e
+  (cd "$project_dir" && GRADLE_USER_HOME=$(gradle_user_home "$project_dir") ./gradlew --no-daemon "$@") >"$output_file" 2>&1
+  CAPTURED_STATUS=$?
+  set -e
+  CAPTURED_OUTPUT=$(cat "$output_file")
+  rm -f "$output_file"
+}
+
+run_posix_installer_capture() {
+  project_dir=$1
+  log "installing POSIX helper into '$project_dir'"
+  run_and_capture env BUILDISH_NO_GRADLE_WRAPPER_JAR_SOURCE_DIR="$TOOL_DIR" sh "$TOOL_DIR/install.sh" "$project_dir"
+}
+
+run_powershell_installer_capture() {
+  project_dir=$1
+  log "installing PowerShell helper into '$project_dir'"
+  run_and_capture env BUILDISH_NO_GRADLE_WRAPPER_JAR_SOURCE_DIR="$TOOL_DIR" pwsh -NoLogo -NoProfile -File "$TOOL_DIR/install.ps1" "$project_dir"
+}
+
+run_posix_helper_direct() {
+  project_dir=$1
+  helper_path="$project_dir/gradle/buildish-no-gradle-wrapper-jar.sh"
+  log "running POSIX helper directly in '$project_dir'"
+  run_and_capture env APP_HOME="$project_dir" sh -c 'helper_path=$1; set --; . "$helper_path"' sh "$helper_path"
+}
+
+run_powershell_helper_direct() {
+  project_dir=$1
+  helper_path="$project_dir/gradle/buildish-no-gradle-wrapper-jar.ps1"
+  log "running PowerShell helper directly in '$project_dir'"
+  run_and_capture env APP_HOME="$project_dir" BUILDISH_NO_GRADLE_WRAPPER_JAR_ORIGINAL_ARGS='' pwsh -NoLogo -NoProfile -File "$helper_path"
+}
+
+assert_installer_distribution_sha_warning_output() {
+  context_label=$1
+  assert_last_output_contains 'does not define distributionSha256Sum' "$context_label did not emit the missing distributionSha256Sum installer warning."
+}
+
+assert_init_distribution_sha_warning_output() {
+  context_label=$1
+  assert_last_output_contains 'Buildish helper warning:' "$context_label did not emit the Buildish warning banner for missing distributionSha256Sum."
+  assert_last_output_contains 'distributionSha256Sum' "$context_label did not mention distributionSha256Sum in its warning output."
+}
+
+exercise_helper_recovery_scenario() {
+  project_dir=$1
+  version=$2
+  helper_kind=$3
+  jar_path="$project_dir/gradle/wrapper/gradle-wrapper.jar"
+  sha_path="$project_dir/gradle/wrapper/gradle-wrapper-$version.sha256"
+  asc_path="$project_dir/gradle/wrapper/gradle-wrapper-$version.asc"
+
+  log "exercising $helper_kind helper recovery scenario in '$project_dir' for Gradle '$version'"
+  printf 'corrupted-wrapper-jar\n' > "$jar_path"
+  rm -f "$sha_path" "$asc_path"
+
+  case "$helper_kind" in
+    posix)
+      run_posix_helper_direct "$project_dir"
+      assert_last_command_succeeded 'POSIX helper did not recover from a corrupted wrapper JAR plus missing metadata.'
+      ;;
+    powershell)
+      run_powershell_helper_direct "$project_dir"
+      assert_last_command_succeeded 'PowerShell helper did not recover from a corrupted wrapper JAR plus missing metadata.'
+      ;;
+    *)
+      fail "unknown helper kind '$helper_kind'"
+      ;;
+  esac
+
+  assert_metadata_for_version "$project_dir" "$version"
+}
+
+exercise_helper_invalid_distribution_failure() {
+  project_dir=$1
+  helper_kind=$2
+  properties_path="$project_dir/gradle/wrapper/gradle-wrapper.properties"
+
+  log "exercising $helper_kind helper invalid-distribution failure in '$project_dir'"
+  set_wrapper_property "$properties_path" distributionUrl 'https\://example.invalid/distributions/gradle-9.4.1-bin.zip'
+
+  case "$helper_kind" in
+    posix)
+      run_posix_helper_direct "$project_dir"
+      assert_last_command_failed 'POSIX helper unexpectedly accepted a non-canonical distributionUrl.'
+      ;;
+    powershell)
+      run_powershell_helper_direct "$project_dir"
+      assert_last_command_failed 'PowerShell helper unexpectedly accepted a non-canonical distributionUrl.'
+      ;;
+    *)
+      fail "unknown helper kind '$helper_kind'"
+      ;;
+  esac
+
+  assert_last_output_contains 'distributionUrl must be a canonical HTTPS services.gradle.org URL' "$helper_kind helper failure output did not mention the canonical distributionUrl requirement."
+}
+
+exercise_installer_missing_properties_failure() {
+  project_dir=$1
+  installer_kind=$2
+
+  log "exercising $installer_kind installer missing-properties failure in '$project_dir'"
+  gradle_init_fixture "$project_dir"
+  rm -f "$project_dir/gradle/wrapper/gradle-wrapper.properties"
+
+  case "$installer_kind" in
+    posix)
+      run_posix_installer_capture "$project_dir"
+      assert_last_command_failed 'POSIX installer unexpectedly succeeded without gradle-wrapper.properties.'
+      ;;
+    powershell)
+      run_powershell_installer_capture "$project_dir"
+      assert_last_command_failed 'PowerShell installer unexpectedly succeeded without gradle-wrapper.properties.'
+      ;;
+    *)
+      fail "unknown installer kind '$installer_kind'"
+      ;;
+  esac
+
+  assert_last_output_contains 'Gradle wrapper properties file was not found' "$installer_kind installer failure output did not mention the missing gradle-wrapper.properties file."
+}
+
 exercise_wrapper_update_to_version() {
   project_dir=$1
   bootstrap_gradle_version=$2
@@ -194,8 +390,9 @@ exercise_wrapper_update_to_version() {
 
   log "starting wrapper exercise for target Gradle '$target_version' in '$project_dir'"
   gradle_init_fixture "$project_dir" "$bootstrap_gradle_version"
-  log "installing POSIX helper into '$project_dir'"
-  BUILDISH_NO_GRADLE_WRAPPER_JAR_SOURCE_DIR="$TOOL_DIR" sh "$TOOL_DIR/install.sh" "$project_dir" >/dev/null
+  run_posix_installer_capture "$project_dir"
+  assert_last_command_succeeded 'POSIX installer failed during the wrapper exercise.'
+  assert_installer_distribution_sha_warning_output 'POSIX installer'
   [ ! -e "$project_dir/gradle/wrapper/gradle-wrapper.jar" ] || fail 'install.sh should remove the existing gradle-wrapper.jar.'
   assert_helper_files "$project_dir"
   assert_launcher_patches "$project_dir"
@@ -208,7 +405,9 @@ exercise_wrapper_update_to_version() {
   assert_metadata_for_version "$project_dir" "$initial_version"
 
   log "upgrading wrapper in '$project_dir' from '$initial_version' to '$target_version'"
-  run_wrapper "$project_dir" wrapper --gradle-version "$target_version" --distribution-type bin
+  run_wrapper_capture "$project_dir" wrapper --gradle-version "$target_version" --distribution-type bin
+  assert_last_command_succeeded 'Gradle wrapper update failed during the wrapper exercise.'
+  assert_init_distribution_sha_warning_output 'Gradle init script'
   updated_version=$(extract_gradle_version "$project_dir")
   [ "$updated_version" = "$target_version" ] || fail "expected updated Gradle version '$target_version' but found '$updated_version'."
   assert_launcher_patches "$project_dir"
@@ -228,8 +427,9 @@ run_powershell_installer_flow() {
   project_dir=$1
   log "running default PowerShell installer flow in '$project_dir'"
   gradle_init_fixture "$project_dir"
-  log "installing PowerShell helper into '$project_dir'"
-  BUILDISH_NO_GRADLE_WRAPPER_JAR_SOURCE_DIR="$TOOL_DIR" pwsh -NoLogo -NoProfile -File "$TOOL_DIR/install.ps1" "$project_dir" >/dev/null
+  run_powershell_installer_capture "$project_dir"
+  assert_last_command_succeeded 'PowerShell installer failed during the default integration flow.'
+  assert_installer_distribution_sha_warning_output 'PowerShell installer'
   [ ! -e "$project_dir/gradle/wrapper/gradle-wrapper.jar" ] || fail 'install.ps1 should remove the existing gradle-wrapper.jar.'
   assert_helper_files "$project_dir"
   assert_launcher_patches "$project_dir"
@@ -240,6 +440,8 @@ run_powershell_installer_flow() {
   installed_version=$(extract_gradle_version "$project_dir")
   [ -n "$installed_version" ] || fail 'unable to extract the installed Gradle version after install.ps1.'
   assert_metadata_for_version "$project_dir" "$installed_version"
+  exercise_helper_recovery_scenario "$project_dir" "$installed_version" powershell
+  exercise_helper_invalid_distribution_failure "$project_dir" powershell
 }
 
 run_default_integration_suite() {
@@ -256,6 +458,10 @@ run_default_integration_suite() {
   log "starting default integration suite (test_root='$test_root')"
   run_posix_installer_flow "$test_root/posix-installer"
   run_powershell_installer_flow "$test_root/powershell-installer"
+  exercise_helper_recovery_scenario "$test_root/posix-installer" "$(extract_gradle_version "$test_root/posix-installer")" posix
+  exercise_helper_invalid_distribution_failure "$test_root/posix-installer" posix
+  exercise_installer_missing_properties_failure "$test_root/posix-installer-missing-properties" posix
+  exercise_installer_missing_properties_failure "$test_root/powershell-installer-missing-properties" powershell
   log 'all helper-tool integration checks passed.'
 }
 

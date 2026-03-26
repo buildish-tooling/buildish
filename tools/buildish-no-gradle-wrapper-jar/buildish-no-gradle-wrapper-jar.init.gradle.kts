@@ -120,6 +120,35 @@ fun replaceAnyExactLine(target: File, replacements: List<Pair<String, String>>, 
   throw GradleException("Unable to find the expected replacement point in $label at '${target.absolutePath}'.")
 }
 
+// Gradle's generated `gradle-wrapper.properties` often omits distributionSha256Sum
+// unless a project or tool explicitly configures it. That omission weakens the
+// wrapper-distribution trust story even though this helper still verifies the
+// wrapper JAR itself, so emit a prominent reminder whenever the Wrapper task leaves
+// the properties file without that checksum pin.
+fun warnIfDistributionSha256SumMissing(wrapperTask: Wrapper) {
+  val propertiesFile = wrapperTask.jarFile.parentFile.resolve("gradle-wrapper.properties")
+  if (!propertiesFile.isFile) return
+  val hasDistributionSha256Sum =
+    propertiesFile.useLines { lines ->
+      lines.any { line ->
+        val normalizedLine = line.removeSuffix("\r")
+        normalizedLine.matches(Regex("^distributionSha256Sum=\\S.*$"))
+      }
+    }
+  if (hasDistributionSha256Sum) return
+  wrapperTask.logger.warn(
+    """
+    ==============================================================================
+    Buildish helper warning: '${propertiesFile.absolutePath}' does not define
+    distributionSha256Sum.
+    Gradle will not pin the wrapper distribution ZIP checksum during wrapper
+    downloads. This helper still verifies gradle-wrapper.jar, but not the
+    distribution ZIP itself.
+    ==============================================================================
+    """.trimIndent(),
+  )
+}
+
 // Init scripts are evaluated with a `Gradle` receiver rather than a project
 // receiver, so the `Wrapper` hook is registered once the projects are loaded.
 //
@@ -129,8 +158,10 @@ fun replaceAnyExactLine(target: File, replacements: List<Pair<String, String>>, 
 gradle.projectsLoaded {
   rootProject {
     tasks.withType<Wrapper>().configureEach {
+      val wrapperTask = this
       notCompatibleWithConfigurationCache("Patches generated launcher scripts after the Wrapper task writes them.")
       doLast {
+        warnIfDistributionSha256SumMissing(wrapperTask)
         patchAfterAnyAnchor(scriptFile, listOf(currentUnixAnchor, oldUnixAnchor), unixInsertion, "gradlew")
         patchAfterAnyAnchor(batchScript, listOf(batchAnchor), batchHelperBlock, "gradlew.bat")
         replaceAnyExactLine(

@@ -410,6 +410,9 @@ GRADLEW_BAT_PATCHED_CURRENT_EXECUTE_LINE='"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_
 [ -f "$PROPERTIES_PATH" ] ||
   buildish_install_fail "Gradle wrapper properties file was not found at '$PROPERTIES_PATH'. Run this installer from a Gradle project root or pass that directory as the only argument."
 buildish_install_assert_not_symlink "$PROPERTIES_PATH" 'gradle-wrapper.properties'
+# The helper can reconstruct and verify `gradle-wrapper.jar`, but it does not
+# replace Gradle's own distribution ZIP verification. Warn early so adopters see
+# the trust gap in the generated properties file before the first wrapper run.
 if ! grep -Eq '^distributionSha256Sum=[^[:space:]].*' "$PROPERTIES_PATH"; then
   buildish_install_warn "WARNING: '$PROPERTIES_PATH' does not define distributionSha256Sum. Gradle itself will not pin the distribution ZIP checksum during wrapper downloads; this helper continues, but it only verifies gradle-wrapper.jar."
 fi

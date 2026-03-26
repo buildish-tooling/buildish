@@ -208,3 +208,15 @@ the URLs and, possibly, the trust material.
 This repository validates the blueprint with tool-local syntax checks, shell integration tests that
 exercise `gradle init` plus `./gradlew ...` flows, and a dedicated Apache RAT check for the tracked
 tool files.
+
+The repository has also run a realistic wrapper-upgrade probe that bootstraps with Gradle `8.1.1`
+and Java `17`, then upgrades through the latest tested patch release of each minor line from `8.1`
+through `9.4`:
+
+- `8.1.1`, `8.2.1`, `8.3`, `8.4`, `8.5`, `8.6`, `8.7`, `8.8`, `8.9`
+- `8.10.2`, `8.11.1`, `8.12.1`, `8.13`, `8.14.4`
+- `9.0.0`, `9.1.0`, `9.2.1`, `9.3.1`, `9.4.1`
+
+That version exercise is a record of test coverage in this repository, not a compatibility promise
+or formal support guarantee for every project layout, operating system, shell environment, or future
+Gradle release.

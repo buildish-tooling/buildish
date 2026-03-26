@@ -741,6 +741,18 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Install GnuPG on Windows
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          choco install gnupg --no-progress -y
+          foreach ($candidate in @('C:\Program Files (x86)\GnuPG\bin', 'C:\Program Files\GnuPG\bin')) {
+            if (Test-Path -LiteralPath $candidate) {
+              $candidate | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            }
+          }
+          gpg --version
+
       - name: Stage cross-platform fixture
         run: |
           fixture_dir="${ACTION_DIRECTORY}/build/integration-fixtures/cross-platform-${{ matrix.os }}"

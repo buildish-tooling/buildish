@@ -365,6 +365,9 @@ if errorlevel 1 goto fail
     throw "Gradle wrapper properties file was not found at '$GradlePropertiesPath'. Run this installer from a Gradle project root or pass that directory as the only argument."
   }
   Assert-BuildishNotSymlink -Path $GradlePropertiesPath -Label 'gradle-wrapper.properties'
+  # The helper verifies `gradle-wrapper.jar`, but it does not make Gradle start
+  # verifying the distribution ZIP automatically. Emit a prominent installer-time
+  # warning so adopters notice the missing checksum pin immediately.
   if (-not (Select-String -Path $GradlePropertiesPath -Pattern '^distributionSha256Sum=\S' -Quiet)) {
     Write-Warning "$BuildishToolName install: WARNING: '$GradlePropertiesPath' does not define distributionSha256Sum. Gradle itself will not pin the distribution ZIP checksum during wrapper downloads; this helper continues, but it only verifies gradle-wrapper.jar."
   }

@@ -336,6 +336,9 @@ if [ -f "$BUILDISH_HELPER_JAR_PATH" ]; then
      buildish_no_gradle_wrapper_jar_verify_signature "$BUILDISH_HELPER_SIGNATURE_PATH" "$BUILDISH_HELPER_JAR_PATH"; then
     return 0 2>/dev/null || exit 0
   fi
+  # Do not keep a locally cached JAR that no longer matches the authoritative
+  # checksum/signature pair. Removing it before the slow path prevents stale or
+  # partially trusted bytes from surviving a later interrupted download.
   rm -f "$BUILDISH_HELPER_JAR_PATH"
 fi
 
@@ -360,6 +363,9 @@ buildish_no_gradle_wrapper_jar_verify_signature "$BUILDISH_HELPER_SIGNATURE_PATH
   buildish_no_gradle_wrapper_jar_fail "Downloaded Gradle wrapper JAR failed detached signature verification."
 }
 
+# Replace the target JAR only after both verification steps succeed. Until then
+# the candidate stays in a temp path so the wrapper directory never advertises an
+# unverified `gradle-wrapper.jar` to a concurrent shell or editor scan.
 mv -f "$downloaded_wrapper_path" "$BUILDISH_HELPER_JAR_PATH" || {
   rm -f "$downloaded_wrapper_path"
   buildish_no_gradle_wrapper_jar_fail "Unable to install the verified Gradle wrapper JAR into '${BUILDISH_HELPER_JAR_PATH}'."

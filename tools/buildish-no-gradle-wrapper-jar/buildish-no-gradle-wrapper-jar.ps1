@@ -395,6 +395,9 @@ try {
     }
 
     if (-not $wrapperJarReady) {
+      # Do not leave a locally cached JAR in place once it has failed checksum or
+      # detached-signature verification. Clearing it here avoids stale bytes being
+      # mistaken for a trusted wrapper if a later download attempt is interrupted.
       Remove-Item -LiteralPath $GradleWrapperJarPath -Force -ErrorAction SilentlyContinue
     }
   }
@@ -410,6 +413,8 @@ try {
       }
 
       Test-BuildishNoGradleWrapperJarDetachedSignature -SignaturePath $GradleWrapperSignaturePath -PayloadPath $downloadedWrapperPath -GpgCommand $GpgCommand
+      # Publish the candidate JAR into the wrapper directory only after checksum
+      # and detached-signature verification have both succeeded.
       Move-Item -LiteralPath $downloadedWrapperPath -Destination $GradleWrapperJarPath -Force
     } finally {
       Remove-Item -LiteralPath $downloadedWrapperPath -Force -ErrorAction SilentlyContinue
