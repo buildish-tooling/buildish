@@ -287,9 +287,7 @@ implementable design.
     - Cover validation, wrapper logic, caching, artifacts, merging, and summaries.
 15. Make sure the delta artifacts are either deleted after the aggregator job has finished or after 12 hours.
 16. Add a safeguard to prevent the action from run more than once per job.
-17. Built-in invocation of `actions/setup-java`
-    - Just to install Java for a particular version using a particular distribution
-    - Using the same defaults as `actions/setup-java` for the version and distribution (value pass-through)
+17. Fail hard when no Java runtime is available.
 18. Support macOS and Windows runners
 19. Integration workflow suite
     - Those workflows are not part of the action itself, but required to run integration tests.
@@ -321,4 +319,11 @@ implementable design.
 - Non-default `GRADLE_USER_HOME`
 - Project-local `.gradle`
 - Non-GitHub CI implementations
-- Java versions below 8
+- Java versions below 8 
+- Built-in invocation of `actions/setup-java`.
+  Just to install Java for a particular version using a particular distribution.
+  Using the same defaults as `actions/setup-java` for the version and distribution (value pass-through).
+  PROBLEM:
+  - the stock setup-java entrypoint always writes Maven auth/toolchain files after installing Java.
+  - invoking upstream setup-java as a raw child process would not update this action’s current process environment by itself
+  - the upstream entrypoint also emits a Java problem matcher and writes Maven settings/toolchains by default
