@@ -21,7 +21,7 @@ BUILD_STAMP := dist/.buildish-mammoth-cache-gradle-built
 BUILD_INPUTS := action.yml package.json tsconfig.json $(shell find src -type f 2>/dev/null)
 HELP_TARGETS := $(MAKEFILE_LIST)
 
-.PHONY: build check clean clean-all help lint-check lint-fix rat-check rebuild sanity-check smoke-test test
+.PHONY: build check clean clean-all help integration-test-distributed-reuse lint-check lint-fix rat-check rebuild sanity-check smoke-test test
 
 help: ## Show available Make targets.
 	@awk 'BEGIN {FS = ":.*## "; printf "Available targets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(HELP_TARGETS)
@@ -84,6 +84,9 @@ rat-check: sanity-check ## Run Apache RAT license-header verification (requires 
 
 smoke-test: build ## Run the bundled-action smoke test against a staged fixture copy.
 	$(NPM) run smoke-test
+
+integration-test-distributed-reuse: sanity-check $(NODE_MODULES_STAMP) ## Run the local worker/aggregator distributed reuse integration test.
+	$(NPM) run integration-test:distributed-reuse
 
 check: ## Run a full clean verification: clean-all, build, test, lint-check, and rat-check.
 	$(MAKE) clean-all

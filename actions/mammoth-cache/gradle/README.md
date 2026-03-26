@@ -307,6 +307,7 @@ Common commands:
 - `make help`
 - `make build`
 - `make smoke-test`
+- `make integration-test-distributed-reuse`
 - `make test`
 - `make lint-check`
 - `make rat-check`
@@ -316,6 +317,7 @@ Equivalent npm script:
 
 - `npm run rat-check`
 - `npm run smoke-test`
+- `npm run integration-test:distributed-reuse`
 
 The Makefile verifies the expected `node` and `npm` versions before running user-facing targets.
 
@@ -353,6 +355,14 @@ This runs:
 - Apache RAT license-header verification (`make check`)
 
 `make smoke-test` / `npm run smoke-test` performs a lightweight bundled-action smoke run against a temporary copy of `test/fixtures/smoke`, so it does not modify committed fixture files.
+
+`make integration-test-distributed-reuse` / `npm run integration-test:distributed-reuse` stages three temporary copies of `test/fixtures/integration/gradle-project`, runs the real worker-A → worker-B → aggregator flow locally, and asserts that the aggregator resolves the expected jars without re-downloading those jar files. This scenario requires:
+
+- Java 21+
+- network access for the initial wrapper/dependency downloads
+- a POSIX-style shell environment (`gradlew` is used, not `gradlew.bat`)
+
+On failure, the staged temporary directory is preserved and printed so you can inspect the generated Gradle homes, summaries, and aggregator log locally.
 
 ## License
 
