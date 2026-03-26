@@ -38,6 +38,7 @@ describe('captureCacheManifest', () => {
     await withGradleUserHome(async (gradleUserHome) => {
       await writeTrackedFile(gradleUserHome, 'caches/modules-2/files-2.1/example.jar', 'module');
       await writeTrackedFile(gradleUserHome, 'caches/8.10/fileHashes/hash.bin', 'transform');
+      await writeTrackedFile(gradleUserHome, 'caches/8.10/md-rule/rule.bin', 'ignored-transform');
       await writeTrackedFile(gradleUserHome, 'caches/8.10/scripts/script.bin', 'script');
       await writeTrackedFile(gradleUserHome, 'caches/build-cache-1/output.bin', 'build');
       await writeTrackedFile(
@@ -47,16 +48,21 @@ describe('captureCacheManifest', () => {
         0o755,
       );
       await writeTrackedFile(gradleUserHome, 'caches/modules-2/example.lock', 'ignored');
+      await writeTrackedFile(gradleUserHome, 'caches/8.10/cc-keystore', 'ignored');
       await writeTrackedFile(
         gradleUserHome,
         'caches/modules-2/configuration-cache/should-be-ignored.bin',
         'ignored',
       );
+      await writeTrackedFile(
+        gradleUserHome,
+        'caches/modules-2/metadata-2.107/module-artifact.bin',
+        'ignored-metadata',
+      );
 
       const manifest = await captureCacheManifest(createTestCacheModel(gradleUserHome));
 
       expect(flattenManifestPaths(manifest)).toEqual([
-        'caches/8.10/fileHashes/hash.bin',
         'caches/8.10/scripts/script.bin',
         'caches/build-cache-1/output.bin',
         'caches/modules-2/files-2.1/example.jar',

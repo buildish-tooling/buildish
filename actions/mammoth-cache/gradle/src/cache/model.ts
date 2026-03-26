@@ -255,14 +255,14 @@ export function createCachePartitions(gradleUserHome: string): readonly CachePar
       'Dependency modules',
       'Downloaded dependency metadata and artifact stores shared across builds.',
       gradleUserHome,
-      ['caches/modules-2/**', 'caches/jars-*/**'],
+      ['caches/modules-*/**', 'caches/jars-*/**', 'caches/resources-*/**'],
     ),
     createPartition(
       'transforms-metadata',
       'Transforms and metadata',
       'Artifact transforms plus supporting metadata reused between builds.',
       gradleUserHome,
-      ['caches/transforms-*/**', 'caches/*/fileHashes/**', 'caches/*/md-rule/**'],
+      ['caches/transforms-*/**'],
     ),
     createPartition(
       'kotlin-dsl',
@@ -358,7 +358,12 @@ function createPartition(
   gradleUserHome: string,
   relativeIncludeGlobs: readonly string[],
 ): CachePartitionDefinition {
-  const relativeExcludeGlobs = ['**/configuration-cache/**', '**/*.lock'];
+  const relativeExcludeGlobs = [
+    '**/configuration-cache/**',
+    '**/*.lock',
+    'caches/*/cc-keystore',
+    'caches/modules-*/metadata-*/**',
+  ];
 
   return {
     id,

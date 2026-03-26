@@ -116,10 +116,27 @@ describe('createCachePartitions', () => {
     expect(
       partitions.every((partition) => partition.relativeExcludeGlobs.includes('**/*.lock')),
     ).toBe(true);
+    expect(
+      partitions.every((partition) =>
+        partition.relativeExcludeGlobs.includes('caches/*/cc-keystore'),
+      ),
+    ).toBe(true);
+    expect(
+      partitions.every((partition) =>
+        partition.relativeExcludeGlobs.includes('caches/modules-*/metadata-*/**'),
+      ),
+    ).toBe(true);
     expect(partitions[0]?.absoluteIncludeGlobs).toContain(
-      '/home/runner/.gradle/caches/modules-2/**',
+      '/home/runner/.gradle/caches/modules-*/**',
     );
     expect(partitions[0]?.absoluteExcludeGlobs).toContain('/home/runner/.gradle/**/*.lock');
+    expect(partitions[0]?.absoluteExcludeGlobs).toContain(
+      '/home/runner/.gradle/caches/*/cc-keystore',
+    );
+    expect(partitions[0]?.absoluteExcludeGlobs).toContain(
+      '/home/runner/.gradle/caches/modules-*/metadata-*/**',
+    );
+    expect(partitions[1]?.relativeIncludeGlobs).toEqual(['caches/transforms-*/**']);
   });
 });
 
@@ -135,6 +152,10 @@ describe('createCacheModel', () => {
     expect(cacheModel.includePaths).toContain('/home/runner/.gradle/wrapper/dists/**');
     expect(cacheModel.excludePaths).toContain('/home/runner/.gradle/**/configuration-cache/**');
     expect(cacheModel.excludePaths).toContain('/home/runner/.gradle/**/*.lock');
+    expect(cacheModel.excludePaths).toContain('/home/runner/.gradle/caches/*/cc-keystore');
+    expect(cacheModel.excludePaths).toContain(
+      '/home/runner/.gradle/caches/modules-*/metadata-*/**',
+    );
   });
 
   it('fails hard with an actionable message when no Java runtime is available', async () => {

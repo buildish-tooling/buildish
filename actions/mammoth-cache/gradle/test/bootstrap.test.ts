@@ -89,22 +89,31 @@ const cacheModel: CacheModel = {
   runnerOs: 'linux',
   runnerArch: 'x64',
   safeRefName: 'main',
-  includePaths: ['/home/runner/.gradle/caches/modules-2/**'],
+  includePaths: ['/home/runner/.gradle/caches/modules-*/**'],
   excludePaths: [
     '/home/runner/.gradle/**/configuration-cache/**',
     '/home/runner/.gradle/**/*.lock',
+    '/home/runner/.gradle/caches/*/cc-keystore',
+    '/home/runner/.gradle/caches/modules-*/metadata-*/**',
   ],
   partitions: [
     {
       id: 'modules',
       displayName: 'Dependency modules',
       description: 'Downloaded dependency metadata and artifact stores shared across builds.',
-      relativeIncludeGlobs: ['caches/modules-2/**'],
-      relativeExcludeGlobs: ['**/configuration-cache/**', '**/*.lock'],
-      absoluteIncludeGlobs: ['/home/runner/.gradle/caches/modules-2/**'],
+      relativeIncludeGlobs: ['caches/modules-*/**'],
+      relativeExcludeGlobs: [
+        '**/configuration-cache/**',
+        '**/*.lock',
+        'caches/*/cc-keystore',
+        'caches/modules-*/metadata-*/**',
+      ],
+      absoluteIncludeGlobs: ['/home/runner/.gradle/caches/modules-*/**'],
       absoluteExcludeGlobs: [
         '/home/runner/.gradle/**/configuration-cache/**',
         '/home/runner/.gradle/**/*.lock',
+        '/home/runner/.gradle/caches/*/cc-keystore',
+        '/home/runner/.gradle/caches/modules-*/metadata-*/**',
       ],
     },
   ],
@@ -117,9 +126,11 @@ const restoreResult: BaseCacheRestoreResult = {
   matchedKey: 'gradle-cache-1-21-linux-x64-main',
   restoreKeys: ['gradle-cache-1-21-linux-x64-'],
   paths: [
-    '/home/runner/.gradle/caches/modules-2/**',
+    '/home/runner/.gradle/caches/modules-*/**',
     '!/home/runner/.gradle/**/configuration-cache/**',
     '!/home/runner/.gradle/**/*.lock',
+    '!/home/runner/.gradle/caches/*/cc-keystore',
+    '!/home/runner/.gradle/caches/modules-*/metadata-*/**',
   ],
   message: "Base cache restore hit exact key 'gradle-cache-1-21-linux-x64-main'.",
 };
