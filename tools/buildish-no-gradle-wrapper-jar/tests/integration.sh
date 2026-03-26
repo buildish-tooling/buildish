@@ -355,7 +355,8 @@ exercise_helper_invalid_distribution_failure() {
       ;;
   esac
 
-  assert_last_output_contains 'distributionUrl must be a canonical HTTPS services.gradle.org URL' "$helper_kind helper failure output did not mention the canonical distributionUrl requirement."
+  assert_last_output_contains 'distributionUrl must be a canonical' "$helper_kind helper failure output did not mention the canonical distributionUrl requirement."
+  assert_last_output_contains 'services.gradle.org URL' "$helper_kind helper failure output did not mention the required services.gradle.org host."
 }
 
 exercise_installer_missing_properties_failure() {

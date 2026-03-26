@@ -741,17 +741,31 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Install GnuPG on Windows
+      - name: Expose GnuPG on Windows PATH
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          choco install gnupg --no-progress -y
-          foreach ($candidate in @('C:\Program Files (x86)\GnuPG\bin', 'C:\Program Files\GnuPG\bin')) {
-            if (Test-Path -LiteralPath $candidate) {
-              $candidate | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-            }
+          $candidates = [System.Collections.Generic.List[string]]::new()
+          $discoveredCommand = Get-Command gpg.exe -ErrorAction SilentlyContinue
+          if ($null -ne $discoveredCommand) {
+            $candidates.Add($discoveredCommand.Source)
           }
-          gpg --version
+          foreach ($candidate in @(
+            'C:\Program Files\Git\usr\bin\gpg.exe',
+            'C:\Program Files\Git\mingw64\bin\gpg.exe',
+            'C:\Program Files (x86)\GnuPG\bin\gpg.exe',
+            'C:\Program Files\GnuPG\bin\gpg.exe'
+          )) {
+            $candidates.Add($candidate)
+          }
+
+          $gpgPath = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($gpgPath)) {
+            throw 'No gpg.exe was found on the Windows runner in the expected Git or GnuPG locations.'
+          }
+
+          Split-Path -Parent $gpgPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & $gpgPath --version
 
       - name: Stage cross-platform fixture
         run: |
