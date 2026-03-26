@@ -34,6 +34,7 @@ const GITHUB_EVENT_NAME_OVERRIDE_ENV = 'BUILDISH_MAMMOTH_CACHE_GITHUB_EVENT_NAME
 const GITHUB_RESOLVED_REF_NAME_OVERRIDE_ENV =
   'BUILDISH_MAMMOTH_CACHE_GITHUB_RESOLVED_REF_NAME_OVERRIDE';
 const GITHUB_DEFAULT_BRANCH_OVERRIDE_ENV = 'BUILDISH_MAMMOTH_CACHE_GITHUB_DEFAULT_BRANCH_OVERRIDE';
+const GITHUB_JOB_NAME_OVERRIDE_ENV = 'BUILDISH_MAMMOTH_CACHE_GITHUB_JOB_NAME_OVERRIDE';
 
 /**
  * Optional overrides used to build a deterministic GitHub adapter in tests.
@@ -128,7 +129,10 @@ export function createGitHubContext(
     isPullRequest: eventName === 'pull_request' || eventName === 'pull_request_target',
     repository: validateMetadataValue(env.GITHUB_REPOSITORY?.trim() || '', 'GITHUB_REPOSITORY'),
     workflowName: validateDisplayName(env.GITHUB_WORKFLOW?.trim() || '', 'GITHUB_WORKFLOW'),
-    jobName: validateDisplayName(env.GITHUB_JOB?.trim() || '', 'GITHUB_JOB'),
+    jobName: validateDisplayName(
+      readNonEmptyEnvValue(env, GITHUB_JOB_NAME_OVERRIDE_ENV) ?? env.GITHUB_JOB?.trim() ?? '',
+      'GITHUB_JOB',
+    ),
     runId: parseOptionalInteger(env.GITHUB_RUN_ID, 'GITHUB_RUN_ID'),
     runAttempt: parseOptionalInteger(env.GITHUB_RUN_ATTEMPT, 'GITHUB_RUN_ATTEMPT'),
     workspace: env.GITHUB_WORKSPACE?.trim() || process.cwd(),

@@ -34,7 +34,7 @@ import {
 import { createCachePartitions, type CacheModel } from '../src/cache/model';
 import type { BaseCacheApi } from '../src/cache/service';
 import type { CiJobContext, SummaryWriter } from '../src/ci/types';
-import { executeMainAction } from '../src/main-flow';
+import { createMainActionOutputs, executeMainAction } from '../src/main-flow';
 import {
   CONSUMED_DELTA_ARTIFACT_NAMES_STATE,
   PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
@@ -173,6 +173,12 @@ describe('executeMainAction', () => {
           '- Pre-build manifest persisted: yes',
         ]),
       );
+      expect(createMainActionOutputs(status)).toEqual({
+        'cache-key': 'gradle-cache-1-21-linux-x64-main',
+        'read-only': 'false',
+        'downloaded-dependent-artifact-count': '1',
+        'job-name': 'aggregate',
+      });
       expect(summary.writeCalls).toBe(2);
     });
   });

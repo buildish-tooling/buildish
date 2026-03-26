@@ -96,6 +96,8 @@ jobs:
     name: Linux standalone round-trip (offline exact restore)
     if: inputs.run-writable-scenarios
     runs-on: ubuntu-latest
+    env:
+      BUILDISH_MAMMOTH_CACHE_GITHUB_JOB_NAME_OVERRIDE: standalone_round_trip
     defaults:
       run:
         shell: bash
@@ -133,6 +135,7 @@ jobs:
           chmod +x "$fixture_dir/gradlew"
 
       - name: Prepare Mammoth Cache for Gradle
+        id: prepare_standalone_cache
         uses: ./actions/mammoth-cache/gradle
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-round-trip
@@ -142,20 +145,13 @@ jobs:
         working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-round-trip
         run: ./gradlew --no-daemon resolveStandalone
 
-      - name: Capture action cache key
-        id: capture_cache_key
-        run: |
-          cache_key="$(grep -F -- '- Cache key:' "$GITHUB_STEP_SUMMARY" | tail -n 1 | sed 's/^- Cache key: //')"
-          test -n "$cache_key"
-          printf 'cache_key=%s\n' "$cache_key" >> "$GITHUB_OUTPUT"
-
       - name: Save exact standalone cache snapshot
         uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ steps.capture_cache_key.outputs.cache_key }}
+          key: ${{ steps.prepare_standalone_cache.outputs.cache-key }}
 
       - name: Wipe Gradle user home to prove restore
         run: |
@@ -169,7 +165,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ steps.capture_cache_key.outputs.cache_key }}
+          key: ${{ steps.prepare_standalone_cache.outputs.cache-key }}
 
       - name: Verify the saved cache restores offline
         working-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-round-trip
@@ -184,6 +180,8 @@ jobs:
     name: Linux distributed worker A (publish delta artifact)
     if: inputs.run-writable-scenarios
     runs-on: ubuntu-latest
+    env:
+      BUILDISH_MAMMOTH_CACHE_GITHUB_JOB_NAME_OVERRIDE: worker_a
     defaults:
       run:
         shell: bash
@@ -236,6 +234,8 @@ jobs:
     name: Linux distributed worker B (publish delta artifact)
     if: inputs.run-writable-scenarios
     runs-on: ubuntu-latest
+    env:
+      BUILDISH_MAMMOTH_CACHE_GITHUB_JOB_NAME_OVERRIDE: worker_b
     defaults:
       run:
         shell: bash
@@ -291,6 +291,8 @@ jobs:
     if: inputs.run-writable-scenarios
     needs: [worker_a, worker_b]
     runs-on: ubuntu-latest
+    env:
+      BUILDISH_MAMMOTH_CACHE_GITHUB_JOB_NAME_OVERRIDE: aggregator
     defaults:
       run:
         shell: bash
@@ -328,6 +330,7 @@ jobs:
           chmod +x "$fixture_dir/gradlew"
 
       - name: Prepare Mammoth Cache for Gradle
+        id: prepare_aggregator_cache
         uses: ./actions/mammoth-cache/gradle
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/aggregator
@@ -341,13 +344,15 @@ jobs:
 
       - name: Assert both worker artifacts were consumed
         run: |
-          grep -F -- '- Downloaded delta artifacts: 2' "$GITHUB_STEP_SUMMARY"
+          test "${{ steps.prepare_aggregator_cache.outputs.downloaded-dependent-artifact-count }}" = '2'
 
   # Proves that two action invocations in the same GitHub job cannot race or double-run post-work.
   duplicate_invocation_guard:
     name: Linux duplicate invocation guard (same-job safety)
     if: inputs.run-writable-scenarios
     runs-on: ubuntu-latest
+    env:
+      BUILDISH_MAMMOTH_CACHE_GITHUB_JOB_NAME_OVERRIDE: duplicate_invocation_guard
     defaults:
       run:
         shell: bash
@@ -413,6 +418,8 @@ jobs:
     name: Pull request standalone (default read-only behavior)
     if: inputs.run-pr-scenarios
     runs-on: ubuntu-latest
+    env:
+      BUILDISH_MAMMOTH_CACHE_GITHUB_JOB_NAME_OVERRIDE: pull_request_read_only
     defaults:
       run:
         shell: bash
@@ -450,6 +457,7 @@ jobs:
           chmod +x "$fixture_dir/gradlew"
 
       - name: Prepare Mammoth Cache for Gradle
+        id: prepare_pull_request_cache
         uses: ./actions/mammoth-cache/gradle
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/pull-request
@@ -461,7 +469,7 @@ jobs:
 
       - name: Assert the PR default stayed read-only
         run: |
-          grep -F -- '- Read only: true' "$GITHUB_STEP_SUMMARY"
+          test "${{ steps.prepare_pull_request_cache.outputs.read-only }}" = 'true'
 
   # Lightweight macOS/Windows smoke coverage only. This runs under bash on both platforms and uses
   # `./gradlew`, so the fixture intentionally relies on the POSIX launcher rather than `gradlew.bat`.
@@ -469,6 +477,8 @@ jobs:
     name: Cross-platform standalone smoke (${{ matrix.os }})
     if: inputs.run-cross-platform
     runs-on: ${{ matrix.os }}
+    env:
+      BUILDISH_MAMMOTH_CACHE_GITHUB_JOB_NAME_OVERRIDE: standalone_cross_platform
     strategy:
       fail-fast: false
       matrix:

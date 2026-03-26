@@ -16,7 +16,7 @@
 
 import * as core from '@actions/core';
 
-import { executeMainAction } from './main-flow';
+import { createMainActionOutputs, executeMainAction } from './main-flow';
 import { claimSingleRunJobInvocation } from './runtime/job-single-run';
 
 export async function runMain(): Promise<void> {
@@ -26,6 +26,9 @@ export async function runMain(): Promise<void> {
   }
 
   const status = await executeMainAction();
+  for (const [name, value] of Object.entries(createMainActionOutputs(status))) {
+    core.setOutput(name, value);
+  }
   if (status.bootstrap.baseCacheResult) {
     core.info(status.bootstrap.baseCacheResult.message);
   }

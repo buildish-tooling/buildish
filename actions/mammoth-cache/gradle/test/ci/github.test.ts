@@ -108,6 +108,7 @@ describe('createGitHubContext', () => {
         BUILDISH_MAMMOTH_CACHE_GITHUB_EVENT_NAME_OVERRIDE: 'pull_request',
         BUILDISH_MAMMOTH_CACHE_GITHUB_RESOLVED_REF_NAME_OVERRIDE: 'release/1.1',
         BUILDISH_MAMMOTH_CACHE_GITHUB_DEFAULT_BRANCH_OVERRIDE: 'main',
+        BUILDISH_MAMMOTH_CACHE_GITHUB_JOB_NAME_OVERRIDE: 'worker_a',
       },
       {
         repository: { default_branch: 'ignored-default' },
@@ -119,6 +120,7 @@ describe('createGitHubContext', () => {
     expect(context.defaultBranch).toBe('main');
     expect(context.resolvedRefName).toBe('release/1.1');
     expect(context.safeRefName).toBe('release-1.1');
+    expect(context.jobName).toBe('worker_a');
   });
 
   it('normalizes runner metadata into cache-safe values', () => {

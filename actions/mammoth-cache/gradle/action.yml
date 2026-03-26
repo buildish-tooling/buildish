@@ -108,6 +108,15 @@ inputs:
       `GITHUB_TOKEN` from the runner environment if present; otherwise requests
       are unauthenticated. Never written to summaries or persisted action state.
     required: false
+outputs:
+  cache-key:
+    description: Effective base cache key resolved during the main phase, or an empty string when caching is disabled.
+  read-only:
+    description: Effective read-only mode after applying event-based defaults and any explicit override.
+  downloaded-dependent-artifact-count:
+    description: Number of dependent distributed delta artifacts downloaded during the main phase.
+  job-name:
+    description: Effective CI job identity seen by the action after any supported reusable-workflow override.
 runs:
   using: node24
   main: dist/main/index.cjs

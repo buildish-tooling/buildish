@@ -209,6 +209,17 @@ export function createMainActionSummaryLines(status: MainActionStatus): readonly
   ];
 }
 
+export function createMainActionOutputs(status: MainActionStatus): Record<string, string> {
+  return {
+    'cache-key': status.bootstrap.cacheModel?.cacheKey ?? '',
+    'read-only': String(status.bootstrap.config.readOnly),
+    'downloaded-dependent-artifact-count': String(
+      status.dependentDeltaResult?.appliedArtifactCount ?? 0,
+    ),
+    'job-name': status.bootstrap.ciContext.jobName,
+  };
+}
+
 function formatSummaryList(values: readonly string[]): string {
   return values.length === 0 ? 'none' : values.join(', ');
 }

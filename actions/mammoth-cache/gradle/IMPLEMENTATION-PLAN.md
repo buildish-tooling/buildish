@@ -349,6 +349,8 @@ implementable design.
       Other licenses that require attribution (e.g., MIT, BSD, etc.) do not go into the NOTICE file.
       They are to be included in the LICENSE file.
 24. Cleanup job summary
+    - Can we get the cache partition statistics from the cache manifest into the summary? Like number of files and
+      total size for each partition.
 25. Cleanup the code base
 26. Documentation
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
