@@ -374,18 +374,21 @@ implementable design.
     - As a generic solution, I created this approach: https://github.com/snazy/gradle-wrapper-no-jar
     - We should replace or adapt that approach, and pull it as a separate tool into this repository.
     - The action and the "local tool" need to work well together, or better: in the same way.
+    - The tool should live in the `tools/` directory of the repository.
     - As we do not have a running Gradle, we cannot put it into any Gradle build or init script, so we
       have to rely on shell script / powershell "magic" to get it working.
     - In a local dev environment we can however retain the downloaded SHA256 and GPG signatures of the wrapper jar,
       keeping those in the gradle/wrapper/ directory as `gradle-wrapper-<version-number>.sha256` and
       `gradle-wrapper-<version-number>.asc` files.
-28. Need to add information performed Gradle builds.
+28. Followup for the "buildish helper tool" - automatic installation script via "run bash via curl"
+29. Followup for the "buildish helper tool" - Gradle init script for Renovate
+30. Need to add information performed Gradle builds.
     - Similar to the information published on this workflow run: https://github.com/apache/polaris/actions/runs/23577520926
     - Probably worth to look into https://github.com/gradle/actions/tree/v5/sources/src/ and use a similar approach
       to capture Gradle build runs, their outcome and whether build scans were attempted, whether they were
       successful and where those are published (link those).
     - Should have a local integration test for this instead of only validating it in the CI workflows.
-29. Cleanup job summary
+31. Cleanup job summary
     - Can we get the cache partition statistics from the cache manifest into the summary? Like number of files and
       total size for each partition.
     - The level of detail is great, it's just not very readable.
