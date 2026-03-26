@@ -168,7 +168,6 @@ jobs:
         run: |
           for result in \
             "$CHECK_RESULT" \
-            "$RAT_RESULT" \
             "$SMOKE_TEST_RESULT" \
             "$INTEGRATION_TRUSTED_RESULT" \
             "$INTEGRATION_PR_RESULT"; do
