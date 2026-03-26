@@ -476,6 +476,8 @@ implementable design.
       See https://docs.github.com/en/actions/how-tos/create-and-publish-actions/using-immutable-releases-and-tags-to-manage-your-actions-releases
     - As the action's `dist/` folder is .gitignore'd, we need to ensure that the release workflow ensure that the
       `dist/` folder is included in the Git commit for the release tag.
+38. Validate that the action build-results (INIT_SCRIPT_CONTENTS + SERVICE_PLUGIN_CONTENTS in actions/mammoth-cache/gradle/src/gradle/build-results.ts)
+    are not too close to the Gradle action's code.
 
 ## Deferred / explicitly out of scope for v1
 

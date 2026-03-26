@@ -24,6 +24,12 @@ import {
 } from './artifacts/service';
 import { bootstrapPhase, type BootstrapDependencies, type BootstrapStatus } from './bootstrap';
 import { captureCacheManifest, computeCacheDelta } from './cache/manifest';
+import {
+  cleanupGradleBuildResultCapture,
+  createGradleBuildSummaryLines,
+  loadGradleBuildReport,
+  type GradleBuildReport,
+} from './gradle/build-results';
 import { appendJobSummary } from './logging/summary';
 import {
   getPersistedDeltaArtifactProducerIdentity,
@@ -53,6 +59,7 @@ export interface PostActionStatus {
   readonly bootstrap: BootstrapStatus;
   readonly consumedDeltaCleanupResult: PostConsumedDeltaCleanupResult | null;
   readonly deltaArtifactResult: PostDeltaArtifactResult | null;
+  readonly gradleBuildReport: GradleBuildReport;
   readonly message: string;
 }
 
@@ -72,21 +79,30 @@ export async function executePostAction(
 ): Promise<PostActionStatus> {
   const bootstrap = await bootstrapPhase('post', dependencies);
   const consumedDeltaCleanupResult = await cleanupConsumedDeltaArtifacts(bootstrap, dependencies);
+  const gradleBuildReport = await loadGradleBuildReport(dependencies.env ?? process.env);
+  const cleanupWarnings = await cleanupGradleBuildResultCapture(bootstrap.config.gradleUserHome);
+  const combinedGradleBuildReport = {
+    builds: gradleBuildReport.builds,
+    warnings: [...gradleBuildReport.warnings, ...cleanupWarnings],
+  } satisfies GradleBuildReport;
 
   if (!bootstrap.cacheModel) {
-    return {
+    const status = {
       bootstrap,
       consumedDeltaCleanupResult,
       deltaArtifactResult: null,
+      gradleBuildReport: combinedGradleBuildReport,
       message: 'Post action flow completed without cache orchestration.',
-    };
+    } satisfies PostActionStatus;
+    await appendJobSummary(dependencies, createPostActionSummaryLines(status));
+    return status;
   }
 
   const preBuildManifest = await loadPersistedPreBuildCacheManifest(
     dependencies.getState ?? (() => ''),
   );
   if (!preBuildManifest) {
-    return {
+    const status = {
       bootstrap,
       consumedDeltaCleanupResult,
       deltaArtifactResult: {
@@ -100,8 +116,11 @@ export async function executePostAction(
         message:
           'Delta artifact upload skipped because no persisted pre-build cache manifest was found in post-action state.',
       },
+      gradleBuildReport: combinedGradleBuildReport,
       message: 'Post action flow completed without a persisted pre-build cache manifest.',
-    };
+    } satisfies PostActionStatus;
+    await appendJobSummary(dependencies, createPostActionSummaryLines(status));
+    return status;
   }
 
   const currentManifest = await captureCacheManifest(bootstrap.cacheModel);
@@ -112,6 +131,7 @@ export async function executePostAction(
     bootstrap,
     consumedDeltaCleanupResult,
     deltaArtifactResult,
+    gradleBuildReport: combinedGradleBuildReport,
     message: createPostActionMessage(deltaArtifactResult),
   } satisfies PostActionStatus;
 
@@ -301,6 +321,7 @@ export function createPostActionSummaryLines(status: PostActionStatus): readonly
   if (!status.deltaArtifactResult) {
     return [
       '## Apache Buildish post action',
+      ...createGradleBuildSummaryLines(status.gradleBuildReport),
       ...createConsumedDeltaCleanupSummaryLines(status.consumedDeltaCleanupResult),
       '- Delta artifact upload: not evaluated.',
     ];
@@ -309,6 +330,7 @@ export function createPostActionSummaryLines(status: PostActionStatus): readonly
   const result = status.deltaArtifactResult;
   return [
     '## Apache Buildish post action',
+    ...createGradleBuildSummaryLines(status.gradleBuildReport),
     ...createConsumedDeltaCleanupSummaryLines(status.consumedDeltaCleanupResult),
     `- Delta artifact result: ${result.status}`,
     `- Post-build cache delta: ${result.addedCount} added, ${result.modifiedCount} modified, ${result.deletedCount} deleted.`,

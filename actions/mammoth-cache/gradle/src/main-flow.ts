@@ -39,6 +39,7 @@ import {
   persistPreBuildCacheManifest,
   type PersistedPreBuildCacheManifestState,
 } from './state/post-action';
+import { installGradleBuildResultCapture } from './gradle/build-results';
 import { appendJobSummary } from './logging/summary';
 
 export interface MainDependentDeltaResult extends DeltaApplyResult {
@@ -71,6 +72,11 @@ export async function executeMainAction(
   dependencies: MainActionDependencies = {},
 ): Promise<MainActionStatus> {
   const bootstrap = await bootstrapPhase('main', dependencies);
+  await installGradleBuildResultCapture(bootstrap.config.gradleUserHome).catch((error: unknown) => {
+    dependencies.logInfo?.(
+      `Gradle build reporting could not install capture hooks and will be skipped for this job: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
 
   if (!bootstrap.cacheModel) {
     return {
