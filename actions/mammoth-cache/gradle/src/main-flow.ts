@@ -125,7 +125,9 @@ async function applyDependentJobDeltas(
 
   try {
     assertCompatibleDependentDeltaArtifacts(downloadedPackages, bootstrap);
-    const plan = mergeDeltaArtifactPackages(downloadedPackages);
+    const plan = mergeDeltaArtifactPackages(downloadedPackages, {
+      allowDuplicateDependentDeltaPaths: bootstrap.config.allowDuplicateDependentDeltaPaths,
+    });
     const applied = await applyMergedDeltaPlan(plan, bootstrap.config.gradleUserHome);
     return createMainDependentDeltaResult(requestedJobs, downloadedPackages, applied);
   } finally {

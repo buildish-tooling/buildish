@@ -119,12 +119,17 @@ describe('cache delta merge/apply engine', () => {
     );
   });
 
-  it('allows identical overlapping content from multiple dependent deltas', async () => {
+  it('allows same-content overlaps with differing timestamps and keeps the highest times', async () => {
     const packageA = await createDownloadedPackage(
       temporaryDirectories,
       'Worker A',
       async (home) => {
         await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'same-after');
+        await utimes(
+          path.join(home, 'caches/modules-2/files-2.1/example.jar'),
+          new Date('2026-03-25T12:00:01.000Z'),
+          new Date('2026-03-25T12:00:02.000Z'),
+        );
       },
     );
     const packageB = await createDownloadedPackage(
@@ -132,15 +137,72 @@ describe('cache delta merge/apply engine', () => {
       'Worker B',
       async (home) => {
         await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'same-after');
+        await utimes(
+          path.join(home, 'caches/modules-2/files-2.1/example.jar'),
+          new Date('2026-03-25T12:00:05.000Z'),
+          new Date('2026-03-25T12:00:06.000Z'),
+        );
       },
     );
 
     const plan = mergeDeltaArtifactPackages([packageA, packageB]);
+    const mergedEntry =
+      plan.deltaManifest.partitions.find((partition) => partition.partitionId === 'modules')
+        ?.entries[0] ?? null;
+
     expect(plan.payloads).toHaveLength(1);
+    expect(mergedEntry?.current).toMatchObject({
+      atimeMs: new Date('2026-03-25T12:00:05.000Z').getTime(),
+      mtimeMs: new Date('2026-03-25T12:00:06.000Z').getTime(),
+    });
+  });
+
+  it('can resolve different overlapping content by newest mtime when explicitly allowed', async () => {
+    const packageA = await createDownloadedPackage(
+      temporaryDirectories,
+      'Worker A',
+      async (home) => {
+        await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'after-a');
+        await utimes(
+          path.join(home, 'caches/modules-2/files-2.1/example.jar'),
+          new Date('2026-03-25T12:00:01.000Z'),
+          new Date('2026-03-25T12:00:02.000Z'),
+        );
+      },
+    );
+    const packageB = await createDownloadedPackage(
+      temporaryDirectories,
+      'Worker B',
+      async (home) => {
+        await writeGradleFile(home, 'caches/modules-2/files-2.1/example.jar', 'after-b');
+        await utimes(
+          path.join(home, 'caches/modules-2/files-2.1/example.jar'),
+          new Date('2026-03-25T12:00:05.000Z'),
+          new Date('2026-03-25T12:00:06.000Z'),
+        );
+      },
+    );
+    const targetGradleUserHome = await createGradleUserHome(
+      temporaryDirectories,
+      'buildish-mammoth-cache-gradle-duplicate-paths-',
+    );
+    await seedBaseGradleUserHome(targetGradleUserHome);
+
+    const plan = mergeDeltaArtifactPackages([packageA, packageB], {
+      allowDuplicateDependentDeltaPaths: true,
+    });
+    await applyMergedDeltaPlan(plan, targetGradleUserHome);
+
+    await expect(
+      readFile(path.join(targetGradleUserHome, 'caches/modules-2/files-2.1/example.jar'), 'utf8'),
+    ).resolves.toBe('after-b');
     expect(
       plan.deltaManifest.partitions.find((partition) => partition.partitionId === 'modules')
-        ?.entries,
-    ).toHaveLength(1);
+        ?.entries[0]?.current,
+    ).toMatchObject({
+      atimeMs: new Date('2026-03-25T12:00:05.000Z').getTime(),
+      mtimeMs: new Date('2026-03-25T12:00:06.000Z').getTime(),
+    });
   });
 
   it('warns and falls back to preserving only mtime when atime restoration fails', async () => {

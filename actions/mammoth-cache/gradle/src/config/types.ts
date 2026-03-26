@@ -81,6 +81,8 @@ export interface RawActionInputs {
   readonly jobMode: string;
   /** Raw comma/newline-separated `dependent-jobs` input. Empty string later defaults to none. */
   readonly dependentJobs: string;
+  /** Raw `allow-duplicate-dependent-delta-paths` input. Empty string later defaults to `'false'`. */
+  readonly allowDuplicateDependentDeltaPaths: string;
   /** Raw `cache-key-prefix` input. Empty string later defaults to `'gradle-cache-'`. */
   readonly cacheKeyPrefix: string;
   /** Raw `cache-key-template` input. Empty string later means “use the built-in template”. */
@@ -140,6 +142,14 @@ export interface NormalizedActionConfig {
    * Defaults to an empty list and may only be non-empty for distributed job modes.
    */
   readonly dependentJobs: readonly string[];
+  /**
+   * Whether aggregators may resolve non-identical overlapping dependent delta paths by choosing the
+   * newest-mtime entry instead of failing.
+   *
+   * Defaults to `false`. Exact same-content/same-mode overlaps still merge timestamp metadata even
+   * when this flag is disabled.
+   */
+  readonly allowDuplicateDependentDeltaPaths: boolean;
   /**
    * Stable cache-key prefix.
    *

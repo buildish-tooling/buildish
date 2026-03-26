@@ -33,6 +33,7 @@ const baseConfig: NormalizedActionConfig = {
   readOnly: false,
   jobMode: 'standalone',
   dependentJobs: [],
+  allowDuplicateDependentDeltaPaths: false,
   cacheKeyPrefix: 'gradle-cache-',
   cacheKeyTemplate: null,
   cacheSchemaVersion: 1,

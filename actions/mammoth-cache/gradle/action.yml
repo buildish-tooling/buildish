@@ -48,6 +48,17 @@ inputs:
       Comma- or newline-separated dependent job names whose cache deltas should be
       consumed later. Only valid with distributed job modes.
     required: false
+  allow-duplicate-dependent-delta-paths:
+    description: >-
+      Only for `distributed-aggregator` jobs. Accepted values: `true` or `false`.
+      Default: `false`. When `true`, overlapping dependent-job delta paths that do
+      not match exactly may be resolved by choosing the entry with the newest
+      modification time instead of failing. Exact same-content/same-mode overlaps
+      already merge by keeping the highest access and modification times even when
+      this flag is `false`, so enable this only when duplicate-path worker output is
+      expected and the relaxed conflict resolution is acceptable.
+    required: false
+    default: 'false'
   cache-key-prefix:
     description: >-
       Prefix used for generated cache keys. Must start with an alphanumeric

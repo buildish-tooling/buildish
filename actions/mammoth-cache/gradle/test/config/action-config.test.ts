@@ -78,10 +78,24 @@ describe('normalizeActionConfig', () => {
       cacheEnabled: true,
       readOnly: false,
       jobMode: 'standalone',
+      allowDuplicateDependentDeltaPaths: false,
       cacheKeyPrefix: 'gradle-cache-',
       wrapperSelectionMode: 'default',
       defaultWrapperPropertiesFile: 'gradle/wrapper/gradle-wrapper.properties',
     });
+  });
+
+  it('parses allow-duplicate-dependent-delta-paths explicitly', () => {
+    const config = normalizeActionConfig(
+      readActionInputs(createInputProvider({ 'allow-duplicate-dependent-delta-paths': 'true' })),
+      {
+        phase: 'main',
+        ciContext: baseCiContext,
+        env: {},
+      },
+    );
+
+    expect(config.allowDuplicateDependentDeltaPaths).toBe(true);
   });
 
   it('defaults to read-only on pull requests', () => {

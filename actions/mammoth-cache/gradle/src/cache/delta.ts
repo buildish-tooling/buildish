@@ -65,8 +65,13 @@ export interface DeltaApplyResult {
   readonly warnings: readonly string[];
 }
 
+export interface MergeDeltaOptions {
+  readonly allowDuplicateDependentDeltaPaths?: boolean;
+}
+
 export function mergeDeltaArtifactPackages(
   packages: readonly DownloadedDeltaArtifactPackage[],
+  options: MergeDeltaOptions = {},
 ): MergedDeltaPlan {
   if (packages.length === 0) {
     return {
@@ -105,23 +110,21 @@ export function mergeDeltaArtifactPackages(
           );
         }
 
+        const candidateState: MergedDeltaState = {
+          entry,
+          artifactName: artifactPackage.artifact.name,
+          producerJobName: artifactPackage.metadata.producer.jobName,
+          payloadPath: candidatePayloadPath,
+        };
         const existing = partitionEntries.get(entry.relativePath);
         if (!existing) {
-          partitionEntries.set(entry.relativePath, {
-            entry,
-            artifactName: artifactPackage.artifact.name,
-            producerJobName: artifactPackage.metadata.producer.jobName,
-            payloadPath: candidatePayloadPath,
-          });
+          partitionEntries.set(entry.relativePath, candidateState);
           continue;
         }
 
-        if (areMergeCompatible(existing.entry, entry)) {
-          continue;
-        }
-
-        throw new Error(
-          `Conflicting dependent deltas for '${entry.relativePath}': artifact '${existing.artifactName}' from job '${existing.producerJobName}' and artifact '${artifactPackage.artifact.name}' from job '${artifactPackage.metadata.producer.jobName}' produce different content or metadata.`,
+        partitionEntries.set(
+          entry.relativePath,
+          mergeOverlappingDeltaStates(existing, candidateState, options),
         );
       }
     }
@@ -268,9 +271,33 @@ function collectPayloadPaths(
   );
 }
 
-function areMergeCompatible(left: CacheDeltaEntry, right: CacheDeltaEntry): boolean {
+function mergeOverlappingDeltaStates(
+  existing: MergedDeltaState,
+  candidate: MergedDeltaState,
+  options: MergeDeltaOptions,
+): MergedDeltaState {
+  if (areEntriesContentCompatible(existing.entry, candidate.entry)) {
+    const preferred = selectNewerState(existing, candidate) ?? existing;
+    const other = preferred === existing ? candidate : existing;
+    return mergeStateTimestamps(preferred, other);
+  }
+
+  if (options.allowDuplicateDependentDeltaPaths) {
+    const preferred = selectNewerState(existing, candidate);
+    if (preferred) {
+      const other = preferred === existing ? candidate : existing;
+      return mergeStateTimestamps(preferred, other);
+    }
+  }
+
+  throw new Error(
+    `Conflicting dependent deltas for '${candidate.entry.relativePath}': artifact '${existing.artifactName}' from job '${existing.producerJobName}' and artifact '${candidate.artifactName}' from job '${candidate.producerJobName}' produce different content or metadata.`,
+  );
+}
+
+function areEntriesContentCompatible(left: CacheDeltaEntry, right: CacheDeltaEntry): boolean {
   if (left.current && right.current) {
-    return areSnapshotsEquivalent(left.current, right.current);
+    return areSnapshotsContentCompatible(left.current, right.current);
   }
 
   if (
@@ -280,20 +307,94 @@ function areMergeCompatible(left: CacheDeltaEntry, right: CacheDeltaEntry): bool
     right.changeType === 'deleted'
   ) {
     return left.previous !== null && right.previous !== null
-      ? areSnapshotsEquivalent(left.previous, right.previous)
+      ? areSnapshotsContentCompatible(left.previous, right.previous)
       : false;
   }
 
   return false;
 }
 
-function areSnapshotsEquivalent(left: CacheFileSnapshot, right: CacheFileSnapshot): boolean {
+function areSnapshotsContentCompatible(left: CacheFileSnapshot, right: CacheFileSnapshot): boolean {
   return (
     left.contentSha256 === right.contentSha256 &&
     left.size === right.size &&
-    left.mode === right.mode &&
-    left.mtimeMs === right.mtimeMs
+    left.mode === right.mode
   );
+}
+
+function selectNewerState(
+  left: MergedDeltaState,
+  right: MergedDeltaState,
+): MergedDeltaState | null {
+  const leftSnapshot = getComparableSnapshot(left.entry);
+  const rightSnapshot = getComparableSnapshot(right.entry);
+  if (!leftSnapshot || !rightSnapshot) {
+    return null;
+  }
+
+  if (leftSnapshot.mtimeMs > rightSnapshot.mtimeMs) {
+    return left;
+  }
+  if (rightSnapshot.mtimeMs > leftSnapshot.mtimeMs) {
+    return right;
+  }
+
+  return null;
+}
+
+function mergeStateTimestamps(
+  preferred: MergedDeltaState,
+  other: MergedDeltaState,
+): MergedDeltaState {
+  const preferredSnapshot = getComparableSnapshot(preferred.entry);
+  const otherSnapshot = getComparableSnapshot(other.entry);
+  if (!preferredSnapshot || !otherSnapshot) {
+    return preferred;
+  }
+
+  return {
+    ...preferred,
+    entry: replaceComparableSnapshot(
+      preferred.entry,
+      mergeSnapshotTimestamps(preferredSnapshot, otherSnapshot),
+    ),
+  };
+}
+
+function getComparableSnapshot(entry: CacheDeltaEntry): CacheFileSnapshot | null {
+  return entry.current ?? entry.previous;
+}
+
+function replaceComparableSnapshot(
+  entry: CacheDeltaEntry,
+  snapshot: CacheFileSnapshot,
+): CacheDeltaEntry {
+  if (entry.current) {
+    return {
+      ...entry,
+      current: snapshot,
+    };
+  }
+
+  if (entry.previous) {
+    return {
+      ...entry,
+      previous: snapshot,
+    };
+  }
+
+  return entry;
+}
+
+function mergeSnapshotTimestamps(
+  preferred: CacheFileSnapshot,
+  other: CacheFileSnapshot,
+): CacheFileSnapshot {
+  return {
+    ...preferred,
+    atimeMs: Math.max(preferred.atimeMs, other.atimeMs),
+    mtimeMs: Math.max(preferred.mtimeMs, other.mtimeMs),
+  };
 }
 
 function compareEntriesByPath(left: CacheDeltaEntry, right: CacheDeltaEntry): number {

@@ -15,7 +15,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
@@ -384,6 +384,120 @@ describe('executeMainAction', () => {
       ).rejects.toThrow(/Cross-runner dependent delta reuse is not supported/u);
     });
   });
+
+  it('can resolve overlapping dependent delta paths by newest mtime when configured', async () => {
+    await withWorkspace(async (workspace) => {
+      const gradleUserHome = path.join(workspace, '.gradle');
+      const wrapperJarBytes = Buffer.from('existing-wrapper-jar');
+      const wrapperJarSha256 = sha256Hex(wrapperJarBytes);
+
+      await mkdir(path.join(workspace, 'gradle', 'wrapper'), { recursive: true });
+      await mkdir(gradleUserHome, { recursive: true });
+      await writeFile(
+        path.join(workspace, 'gradle', 'wrapper', 'gradle-wrapper.jar'),
+        wrapperJarBytes,
+      );
+      await writeFile(
+        path.join(workspace, 'gradle', 'wrapper', 'gradle-wrapper.properties'),
+        [
+          'distributionBase=GRADLE_USER_HOME',
+          'distributionPath=wrapper/dists',
+          'distributionSha256Sum=61ad310d3c7d3e5da131b76bbf22b5a4c0786e9d892dae8c1658d4b484de3caa',
+          'distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14-bin.zip',
+          'validateDistributionUrl=true',
+          'zipStoreBase=GRADLE_USER_HOME',
+          'zipStorePath=wrapper/dists',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+
+      const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
+      await stageWorkerDeltaArtifact(artifactApi, workspace, {
+        jobName: 'worker-a',
+        runId: 101,
+        runAttempt: 2,
+        relativePath: 'caches/modules-2/files-2.1/example/module.bin',
+        contents: 'from-worker-a',
+        modifiedAt: new Date('2026-03-25T12:00:02.000Z'),
+        accessedAt: new Date('2026-03-25T12:00:01.000Z'),
+      });
+      await stageWorkerDeltaArtifact(artifactApi, workspace, {
+        jobName: 'worker-b',
+        runId: 101,
+        runAttempt: 2,
+        relativePath: 'caches/modules-2/files-2.1/example/module.bin',
+        contents: 'from-worker-b',
+        modifiedAt: new Date('2026-03-25T12:00:06.000Z'),
+        accessedAt: new Date('2026-03-25T12:00:05.000Z'),
+      });
+
+      const status = await executeMainAction({
+        artifactApi,
+        cacheApi: createCacheApi(),
+        captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
+        env: {
+          GITHUB_EVENT_NAME: 'push',
+          GITHUB_REF: 'refs/heads/main',
+          GITHUB_REPOSITORY: 'apache/buildish',
+          GITHUB_WORKFLOW: 'CI',
+          GITHUB_JOB: 'aggregate',
+          GITHUB_RUN_ID: '101',
+          GITHUB_RUN_ATTEMPT: '2',
+          GITHUB_WORKSPACE: workspace,
+          GRADLE_USER_HOME: gradleUserHome,
+          RUNNER_OS: 'Linux',
+          RUNNER_ARCH: 'X64',
+          HOME: workspace,
+          RUNNER_TEMP: path.join(workspace, 'runner-temp'),
+        },
+        eventPayload: {
+          repository: { default_branch: 'main' },
+        },
+        fetchImpl: async (input: string | URL | Request): Promise<Response> => {
+          const url = String(input);
+          if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
+            return new Response(`${wrapperJarSha256}\n`, { status: 200 });
+          }
+          if (url.endsWith('gradle-8.14-wrapper.jar.asc')) {
+            return new Response(TEST_SIGNATURE_ARMORED, { status: 200 });
+          }
+          throw new Error(`Unexpected fetch URL: ${url}`);
+        },
+        inputProvider: {
+          getInput(name: string): string {
+            switch (name) {
+              case 'job-mode':
+                return 'distributed-aggregator';
+              case 'dependent-jobs':
+                return 'worker-a,worker-b';
+              case 'allow-duplicate-dependent-delta-paths':
+                return 'true';
+              default:
+                return '';
+            }
+          },
+        },
+        summaryWriter: createSummaryCapture().writer,
+        verifyWrapperSignature: async () => {},
+      });
+
+      expect(status.dependentDeltaResult).toEqual(
+        expect.objectContaining({
+          appliedArtifactCount: 2,
+          addedCount: 1,
+          modifiedCount: 0,
+          deletedCount: 0,
+        }),
+      );
+      await expect(
+        readFile(
+          path.join(gradleUserHome, 'caches', 'modules-2', 'files-2.1', 'example', 'module.bin'),
+          'utf8',
+        ),
+      ).resolves.toBe('from-worker-b');
+    });
+  });
 });
 
 async function stageWorkerDeltaArtifact(
@@ -395,6 +509,8 @@ async function stageWorkerDeltaArtifact(
     readonly runAttempt: number;
     readonly relativePath: string;
     readonly contents: string;
+    readonly accessedAt?: Date;
+    readonly modifiedAt?: Date;
     readonly runnerOs?: string;
     readonly runnerArch?: string;
   },
@@ -409,6 +525,11 @@ async function stageWorkerDeltaArtifact(
   );
   const previousManifest = await captureCacheManifest(cacheModel);
   await writeFile(path.join(workerGradleHome, options.relativePath), options.contents, 'utf8');
+  if (options.accessedAt || options.modifiedAt) {
+    const modifiedAt = options.modifiedAt ?? options.accessedAt ?? new Date();
+    const accessedAt = options.accessedAt ?? modifiedAt;
+    await utimes(path.join(workerGradleHome, options.relativePath), accessedAt, modifiedAt);
+  }
   const currentManifest = await captureCacheManifest(cacheModel);
   const deltaManifest = computeCacheDelta(previousManifest, currentManifest);
   const stagedPackage = await stageDeltaArtifactPackage(

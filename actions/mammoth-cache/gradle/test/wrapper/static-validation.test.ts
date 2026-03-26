@@ -126,6 +126,7 @@ function createConfig(overrides: Partial<NormalizedActionConfig> = {}): Normaliz
     readOnly: false,
     jobMode: 'standalone',
     dependentJobs: [],
+    allowDuplicateDependentDeltaPaths: false,
     cacheKeyPrefix: 'gradle-cache-',
     cacheKeyTemplate: null,
     cacheSchemaVersion: 1,

@@ -89,6 +89,10 @@ export function readActionInputs(inputProvider: InputProvider = core): RawAction
     readOnly: inputProvider.getInput('read-only', { trimWhitespace: true }),
     jobMode: inputProvider.getInput('job-mode', { trimWhitespace: true }),
     dependentJobs: inputProvider.getInput('dependent-jobs', { trimWhitespace: true }),
+    allowDuplicateDependentDeltaPaths: inputProvider.getInput(
+      'allow-duplicate-dependent-delta-paths',
+      { trimWhitespace: true },
+    ),
     cacheKeyPrefix: inputProvider.getInput('cache-key-prefix', { trimWhitespace: true }),
     cacheKeyTemplate: inputProvider.getInput('cache-key-template', { trimWhitespace: true }),
     processAllWrapperFiles: inputProvider.getInput('process-all-wrapper-files', {
@@ -124,6 +128,10 @@ export function normalizeActionConfig(
   const jobMode = parseEnumInput(rawInputs.jobMode || 'standalone', JOB_MODES, 'job-mode');
   const dependentJobs = parseListInput(rawInputs.dependentJobs).map((jobName) =>
     validateNamedValue(jobName, 'dependent-jobs'),
+  );
+  const allowDuplicateDependentDeltaPaths = parseBooleanInput(
+    rawInputs.allowDuplicateDependentDeltaPaths || 'false',
+    'allow-duplicate-dependent-delta-paths',
   );
   const cacheKeyPrefix = validateCacheKeyPrefix(rawInputs.cacheKeyPrefix || 'gradle-cache-');
   const cacheKeyTemplate = validateCacheKeyTemplate(rawInputs.cacheKeyTemplate);
@@ -167,6 +175,7 @@ export function normalizeActionConfig(
     readOnly,
     jobMode,
     dependentJobs,
+    allowDuplicateDependentDeltaPaths,
     cacheKeyPrefix,
     cacheKeyTemplate,
     cacheSchemaVersion: CACHE_SCHEMA_VERSION,
