@@ -39,8 +39,9 @@ The helpers are standalone on purpose. They do not import this repository's Type
 ## Automatic installation scripts
 
 This repository also ships installer entrypoints that download the helper files plus the init
-script, patch existing `gradlew` / `gradlew.bat`, and add the retained wrapper metadata patterns
-to `.gitignore`.
+script, patch existing `gradlew` / `gradlew.bat`, remove any pre-existing
+`gradle/wrapper/gradle-wrapper.jar`, and add the retained wrapper metadata patterns to
+`.gitignore`.
 
 ### POSIX / bash
 
@@ -75,6 +76,11 @@ powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\tools\buildish-no-
 The `curl | bash` and `Invoke-RestMethod | Invoke-Expression` forms execute remote script content.
 Prefer pinning to a reviewed tag or commit, or download the installer first and inspect it before
 execution if your environment requires stricter supply-chain controls.
+
+For trusted local development and integration testing, set
+`BUILDISH_NO_GRADLE_WRAPPER_JAR_SOURCE_DIR` to a checked-out
+`tools/buildish-no-gradle-wrapper-jar/` directory to copy helper files from disk instead of
+downloading them from GitHub.
 
 ## What the helpers do
 
@@ -170,6 +176,23 @@ Projects that want source trees without compiled wrapper binaries should remove
 Whether projects also commit the retained `.sha256` / `.asc` files is a policy choice. The helper
 works when those files are absent because it will download and retain them locally.
 
+## Development and verification
+
+This tool directory has its own local verification trampoline:
+
+- `make test` — shell integration tests using `gradle init`
+- `make rat-check` — Apache RAT over the tracked tool files
+- `make check` — syntax checks, integration tests, and RAT
+
+The integration tests expect these commands to be available on `PATH`:
+
+- `gradle`
+- `pwsh`
+- `gpg`
+
+They also need network access so the helper can fetch the wrapper JAR, checksum, and detached
+signature from the upstream Gradle endpoints.
+
 ## Customization boundaries
 
 The scripts intentionally assume the same Gradle hosts as the action:
@@ -182,5 +205,6 @@ the URLs and, possibly, the trust material.
 
 ## Current validation scope in this repository
 
-This repository currently validates the blueprint with focused static / syntax checks. End-to-end
-integration coverage for the copied helper flow is intentionally deferred for now.
+This repository validates the blueprint with tool-local syntax checks, shell integration tests that
+exercise `gradle init` plus `./gradlew ...` flows, and a dedicated Apache RAT check for the tracked
+tool files.

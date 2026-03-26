@@ -435,6 +435,13 @@ implementable design.
           - Run Gradle with any task again.
           - Verify that the `gradle/wrapper/gradle-wrapper-<version>.sha256` and
             `gradle/wrapper/gradle-wrapper-<version>.asc` files have been updated.
+    - Implemented in `tools/buildish-no-gradle-wrapper-jar/` with:
+      - `Makefile` targets for `syntax-check`, `test`, `rat-check`, `release-check`, and `check`
+      - `scripts/rat-check.sh` using a local `build/rat/` cache plus `curl`
+      - `tests/integration.sh` covering `gradle init`, installer patching, wrapper-JAR removal,
+        helper file placement, metadata retention, and `./gradlew wrapper` re-patching
+      - installer support for trusted local-source copies via
+        `BUILDISH_NO_GRADLE_WRAPPER_JAR_SOURCE_DIR`
 32. Need to add information about the performed Gradle builds.
     - Similar to the information published on this workflow run: https://github.com/apache/polaris/actions/runs/23577520926
     - Probably worth to look into https://github.com/gradle/actions/tree/v5/sources/src/ and use a similar approach

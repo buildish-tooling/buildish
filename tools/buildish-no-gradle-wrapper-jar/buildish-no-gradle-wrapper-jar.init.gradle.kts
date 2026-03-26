@@ -30,10 +30,14 @@ val batchHelperBlock =
   set BUILDISH_NO_GRADLE_WRAPPER_JAR_ORIGINAL_ARGS=
   if errorlevel 1 goto fail
   """.trimIndent()
-val batchExecuteLine =
+val legacyBatchExecuteLine =
   "\"%JAVA_EXE%\" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% \"-Dorg.gradle.appname=%APP_BASE_NAME%\" -classpath \"%CLASSPATH%\" -jar \"%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar\" %*"
-val patchedBatchExecuteLine =
+val patchedLegacyBatchExecuteLine =
   "\"%JAVA_EXE%\" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% \"-Dorg.gradle.appname=%APP_BASE_NAME%\" -classpath \"%CLASSPATH%\" -jar \"%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar\" %BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS% %*"
+val currentBatchExecuteLine =
+  "\"%JAVA_EXE%\" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% \"-Dorg.gradle.appname=%APP_BASE_NAME%\" -jar \"%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar\" %*"
+val patchedCurrentBatchExecuteLine =
+  "\"%JAVA_EXE%\" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% \"-Dorg.gradle.appname=%APP_BASE_NAME%\" -jar \"%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar\" %BUILDISH_NO_GRADLE_WRAPPER_JAR_ARGS% %*"
 
 fun normalizeForFile(text: String, newline: String): String = text.lines().joinToString(newline)
 
@@ -53,26 +57,45 @@ fun patchAfterAnchor(target: File, anchor: String, insertion: String, label: Str
   target.writeText(updated)
 }
 
-fun replaceExactLine(target: File, currentLine: String, replacement: String, label: String) {
+fun replaceAnyExactLine(target: File, replacements: List<Pair<String, String>>, label: String) {
   val content = target.readText()
   val newline = if (content.contains("\r\n")) "\r\n" else "\n"
-  val normalizedReplacement = normalizeForFile(replacement, newline)
-  if (content.contains(normalizedReplacement)) return
-  val currentLineWithNewline = "$currentLine$newline"
-  val replacementWithNewline = "$normalizedReplacement$newline"
-  val updated =
-    when {
-      content.contains(currentLineWithNewline) -> content.replace(currentLineWithNewline, replacementWithNewline)
-      content.endsWith(currentLine) -> content.dropLast(currentLine.length) + normalizedReplacement
-      else -> throw GradleException("Unable to find the expected replacement point in $label at '${target.absolutePath}'.")
-    }
-  target.writeText(updated)
+  for ((_, replacement) in replacements) {
+    val normalizedReplacement = normalizeForFile(replacement, newline)
+    if (content.contains(normalizedReplacement)) return
+  }
+  for ((currentLine, replacement) in replacements) {
+    val normalizedReplacement = normalizeForFile(replacement, newline)
+    val currentLineWithNewline = "$currentLine$newline"
+    val replacementWithNewline = "$normalizedReplacement$newline"
+    val updated =
+      when {
+        content.contains(currentLineWithNewline) -> content.replace(currentLineWithNewline, replacementWithNewline)
+        content.endsWith(currentLine) -> content.dropLast(currentLine.length) + normalizedReplacement
+        else -> continue
+      }
+    target.writeText(updated)
+    return
+  }
+  throw GradleException("Unable to find the expected replacement point in $label at '${target.absolutePath}'.")
 }
 
-tasks.withType<Wrapper>().configureEach {
-  doLast {
-    patchAfterAnchor(scriptFile, unixAnchor, unixInsertion, "gradlew")
-    patchAfterAnchor(batchScript, batchAnchor, batchHelperBlock, "gradlew.bat")
-    replaceExactLine(batchScript, batchExecuteLine, patchedBatchExecuteLine, "gradlew.bat")
+gradle.projectsLoaded {
+  rootProject {
+    tasks.withType<Wrapper>().configureEach {
+      notCompatibleWithConfigurationCache("Patches generated launcher scripts after the Wrapper task writes them.")
+      doLast {
+        patchAfterAnchor(scriptFile, unixAnchor, unixInsertion, "gradlew")
+        patchAfterAnchor(batchScript, batchAnchor, batchHelperBlock, "gradlew.bat")
+        replaceAnyExactLine(
+          batchScript,
+          listOf(
+            legacyBatchExecuteLine to patchedLegacyBatchExecuteLine,
+            currentBatchExecuteLine to patchedCurrentBatchExecuteLine,
+          ),
+          "gradlew.bat",
+        )
+      }
+    }
   }
 }
