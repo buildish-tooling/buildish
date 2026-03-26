@@ -14,4 +14,11 @@
 # limitations under the License.
 
 .idea/
-**/.swp
+build/
+coverage/
+dist/
+IMPLEMENTATION-PLAN.md
+lib/
+node_modules/
+package-lock.json
+REQUIREMENTS.md

@@ -13,5 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.idea/
-**/.swp
+/build/
+/coverage/
+/dist/
+/lib/
+/node_modules/
+*.tsbuildinfo
