@@ -135,4 +135,25 @@ describe('createCacheModel', () => {
     expect(cacheModel.excludePaths).toContain('/home/runner/.gradle/**/configuration-cache/**');
     expect(cacheModel.excludePaths).toContain('/home/runner/.gradle/**/*.lock');
   });
+
+  it('fails hard with an actionable message when no Java runtime is available', async () => {
+    await expect(
+      createCacheModel(baseConfig, baseCiContext, {
+        env: {
+          ...process.env,
+          JAVA_BIN: '__cache_gradle_missing_java_binary__',
+        },
+      }),
+    ).rejects.toThrow(/No Java runtime is available for cache-gradle/);
+  });
+
+  it('preserves non-missing Java detection failures as probe errors', async () => {
+    await expect(
+      createCacheModel(baseConfig, baseCiContext, {
+        captureCommandOutput: async () => {
+          throw new Error("'java -version' failed with exit code 2.");
+        },
+      }),
+    ).rejects.toThrow(/Failed to detect the Java runtime using 'java -version'/);
+  });
 });

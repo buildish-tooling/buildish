@@ -292,11 +292,26 @@ async function detectJavaMajor(
   captureCommandOutput: CommandOutputCapture,
   env: NodeJS.ProcessEnv | undefined,
 ): Promise<number> {
-  const javaVersionOutput = await captureCommandOutput(
-    env?.JAVA_BIN?.trim() || 'java',
-    ['-version'],
-    env,
-  );
+  const javaCommand = env?.JAVA_BIN?.trim() || 'java';
+  let javaVersionOutput: string;
+
+  try {
+    javaVersionOutput = await captureCommandOutput(javaCommand, ['-version'], env);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (!/ENOENT|not found/iu.test(message)) {
+      throw new Error(`Failed to detect the Java runtime using '${javaCommand} -version'.`, {
+        cause: error,
+      });
+    }
+
+    throw new Error(
+      `No Java runtime is available for cache-gradle. Install Java 8 or newer and make it available via '${javaCommand}' before running this action.`,
+      { cause: error },
+    );
+  }
+
   return parseJavaMajor(javaVersionOutput);
 }
 
