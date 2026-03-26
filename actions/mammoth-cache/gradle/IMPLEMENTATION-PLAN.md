@@ -382,7 +382,7 @@ implementable design.
       `gradle-wrapper-<version-number>.asc` files.
 28. Followup for the "buildish helper tool" - automatic installation script via "run bash via curl"
     - The idea is to setup the "buildish helper tool" via a "bash script" that can be installed via
-      `curl -s https://raw.githubusercontent.com/apache/buildish/main/install.sh | bash`.
+      `curl -s https://raw.githubusercontent.com/apache/buildish/main/tools/buildish-no-gradle-wrapper-jar/install.sh | bash`.
     - Should have a similar mechanism for Windows, if that's available.
     - The setup script should also patch existing `gradlew[.bat]` scripts, aka insert the helper script invocation
       at the right place.
@@ -402,21 +402,19 @@ implementable design.
       necessary command line options, see https://docs.gradle.org/current/userguide/init_scripts.html#sec:using_an_init_script.
     - In bash, we might be able to prepend the command line arguments.
     - For powershell, I've got no clue - do you?
-31. Followup for the "buildish helper tool" - hardening
-    - optional arguments to pass different GitHub repository and ref for the "buildish helper tool" installer
-32. Followup for the "buildish helper tool" - Integration and other tests
+31. Followup for the "buildish helper tool" - Integration and other tests
     - Add a Makefile to the `tools/buildish-no-gradle-wrapper-jar/` directory acting as a trampoline to run tests,
       RAT, and release verification tasks.
     - RAT check - share the RAT setup across all tools.
     - License check
     - LICENSE/NOTICE (just symlinks to the root)
-33. Need to add information performed Gradle builds.
+32. Need to add information performed Gradle builds.
     - Similar to the information published on this workflow run: https://github.com/apache/polaris/actions/runs/23577520926
     - Probably worth to look into https://github.com/gradle/actions/tree/v5/sources/src/ and use a similar approach
       to capture Gradle build runs, their outcome and whether build scans were attempted, whether they were
       successful and where those are published (link those).
     - Should have a local integration test for this instead of only validating it in the CI workflows.
-34. Cleanup job summary
+33. Cleanup job summary
     - Can we get the cache partition statistics from the cache manifest into the summary? Like number of files and
       total size for each partition.
     - The level of detail is great, it's just not very readable.
@@ -425,9 +423,9 @@ implementable design.
     - Should use "red crosses" (UTF-8 icon) for each error. Place errors right at the top.
     - Should use "yellow warning signs" (UTF-8 icon) for each warning. Place warnings right after errors.
     - Do not emit duplicate information.
-35. Cleanup the code base
+34. Cleanup the code base
     - Check validate*() functions for duplicates
-36. Documentation for the action
+35. Documentation for the action
     - Write `README.md`, examples, permissions table, security section, and maintenance notes.
     - Explicitly document the Gradle wrapper jar download and verification process in the docs/ directory.
     - Explicitly document the cache key generation process in the docs/ directory.
@@ -435,8 +433,8 @@ implementable design.
     - Explicitly document the CI abstraction layer in the docs/ directory.
     - Explicitly document the bootstrap process in the docs/ directory.
     - All types and functions must have JSDoc comments.
-37. Add the "buildish helper tool" to the top-level README
-38. Add release workflows
+36. Add the "buildish helper tool" to the top-level README
+37. Add release workflows
     - Use version tags. "full" version tags like v1.2.3 become actual GitHub releases.
       We can provide "moving" tags like v1, v1.2 as well. Those would then point to the latest release in their
       respective series.
