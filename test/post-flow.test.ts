@@ -23,10 +23,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   downloadAndVerifyDeltaArtifactPackage,
+  stageDeltaArtifactPackage,
   type WorkflowArtifactApi,
   type WorkflowArtifactDescriptor,
 } from '../src/artifacts/service';
-import { captureCacheManifest } from '../src/cache/manifest';
+import { captureCacheManifest, computeCacheDelta } from '../src/cache/manifest';
 import { createCachePartitions, type CacheModel } from '../src/cache/model';
 import type { BaseCacheApi } from '../src/cache/service';
 import type { SummaryWriter } from '../src/ci/types';
@@ -34,6 +35,7 @@ import { executePostAction } from '../src/post-flow';
 import {
   persistPreBuildCacheManifest,
   PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
+  persistConsumedDeltaArtifactNames,
 } from '../src/state/post-action';
 
 describe('executePostAction', () => {
@@ -89,6 +91,7 @@ describe('executePostAction', () => {
 
       const artifacts = await artifactApi.listArtifacts();
       expect(artifacts).toHaveLength(1);
+      expect(artifactApi.uploadRetentionDays).toEqual([7]);
       const downloaded = await downloadAndVerifyDeltaArtifactPackage(artifactApi, artifacts[0]);
       expect(downloaded.metadata.producer.jobName).toBe('worker-build');
       expect(downloaded.metadata.producer.runId).toBe(101);
@@ -195,6 +198,9 @@ describe('executePostAction', () => {
         'caches/modules-2/files-2.1/org/example/module.bin',
         'after',
       );
+      await stageWorkerArtifactForCleanup(artifactApi, workspace, 'worker-build');
+      const artifactNameToDelete = (await artifactApi.listArtifacts())[0]!.name;
+      persistConsumedDeltaArtifactNames([artifactNameToDelete], savedState.set.bind(savedState));
 
       const status = await executePostAction({
         artifactApi,
@@ -230,9 +236,19 @@ describe('executePostAction', () => {
           totalChangedCount: 1,
         }),
       );
+      expect(status.consumedDeltaCleanupResult).toEqual(
+        expect.objectContaining({
+          attemptedArtifactNames: [artifactNameToDelete],
+          deletedArtifactNames: [artifactNameToDelete],
+          warnings: [],
+        }),
+      );
       expect(summary.lines).toEqual(
         expect.arrayContaining([
           '## Cache Gradle post action',
+          '- Consumed delta cleanup attempted: 1',
+          '- Consumed delta cleanup deleted: 1',
+          '- Consumed delta cleanup warnings: 0',
           '- Delta artifact result: not-distributed-worker',
           '- Post-build cache delta: 0 added, 1 modified, 0 deleted.',
         ]),
@@ -426,11 +442,13 @@ class FakeArtifactApi implements WorkflowArtifactApi {
     name: string,
     _files: readonly string[],
     rootDirectory: string,
+    options?: { readonly retentionDays?: number; readonly compressionLevel?: number },
   ): Promise<WorkflowArtifactDescriptor> {
     await mkdir(this.storageRoot, { recursive: true });
     const id = this.nextId++;
     const directory = path.join(this.storageRoot, String(id));
     await cp(rootDirectory, directory, { recursive: true });
+    this.uploadRetentionDays.push(options?.retentionDays ?? null);
 
     const descriptor: WorkflowArtifactDescriptor = {
       id,
@@ -474,4 +492,67 @@ class FakeArtifactApi implements WorkflowArtifactApi {
       digestMismatch: false,
     };
   }
+
+  async deleteArtifact(name: string): Promise<void> {
+    this.deletedArtifactNames.push(name);
+    const artifact = [...this.artifacts.entries()].find(
+      ([, candidate]) => candidate.descriptor.name === name,
+    );
+    if (!artifact) {
+      throw new Error(`Artifact '${name}' not found.`);
+    }
+    this.artifacts.delete(artifact[0]);
+  }
+
+  readonly uploadRetentionDays: Array<number | null> = [];
+
+  readonly deletedArtifactNames: string[] = [];
+}
+
+async function stageWorkerArtifactForCleanup(
+  artifactApi: WorkflowArtifactApi,
+  workspace: string,
+  jobName: string,
+): Promise<void> {
+  const workerGradleHome = path.join(workspace, `${jobName}-gradle-home`);
+  await writeGradleFile(
+    workerGradleHome,
+    'caches/modules-2/files-2.1/example/module.bin',
+    'worker-before',
+  );
+  const cacheModel = createTestCacheModel(workerGradleHome);
+  const previousManifest = await captureCacheManifest(cacheModel);
+  await writeGradleFile(
+    workerGradleHome,
+    'caches/modules-2/files-2.1/example/module.bin',
+    'worker-after',
+  );
+  const currentManifest = await captureCacheManifest(cacheModel);
+  const deltaManifest = computeCacheDelta(previousManifest, currentManifest);
+  const stagedPackage = await stageDeltaArtifactPackage(
+    {
+      platform: 'github',
+      eventName: 'push',
+      resolvedRefName: 'main',
+      safeRefName: 'main',
+      runnerOs: 'linux',
+      runnerArch: 'x64',
+      defaultBranch: 'main',
+      isPullRequest: false,
+      repository: 'projectnessie/cache-gradle',
+      workflowName: 'CI',
+      jobName,
+      runId: 101,
+      runAttempt: 2,
+      workspace,
+      actionPath: null,
+    },
+    cacheModel,
+    deltaManifest,
+  );
+  await artifactApi.uploadArtifact(
+    stagedPackage.artifactName,
+    stagedPackage.files,
+    stagedPackage.rootDirectory,
+  );
 }

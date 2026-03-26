@@ -290,6 +290,17 @@ class FakeArtifactApi implements WorkflowArtifactApi {
         options?.expectedHash !== undefined && options.expectedHash !== artifact.descriptor.digest,
     };
   }
+
+  async deleteArtifact(name: string): Promise<void> {
+    const artifact = [...this.artifacts.entries()].find(
+      ([, candidate]) => candidate.descriptor.name === name,
+    );
+    if (!artifact) {
+      throw new Error(`Artifact '${name}' not found.`);
+    }
+
+    this.artifacts.delete(artifact[0]);
+  }
 }
 
 async function createStagedDeltaFixture(temporaryDirectories: Set<string>) {

@@ -32,6 +32,7 @@ import {
 } from './cache/delta';
 import { captureCacheManifest } from './cache/manifest';
 import {
+  persistConsumedDeltaArtifactNames,
   persistPreBuildCacheManifest,
   type PersistedPreBuildCacheManifestState,
 } from './state/post-action';
@@ -70,6 +71,12 @@ export async function executeMainAction(
   }
 
   const dependentDeltaResult = await applyDependentJobDeltas(bootstrap, dependencies);
+  if (dependentDeltaResult) {
+    persistConsumedDeltaArtifactNames(
+      dependentDeltaResult.downloadedArtifactNames,
+      dependencies.saveState ?? core.saveState,
+    );
+  }
   const manifest = await captureCacheManifest(bootstrap.cacheModel);
   const preBuildManifestState = await persistPreBuildCacheManifest(
     manifest,
@@ -167,6 +174,7 @@ export function createMainActionSummaryLines(status: MainActionStatus): readonly
           `- Artifact names: ${formatSummaryList(status.dependentDeltaResult.downloadedArtifactNames)}`,
           `- Applied delta changes: ${status.dependentDeltaResult.addedCount} added, ${status.dependentDeltaResult.modifiedCount} modified, ${status.dependentDeltaResult.deletedCount} deleted.`,
           `- Delta apply warnings: ${status.dependentDeltaResult.warnings.length}`,
+          `- Post-job artifact cleanup scheduled: ${status.dependentDeltaResult.downloadedArtifactNames.length}`,
           ...status.dependentDeltaResult.warnings.map((warning) => `- Warning: ${warning}`),
         ]
       : ['- Dependent jobs requested: none', '- Downloaded delta artifacts: 0']),

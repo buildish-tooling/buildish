@@ -107,6 +107,7 @@ export interface WorkflowArtifactApi {
     readonly downloadPath: string;
     readonly digestMismatch: boolean;
   }>;
+  deleteArtifact(name: string, options?: ArtifactFindOptions): Promise<void>;
 }
 
 /**
@@ -268,6 +269,9 @@ export function createGitHubArtifactApi(
         downloadPath: response.downloadPath,
         digestMismatch: response.digestMismatch ?? false,
       };
+    },
+    async deleteArtifact(name, options) {
+      await client.deleteArtifact(name, options?.findBy ? { findBy: options.findBy } : undefined);
     },
   };
 }

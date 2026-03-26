@@ -35,7 +35,10 @@ import { createCachePartitions, type CacheModel } from '../src/cache/model';
 import type { BaseCacheApi } from '../src/cache/service';
 import type { CiJobContext, SummaryWriter } from '../src/ci/types';
 import { executeMainAction } from '../src/main-flow';
-import { PRE_BUILD_CACHE_MANIFEST_PATH_STATE } from '../src/state/post-action';
+import {
+  CONSUMED_DELTA_ARTIFACT_NAMES_STATE,
+  PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
+} from '../src/state/post-action';
 
 describe('executeMainAction', () => {
   it('downloads dependent job deltas, applies them, and persists the pre-build manifest', async () => {
@@ -143,6 +146,7 @@ describe('executeMainAction', () => {
         ),
       ).resolves.toBe('from-worker-delta');
       expect(savedState.get('cache-gradle-base-cache-armed')).toBe('true');
+      expect(savedState.get(CONSUMED_DELTA_ARTIFACT_NAMES_STATE)).toContain('cache-gradle-delta-');
 
       const manifestPath = savedState.get(PRE_BUILD_CACHE_MANIFEST_PATH_STATE);
       expect(manifestPath).toBeTruthy();
@@ -163,6 +167,7 @@ describe('executeMainAction', () => {
           `- Artifact names: ${status.dependentDeltaResult!.downloadedArtifactNames[0]}`,
           '- Applied delta changes: 1 added, 0 modified, 0 deleted.',
           '- Delta apply warnings: 0',
+          '- Post-job artifact cleanup scheduled: 1',
           '- Pre-build manifest persisted: yes',
         ]),
       );
@@ -390,6 +395,7 @@ class FakeArtifactApi implements WorkflowArtifactApi {
     name: string,
     _files: readonly string[],
     rootDirectory: string,
+    _options?: { readonly retentionDays?: number; readonly compressionLevel?: number },
   ): Promise<WorkflowArtifactDescriptor> {
     await mkdir(this.storageRoot, { recursive: true });
     const id = this.nextId++;
@@ -437,6 +443,16 @@ class FakeArtifactApi implements WorkflowArtifactApi {
       downloadPath,
       digestMismatch: false,
     };
+  }
+
+  async deleteArtifact(name: string): Promise<void> {
+    const artifact = [...this.artifacts.entries()].find(
+      ([, candidate]) => candidate.descriptor.name === name,
+    );
+    if (!artifact) {
+      throw new Error(`Artifact '${name}' not found.`);
+    }
+    this.artifacts.delete(artifact[0]);
   }
 }
 

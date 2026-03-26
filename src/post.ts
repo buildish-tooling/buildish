@@ -23,6 +23,12 @@ export async function runPost(): Promise<void> {
   if (status.bootstrap.baseCacheResult) {
     core.info(status.bootstrap.baseCacheResult.message);
   }
+  if (status.consumedDeltaCleanupResult) {
+    core.info(status.consumedDeltaCleanupResult.message);
+    for (const warning of status.consumedDeltaCleanupResult.warnings) {
+      core.warning(warning);
+    }
+  }
   if (status.deltaArtifactResult) {
     core.info(status.deltaArtifactResult.message);
   }

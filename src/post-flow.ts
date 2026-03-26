@@ -25,7 +25,12 @@ import {
 import { bootstrapPhase, type BootstrapDependencies, type BootstrapStatus } from './bootstrap';
 import { captureCacheManifest, computeCacheDelta } from './cache/manifest';
 import { appendJobSummary } from './logging/summary';
-import { loadPersistedPreBuildCacheManifest } from './state/post-action';
+import {
+  getPersistedConsumedDeltaArtifactNames,
+  loadPersistedPreBuildCacheManifest,
+} from './state/post-action';
+
+const DELTA_ARTIFACT_RETENTION_DAYS = 7;
 
 export interface PostDeltaArtifactResult {
   readonly status:
@@ -45,7 +50,15 @@ export interface PostDeltaArtifactResult {
 
 export interface PostActionStatus {
   readonly bootstrap: BootstrapStatus;
+  readonly consumedDeltaCleanupResult: PostConsumedDeltaCleanupResult | null;
   readonly deltaArtifactResult: PostDeltaArtifactResult | null;
+  readonly message: string;
+}
+
+export interface PostConsumedDeltaCleanupResult {
+  readonly attemptedArtifactNames: readonly string[];
+  readonly deletedArtifactNames: readonly string[];
+  readonly warnings: readonly string[];
   readonly message: string;
 }
 
@@ -57,10 +70,12 @@ export async function executePostAction(
   dependencies: PostActionDependencies = {},
 ): Promise<PostActionStatus> {
   const bootstrap = await bootstrapPhase('post', dependencies);
+  const consumedDeltaCleanupResult = await cleanupConsumedDeltaArtifacts(bootstrap, dependencies);
 
   if (!bootstrap.cacheModel) {
     return {
       bootstrap,
+      consumedDeltaCleanupResult,
       deltaArtifactResult: null,
       message: 'Post action flow completed without cache orchestration.',
     };
@@ -72,6 +87,7 @@ export async function executePostAction(
   if (!preBuildManifest) {
     return {
       bootstrap,
+      consumedDeltaCleanupResult,
       deltaArtifactResult: {
         status: 'missing-pre-build-manifest',
         addedCount: 0,
@@ -93,6 +109,7 @@ export async function executePostAction(
 
   const status = {
     bootstrap,
+    consumedDeltaCleanupResult,
     deltaArtifactResult,
     message: createPostActionMessage(deltaArtifactResult),
   } satisfies PostActionStatus;
@@ -148,7 +165,9 @@ async function uploadPostDeltaArtifact(
   );
 
   try {
-    const uploadedPackage = await uploadDeltaArtifactPackage(artifactApi, stagedPackage);
+    const uploadedPackage = await uploadDeltaArtifactPackage(artifactApi, stagedPackage, {
+      retentionDays: DELTA_ARTIFACT_RETENTION_DAYS,
+    });
     return {
       status: 'uploaded',
       artifactName: uploadedPackage.artifact.name,
@@ -157,11 +176,75 @@ async function uploadPostDeltaArtifact(
       message:
         `Uploaded delta artifact '${uploadedPackage.artifact.name}' ` +
         `with ${counts.addedCount} added, ${counts.modifiedCount} modified, ` +
-        `${counts.deletedCount} deleted cache path(s).`,
+        `${counts.deletedCount} deleted cache path(s); ` +
+        `unconsumed artifacts expire after ${DELTA_ARTIFACT_RETENTION_DAYS} day(s).`,
     };
   } finally {
     await rm(stagedPackage.stagingDirectory, { recursive: true, force: true });
   }
+}
+
+async function cleanupConsumedDeltaArtifacts(
+  bootstrap: BootstrapStatus,
+  dependencies: PostActionDependencies,
+): Promise<PostConsumedDeltaCleanupResult | null> {
+  if (bootstrap.config.jobMode !== 'distributed-aggregator') {
+    return null;
+  }
+
+  let artifactNames: readonly string[];
+  try {
+    artifactNames = getPersistedConsumedDeltaArtifactNames(dependencies.getState ?? (() => ''));
+  } catch (error) {
+    return {
+      attemptedArtifactNames: [],
+      deletedArtifactNames: [],
+      warnings: [
+        `Unable to load persisted consumed delta artifact names: ${error instanceof Error ? error.message : String(error)}`,
+      ],
+      message:
+        'Consumed delta artifact cleanup skipped because persisted cleanup state could not be read.',
+    };
+  }
+
+  if (artifactNames.length === 0) {
+    return {
+      attemptedArtifactNames: [],
+      deletedArtifactNames: [],
+      warnings: [],
+      message:
+        'Consumed delta artifact cleanup skipped because no dependent artifact names were persisted during the main phase.',
+    };
+  }
+
+  const artifactApi = dependencies.artifactApi ?? createGitHubArtifactApi();
+  const deleteResults = await Promise.allSettled(
+    artifactNames.map(async (artifactName) => {
+      await artifactApi.deleteArtifact(artifactName);
+      return artifactName;
+    }),
+  );
+
+  const deletedArtifactNames: string[] = [];
+  const warnings: string[] = [];
+  for (const [index, result] of deleteResults.entries()) {
+    const artifactName = artifactNames[index]!;
+    if (result.status === 'fulfilled') {
+      deletedArtifactNames.push(result.value);
+      continue;
+    }
+
+    warnings.push(
+      `Failed to delete consumed delta artifact '${artifactName}': ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+    );
+  }
+
+  return {
+    attemptedArtifactNames: artifactNames,
+    deletedArtifactNames,
+    warnings,
+    message: `Consumed delta artifact cleanup deleted ${deletedArtifactNames.length} of ${artifactNames.length} persisted artifact(s).`,
+  };
 }
 
 function countDeltaEntries(deltaManifest: Parameters<typeof stageDeltaArtifactPackage>[2]): {
@@ -204,12 +287,17 @@ function createPostActionMessage(deltaArtifactResult: PostDeltaArtifactResult): 
 
 export function createPostActionSummaryLines(status: PostActionStatus): readonly string[] {
   if (!status.deltaArtifactResult) {
-    return ['## Cache Gradle post action', '- Delta artifact upload: not evaluated.'];
+    return [
+      '## Cache Gradle post action',
+      ...createConsumedDeltaCleanupSummaryLines(status.consumedDeltaCleanupResult),
+      '- Delta artifact upload: not evaluated.',
+    ];
   }
 
   const result = status.deltaArtifactResult;
   return [
     '## Cache Gradle post action',
+    ...createConsumedDeltaCleanupSummaryLines(status.consumedDeltaCleanupResult),
     `- Delta artifact result: ${result.status}`,
     `- Post-build cache delta: ${result.addedCount} added, ${result.modifiedCount} modified, ${result.deletedCount} deleted.`,
     ...(result.artifactName
@@ -219,5 +307,20 @@ export function createPostActionSummaryLines(status: PostActionStatus): readonly
         ]
       : []),
     `- Detail: ${result.message}`,
+  ];
+}
+
+function createConsumedDeltaCleanupSummaryLines(
+  cleanupResult: PostConsumedDeltaCleanupResult | null,
+): readonly string[] {
+  if (!cleanupResult) {
+    return [];
+  }
+
+  return [
+    `- Consumed delta cleanup attempted: ${cleanupResult.attemptedArtifactNames.length}`,
+    `- Consumed delta cleanup deleted: ${cleanupResult.deletedArtifactNames.length}`,
+    `- Consumed delta cleanup warnings: ${cleanupResult.warnings.length}`,
+    ...cleanupResult.warnings.map((warning) => `- Warning: ${warning}`),
   ];
 }

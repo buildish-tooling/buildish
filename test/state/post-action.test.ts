@@ -22,8 +22,11 @@ import { describe, expect, it } from 'vitest';
 
 import { CACHE_MANIFEST_SCHEMA_VERSION, type CacheManifest } from '../../src/cache/manifest';
 import {
+  CONSUMED_DELTA_ARTIFACT_NAMES_STATE,
+  getPersistedConsumedDeltaArtifactNames,
   getPersistedPreBuildCacheManifestPath,
   loadPersistedPreBuildCacheManifest,
+  persistConsumedDeltaArtifactNames,
   persistPreBuildCacheManifest,
   PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
 } from '../../src/state/post-action';
@@ -78,6 +81,31 @@ describe('post-action state helpers', () => {
         () => '  relative/post-state/pre-build-cache-manifest.json  ',
       ),
     ).toBe(path.resolve('relative/post-state/pre-build-cache-manifest.json'));
+  });
+
+  it('persists consumed delta artifact names as trimmed unique JSON state', () => {
+    const savedState = new Map<string, string>();
+
+    persistConsumedDeltaArtifactNames(
+      ['artifact-a', 'artifact-b', 'artifact-a'],
+      savedState.set.bind(savedState),
+    );
+
+    expect(savedState.get(CONSUMED_DELTA_ARTIFACT_NAMES_STATE)).toContain('artifact-a');
+    expect(
+      getPersistedConsumedDeltaArtifactNames((name: string) =>
+        name === CONSUMED_DELTA_ARTIFACT_NAMES_STATE
+          ? '  ["artifact-a", "artifact-b", "artifact-a"]\n '
+          : '',
+      ),
+    ).toEqual(['artifact-a', 'artifact-b']);
+  });
+
+  it('rejects malformed consumed delta artifact state', () => {
+    expect(() => getPersistedConsumedDeltaArtifactNames(() => 'not-json')).toThrow(/valid JSON/u);
+    expect(() => getPersistedConsumedDeltaArtifactNames(() => '[""]')).toThrow(
+      /must not be blank/u,
+    );
   });
 });
 
