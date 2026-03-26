@@ -398,7 +398,10 @@ implementable design.
 30. Followup for the "buildish helper tool" - support from the action
     - The buildish mammoth action should write the right `gradle-wrapper-<version-number>[.sha256|.asc]` files.
     - That way, the "buildish helper tool" does not need to download the files again.
-31. Followup for the "buildish helper tool" - Integration tests
+31. Followup for the "buildish helper tool" - Integration and other tests
+    - RAT check - share the RAT setup across all tools
+    - License check
+    - LICENSE/NOTICE (just symlinks to the root)
 32. Need to add information performed Gradle builds.
     - Similar to the information published on this workflow run: https://github.com/apache/polaris/actions/runs/23577520926
     - Probably worth to look into https://github.com/gradle/actions/tree/v5/sources/src/ and use a similar approach
@@ -425,7 +428,7 @@ implementable design.
     - Explicitly document the bootstrap process in the docs/ directory.
     - All types and functions must have JSDoc comments.
 36. Add the "buildish helper tool" to the top-level README
-39. Add release workflows
+37. Add release workflows
     - Use version tags. "full" version tags like v1.2.3 become actual GitHub releases.
       We can provide "moving" tags like v1, v1.2 as well. Those would then point to the latest release in their
       respective series.
