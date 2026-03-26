@@ -762,7 +762,7 @@ jobs:
 
           $gpgPath = $candidates |
             Where-Object {
-              Test-Path -LiteralPath $_ -and $_ -notmatch '[\\/]usr[\\/]bin[\\/]gpg\.exe$'
+              (Test-Path -LiteralPath $_) -and ($_ -notmatch '[\\/]usr[\\/]bin[\\/]gpg\.exe$')
             } |
             Select-Object -Unique -First 1
           if ([string]::IsNullOrWhiteSpace($gpgPath)) {
