@@ -34,7 +34,7 @@ const baseConfig: NormalizedActionConfig = {
   jobMode: 'standalone',
   dependentJobs: [],
   allowDuplicateDependentDeltaPaths: false,
-  cacheKeyPrefix: 'gradle-cache-',
+  cacheKeyPrefix: 'buildish-mammoth-gradle-cache-',
   cacheKeyTemplate: null,
   cachePartitions: [],
   cacheSchemaVersion: 2,
@@ -48,7 +48,7 @@ const baseConfig: NormalizedActionConfig = {
 };
 
 const cacheModel: CacheModel = {
-  cacheKey: 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-feature-cache-model',
+  cacheKey: 'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-feature-cache-model',
   javaMajor: 21,
   runnerOs: 'linux',
   runnerArch: 'x64',
@@ -75,7 +75,7 @@ describe('createBaseCachePaths', () => {
 describe('createBaseCacheRestoreKeys', () => {
   it('derives a branch-agnostic restore key for the default template', () => {
     expect(createBaseCacheRestoreKeys(baseConfig, cacheModel)).toEqual([
-      'gradle-cache-2-21-linux-x64-feedcafe1234abcd-',
+      'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-',
     ]);
   });
 
@@ -104,20 +104,25 @@ describe('restoreBaseCache', () => {
     });
 
     expect(result.status).toBe('exact-hit');
-    expect(result.restoreKeys).toEqual(['gradle-cache-2-21-linux-x64-feedcafe1234abcd-']);
+    expect(result.restoreKeys).toEqual([
+      'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-',
+    ]);
   });
 
   it('classifies partial cache hits', async () => {
     const result = await restoreBaseCache(baseConfig, cacheModel, {
       cacheApi: {
         isFeatureAvailable: () => true,
-        restoreCache: async () => 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
+        restoreCache: async () =>
+          'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
         saveCache: async () => 0,
       },
     });
 
     expect(result.status).toBe('partial-hit');
-    expect(result.matchedKey).toBe('gradle-cache-2-21-linux-x64-feedcafe1234abcd-main');
+    expect(result.matchedKey).toBe(
+      'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
+    );
   });
 
   it('returns a miss when no base cache is restored', async () => {

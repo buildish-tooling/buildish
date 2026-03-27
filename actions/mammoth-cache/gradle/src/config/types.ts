@@ -111,7 +111,7 @@ export interface RawActionInputs {
   readonly dependentJobs: string;
   /** Raw `allow-duplicate-dependent-delta-paths` input. Empty string later defaults to `'false'`. */
   readonly allowDuplicateDependentDeltaPaths: string;
-  /** Raw `cache-key-prefix` input. Empty string later defaults to `'gradle-cache-'`. */
+  /** Raw `cache-key-prefix` input. Empty string later defaults to `'buildish-mammoth-gradle-cache-'`. */
   readonly cacheKeyPrefix: string;
   /** Raw `cache-key-template` input. Empty string later means “use the built-in template”. */
   readonly cacheKeyTemplate: string;
@@ -185,7 +185,7 @@ export interface NormalizedActionConfig {
   /**
    * Stable cache-key prefix.
    *
-   * Defaults to `gradle-cache-` and must match the repository's prefix validation rules.
+   * Defaults to `buildish-mammoth-gradle-cache-` and must match the repository's prefix validation rules.
    */
   readonly cacheKeyPrefix: string;
   /**

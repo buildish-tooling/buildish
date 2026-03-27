@@ -249,7 +249,7 @@ function createTestCacheModel(
   partitions = createCachePartitions(gradleUserHome),
 ): CacheModel {
   return {
-    cacheKey: 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
+    cacheKey: 'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
     javaMajor: 21,
     runnerOs: 'linux',
     runnerArch: 'x64',

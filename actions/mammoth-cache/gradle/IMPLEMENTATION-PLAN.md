@@ -45,7 +45,7 @@ implementable design.
 
 ### Action shape
 
-- `action-descriptors/github/very-temporary-unreleased-consumer-path/action.yml`
+- `action-descriptors/github/internal-unreleased-consumer-path/action.yml`
   - `runs.using: node24`
   - `main: ../../../dist/github/main/index.cjs`
   - `post: ../../../dist/github/post/index.cjs`
@@ -170,7 +170,7 @@ implementable design.
   - build cache
   - wrapper distributions when present under the supported layout
 - Key format default:
-  - `gradle-cache-${schemaVersion}-${javaMajor}-${runnerOs}-${runnerArch}-${safeRefName}`
+  - `buildish-mammoth-gradle-cache-${schemaVersion}-${javaMajor}-${runnerOs}-${runnerArch}-${safeRefName}`
 - Allow user customization only via:
   - prefix override
   - optional restricted template placeholders

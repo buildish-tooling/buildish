@@ -246,7 +246,7 @@ describe('normalizeActionConfig', () => {
       readOnly: false,
       jobMode: 'standalone',
       allowDuplicateDependentDeltaPaths: false,
-      cacheKeyPrefix: 'gradle-cache-',
+      cacheKeyPrefix: 'buildish-mammoth-gradle-cache-',
       cachePartitions: [],
       restoreCleanupMode: 'none',
       wrapperSelectionMode: 'default',

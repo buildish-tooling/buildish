@@ -33,7 +33,7 @@ const baseConfig: NormalizedActionConfig = {
   jobMode: 'standalone',
   dependentJobs: [],
   allowDuplicateDependentDeltaPaths: false,
-  cacheKeyPrefix: 'gradle-cache-',
+  cacheKeyPrefix: 'buildish-mammoth-gradle-cache-',
   cacheKeyTemplate: null,
   cachePartitions: [],
   cacheSchemaVersion: 2,
@@ -81,7 +81,7 @@ describe('parseJavaMajor', () => {
 describe('renderCacheKey', () => {
   it('renders the default cache key using the safe ref name', () => {
     expect(renderCacheKey(baseConfig, baseCiContext, 21, 'feedcafe1234abcd')).toBe(
-      'gradle-cache-2-21-linux-x64-feedcafe1234abcd-feature-cache-model',
+      'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-feature-cache-model',
     );
   });
 
@@ -97,7 +97,7 @@ describe('renderCacheKey', () => {
         17,
         'feedcafe1234abcd',
       ),
-    ).toBe('gradle-cache-linux:x64:17:feedcafe1234abcd:feature-cache-model');
+    ).toBe('buildish-mammoth-gradle-cache-linux:x64:17:feedcafe1234abcd:feature-cache-model');
   });
 });
 
@@ -190,7 +190,7 @@ describe('createCacheModel', () => {
     });
 
     expect(cacheModel.cacheKey).toMatch(
-      /^gradle-cache-2-21-linux-x64-[a-f0-9]{16}-feature-cache-model$/,
+      /^buildish-mammoth-gradle-cache-2-21-linux-x64-[a-f0-9]{16}-feature-cache-model$/,
     );
     expect(cacheModel.javaMajor).toBe(21);
     expect(cacheModel.partitionFingerprint).toMatch(/^[a-f0-9]{16}$/);

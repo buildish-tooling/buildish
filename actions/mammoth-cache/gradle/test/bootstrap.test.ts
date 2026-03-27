@@ -40,7 +40,7 @@ const config = {
   jobMode: 'standalone',
   dependentJobs: [],
   allowDuplicateDependentDeltaPaths: false,
-  cacheKeyPrefix: 'gradle-cache-',
+  cacheKeyPrefix: 'buildish-mammoth-gradle-cache-',
   cacheKeyTemplate: null,
   cachePartitions: [],
   cacheSchemaVersion: 2,
@@ -112,7 +112,7 @@ const validatedWrappers: readonly ValidatedWrapperPropertiesFile[] = [
 ] as const;
 
 const cacheModel: CacheModel = {
-  cacheKey: 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
+  cacheKey: 'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
   javaMajor: 21,
   runnerOs: 'linux',
   runnerArch: 'x64',
@@ -151,9 +151,9 @@ const cacheModel: CacheModel = {
 const restoreResult: BaseCacheRestoreResult = {
   operation: 'restore',
   status: 'exact-hit',
-  cacheKey: 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
-  matchedKey: 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
-  restoreKeys: ['gradle-cache-2-21-linux-x64-feedcafe1234abcd-'],
+  cacheKey: 'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
+  matchedKey: 'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
+  restoreKeys: ['buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-'],
   paths: [
     '/home/runner/.gradle/caches/modules-*/files-*/**',
     '!/home/runner/.gradle/**/configuration-cache/**',
@@ -161,7 +161,8 @@ const restoreResult: BaseCacheRestoreResult = {
     '!/home/runner/.gradle/caches/*/cc-keystore',
     '!/home/runner/.gradle/caches/modules-*/metadata-*/**',
   ],
-  message: "Base cache restore hit exact key 'gradle-cache-2-21-linux-x64-feedcafe1234abcd-main'.",
+  message:
+    "Base cache restore hit exact key 'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-main'.",
 };
 
 const provisionedWrappers: readonly ProvisionedWrapperJar[] = [
@@ -228,7 +229,7 @@ describe('bootstrap helpers', () => {
     expect(summaryText).toContain('<table>');
     expect(summaryText).toContain('gradle/wrapper/gradle-wrapper.properties');
     expect(summaryText).toMatch(
-      /- Cache key: gradle\\-cache\\-2\\-21\\-linux\\-x64\\-feedcafe1234abcd\\-main/u,
+      /- Cache key: buildish\\-mammoth\\-gradle\\-cache\\-2\\-21\\-linux\\-x64\\-feedcafe1234abcd\\-main/u,
     );
   });
 
@@ -260,7 +261,7 @@ describe('bootstrap helpers', () => {
     expect(logText).toContain("GitHub environment 'GITHUB_TOKEN' available: yes.");
     expect(logText).toContain("GitHub input 'github-job-check-run-id': 987654321.");
     expect(logText).toContain(
-      'Cache key: gradle-cache-2-21-linux-x64-feedcafe1234abcd-main; Java major: 21; cache partitions: 1.',
+      'Cache key: buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-main; Java major: 21; cache partitions: 1.',
     );
     expect(logText).toContain(
       "Downloaded trusted wrapper JAR for 'gradle/wrapper/gradle-wrapper.properties'",
@@ -362,7 +363,7 @@ describe('bootstrap helpers', () => {
 
       expect(status.message).toBe('Prepared main phase for push on main in standalone mode.');
       expect(status.cacheModel?.cacheKey).toMatch(
-        /^gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/,
+        /^buildish-mammoth-gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/,
       );
       expect(status.baseCacheResult?.status).toBe('exact-hit');
       expect(status.validatedWrappers).toHaveLength(1);
@@ -445,7 +446,9 @@ describe('bootstrap helpers', () => {
         expect.objectContaining({
           operation: 'save',
           status: 'saved',
-          cacheKey: expect.stringMatching(/^gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/),
+          cacheKey: expect.stringMatching(
+            /^buildish-mammoth-gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/,
+          ),
           cacheId: 42,
         }),
       );

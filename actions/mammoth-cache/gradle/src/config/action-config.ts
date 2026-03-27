@@ -196,7 +196,9 @@ export function normalizeActionConfig(
     rawInputs.allowDuplicateDependentDeltaPaths || 'false',
     'allow-duplicate-dependent-delta-paths',
   );
-  const cacheKeyPrefix = validateCacheKeyPrefix(rawInputs.cacheKeyPrefix || 'gradle-cache-');
+  const cacheKeyPrefix = validateCacheKeyPrefix(
+    rawInputs.cacheKeyPrefix || 'buildish-mammoth-gradle-cache-',
+  );
   const cacheKeyTemplate = validateCacheKeyTemplate(rawInputs.cacheKeyTemplate);
   const cachePartitions = parseCachePartitionsInput(rawInputs.cachePartitions);
   const processAllWrapperFiles = parseBooleanInput(

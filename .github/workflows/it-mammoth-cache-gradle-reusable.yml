@@ -136,7 +136,7 @@ jobs:
 
       - name: Prepare Mammoth Cache for Gradle
         id: prepare_standalone_cache
-        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/very-temporary-unreleased-consumer-path
+        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/internal-unreleased-consumer-path
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/standalone-round-trip
           cache-key-prefix: it-standalone-${{ github.run_id }}-${{ github.run_attempt }}-
@@ -273,7 +273,7 @@ jobs:
 
       - name: Prepare Mammoth Cache for Gradle
         id: prepare_worker_a_cache
-        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/very-temporary-unreleased-consumer-path
+        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/internal-unreleased-consumer-path
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/worker-a
           job-mode: distributed-worker
@@ -361,7 +361,7 @@ jobs:
 
       - name: Prepare Mammoth Cache for Gradle
         id: prepare_worker_b_cache
-        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/very-temporary-unreleased-consumer-path
+        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/internal-unreleased-consumer-path
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/worker-b
           job-mode: distributed-worker
@@ -452,7 +452,7 @@ jobs:
 
       - name: Prepare Mammoth Cache for Gradle
         id: prepare_aggregator_cache
-        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/very-temporary-unreleased-consumer-path
+        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/internal-unreleased-consumer-path
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/aggregator
           job-mode: distributed-aggregator
@@ -569,7 +569,7 @@ jobs:
           chmod +x "$fixture_dir/gradlew"
 
       - name: First action invocation succeeds
-        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/very-temporary-unreleased-consumer-path
+        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/internal-unreleased-consumer-path
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/duplicate-guard
           cache-enabled: false
@@ -582,7 +582,7 @@ jobs:
       - name: Duplicate action invocation is rejected
         id: duplicate_action
         continue-on-error: true
-        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/very-temporary-unreleased-consumer-path
+        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/internal-unreleased-consumer-path
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/duplicate-guard
           cache-enabled: false
@@ -637,7 +637,7 @@ jobs:
 
       - name: Prepare Mammoth Cache for Gradle
         id: prepare_pull_request_cache
-        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/very-temporary-unreleased-consumer-path
+        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/internal-unreleased-consumer-path
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/pull-request
           cache-key-prefix: it-pr-${{ github.run_id }}-${{ github.run_attempt }}-
@@ -782,7 +782,7 @@ jobs:
 
       - name: Prepare Mammoth Cache for Gradle
         id: prepare_cross_platform_cache
-        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/very-temporary-unreleased-consumer-path
+        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/internal-unreleased-consumer-path
         with:
           base-directory: actions/mammoth-cache/gradle/build/integration-fixtures/cross-platform-${{ matrix.os }}
           cache-key-prefix: it-cross-platform-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}-

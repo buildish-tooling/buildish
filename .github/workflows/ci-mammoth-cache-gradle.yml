@@ -125,7 +125,7 @@ jobs:
           cp -R test/fixtures/smoke build/smoke-fixture
 
       - name: Run the local action
-        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/very-temporary-unreleased-consumer-path
+        uses: ./actions/mammoth-cache/gradle/action-descriptors/github/internal-unreleased-consumer-path
         with:
           base-directory: actions/mammoth-cache/gradle/build/smoke-fixture
 

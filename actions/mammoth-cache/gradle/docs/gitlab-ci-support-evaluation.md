@@ -27,7 +27,7 @@ The current `src/ci/**` adapter is **not sufficient** to make GitLab support a s
 
 For GitLab, the main problem is not event/ref parsing. The main problem is that this project is still fundamentally shaped like a **GitHub Action runtime**:
 
-- `action-descriptors/github/very-temporary-unreleased-consumer-path/action.yml`
+- `action-descriptors/github/internal-unreleased-consumer-path/action.yml`
 - `@actions/core`
 - `@actions/cache`
 - `@actions/artifact`

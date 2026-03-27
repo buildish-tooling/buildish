@@ -90,7 +90,7 @@ For Codeberg, this may or may not be acceptable depending on the exact Forgejo/C
 ### 4. Entry points are still GitHub Action shaped
 
 The project is still packaged through a GitHub-specific action descriptor at
-`action-descriptors/github/very-temporary-unreleased-consumer-path/action.yml`, including:
+`action-descriptors/github/internal-unreleased-consumer-path/action.yml`, including:
 
 - action inputs
 - outputs

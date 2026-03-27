@@ -335,7 +335,7 @@ function createFixtureCacheModel(gradleUserHome: string): CacheModel {
   const partitions = createCachePartitions(gradleUserHome);
 
   return {
-    cacheKey: 'gradle-cache-v1:21:linux:x64:main',
+    cacheKey: 'buildish-mammoth-gradle-cache-v1:21:linux:x64:main',
     javaMajor: 21,
     runnerOs: 'linux',
     runnerArch: 'x64',

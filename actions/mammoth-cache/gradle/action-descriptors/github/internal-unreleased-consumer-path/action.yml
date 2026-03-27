@@ -71,9 +71,9 @@ inputs:
     description: >-
       Prefix used for generated cache keys. Must start with an alphanumeric
       character and then use only letters, numbers, dot, underscore, and dash.
-      Default: `gradle-cache-`.
+      Default: `buildish-mammoth-gradle-cache-`.
     required: false
-    default: gradle-cache-
+    default: buildish-mammoth-gradle-cache-
   cache-key-template:
     description: >-
       Optional restricted cache key template. Supported placeholders:

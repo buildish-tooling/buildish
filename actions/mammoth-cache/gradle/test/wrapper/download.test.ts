@@ -470,7 +470,7 @@ const baseConfig: NormalizedActionConfig = {
   jobMode: 'standalone',
   dependentJobs: [],
   allowDuplicateDependentDeltaPaths: false,
-  cacheKeyPrefix: 'gradle-cache-',
+  cacheKeyPrefix: 'buildish-mammoth-gradle-cache-',
   cacheKeyTemplate: null,
   cachePartitions: [],
   cacheSchemaVersion: 2,

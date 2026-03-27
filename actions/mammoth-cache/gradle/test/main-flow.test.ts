@@ -226,7 +226,9 @@ describe('executeMainAction', () => {
         ]),
       );
       expect(createMainActionOutputs(status)).toEqual({
-        'cache-key': expect.stringMatching(/^gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/),
+        'cache-key': expect.stringMatching(
+          /^buildish-mammoth-gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/,
+        ),
         'base-cache-restore-status': 'miss',
         'java-major': '21',
         'job-mode': 'distributed-aggregator',
@@ -441,7 +443,9 @@ describe('executeMainAction', () => {
       expect(summaryText).toContain('- Downloaded delta artifacts: 0');
       expect(summaryText).toContain('- Pre-build manifest: persisted');
       expect(createMainActionOutputs(status)).toEqual({
-        'cache-key': expect.stringMatching(/^gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/),
+        'cache-key': expect.stringMatching(
+          /^buildish-mammoth-gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/,
+        ),
         'base-cache-restore-status': 'miss',
         'java-major': '21',
         'job-mode': 'standalone',
@@ -882,7 +886,7 @@ function createTestConfig(gradleUserHome: string): NormalizedActionConfig {
     jobMode: 'standalone',
     dependentJobs: [],
     allowDuplicateDependentDeltaPaths: false,
-    cacheKeyPrefix: 'gradle-cache-',
+    cacheKeyPrefix: 'buildish-mammoth-gradle-cache-',
     cacheKeyTemplate: null,
     cachePartitions: [],
     cacheSchemaVersion: 2,

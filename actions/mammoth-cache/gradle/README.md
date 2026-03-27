@@ -120,7 +120,7 @@ the RAT checks locally.
 
 ### `cache-key-prefix`
 
-- Default: `gradle-cache-`
+- Default: `buildish-mammoth-gradle-cache-`
 - Must start with an alphanumeric character.
 - Remaining characters may only be letters, numbers, `.`, `_`, or `-`.
 
