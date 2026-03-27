@@ -23,7 +23,7 @@ For the concrete shared refactor sequence and proposed target architecture, see
 
 ## Bottom line
 
-The current `src/ci/**` adapter is **not sufficient** to make GitLab support a small follow-on task.
+The current architecture is **meaningfully better prepared** for GitLab than it was before the portability refactors, but GitLab support is still **not** a small follow-on task.
 
 For GitLab, the main problem is not event/ref parsing. The main problem is that this project is still fundamentally shaped like a **GitHub Action runtime**:
 
@@ -31,21 +31,22 @@ For GitLab, the main problem is not event/ref parsing. The main problem is that 
 - `@actions/core`
 - `@actions/cache`
 - `@actions/artifact`
-- main/post lifecycle
+- GitHub-action packaging and state/output semantics
 - action inputs/outputs/state
 
 GitLab CI has useful equivalents for some of these concepts, but they are exposed through a **different execution model**. Supporting GitLab later would still require a **different packaging/invocation story** and likely a **GitLab-specific runtime host / lifecycle model**, not just a new CI adapter.
 
 ## Why the current CI adapter still helps
 
-The existing adapter work is still valuable.
+The existing portability work is still valuable.
 
 It already centralizes:
 
 - normalized CI metadata
 - execution URLs
-- provider-specific summary/log hooks
+- provider-specific reporting sinks
 - provider-scoped HTTP headers
+- shared `prepare` / `finalize` entrypoints under `src/entrypoints/cli/**`
 
 GitLab also exposes rich predefined variables such as:
 
@@ -92,11 +93,11 @@ But the contract itself still models GitHub Actions toolkit behavior for:
 
 GitLab has no direct equivalent to GitHub Action `saveState` / `getState`, so a future GitLab host would need a different state/lifecycle strategy.
 
-### 3. The action depends on a post-action lifecycle
+### 3. The shared core has `prepare` / `finalize`, but GitHub packaging still depends on a post-action lifecycle
 
-A lot of the design assumes a main phase plus a later post phase.
+The shared core now models lifecycle as `prepare` plus `finalize`.
 
-That is normal for GitHub Actions JavaScript actions, but GitLab CI does not provide the same action-level post hook. The closest GitLab concept is usually `after_script`, which is job-level shell behavior, not action-runtime behavior.
+However, the published GitHub consumer path still relies on the GitHub Actions JavaScript-action `post` hook. GitLab CI does not provide the same action-level post hook. The closest GitLab concept is usually `after_script`, which is job-level shell behavior, not action-runtime behavior.
 
 That affects:
 
@@ -105,7 +106,7 @@ That affects:
 - build-result summary generation
 - cleanup of consumed delta artifacts
 
-This likely requires a deliberate redesign of lifecycle control for GitLab.
+This still requires a deliberate GitLab-specific lifecycle mapping.
 
 ### 4. The cache backend seam exists, but the contract is still Actions-cache shaped
 
@@ -145,18 +146,11 @@ Recent refactors already improved several earlier portability blockers:
 
 That is real progress, but it does **not** remove the need for a GitLab-specific host/lifecycle model because GitLab still does not execute JavaScript actions with GitHub main/post semantics.
 
-## Architectural preparation needed before GitLab becomes realistic
+## Shared preparation that is now in place, and what GitLab still needs
 
-### A. Split `ActionRuntimeHost` into narrower capabilities
+### A. Runtime-host capabilities are split, but GitLab still needs its own host strategy
 
-Today `ActionRuntimeHost` bundles several concerns together:
-
-- input resolution
-- state handoff
-- output emission
-- logging and failure reporting
-
-For GitLab preparation, that should become smaller capability interfaces such as:
+The shared code now consumes narrower capability interfaces such as:
 
 - `RuntimeInputSource`
 - `RuntimeStateStore`
@@ -164,28 +158,27 @@ For GitLab preparation, that should become smaller capability interfaces such as
 - `RuntimeReporter`
 - `RuntimePaths`
 
-Then `bootstrap`, `main-flow`, and `post-flow` can depend only on the pieces they actually need, instead of assuming a GitHub-Action-shaped runtime object.
+That shared prep is done. A future GitLab port still needs a concrete host that can implement or emulate those capabilities safely.
 
-### B. Add an explicit lifecycle driver instead of assuming GitHub `main`/`post`
+### B. An explicit lifecycle driver exists, but GitLab still needs host-level lifecycle mapping
 
 GitHub Actions happens to provide a two-phase JavaScript-action lifecycle.
 
-GitLab does not. So the project needs an explicit lifecycle abstraction such as:
+The shared code now expresses that as `prepare` / `finalize`, and the current GitHub entrypoints are thin adapters over it. GitLab still needs a deliberate mapping to job scripts, `after_script`, or two explicit commands.
 
-- `prepare` / `finalize`
-- or `restore` / `complete`
+### C. A CLI-friendly core entrypoint exists now
 
-The current GitHub action entrypoints can remain thin adapters over that lifecycle, while GitLab can map it to job scripts, `after_script`, or two explicit commands.
+The core orchestration in `bootstrap`, `main-flow`, and `post-flow` is now callable from provider-neutral entrypoints under `src/entrypoints/cli/**`.
 
-### C. Extract a CLI-friendly core
+That means GitLab no longer needs this shared refactor first; it needs provider-specific invocation and packaging around those entrypoints.
 
-The core orchestration in `bootstrap`, `main-flow`, and `post-flow` should eventually be callable from:
+Possible future GitLab consumers still include:
 
 - GitHub Action entrypoints
 - a plain Node CLI
 - possibly a future container entrypoint
 
-That would let GitLab invoke the same core logic from `.gitlab-ci.yml` instead of pretending to be a GitHub Action runtime.
+That is the bridge GitLab can use from `.gitlab-ci.yml` instead of pretending to be a GitHub Action runtime.
 
 ### D. Generalize artifact lookup and execution-scope identity
 
@@ -203,20 +196,20 @@ Producer-job identity is still expressed indirectly through artifact naming and 
 
 That remaining design choice belongs in shared code, because it is not GitLab-specific; it is the remaining abstraction point for any non-GitHub backend.
 
-### E. Decouple reporting surfaces from provider-native summaries
+### E. Reporting is already decoupled from provider-native summaries
 
-Current reporting assumes two provider surfaces:
+Current reporting now flows through a provider-neutral report sink with two logical surfaces:
 
 - grouped logs
 - replaceable/appendable job summaries
 
-For GitLab prep, introduce a report sink abstraction so the same generated Markdown/details can be sent to:
+That means a future GitLab implementation can send the same generated Markdown/details to:
 
 - a native summary surface when one exists
 - a plain log sink
 - a generated file or uploaded artifact
 
-That keeps report generation reusable without forcing every provider to emulate GitHub step summaries.
+That shared prep is done; the remaining GitLab work is to decide which concrete surfaces it should implement.
 
 ### F. Redesign lifecycle for non-post environments
 
@@ -324,17 +317,16 @@ That likely requires the larger redesign described above.
 
 If GitLab support becomes a real roadmap item later, the safest order looks like this:
 
-1. Split the current runtime host into smaller capabilities and introduce an explicit lifecycle driver.
-2. Extract a **CLI-friendly core** that does not require a GitHub action descriptor.
-3. Generalize artifact execution-scope lookup and report-sink abstractions in shared code.
-4. Add a GitLab-capable host plus GitLab-specific **cache** and **artifact** backends.
-5. Design and validate the GitLab lifecycle model using job scripts / `after_script` / explicit finalize commands.
-6. Only then implement and validate a GitLab provider/package surface.
+1. Decide the GitLab packaging/invocation model around the existing shared `prepare` / `finalize` entrypoints.
+2. Add a GitLab-capable host plus GitLab-specific cache and artifact backends.
+3. Design and validate the GitLab lifecycle model using job scripts, `after_script`, or explicit finalize commands.
+4. Confirm artifact lookup identity and reporting surfaces against real GitLab pipeline/job semantics.
+5. Implement and validate the GitLab provider/package surface.
 
 ## Final assessment
 
 For GitLab, I would describe the current codebase as:
 
-> **not yet abstracted at the right level for low-cost provider support.**
+> **much closer to the right abstraction level, but still a substantial provider/runtime integration project.**
 
-The current CI adapter is useful, but GitLab support would require a broader shift from a **GitHub Action-shaped application** to a **provider-neutral core plus provider/runtime/reporting/storage adapters**.
+The shared core is now provider-neutral enough that GitLab work can start from real provider/runtime/storage decisions instead of first having to unwind GitHub-shaped shared orchestration.

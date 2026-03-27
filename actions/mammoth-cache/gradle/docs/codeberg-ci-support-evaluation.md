@@ -27,11 +27,13 @@ The codebase is in a **meaningfully better place** for future Codeberg support t
 
 Today there is a real split between:
 
-- provider metadata/log/summary wiring in `src/ci/**`
-- runtime-host behavior in `src/ci/runtime-host.ts`
-- cache and artifact backend interfaces in `src/cache/service.ts` and `src/artifacts/service.ts`
+- provider metadata in `src/ci/**`
+- report publication in `src/reporting/**`
+- runtime-host capabilities in `src/runtime-host/**`
+- shared prepare/finalize entrypoints in `src/entrypoints/cli/**`
+- cache and artifact backend interfaces in `src/storage/**`
 
-That means Codeberg support later looks **plausible with moderate follow-on work**, not a rewrite. But it is still **not adapter-only yet**, because several shared contracts are still shaped around GitHub Action runtime semantics and the consumer packaging/runtime model is still a GitHub-style JavaScript action.
+That means Codeberg support later looks **plausible with moderate follow-on work**, not a rewrite. The remaining risk is now centered more on **runtime/toolkit compatibility and provider packaging** than on missing shared-core seams.
 
 ## Why Codeberg looks feasible
 
@@ -44,6 +46,8 @@ That means Codeberg support later looks **plausible with moderate follow-on work
   - provider-scoped HTTP headers
 
 Those are exactly the kinds of things that should live in a provider adapter.
+
+The shared portability prep is now largely complete; the remaining work is mostly validating a real Forgejo runtime and adding the provider-specific host/descriptor/backend pieces only where compatibility actually requires them.
 
 ## Why the current abstraction is not sufficient by itself
 
@@ -87,29 +91,31 @@ The codebase still depends on:
 
 For Codeberg, this may or may not be acceptable depending on the exact Forgejo/Codeberg runtime behavior. Forgejo explicitly documents **familiarity instead of compatibility**, so this should be treated as a real integration risk, not assumed to work.
 
-### 4. Entry points are still GitHub Action shaped
+### 4. Shared entrypoints exist now, but packaging is still GitHub-action-first
 
-The project is still packaged through a GitHub-specific action descriptor at
-`action-descriptors/github/internal-unreleased-consumer-path/action.yml`, including:
+The shared core now exposes provider-neutral `prepare` / `finalize` entrypoints under
+`src/entrypoints/cli/**`.
+
+However, the published consumer path is still packaged through the GitHub-specific action
+descriptor at `action-descriptors/github/internal-unreleased-consumer-path/action.yml`, including:
 
 - action inputs
 - outputs
 - `post` entrypoint
 - `post-if`
 
-If Codeberg executes JavaScript actions with enough GitHub compatibility, this may still be fine. But it means portability is not purely inside `src/ci/**`.
+If Codeberg executes JavaScript actions with enough GitHub compatibility, this may still be fine. But future Codeberg packaging still needs a provider-specific descriptor decision.
 
 ## What “not adapter-only” means concretely
 
 Besides the Codeberg-specific work itself (event/env mapping, URLs, headers, summary/log behavior), the remaining cross-cutting tasks are:
 
-1. Narrow the runtime-host contract so inputs, outputs, state handoff, failure reporting, and path discovery are not all assumed to come from one GitHub-Action-shaped surface.
-2. Decide whether the current provider-neutral artifact lookup scope needs to widen beyond repository/run/auth context for non-GitHub backends.
-3. Isolate lifecycle assumptions so `main`/`post` is primarily a host concern rather than a shared-core assumption.
-4. Provide a provider-neutral consumer/package surface, or at least a CLI fallback, so packaging is not tied only to a GitHub action descriptor.
-5. Add explicit compatibility checks for `@actions/core`, `@actions/cache`, `@actions/artifact`, and JavaScript-action post behavior on the target Codeberg/Forgejo runtime.
+1. Decide whether the current provider-neutral artifact lookup scope needs to widen beyond repository/run/auth context for a real Forgejo backend.
+2. Validate `@actions/core`, `@actions/cache`, `@actions/artifact`, and JavaScript-action post behavior on the target Codeberg/Forgejo runtime.
+3. Confirm whether Codeberg can reuse the current GitHub-shaped runtime host safely or needs a small compatibility host shim.
+4. Add provider-specific descriptor/packaging once the runtime compatibility story is proven.
 
-If Forgejo compatibility proves strong, some of those can stay as light-touch wrappers. If not, these are the concrete non-Codeberg-centric tasks that turn the work from “add an adapter” into “finish the portability refactor”.
+If Forgejo compatibility proves strong, most of the remaining work really can stay provider-specific.
 
 ## What would likely need to be done
 
@@ -124,15 +130,16 @@ Likely work:
 
 This part should be straightforward.
 
-### B. Narrow the remaining GitHub-shaped shared contracts
+### B. Reuse the current shared seams and widen them only if the real backend needs it
 
-The smallest helpful shared cleanup would be:
+Most of the helpful shared prep is already in place:
 
-- split `ActionRuntimeHost` into narrower capabilities, or at least document which capabilities may be emulated by a non-GitHub host
-- widen the current provider-neutral artifact lookup scope further if a target backend needs more than repository/run/auth lookup context
-- scrub remaining GitHub-specific wording from shared cache/artifact status and error surfaces
+- runtime-host capabilities are split
+- lifecycle is `prepare` / `finalize`
+- report publication is provider-neutral
+- shared CLI-style entrypoints exist
 
-Those are not Codeberg-specific features, but they lower the risk of the later provider port substantially.
+The main remaining shared question is whether a real Forgejo backend needs broader artifact lookup identity than the current repository/run/auth-oriented scope exposes.
 
 ### C. Keep provider-specific inputs confined to provider-specific entrypoints
 
@@ -168,17 +175,17 @@ Do not assume GitHub security semantics transfer exactly.
 
 If the Forgejo/Codeberg runtime proves compatible enough with the GitHub Actions toolkits:
 
-- **Adapter + focused shared refactors:** small-to-medium effort
+- **Adapter + focused validation:** small-to-medium effort
 - **Validation and provider-specific workflow wiring:** medium effort
 
 If toolkit compatibility is partial or weak:
 
-- **Runtime-host/lifecycle refactor + provider adapter + artifact/cache contract cleanup:** medium-to-large effort
+- **Host compatibility work + provider adapter + artifact/cache contract cleanup:** medium-to-large effort
 
 So the realistic summary is:
 
 - **best case:** moderate effort
-- **likely case:** moderate effort with one or two additional abstraction passes
+- **likely case:** moderate effort with one or two compatibility-driven cleanup passes
 - **worst case:** much larger if `@actions/cache` / `@actions/artifact` compatibility is poor
 
 ## Recommended future sequence
@@ -186,10 +193,10 @@ So the realistic summary is:
 If Codeberg support becomes a real goal later, the safest order looks like this:
 
 1. Spike actual Codeberg/Forgejo compatibility for `@actions/core`, `@actions/cache`, and `@actions/artifact`.
-2. Add a real Codeberg/Forgejo provider implementation under `src/ci/codeberg/*` or `src/ci/forgejo/*`.
+2. Add a real Codeberg/Forgejo provider implementation under `src/ci/codeberg/*` or `src/ci/forgejo/*` plus a provider report sink if needed.
 3. Add a provider-specific runtime host only if Forgejo compatibility is too weak to reuse the GitHub one safely.
 4. Re-check cache/artifact backend assumptions against the real Codeberg runtime and APIs.
-5. Only then freeze user-facing provider packaging/descriptor paths.
+5. Freeze user-facing provider packaging/descriptor paths once runtime behavior is proven.
 
 ## Final assessment
 
@@ -197,6 +204,6 @@ The current CI adapter refactor was worthwhile and moves the project in the righ
 
 For Codeberg, I would describe the codebase as:
 
-> **portable enough to justify future support, but not yet portable enough to make it an adapter-only task.**
+> **portable enough to justify future support, with the remaining risk concentrated in runtime/toolkit compatibility rather than missing shared-core seams.**
 
 The main remaining question is not the high-level shape anymore. It is whether the GitHub-oriented runtime/toolkit assumptions are compatible enough with the real Codeberg runtime to reuse the current seams safely.

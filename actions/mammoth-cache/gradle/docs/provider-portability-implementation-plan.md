@@ -28,13 +28,26 @@ There are two workstreams:
 
 Codeberg likely needs less shared prep than GitLab, but both benefit from the same target shape.
 
+## Shared portability prep status
+
+The shared portability prep tracked in this note is now largely in place:
+
+- runtime-host capabilities are split under `src/runtime-host/types.ts`
+- lifecycle is expressed as provider-neutral `prepare` / `finalize`
+- report publication uses `src/reporting/**` instead of living on the CI adapter
+- shared entrypoints live under `src/entrypoints/cli/**`
+- cache and artifact backends expose explicit capability metadata
+
+The remaining work is mostly provider-specific validation and implementation.
+
 ## Target architecture
 
-- `src/core/**`: provider-neutral prepare/finalize orchestration
-- `src/ci/**`: provider metadata, URLs, provider HTTP headers
+- `src/core/**`: provider-neutral lifecycle types and shared coordination primitives
+- `src/ci/**`: provider metadata, URLs, provider HTTP headers, provider-specific runtime entry adapters
+- `src/reporting/**`: grouped logs and summary/report publication
 - `src/runtime-host/**`: inputs, outputs, state, reporting, temp/workspace paths
 - `src/storage/**`: base-cache and artifact backend interfaces/implementations
-- `src/entrypoints/**`: GitHub action entrypoints today, CLI/provider entrypoints later
+- `src/entrypoints/**`: provider-neutral prepare/finalize entrypoints
 
 The immediate goal is not a large move. It is to make current modules depend on narrower seams.
 
@@ -68,8 +81,9 @@ The immediate goal is not a large move. It is to make current modules depend on 
   - `src/runtime/job-single-run.ts`
 - Current state:
   - shared lifecycle phases now use `prepare` / `finalize`
-  - `src/core/lifecycle.ts` owns the provider-neutral lifecycle driver
-  - GitHub-facing `runMain()` / `runPost()` are now thin wrappers over that shared lifecycle driver
+  - `src/core/lifecycle.ts` defines the shared provider-neutral lifecycle phase model
+  - provider-neutral prepare/finalize entrypoints now live under `src/entrypoints/cli/**`
+  - GitHub-facing `runMain()` / `runPost()` are now thin wrappers over those shared entrypoints
 - Why: Codeberg may need lifecycle adaptation; GitLab needs mapping to job scripts or `after_script`.
 
 ## Phase 3: generalize artifact lookup scope
@@ -114,6 +128,9 @@ The immediate goal is not a large move. It is to make current modules depend on 
   - add `src/entrypoints/cli/prepare.ts`
   - add `src/entrypoints/cli/finalize.ts`
   - keep GitHub entrypoints where they are until the earlier phases settle
+- Current state:
+  - provider-neutral prepare/finalize entrypoints now live under `src/entrypoints/cli/**`
+  - `src/main.ts` and `src/post.ts` remain thin compatibility adapters over those shared entrypoints
 - Why: optional for Codeberg if Forgejo runs JavaScript actions well enough; strongly recommended for GitLab.
 
 ## Provider-specific work after shared prep
@@ -134,18 +151,12 @@ The immediate goal is not a large move. It is to make current modules depend on 
 - map `prepare` / `finalize` to `.gitlab-ci.yml` steps or explicit commands
 - decide whether reports live in logs, artifacts, or both
 
-## Recommended sequence
+## Recommended remaining sequence
 
-1. Runtime-host capability split
-2. Lifecycle driver
-3. Artifact execution-scope generalization
-4. Reporting sink split
-5. Shared cache/artifact contract cleanup
-6. Codeberg compatibility spike
-7. Codeberg implementation
-8. CLI entrypoint extraction
-9. GitLab host/backend design spike
-10. GitLab implementation
+1. Codeberg / Forgejo compatibility spike for `@actions/core`, `@actions/cache`, and `@actions/artifact`
+2. Codeberg / Forgejo provider implementation and descriptor packaging
+3. GitLab host/backend/lifecycle design around the shared `prepare` / `finalize` CLI entrypoints
+4. GitLab implementation and validation
 
 ## Success criteria
 
@@ -156,3 +167,5 @@ Shared portability prep is complete when:
 - artifact lookup scope is provider-neutral
 - report generation does not require a GitHub-native summary surface
 - provider-specific code is confined to provider/runtime/storage entry layers
+
+The current codebase now satisfies those shared-prep criteria closely enough that the remaining work is mostly provider-specific.
