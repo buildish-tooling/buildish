@@ -17,4 +17,4 @@
 export {
   type FinalizeEntrypointDependencies as PostEntrypointDependencies,
   runFinalizeExecution as runPost,
-} from './core/lifecycle';
+} from './entrypoints/cli/finalize';

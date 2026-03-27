@@ -16,6 +16,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { runFinalizeExecution } from '../src/entrypoints/cli/finalize';
 import { runPost, type PostEntrypointDependencies } from '../src/post';
 
 const postFlowMock = vi.hoisted(() => ({
@@ -40,6 +41,10 @@ vi.mock('../src/runtime/job-single-run', () => jobSingleRunMock);
 describe('post entrypoint', () => {
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('remains a thin adapter over the shared finalize entrypoint', () => {
+    expect(runPost).toBe(runFinalizeExecution);
   });
 
   it('loads persisted action state when deciding and executing post work', async () => {

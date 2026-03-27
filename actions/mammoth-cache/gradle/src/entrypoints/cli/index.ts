@@ -15,7 +15,8 @@
  */
 
 export {
-  type PrepareEntrypointDependencies as MainEntrypointDependencies,
-  type PrepareEntrypointRuntimeHost as MainEntrypointRuntimeHost,
-  runPrepareExecution as runMain,
-} from './entrypoints/cli/prepare';
+  type PrepareEntrypointDependencies,
+  type PrepareEntrypointRuntimeHost,
+  runPrepareExecution,
+} from './prepare';
+export { type FinalizeEntrypointDependencies, runFinalizeExecution } from './finalize';

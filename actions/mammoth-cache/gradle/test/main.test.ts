@@ -16,6 +16,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { runPrepareExecution } from '../src/entrypoints/cli/prepare';
 import { runMain, type MainEntrypointDependencies } from '../src/main';
 
 const mainFlowMock = vi.hoisted(() => ({
@@ -41,6 +42,10 @@ vi.mock('../src/runtime/job-single-run', () => jobSingleRunMock);
 describe('main entrypoint', () => {
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('remains a thin adapter over the shared prepare entrypoint', () => {
+    expect(runMain).toBe(runPrepareExecution);
   });
 
   it('persists single-run ownership state for the post action', async () => {
