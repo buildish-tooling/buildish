@@ -109,7 +109,7 @@ This likely requires a deliberate redesign of lifecycle control for GitLab.
 
 ### 4. The cache backend seam exists, but the contract is still Actions-cache shaped
 
-The code now has a `BaseCacheBackend` seam, but the contract and status model are still shaped around the Actions cache runtime.
+The code now has a `BaseCacheBackend` seam, and shared wording is provider-neutral, but the contract still assumes a programmatic restore/save backend rather than runner-managed cache wiring.
 
 GitLab cache behavior is largely configured in `.gitlab-ci.yml` and handled by the runner. It is not the same as calling a GitHub Actions cache toolkit from inside a Node program.
 
@@ -121,9 +121,9 @@ At minimum, a GitLab port would need one of these decisions:
 - treat GitLab cache as workflow-level wiring outside this action logic
 - or disable/replace parts of current base-cache behavior for GitLab
 
-### 5. The artifact backend seam exists, but the lookup model is still GitHub-shaped
+### 5. The artifact backend seam exists, but the distributed exchange model still carries provider-specific assumptions
 
-The code now has a `WorkflowArtifactBackend` seam, but the distributed delta flow still depends on artifact behavior shaped around GitHub workflow runs/jobs for:
+The code now has a `WorkflowArtifactBackend` seam, but the distributed delta flow still depends on artifact behavior tied to one execution's jobs for:
 
 - upload
 - lookup

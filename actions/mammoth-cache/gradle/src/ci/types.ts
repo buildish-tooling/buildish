@@ -57,9 +57,9 @@ export interface CiJobContext {
   readonly workflowName: string;
   /** Job name as exposed by the provider. */
   readonly jobName: string;
-  /** Numeric workflow run identifier, or `null` when unavailable from the provider. */
+  /** Numeric provider run/execution identifier, or `null` when unavailable. */
   readonly runId: number | null;
-  /** Numeric retry/attempt count for the workflow run, or `null` when unavailable. */
+  /** Numeric retry/attempt count for the current provider run/execution, or `null` when unavailable. */
   readonly runAttempt: number | null;
   /** Absolute provider-managed temp directory for the current job, or `null` when unavailable. */
   readonly tempDirectory: string | null;
@@ -93,7 +93,7 @@ export type HttpHeadersByHost = ReadonlyMap<string, ReadonlyMap<string, string>>
 export interface CiExecutionUrls {
   /** Direct link to the current job's logs/details view, or `null` when unavailable. */
   readonly jobUrl: string | null;
-  /** Direct link to the current workflow run, or `null` when unavailable. */
+  /** Direct link to the current execution or run view, or `null` when unavailable. */
   readonly workflowRunUrl: string | null;
 }
 
@@ -103,7 +103,7 @@ export interface CiExecutionUrls {
 export interface CiPlatformAdapter {
   /** Normalized CI metadata for the current execution. */
   readonly context: CiJobContext;
-  /** Optional exact-host HTTP headers, such as GitHub API auth headers derived from CI tokens. */
+  /** Optional exact-host HTTP headers, such as provider API auth headers derived from CI tokens. */
   readonly httpHeadersByHost: HttpHeadersByHost;
   /** Provider-generated execution URLs for the current job/run, when available. */
   readonly executionUrls: CiExecutionUrls;

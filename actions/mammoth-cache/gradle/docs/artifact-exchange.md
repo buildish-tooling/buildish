@@ -58,7 +58,7 @@ Properties:
 
 ### Important limitation
 
-Distributed mode still assumes **unique GitHub job names per worker**. If multiple workers share the same `GITHUB_JOB` value within one run, artifact discovery becomes ambiguous. That limitation already matches the `dependent-jobs` configuration surface and is enforced by `findDeltaArtifactByProducerJob()`.
+Distributed mode still assumes **unique producer job names per worker**. If multiple workers share the same job name within one distributed execution, artifact discovery becomes ambiguous. That limitation already matches the `dependent-jobs` configuration surface and is enforced by `findDeltaArtifactByProducerJob()`.
 
 ## Package layout
 
@@ -93,9 +93,9 @@ This avoids leaking worker-local filesystem paths into exchanged artifacts while
 
 Verification happens in multiple layers.
 
-### 1. GitHub artifact digest
+### 1. Backend-reported artifact digest
 
-When GitHub returns an artifact digest, download verification passes it back as `expectedHash`. If the toolkit reports a digest mismatch, the package is rejected immediately.
+When the active artifact backend returns an artifact digest, download verification passes it back as `expectedHash`. If the backend reports a digest mismatch, the package is rejected immediately.
 
 ### 2. Metadata schema validation
 
@@ -133,7 +133,7 @@ Worker-side packaging also defends against local races.
 For every source file copied into `payload/`:
 
 - the file must still match the snapshot captured in the delta manifest before streaming begins
-- the copied bytes must hash to the expected digest
+- the copied bytes must hash to the expected content hash
 - the source file's size/mode/mtime/ctime must remain stable before and after the copy
 
 If any of those checks fail, staging aborts and instructs the caller to recompute the delta manifest. This avoids uploading a package whose payload no longer matches the manifest.

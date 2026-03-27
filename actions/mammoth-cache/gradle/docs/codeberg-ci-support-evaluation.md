@@ -69,11 +69,11 @@ The code now has top-level seams for:
 - base cache operations
 - workflow artifact operations
 
-However, some shared contracts still encode GitHub-oriented assumptions, for example:
+However, some shared contracts still encode provider-specific assumptions, for example:
 
-- cache availability/status wording still talks about the Actions cache runtime
+- cache behavior still assumes a programmatic restore/save backend rather than runner-managed cache wiring
 - artifact lookup scope is provider-neutral now, but it still only models repository/run/auth lookup context
-- some artifact lookup/verification wording still assumes GitHub-style job naming or GitHub-provided digests
+- some artifact lookup/verification behavior still assumes unique producer-job identity and backend-reported digests when available
 
 So the seam is there, but Codeberg still needs a little shared cleanup beyond pure provider wiring.
 

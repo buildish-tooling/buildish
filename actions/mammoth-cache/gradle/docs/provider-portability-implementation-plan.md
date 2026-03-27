@@ -93,7 +93,7 @@ The immediate goal is not a large move. It is to make current modules depend on 
 - Planned change:
   - use `BaseCacheBackend` and `WorkflowArtifactBackend` consistently in shared code
   - remove remaining temporary compatibility aliases once callers are migrated
-  - scrub GitHub-specific wording from shared status/error text
+  - keep shared status/error/reporting text provider-neutral as execution/cache/artifact flows evolve
   - document backend-varying capabilities explicitly: digest availability, retention, delete support, cross-run lookup scope
 - This is shared cleanup, not provider implementation.
 

@@ -428,9 +428,9 @@ function createPostActionLogLines(status: PostActionStatus): readonly string[] {
   ];
 
   if (status.jobUrl) {
-    lines.push(`Job logs: ${status.jobUrl}`);
+    lines.push(`Execution details: ${status.jobUrl}`);
   } else if (status.workflowRunUrl) {
-    lines.push(`Workflow run: ${status.workflowRunUrl}`);
+    lines.push(`Execution details: ${status.workflowRunUrl}`);
   }
 
   for (const error of summaryIssues.errors) {

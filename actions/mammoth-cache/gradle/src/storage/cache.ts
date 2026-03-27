@@ -17,8 +17,8 @@
 /**
  * Minimal provider-neutral base-cache backend contract.
  *
- * The current GitHub implementation maps this to `@actions/cache`, but shared orchestration should
- * depend only on this narrower backend seam.
+ * Provider adapters may map this to toolkit- or service-specific cache APIs, but shared
+ * orchestration should depend only on this narrower backend seam.
  */
 export interface BaseCacheBackend {
   /** Reports whether the active cache backend is usable in the current environment. */

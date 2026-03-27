@@ -296,6 +296,7 @@ describe('executePostAction', () => {
           'Bootstrap: Prepared post phase for push on main in distributed-worker mode.',
           'Base cache restore: exact-hit.',
           'Delta artifact: uploaded.',
+          'Execution details: https://github.com/apache/buildish/actions/runs/101/job/987654321',
           'Cache partition statistics (manifest-derived, uncompressed content sizes):',
           expect.stringContaining("Uploaded delta artifact 'buildish-mammoth-cache-gradle-delta-"),
           'Captured Gradle build 1: platform — build --scan; Gradle 8.14.3 / Java 21.0.4; configuration cache reused; Build Scan https://scans.gradle.com/s/local-it-published.',

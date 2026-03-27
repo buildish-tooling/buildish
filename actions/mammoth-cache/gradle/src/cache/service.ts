@@ -36,7 +36,7 @@ export interface BaseCacheServiceDependencies {
  * Result of restoring the base cache before the workflow's Gradle work begins.
  *
  * `status` distinguishes exact reuse of the primary key from broader prefix fallback so later
- * orchestration can make policy decisions without reinterpreting raw toolkit return values.
+ * orchestration can make policy decisions without reinterpreting raw backend return values.
  */
 export interface BaseCacheRestoreResult {
   /** Discriminator for bootstrap consumers; always `restore` for this result shape. */
@@ -45,7 +45,7 @@ export interface BaseCacheRestoreResult {
    * Restore outcome classification.
    *
    * Valid values:
-   * - `feature-unavailable`: cache service unavailable in this environment
+   * - `feature-unavailable`: cache backend unavailable in this environment
    * - `miss`: no cache matched
    * - `exact-hit`: exact primary key match restored
    * - `partial-hit`: a prefix restore key matched instead of the primary key
@@ -53,11 +53,11 @@ export interface BaseCacheRestoreResult {
   readonly status: 'feature-unavailable' | 'miss' | 'exact-hit' | 'partial-hit';
   /** Primary cache key derived for the current job. */
   readonly cacheKey: string;
-  /** Key actually restored by the cache service, if any. */
+  /** Key actually restored by the active cache backend, if any. */
   readonly matchedKey: string | null;
   /** Prefix fallback keys attempted after the primary key miss. */
   readonly restoreKeys: readonly string[];
-  /** Ordered cache path list passed to `@actions/cache`, including negated excludes. */
+  /** Ordered cache path list passed to the active cache backend, including negated excludes. */
   readonly paths: readonly string[];
   /** Human-readable summary suitable for logs and job summaries. */
   readonly message: string;
@@ -79,10 +79,10 @@ export interface BaseCacheSaveResult {
    * - `not-armed`: post phase was not paired with an armed main phase
    * - `read-only`: config forbids writes
    * - `distributed-worker`: worker jobs do not save shared base caches
-   * - `feature-unavailable`: cache service unavailable in this environment
+   * - `feature-unavailable`: cache backend unavailable in this environment
    * - `missing-paths`: no configured cache paths currently exist on disk, so save is skipped
    * - `saved`: a new cache entry was created
-   * - `not-saved`: toolkit ran but did not create a new cache entry
+   * - `not-saved`: the backend ran but did not create a new cache entry
    */
   readonly status:
     | 'not-armed'
@@ -96,7 +96,7 @@ export interface BaseCacheSaveResult {
   readonly cacheKey: string;
   /** Cache identifier returned by the active backend when a new entry is successfully created. */
   readonly cacheId: number | null;
-  /** Ordered cache path list passed to `@actions/cache`, including negated excludes. */
+  /** Ordered cache path list passed to the active cache backend, including negated excludes. */
   readonly paths: readonly string[];
   /** Human-readable summary suitable for logs and job summaries. */
   readonly message: string;
@@ -108,7 +108,7 @@ export type BaseCacheOperationResult = BaseCacheRestoreResult | BaseCacheSaveRes
 /**
  * Creates the ordered include/exclude path list expected by the current base-cache backend.
  *
- * Excludes are emitted as negated patterns so the cache service never captures transient Gradle
+ * Excludes are emitted as negated patterns so the cache backend never captures transient Gradle
  * state such as configuration cache content or lock files.
  */
 export function createBaseCachePaths(cacheModel: CacheModel): readonly string[] {
@@ -150,7 +150,7 @@ export function createBaseCacheRestoreKeys(
  * Restores the base Gradle cache and classifies the outcome for logs and summaries.
  *
  * This function intentionally treats cache availability and cache misses as ordinary outcomes. It
- * only delegates exceptional behavior to the underlying toolkit when restore itself fails.
+ * only delegates exceptional behavior to the active backend when restore itself fails.
  */
 export async function restoreBaseCache(
   config: NormalizedActionConfig,

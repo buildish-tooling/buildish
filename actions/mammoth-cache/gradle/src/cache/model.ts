@@ -41,8 +41,8 @@ export interface CacheModel {
   /**
    * Fully resolved primary cache key for this job.
    *
-   * Must satisfy the GitHub cache key constraints enforced by `CACHE_KEY_PATTERN`: only
-   * `[A-Za-z0-9._:-]` characters and a maximum length of 512 characters.
+   * Must satisfy the cache key constraints enforced by `CACHE_KEY_PATTERN`: only `[A-Za-z0-9._:-]`
+   * characters and a maximum length of 512 characters.
    */
   readonly cacheKey: string;
   /**

@@ -327,7 +327,8 @@ export async function findDeltaArtifactByProducerJob(
 }
 
 /**
- * Downloads a named artifact, verifies the reported digest when available, and validates the package.
+ * Downloads a named artifact, verifies the reported content hash when available, and validates the
+ * package.
  */
 export async function downloadAndVerifyDeltaArtifactPackageByName(
   artifactBackend: WorkflowArtifactBackend,
@@ -339,7 +340,8 @@ export async function downloadAndVerifyDeltaArtifactPackageByName(
 }
 
 /**
- * Downloads an artifact by descriptor, verifies the reported digest when available, and validates the package.
+ * Downloads an artifact by descriptor, verifies the reported content hash when available, and
+ * validates the package.
  */
 export async function downloadAndVerifyDeltaArtifactPackage(
   artifactBackend: WorkflowArtifactBackend,
@@ -357,7 +359,7 @@ export async function downloadAndVerifyDeltaArtifactPackage(
   });
 
   if (downloadResult.digestMismatch) {
-    throw new Error(`Downloaded artifact '${artifact.name}' did not match the expected digest.`);
+    throw new Error(`Downloaded artifact '${artifact.name}' did not match the expected hash.`);
   }
 
   const verified = await verifyExtractedDeltaArtifactPackage(
