@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-import type { InputProvider } from '../config/action-config';
-
 /**
- * Runtime host surface used by provider-agnostic orchestration code.
+ * Compatibility re-export for runtime-host capability types while imports are migrated away from
+ * the historical `src/ci/**` location.
  */
-export interface ActionRuntimeHost extends InputProvider {
-  getState(name: string): string;
-  saveState(name: string, value: string): void;
-  setOutput(name: string, value: unknown): void;
-  info(message: string): void;
-  warning(message: string): void;
-  setFailed(message: string): void;
-}
+export type {
+  ActionRuntimeHost,
+  RuntimeFailureReporter,
+  RuntimeInputSource,
+  RuntimeOutputSink,
+  RuntimeReporter,
+  RuntimeStateStore,
+} from '../runtime-host/types';

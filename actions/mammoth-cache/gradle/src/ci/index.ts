@@ -21,4 +21,11 @@ export type {
   HttpHeadersByHost,
   SummaryWriter,
 } from './types';
-export type { ActionRuntimeHost } from './runtime-host';
+export type {
+  ActionRuntimeHost,
+  RuntimeFailureReporter,
+  RuntimeInputSource,
+  RuntimeOutputSink,
+  RuntimeReporter,
+  RuntimeStateStore,
+} from './runtime-host';

@@ -19,9 +19,14 @@ import {
   executeMainAction,
   type MainActionDependencies,
 } from './main-flow';
+import type { RuntimeOutputSink } from './runtime-host/types';
 import { claimSingleRunJobInvocation } from './runtime/job-single-run';
 
-export type MainEntrypointDependencies = MainActionDependencies;
+export type MainEntrypointRuntimeHost = MainActionDependencies['runtimeHost'] & RuntimeOutputSink;
+
+export type MainEntrypointDependencies = Omit<MainActionDependencies, 'runtimeHost'> & {
+  readonly runtimeHost: MainEntrypointRuntimeHost;
+};
 
 export async function runMain(dependencies: MainEntrypointDependencies): Promise<void> {
   const { ciProvider, runtimeHost } = dependencies;

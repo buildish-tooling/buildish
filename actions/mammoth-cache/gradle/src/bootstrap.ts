@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import type { ActionRuntimeHost } from './ci';
 import {
   armBaseCachePostAction,
   isBaseCachePostActionArmed,
@@ -37,6 +36,7 @@ import {
   escapeHtml,
   escapeSummaryText,
 } from './logging/summary';
+import type { RuntimeInputSource, RuntimeReporter, RuntimeStateStore } from './runtime-host/types';
 import { provisionWrapperJars, type WrapperProvisionOptions } from './wrapper/download';
 import { validateTargetWrapperProperties } from './wrapper/static-validation';
 import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from './wrapper/types';
@@ -95,14 +95,16 @@ export interface BootstrapExecution extends BootstrapStatus {
   readonly ciProvider: CiPlatformAdapter;
 }
 
+export type BootstrapRuntimeHost = RuntimeInputSource & RuntimeStateStore & RuntimeReporter;
+
 /**
  * Injectable dependencies for bootstrap-time environment/input discovery.
  */
 export interface BootstrapDependencies {
   /** Optional environment map used by config resolution and persistence helpers. */
   readonly env?: NodeJS.ProcessEnv;
-  /** Runtime host implementation used for inputs, logs, outputs, and state. */
-  readonly runtimeHost: ActionRuntimeHost;
+  /** Runtime host implementation used for input discovery, non-fatal reporting, and state. */
+  readonly runtimeHost: BootstrapRuntimeHost;
   /** Provider adapter for the active CI environment. */
   readonly ciProvider: CiPlatformAdapter;
   /**
