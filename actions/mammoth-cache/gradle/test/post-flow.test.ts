@@ -33,11 +33,11 @@ import type { BaseCacheApi } from '../src/cache/service';
 import type { SummaryWriter } from '../src/ci/types';
 import { createPostActionSummaryLines, executePostAction } from '../src/post-flow';
 import {
-  DELTA_ARTIFACT_PRODUCER_IDENTITY_STATE,
+  DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE,
   persistBaseCacheRestoreResult,
   persistPreBuildCacheManifest,
   PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
-  persistDeltaArtifactProducerIdentity,
+  persistDeltaArtifactExecutionIdentity,
   persistConsumedDeltaArtifactNames,
 } from '../src/state/post-action';
 import { createTestGitHubProvider, createTestRuntimeHost } from './support/github-test-runtime';
@@ -142,7 +142,7 @@ describe('executePostAction', () => {
     });
   });
 
-  it('reuses the persisted main-phase producer identity when post-phase job metadata drifts', async () => {
+  it('reuses the persisted main-phase execution identity when post-phase job metadata drifts', async () => {
     await withWorkspace(async (workspace) => {
       const gradleUserHome = path.join(workspace, '.gradle');
       const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
@@ -155,7 +155,7 @@ describe('executePostAction', () => {
         'before',
       );
       await persistPreBuildState(gradleUserHome, savedState, workspace);
-      persistDeltaArtifactProducerIdentity(
+      persistDeltaArtifactExecutionIdentity(
         {
           ...createTestCiContext(workspace),
           jobName: 'worker_a',
@@ -164,7 +164,7 @@ describe('executePostAction', () => {
         },
         (name: string, value: string) => savedState.set(name, value),
       );
-      expect(savedState.get(DELTA_ARTIFACT_PRODUCER_IDENTITY_STATE)).toBeTruthy();
+      expect(savedState.get(DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE)).toBeTruthy();
       await writeGradleFile(
         gradleUserHome,
         'caches/modules-2/files-2.1/org/example/module.bin',

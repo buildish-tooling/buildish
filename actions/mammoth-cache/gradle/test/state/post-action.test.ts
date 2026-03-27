@@ -22,15 +22,19 @@ import { describe, expect, it } from 'vitest';
 
 import { CACHE_MANIFEST_SCHEMA_VERSION, type CacheManifest } from '../../src/cache/manifest';
 import type { BaseCacheRestoreResult } from '../../src/cache/service';
+import type { CiJobContext } from '../../src/ci/types';
 import {
   BASE_CACHE_RESTORE_RESULT_STATE,
   CONSUMED_DELTA_ARTIFACT_NAMES_STATE,
+  DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE,
   getPersistedBaseCacheRestoreResult,
   getPersistedConsumedDeltaArtifactNames,
+  getPersistedDeltaArtifactExecutionIdentity,
   getPersistedPreBuildCacheManifestPath,
   loadPersistedPreBuildCacheManifest,
   persistBaseCacheRestoreResult,
   persistConsumedDeltaArtifactNames,
+  persistDeltaArtifactExecutionIdentity,
   persistPreBuildCacheManifest,
   PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
 } from '../../src/state/post-action';
@@ -119,6 +123,30 @@ describe('post-action state helpers', () => {
     ).toEqual(SAMPLE_BASE_CACHE_RESTORE_RESULT);
   });
 
+  it('persists only normalized execution identity for delta artifacts', () => {
+    const savedState = new Map<string, string>();
+
+    persistDeltaArtifactExecutionIdentity(SAMPLE_CI_CONTEXT, savedState.set.bind(savedState));
+
+    expect(savedState.get(DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE)).toBe(
+      '{"jobName":"check","runId":123,"runAttempt":1}\n',
+    );
+    expect(
+      getPersistedDeltaArtifactExecutionIdentity((name: string) => savedState.get(name) ?? ''),
+    ).toEqual({
+      jobName: 'check',
+      runId: 123,
+      runAttempt: 1,
+    });
+
+    const parsedState = JSON.parse(
+      savedState.get(DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE) ?? 'null',
+    ) as Record<string, unknown>;
+    expect(Object.keys(parsedState).sort()).toEqual(['jobName', 'runAttempt', 'runId']);
+    expect(parsedState).not.toHaveProperty('platform');
+    expect(parsedState).not.toHaveProperty('provider');
+  });
+
   it('rejects malformed consumed delta artifact state', () => {
     expect(() => getPersistedConsumedDeltaArtifactNames(() => 'not-json')).toThrow(/valid JSON/u);
     expect(() => getPersistedConsumedDeltaArtifactNames(() => '[""]')).toThrow(
@@ -164,6 +192,24 @@ const SAMPLE_BASE_CACHE_RESTORE_RESULT: BaseCacheRestoreResult = {
   restoreKeys: ['buildish-cache-main-linux', 'buildish-cache-main'],
   paths: ['/tmp/workspace/.gradle/caches'],
   message: 'Restored cache using exact key hit.',
+};
+
+const SAMPLE_CI_CONTEXT: CiJobContext = {
+  eventName: 'push',
+  resolvedRefName: 'main',
+  safeRefName: 'main',
+  runnerOs: 'linux',
+  runnerArch: 'x64',
+  defaultBranch: 'main',
+  isPullRequest: false,
+  repository: 'apache/buildish',
+  workflowName: 'CI',
+  jobName: 'check',
+  runId: 123,
+  runAttempt: 1,
+  tempDirectory: null,
+  workspace: '/workspace',
+  actionPath: '/workspace',
 };
 
 async function withWorkspace(testBody: (workspace: string) => Promise<void>): Promise<void> {

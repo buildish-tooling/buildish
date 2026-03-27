@@ -39,7 +39,7 @@ import { restoreBaseCache } from './cache/service';
 import {
   persistBaseCacheRestoreResult,
   persistConsumedDeltaArtifactNames,
-  persistDeltaArtifactProducerIdentity,
+  persistDeltaArtifactExecutionIdentity,
   persistPreBuildCacheManifest,
   type PersistedPreBuildCacheManifestState,
 } from './state/post-action';
@@ -114,7 +114,7 @@ export async function executeMainAction(
   if (bootstrap.baseCacheResult?.operation === 'restore') {
     persistBaseCacheRestoreResult(bootstrap.baseCacheResult, dependencies.runtimeHost.saveState);
   }
-  persistDeltaArtifactProducerIdentity(bootstrap.ciContext, dependencies.runtimeHost.saveState);
+  persistDeltaArtifactExecutionIdentity(bootstrap.ciContext, dependencies.runtimeHost.saveState);
   const manifest = await captureCacheManifest(bootstrap.cacheModel);
   const preBuildManifestState = await persistPreBuildCacheManifest(
     manifest,

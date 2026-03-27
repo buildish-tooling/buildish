@@ -141,30 +141,30 @@ export async function bootstrapPhase(
 ): Promise<BootstrapExecution> {
   const runtimeEnv = dependencies.env ?? process.env;
   const directInputs = readActionInputs(dependencies.runtimeHost);
-  const platform = dependencies.ciProvider;
+  const ciProvider = dependencies.ciProvider;
   const rawInputs = await resolveActionInputsFromConfigFile(directInputs, {
-    workspace: platform.context.workspace,
+    workspace: ciProvider.context.workspace,
   });
   const config = normalizeActionConfig(rawInputs, {
     phase,
-    ciContext: platform.context,
+    ciContext: ciProvider.context,
     env: runtimeEnv,
   });
   const cacheModel = config.cacheEnabled
-    ? await createCacheModel(config, platform.context, {
+    ? await createCacheModel(config, ciProvider.context, {
         captureCommandOutput: dependencies.captureCommandOutput,
         env: runtimeEnv,
       })
     : null;
   const validatedWrappers =
     phase === 'main'
-      ? await validateTargetWrapperProperties(config, platform.context.workspace)
+      ? await validateTargetWrapperProperties(config, ciProvider.context.workspace)
       : [];
   const provisionedWrappers =
     phase === 'main'
       ? await provisionWrapperJars(validatedWrappers, {
           fetchImpl: dependencies.fetchImpl,
-          httpHeadersByHost: platform.httpHeadersByHost,
+          httpHeadersByHost: ciProvider.httpHeadersByHost,
           logRetry: dependencies.runtimeHost.info,
           verifyWrapperSignature: dependencies.verifyWrapperSignature,
         })
@@ -173,18 +173,18 @@ export async function bootstrapPhase(
   const status = createBootstrapStatus(
     phase,
     config,
-    platform.context,
+    ciProvider.context,
     cacheModel,
     baseCacheResult,
     validatedWrappers,
     provisionedWrappers,
-    platform.createBootstrapDiagnosticsLines(phase),
-    platform.executionUrls,
+    ciProvider.createBootstrapDiagnosticsLines(phase),
+    ciProvider.executionUrls,
   );
 
   return {
     ...status,
-    ciProvider: platform,
+    ciProvider,
   };
 }
 

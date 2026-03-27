@@ -137,6 +137,22 @@ describe('artifact exchange service', () => {
     const metadata = deserializeDeltaArtifactPackageMetadata(serializedMetadata);
     expect(metadata.artifactName).toBe(stagedPackage.artifactName);
     expect(metadata.producer.cacheKey).toBe(cacheModel.cacheKey);
+    const rawMetadata = JSON.parse(serializedMetadata) as {
+      producer: Record<string, unknown>;
+    };
+    expect(Object.keys(rawMetadata.producer).sort()).toEqual([
+      'cacheKey',
+      'jobName',
+      'repository',
+      'runAttempt',
+      'runId',
+      'runnerArch',
+      'runnerOs',
+      'safeRefName',
+      'workflowName',
+    ]);
+    expect(rawMetadata.producer).not.toHaveProperty('platform');
+    expect(rawMetadata.producer).not.toHaveProperty('provider');
 
     const fakeApi = new FakeArtifactApi(
       await createTempDirectory(

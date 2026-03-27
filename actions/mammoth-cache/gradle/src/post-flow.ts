@@ -45,7 +45,7 @@ import {
 } from './logging/summary';
 import {
   getPersistedBaseCacheRestoreResult,
-  getPersistedDeltaArtifactProducerIdentity,
+  getPersistedDeltaArtifactExecutionIdentity,
   getPersistedConsumedDeltaArtifactNames,
   loadPersistedPreBuildCacheManifest,
 } from './state/post-action';
@@ -245,19 +245,19 @@ async function uploadPostDeltaArtifact(
   }
 
   const { artifactApi } = dependencies;
-  const persistedProducerIdentity = getPersistedDeltaArtifactProducerIdentity(
+  const persistedExecutionIdentity = getPersistedDeltaArtifactExecutionIdentity(
     dependencies.runtimeHost.getState,
   );
-  const deltaArtifactProducerContext = persistedProducerIdentity
+  const deltaArtifactExecutionContext = persistedExecutionIdentity
     ? {
         ...bootstrap.ciContext,
-        jobName: persistedProducerIdentity.jobName,
-        runId: persistedProducerIdentity.runId,
-        runAttempt: persistedProducerIdentity.runAttempt,
+        jobName: persistedExecutionIdentity.jobName,
+        runId: persistedExecutionIdentity.runId,
+        runAttempt: persistedExecutionIdentity.runAttempt,
       }
     : bootstrap.ciContext;
   const stagedPackage = await stageDeltaArtifactPackage(
-    deltaArtifactProducerContext,
+    deltaArtifactExecutionContext,
     bootstrap.cacheModel!,
     deltaManifest,
   );

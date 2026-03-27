@@ -36,8 +36,12 @@ export const PRE_BUILD_CACHE_MANIFEST_PATH_STATE =
   'buildish-mammoth-cache-gradle-pre-build-manifest-path';
 export const CONSUMED_DELTA_ARTIFACT_NAMES_STATE =
   'buildish-mammoth-cache-gradle-consumed-delta-artifact-names';
-export const DELTA_ARTIFACT_PRODUCER_IDENTITY_STATE =
+/**
+ * Historical state key retained for wire compatibility between main/post phases.
+ */
+export const DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE =
   'buildish-mammoth-cache-gradle-delta-artifact-producer-identity';
+export const DELTA_ARTIFACT_PRODUCER_IDENTITY_STATE = DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE;
 export const BASE_CACHE_RESTORE_RESULT_STATE =
   'buildish-mammoth-cache-gradle-base-cache-restore-result';
 const BASE_CACHE_RESTORE_STATUSES = [
@@ -48,11 +52,13 @@ const BASE_CACHE_RESTORE_STATUSES = [
 ] as const;
 const PRE_BUILD_CACHE_MANIFEST_FILE = 'pre-build-cache-manifest.json';
 
-export interface PersistedDeltaArtifactProducerIdentity {
+export interface PersistedDeltaArtifactExecutionIdentity {
   readonly jobName: string;
   readonly runId: number | null;
   readonly runAttempt: number | null;
 }
+
+export type PersistedDeltaArtifactProducerIdentity = PersistedDeltaArtifactExecutionIdentity;
 
 export interface PersistedPreBuildCacheManifestState {
   readonly manifestPath: string;
@@ -113,16 +119,23 @@ export function persistConsumedDeltaArtifactNames(
   saveState(CONSUMED_DELTA_ARTIFACT_NAMES_STATE, `${JSON.stringify([...artifactNames])}\n`);
 }
 
-export function persistDeltaArtifactProducerIdentity(
+export function persistDeltaArtifactExecutionIdentity(
   ciContext: CiJobContext,
   saveState: (name: string, value: string) => void,
 ): void {
-  const identity: PersistedDeltaArtifactProducerIdentity = {
+  const identity: PersistedDeltaArtifactExecutionIdentity = {
     jobName: ciContext.jobName,
     runId: ciContext.runId,
     runAttempt: ciContext.runAttempt,
   };
-  saveState(DELTA_ARTIFACT_PRODUCER_IDENTITY_STATE, `${JSON.stringify(identity)}\n`);
+  saveState(DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE, `${JSON.stringify(identity)}\n`);
+}
+
+export function persistDeltaArtifactProducerIdentity(
+  ciContext: CiJobContext,
+  saveState: (name: string, value: string) => void,
+): void {
+  persistDeltaArtifactExecutionIdentity(ciContext, saveState);
 }
 
 export function persistBaseCacheRestoreResult(
@@ -132,10 +145,10 @@ export function persistBaseCacheRestoreResult(
   saveState(BASE_CACHE_RESTORE_RESULT_STATE, `${JSON.stringify(result)}\n`);
 }
 
-export function getPersistedDeltaArtifactProducerIdentity(
+export function getPersistedDeltaArtifactExecutionIdentity(
   getState: (name: string) => string,
-): PersistedDeltaArtifactProducerIdentity | null {
-  const serializedIdentity = getState(DELTA_ARTIFACT_PRODUCER_IDENTITY_STATE).trim();
+): PersistedDeltaArtifactExecutionIdentity | null {
+  const serializedIdentity = getState(DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE).trim();
   if (serializedIdentity.length === 0) {
     return null;
   }
@@ -155,6 +168,12 @@ export function getPersistedDeltaArtifactProducerIdentity(
       'delta artifact producer identity runAttempt',
     ),
   };
+}
+
+export function getPersistedDeltaArtifactProducerIdentity(
+  getState: (name: string) => string,
+): PersistedDeltaArtifactProducerIdentity | null {
+  return getPersistedDeltaArtifactExecutionIdentity(getState);
 }
 
 export function getPersistedBaseCacheRestoreResult(
