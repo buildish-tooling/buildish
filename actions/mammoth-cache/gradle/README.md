@@ -17,7 +17,10 @@ limitations under the License.
 # Apache Buildish Mammoth Cache for Gradle
 
 Apache Buildish Mammoth Cache for Gradle provides secure Gradle wrapper provisioning plus local and distributed cache
-management for GitHub Actions.
+management for GitHub Actions today.
+
+The shared core is structured so future provider integrations can target GitHub, Codeberg/Forgejo, and GitLab without
+rewriting the wrapper, cache, or distributed-delta logic.
 
 Use it in workflows as `apache/buildish/actions/mammoth-cache/gradle@<ref>`.
 
@@ -30,24 +33,28 @@ Mammoth Cache for Gradle is under active development.
 
 Implemented today:
 
-- action bootstrap entrypoints
-- runtime input parsing and validation
-- GitHub CI context abstraction
-- provider-neutral shared runtime-host capabilities and `prepare` / `finalize` entrypoints
-- local build, lint, test, and CI workflows
+- shared `prepare` / `finalize` lifecycle entrypoints and orchestration
+- provider-neutral CI/runtime/reporting/storage seams
+- Gradle wrapper discovery, static validation, download, and checksum verification
+- base cache restore/save orchestration
+- distributed worker / aggregator delta exchange, merge, and cleanup
+- grouped-log and summary reporting through provider report sinks
+- GitHub consumer packaging under `action-descriptors/github/**` and `dist/github/**`
 
-Not implemented yet:
+Remaining portability architecture work is limited to **new provider implementations**, not more speculative shared-core
+rewrites:
 
-- Gradle wrapper discovery and static validation
-- wrapper download and checksum verification
-- cache restore/save orchestration
-- distributed worker / aggregator data exchange
+- Codeberg / Forgejo: validate toolkit/runtime compatibility and add provider-specific adapter/descriptor wiring where
+  GitHub reuse is insufficient
+- GitLab: add a GitLab-facing runtime/report/cache/artifact implementation around the existing shared
+  `prepare` / `finalize` core
 
-The action metadata and configuration surface are ready, but the core Gradle execution and cache-management behavior are
-still being built.
+Only the GitHub consumer path is implemented and bundled today. For the remaining cross-provider work, see:
 
-Shared portability prep for additional CI providers is complete at the internal architecture level, but this package
-currently implements only the GitHub Actions runtime, storage, and packaging layers.
+- `IMPLEMENTATION-PLAN.md`
+- `docs/provider-portability-implementation-plan.md`
+- `docs/codeberg-ci-support-evaluation.md`
+- `docs/gitlab-ci-support-evaluation.md`
 
 ## Usage in workflows
 

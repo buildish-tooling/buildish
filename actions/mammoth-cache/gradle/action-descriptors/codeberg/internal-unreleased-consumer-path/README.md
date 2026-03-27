@@ -16,7 +16,7 @@ limitations under the License.
 
 # Codeberg placeholder
 
-This directory intentionally exists as a placeholder for a future Codeberg-facing
-consumer descriptor for the Mammoth Cache for Gradle action.
+This directory is reserved for a future Codeberg / Forgejo-facing consumer descriptor for Mammoth Cache for Gradle.
 
-It is not wired up yet.
+Do not add a descriptor here until the Codeberg / Forgejo runtime has been validated for the required toolkit and
+lifecycle behavior and a provider adapter exists under `src/ci/codeberg/**` or `src/ci/forgejo/**`.
