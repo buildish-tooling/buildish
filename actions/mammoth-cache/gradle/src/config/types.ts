@@ -137,6 +137,8 @@ export interface RawActionInputs {
   readonly setupJava: string;
   /** Raw `github-token` input used only for authenticated GitHub-host fetches. */
   readonly githubToken: string;
+  /** Raw internal workflow job/check-run identifier used only for direct job links. */
+  readonly internalJobCheckRunId: string;
 }
 
 /**

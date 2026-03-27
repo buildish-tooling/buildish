@@ -153,10 +153,19 @@ inputs:
   github-token:
     description: >-
       Optional GitHub token used only for authenticated wrapper JAR downloads
-      against the GitHub API to reduce throttling. When omitted, the action uses
-      `GITHUB_TOKEN` from the runner environment if present; otherwise requests
-      are unauthenticated. Never written to summaries or persisted action state.
+      against the GitHub API to reduce throttling. Defaults to `${{ github.token
+      }}` when GitHub exposes it; otherwise the action falls back to
+      `GITHUB_TOKEN` from the runner environment if present. Never written to
+      summaries or persisted action state.
     required: false
+    default: ${{ github.token }}
+  internal-job-check-run-id:
+    description: >-
+      Internal-use workflow job identifier for direct summary/log links.
+      Defaults to `${{ job.check_run_id }}` when GitHub exposes it. End users
+      normally should not set this manually.
+    required: false
+    default: ${{ job.check_run_id }}
 outputs:
   cache-key:
     description: Effective base cache key resolved during the main phase, or an empty string when caching is disabled.

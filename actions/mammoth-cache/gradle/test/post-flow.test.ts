@@ -222,31 +222,9 @@ describe('executePostAction', () => {
         artifactApi,
         cacheApi: createCacheApi({ saveCache: async () => 0 }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
-        env: {
-          ...createTestEnv(workspace, gradleUserHome, 'worker-build'),
-          GITHUB_TOKEN: 'test-token',
-        },
+        env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
         eventPayload: {
           repository: { default_branch: 'main' },
-        },
-        fetchImpl: async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-          const url = String(input);
-          if (url.includes('/actions/runs/101/attempts/2/jobs')) {
-            expect(init?.headers).toBeInstanceOf(Headers);
-            expect((init!.headers as Headers).get('authorization')).toBe('Bearer test-token');
-            return new Response(
-              JSON.stringify({
-                jobs: [
-                  {
-                    name: 'worker-build',
-                    html_url: 'https://github.com/apache/buildish/actions/runs/101/job/987654321',
-                  },
-                ],
-              }),
-              { status: 200 },
-            );
-          }
-          throw new Error(`Unexpected fetch URL: ${url}`);
         },
         getState(name: string): string {
           if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
@@ -254,7 +232,7 @@ describe('executePostAction', () => {
           }
           return savedState.get(name) ?? '';
         },
-        inputProvider: createInputProvider('distributed-worker'),
+        inputProvider: createInputProvider('distributed-worker', '987654321'),
         logInfo(message: string): void {
           infoMessages.push(message);
         },
@@ -541,10 +519,19 @@ function createTestCiContext(workspace: string) {
   };
 }
 
-function createInputProvider(jobMode: string): { getInput(name: string): string } {
+function createInputProvider(
+  jobMode: string,
+  internalJobCheckRunId = '',
+): { getInput(name: string): string } {
   return {
     getInput(name: string): string {
-      return name === 'job-mode' ? jobMode : '';
+      if (name === 'job-mode') {
+        return jobMode;
+      }
+      if (name === 'internal-job-check-run-id') {
+        return internalJobCheckRunId;
+      }
+      return '';
     },
   };
 }

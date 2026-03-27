@@ -66,7 +66,18 @@ describe('readActionInputs', () => {
       cacheEnabled: 'false',
       jobMode: 'distributed-worker',
       githubToken: '',
+      internalJobCheckRunId: '',
     });
+  });
+
+  it('reads the internal workflow job identifier input when provided', () => {
+    const inputProvider: InputProvider = {
+      getInput(name: string): string {
+        return name === 'internal-job-check-run-id' ? '987654321' : '';
+      },
+    };
+
+    expect(readActionInputs(inputProvider).internalJobCheckRunId).toBe('987654321');
   });
 });
 
@@ -175,6 +186,28 @@ describe('resolveActionInputsFromConfigFile', () => {
             { workspace },
           ),
         ).rejects.toThrow(/must not contain github-token/u);
+      },
+    );
+  });
+
+  it('rejects internal-job-check-run-id in config files', async () => {
+    await withWorkspace(
+      {
+        '.github/buildish-mammoth-cache.yml': ['internal-job-check-run-id: 987654321', ''].join(
+          '\n',
+        ),
+      },
+      async (workspace) => {
+        await expect(
+          resolveActionInputsFromConfigFile(
+            readActionInputs(
+              createInputProvider({
+                'config-file': '.github/buildish-mammoth-cache.yml',
+              }),
+            ),
+            { workspace },
+          ),
+        ).rejects.toThrow(/must not contain internal-job-check-run-id/u);
       },
     );
   });

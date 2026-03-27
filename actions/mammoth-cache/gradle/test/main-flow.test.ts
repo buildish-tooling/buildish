@@ -182,6 +182,9 @@ describe('executeMainAction', () => {
         expect.arrayContaining([
           '::group::Apache Buildish main action',
           'Bootstrap: Prepared main phase for push on main in distributed-aggregator mode.',
+          "GitHub input 'github-token' present: no.",
+          "GitHub environment 'GITHUB_TOKEN' available: no.",
+          "GitHub input 'internal-job-check-run-id': absent.",
           'Wrapper provisioning: 1 ready (0 downloaded, 1 reused).',
           `Downloaded dependent delta artifacts: ${status.dependentDeltaResult!.downloadedArtifactNames[0]}.`,
           `Persisted pre-build cache manifest to '${manifestPath}'.`,

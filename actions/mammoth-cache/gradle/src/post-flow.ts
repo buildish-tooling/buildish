@@ -29,7 +29,6 @@ import {
   type BootstrapDependencies,
   type BootstrapStatus,
 } from './bootstrap';
-import { createGitHubHttpHeadersByHost } from './ci/github';
 import type { CacheDeltaManifest, CacheManifest } from './cache/manifest';
 import { captureCacheManifest, computeCacheDelta } from './cache/manifest';
 import type { CacheModel } from './cache/model';
@@ -53,7 +52,6 @@ import {
   getPersistedConsumedDeltaArtifactNames,
   loadPersistedPreBuildCacheManifest,
 } from './state/post-action';
-import { isRecord } from './validation';
 
 const DELTA_ARTIFACT_RETENTION_DAYS = 7;
 
@@ -870,119 +868,25 @@ async function resolveCurrentGitHubJobUrl(
 ): Promise<string | null> {
   const runId = bootstrap.ciContext.runId;
   const repository = bootstrap.ciContext.repository.trim();
-  const jobName = bootstrap.ciContext.jobName.trim();
-  if (runId === null || repository.length === 0 || jobName.length === 0) {
+  const jobCheckRunId = parseJobCheckRunId(
+    readActionInputs(dependencies.inputProvider).internalJobCheckRunId,
+  );
+  if (runId === null || repository.length === 0 || jobCheckRunId === null) {
     return null;
   }
 
-  const githubToken = resolveGitHubApiToken(dependencies);
-  if (!githubToken) {
+  const serverUrl = normalizeServerUrl((dependencies.env ?? process.env).GITHUB_SERVER_URL);
+  return `${serverUrl}/${repository}/actions/runs/${runId}/job/${jobCheckRunId}`;
+}
+
+function parseJobCheckRunId(value: string): number | null {
+  const trimmedValue = value.trim();
+  if (!/^[1-9][0-9]*$/u.test(trimmedValue)) {
     return null;
   }
 
-  const jobsApiUrl = createGitHubJobsApiUrl(dependencies.env ?? process.env, bootstrap);
-  const headersByHost = createGitHubHttpHeadersByHost(
-    githubToken,
-    dependencies.env?.GITHUB_API_URL ?? process.env.GITHUB_API_URL,
-  );
-  const fetchImpl = dependencies.fetchImpl ?? fetch;
-
-  for (let page = 1; page <= 10; page += 1) {
-    const requestUrl = new URL(jobsApiUrl);
-    requestUrl.searchParams.set('per_page', '100');
-    requestUrl.searchParams.set('page', String(page));
-
-    const response = await fetchImpl(
-      requestUrl,
-      createRequestInitForUrl(requestUrl, headersByHost),
-    );
-    if (!response.ok) {
-      return null;
-    }
-
-    const jobs = extractGitHubWorkflowJobs(await response.json());
-    const matchingJobs = jobs.filter((job) => job.name === jobName);
-    if (matchingJobs.length === 1) {
-      return matchingJobs[0].htmlUrl;
-    }
-    if (matchingJobs.length > 1 || jobs.length < 100) {
-      return null;
-    }
-  }
-
-  return null;
-}
-
-function resolveGitHubApiToken(dependencies: PostActionDependencies): string | null {
-  const directToken = dependencies.githubToken?.trim();
-  if (directToken) {
-    return directToken;
-  }
-
-  const inputToken = readActionInputs(dependencies.inputProvider).githubToken.trim();
-  if (inputToken.length > 0) {
-    return inputToken;
-  }
-
-  const envToken = (dependencies.env ?? process.env).GITHUB_TOKEN?.trim();
-  return envToken && envToken.length > 0 ? envToken : null;
-}
-
-function createGitHubJobsApiUrl(env: NodeJS.ProcessEnv, bootstrap: BootstrapStatus): URL {
-  const apiBaseUrl = normalizeGitHubApiUrl(env.GITHUB_API_URL);
-  const runAttemptSegment =
-    bootstrap.ciContext.runAttempt === null ? '' : `/attempts/${bootstrap.ciContext.runAttempt}`;
-
-  return new URL(
-    `/repos/${bootstrap.ciContext.repository}/actions/runs/${bootstrap.ciContext.runId}${runAttemptSegment}/jobs`,
-    `${apiBaseUrl}/`,
-  );
-}
-
-function normalizeGitHubApiUrl(value: string | undefined): string {
-  const trimmedValue = value?.trim();
-  if (!trimmedValue) {
-    return 'https://api.github.com';
-  }
-
-  try {
-    const parsed = new URL(trimmedValue);
-    parsed.search = '';
-    parsed.hash = '';
-    return parsed.toString().replace(/\/+$/, '');
-  } catch {
-    return 'https://api.github.com';
-  }
-}
-
-function createRequestInitForUrl(
-  url: URL,
-  httpHeadersByHost: ReadonlyMap<string, ReadonlyMap<string, string>>,
-): RequestInit {
-  if (url.protocol !== 'https:') {
-    return {};
-  }
-
-  const headers = httpHeadersByHost.get(url.hostname.toLowerCase());
-  return headers ? { headers: new Headers([...headers.entries()]) } : {};
-}
-
-function extractGitHubWorkflowJobs(
-  payload: unknown,
-): readonly { readonly name: string; readonly htmlUrl: string }[] {
-  if (!isRecord(payload) || !Array.isArray(payload.jobs)) {
-    return [];
-  }
-
-  return payload.jobs.flatMap((job) => {
-    if (!isRecord(job) || typeof job.name !== 'string' || typeof job.html_url !== 'string') {
-      return [];
-    }
-
-    const name = job.name.trim();
-    const htmlUrl = job.html_url.trim();
-    return name.length > 0 && htmlUrl.length > 0 ? [{ name, htmlUrl }] : [];
-  });
+  const parsed = Number.parseInt(trimmedValue, 10);
+  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 function formatByteCount(value: number): string {

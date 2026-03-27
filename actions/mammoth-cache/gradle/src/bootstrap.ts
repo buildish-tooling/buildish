@@ -52,6 +52,15 @@ import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from './wr
  */
 export type BootstrapPhase = 'main' | 'post';
 
+export interface BootstrapInputDiagnostics {
+  /** Whether `github-token` was present after direct input resolution. */
+  readonly githubTokenPresentViaInput: boolean;
+  /** Whether `GITHUB_TOKEN` is available from the runtime environment. */
+  readonly githubTokenAvailableViaEnvironment: boolean;
+  /** Directly resolved workflow job/check-run identifier, when present. */
+  readonly internalJobCheckRunId: string | null;
+}
+
 /**
  * Bootstrap output shared by the action entrypoints and tests.
  */
@@ -88,6 +97,8 @@ export interface BootstrapStatus {
    * Defaults to an empty array and is empty in the `post` phase.
    */
   readonly provisionedWrappers: readonly ProvisionedWrapperJar[];
+  /** Optional runtime diagnostics about GitHub input/env token resolution. */
+  readonly inputDiagnostics?: BootstrapInputDiagnostics;
 }
 
 /**
@@ -156,6 +167,7 @@ export async function bootstrapPhase(
 ): Promise<BootstrapStatus> {
   const runtimeEnv = dependencies.env ?? process.env;
   const directInputs = readActionInputs(dependencies.inputProvider);
+  const inputDiagnostics = createBootstrapInputDiagnostics(directInputs, runtimeEnv);
   const platform = createGitHubPlatform({
     ...dependencies,
     githubToken: dependencies.githubToken ?? directInputs.githubToken,
@@ -196,6 +208,7 @@ export async function bootstrapPhase(
     baseCacheResult,
     validatedWrappers,
     provisionedWrappers,
+    inputDiagnostics,
   );
 
   return status;
@@ -212,6 +225,7 @@ export function createBootstrapStatus(
   baseCacheResult: BaseCacheOperationResult | null = null,
   validatedWrappers: readonly ValidatedWrapperPropertiesFile[] = [],
   provisionedWrappers: readonly ProvisionedWrapperJar[] = [],
+  inputDiagnostics?: BootstrapInputDiagnostics,
 ): BootstrapStatus {
   return {
     phase,
@@ -221,6 +235,7 @@ export function createBootstrapStatus(
     baseCacheResult,
     validatedWrappers,
     provisionedWrappers,
+    ...(inputDiagnostics ? { inputDiagnostics } : {}),
     message: `Prepared ${phase} phase for ${ciContext.eventName} on ${ciContext.safeRefName} in ${config.jobMode} mode.`,
   };
 }
@@ -263,6 +278,7 @@ export function createBootstrapSummaryLines(status: BootstrapStatus): readonly s
 }
 
 export function createBootstrapLogLines(status: BootstrapStatus): readonly string[] {
+  const inputDiagnostics = status.inputDiagnostics ?? createBootstrapInputDiagnostics();
   const downloadedWrapperCount = status.provisionedWrappers.filter(
     (wrapper) => wrapper.wasDownloaded,
   ).length;
@@ -283,6 +299,16 @@ export function createBootstrapLogLines(status: BootstrapStatus): readonly strin
 
   if (status.baseCacheResult) {
     lines.push(status.baseCacheResult.message);
+  }
+
+  if (status.phase === 'main') {
+    lines.push(
+      `GitHub input 'github-token' present: ${inputDiagnostics.githubTokenPresentViaInput ? 'yes' : 'no'}.`,
+      `GitHub environment 'GITHUB_TOKEN' available: ${inputDiagnostics.githubTokenAvailableViaEnvironment ? 'yes' : 'no'}.`,
+      inputDiagnostics.internalJobCheckRunId === null
+        ? "GitHub input 'internal-job-check-run-id': absent."
+        : `GitHub input 'internal-job-check-run-id': ${inputDiagnostics.internalJobCheckRunId}.`,
+    );
   }
 
   if (status.phase === 'post') {
@@ -320,6 +346,23 @@ function createWrapperProvisioningSummaryLines(status: BootstrapStatus): readonl
       escapeHtml(wrapper.wrapperSourceVersion),
     ]),
   );
+}
+
+function createBootstrapInputDiagnostics(
+  directInputs: Pick<
+    ReturnType<typeof readActionInputs>,
+    'githubToken' | 'internalJobCheckRunId'
+  > = { githubToken: '', internalJobCheckRunId: '' },
+  runtimeEnv: NodeJS.ProcessEnv = {},
+): BootstrapInputDiagnostics {
+  const githubToken = directInputs.githubToken.trim();
+  const internalJobCheckRunId = directInputs.internalJobCheckRunId.trim();
+
+  return {
+    githubTokenPresentViaInput: githubToken.length > 0,
+    githubTokenAvailableViaEnvironment: (runtimeEnv.GITHUB_TOKEN?.trim().length ?? 0) > 0,
+    internalJobCheckRunId: internalJobCheckRunId.length > 0 ? internalJobCheckRunId : null,
+  };
 }
 
 function createWrapperProvisioningLogMessage(wrapper: ProvisionedWrapperJar): string {

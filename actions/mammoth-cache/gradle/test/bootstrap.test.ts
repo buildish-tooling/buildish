@@ -216,6 +216,11 @@ describe('bootstrap helpers', () => {
         restoreResult,
         validatedWrappers,
         provisionedWrappers,
+        {
+          githubTokenPresentViaInput: true,
+          githubTokenAvailableViaEnvironment: true,
+          internalJobCheckRunId: '987654321',
+        },
       ),
     ).join('\n');
 
@@ -225,6 +230,9 @@ describe('bootstrap helpers', () => {
     expect(logText).toContain('Base cache restore: exact-hit.');
     expect(logText).toContain('Wrapper provisioning: 1 ready (1 downloaded, 0 reused).');
     expect(logText).toContain("Execution context: workflow 'CI', job 'check', event 'push'");
+    expect(logText).toContain("GitHub input 'github-token' present: yes.");
+    expect(logText).toContain("GitHub environment 'GITHUB_TOKEN' available: yes.");
+    expect(logText).toContain("GitHub input 'internal-job-check-run-id': 987654321.");
     expect(logText).toContain(
       'Cache key: gradle-cache-2-21-linux-x64-feedcafe1234abcd-main; Java major: 21; cache partitions: 1.',
     );
@@ -323,6 +331,11 @@ describe('bootstrap helpers', () => {
       expect(status.baseCacheResult?.status).toBe('exact-hit');
       expect(status.validatedWrappers).toHaveLength(1);
       expect(status.provisionedWrappers).toHaveLength(1);
+      expect(status.inputDiagnostics).toEqual({
+        githubTokenPresentViaInput: true,
+        githubTokenAvailableViaEnvironment: false,
+        internalJobCheckRunId: null,
+      });
       expect(summaryLines).toEqual([]);
       expect(savedState.get('buildish-mammoth-cache-gradle-base-cache-armed')).toBe('true');
       expect(writeCalls).toBe(0);

@@ -136,6 +136,9 @@ export function readActionInputs(inputProvider: InputProvider = core): RawAction
     gradleUserHome: inputProvider.getInput('gradle-user-home', { trimWhitespace: true }),
     setupJava: inputProvider.getInput('setup-java', { trimWhitespace: true }),
     githubToken: inputProvider.getInput('github-token', { trimWhitespace: true }),
+    internalJobCheckRunId: inputProvider.getInput('internal-job-check-run-id', {
+      trimWhitespace: true,
+    }),
   };
 }
 
@@ -283,6 +286,7 @@ function createEmptyRawActionInputs(): RawActionInputs {
     gradleUserHome: '',
     setupJava: '',
     githubToken: '',
+    internalJobCheckRunId: '',
   };
 }
 
@@ -444,6 +448,10 @@ function serializeConfigFileInputs(
         throw new Error(
           `config-file '${normalizedConfigFile}' must not contain github-token. Pass it directly as an action input or environment secret instead.`,
         );
+      case 'internal-job-check-run-id':
+        throw new Error(
+          `config-file '${normalizedConfigFile}' must not contain internal-job-check-run-id. Pass it directly from the calling workflow when needed.`,
+        );
       default:
         throw new Error(
           `config-file '${normalizedConfigFile}' contains unsupported key '${key}'. Use the same kebab-case names as action inputs.`,
@@ -519,6 +527,7 @@ function overlayConfiguredInputs(
     gradleUserHome: directInputs.gradleUserHome || fileInputs.gradleUserHome,
     setupJava: directInputs.setupJava || fileInputs.setupJava,
     githubToken: directInputs.githubToken,
+    internalJobCheckRunId: directInputs.internalJobCheckRunId,
   };
 }
 
