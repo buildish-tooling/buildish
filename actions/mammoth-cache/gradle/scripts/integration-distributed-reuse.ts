@@ -26,8 +26,14 @@ import { createGitHubPlatform } from '../src/ci/github';
 import type { SummaryWriter } from '../src/ci/types';
 import { createMainActionOutputs, executeMainAction } from '../src/main-flow';
 import { executePostAction } from '../src/post-flow';
-import type { WorkflowArtifactBackend } from '../src/storage/artifacts';
-import type { BaseCacheBackend } from '../src/storage/cache';
+import {
+  STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
+  type WorkflowArtifactBackend,
+} from '../src/storage/artifacts';
+import {
+  STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
+  type BaseCacheBackend,
+} from '../src/storage/cache';
 
 const RUN_ID = '92001';
 const RUN_ATTEMPT = '1';
@@ -35,6 +41,7 @@ const CACHE_KEY_PREFIX = `local-it-distributed-${RUN_ID}-${RUN_ATTEMPT}-`;
 const INTEGRATION_WORKFLOW_NAME = 'Local Distributed Reuse Integration Test';
 const FIXTURE_JOB_NAMES = ['worker_a', 'worker_b', 'aggregator'] as const;
 const UNAVAILABLE_CACHE_API: BaseCacheBackend = {
+  capabilities: STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
   isFeatureAvailable(): boolean {
     return false;
   },
@@ -414,6 +421,8 @@ function normalizeRunnerArch(arch: string): string {
 }
 
 class FakeArtifactApi implements WorkflowArtifactBackend {
+  readonly capabilities = STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES;
+
   private nextId = 1;
   private readonly artifacts = new Map<
     number,

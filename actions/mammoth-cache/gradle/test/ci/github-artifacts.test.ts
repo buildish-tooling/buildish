@@ -17,6 +17,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createGitHubWorkflowArtifactBackend } from '../../src/ci/github';
+import { STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES } from '../../src/storage/artifacts';
 
 describe('createGitHubWorkflowArtifactBackend', () => {
   it('maps provider-neutral lookup scope to GitHub artifact findBy coordinates', async () => {
@@ -56,6 +57,7 @@ describe('createGitHubWorkflowArtifactBackend', () => {
     await backend.downloadArtifact(7, { path: '/tmp/work', expectedHash: 'sha256:test', scope });
     await backend.deleteArtifact('delta', { scope });
 
+    expect(backend.capabilities).toEqual(STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES);
     expect(recorded).toEqual({
       list: { latest: true, findBy },
       get: { findBy },

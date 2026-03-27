@@ -36,7 +36,10 @@ import {
 import { captureCacheManifest, computeCacheDelta } from '../../src/cache/manifest';
 import { createCachePartitions, type CacheModel } from '../../src/cache/model';
 import type { CiJobContext } from '../../src/ci/types';
-import type { WorkflowArtifactBackend } from '../../src/storage/artifacts';
+import {
+  STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
+  type WorkflowArtifactBackend,
+} from '../../src/storage/artifacts';
 
 describe('artifact exchange service', () => {
   const temporaryDirectories = new Set<string>();
@@ -185,6 +188,72 @@ describe('artifact exchange service', () => {
     expect(downloadedPackage.metadata.payloadEntries).toEqual(metadata.payloadEntries);
   });
 
+  it('rejects retention overrides when the artifact backend does not support them', async () => {
+    const stagedPackage = await createStagedDeltaFixture(temporaryDirectories);
+
+    const unsupportedArtifactBackend: WorkflowArtifactBackend = {
+      capabilities: {
+        ...STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
+        supportsRetentionDays: false,
+      },
+      async uploadArtifact(): Promise<never> {
+        throw new Error(
+          'uploadArtifact should not be called when retention overrides are unsupported',
+        );
+      },
+      async listArtifacts(): Promise<readonly WorkflowArtifactDescriptor[]> {
+        return [];
+      },
+      async getArtifact(): Promise<never> {
+        throw new Error('getArtifact should not be called in this test');
+      },
+      async downloadArtifact(): Promise<never> {
+        throw new Error('downloadArtifact should not be called in this test');
+      },
+      async deleteArtifact(): Promise<void> {
+        throw new Error('deleteArtifact should not be called in this test');
+      },
+    };
+
+    await expect(
+      uploadDeltaArtifactPackage(unsupportedArtifactBackend, stagedPackage, { retentionDays: 14 }),
+    ).rejects.toThrow(/does not support retention-day overrides/u);
+  });
+
+  it('rejects cross-execution lookups when the artifact backend cannot scope queries', async () => {
+    const unsupportedArtifactBackend: WorkflowArtifactBackend = {
+      capabilities: {
+        ...STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
+        supportsCrossExecutionLookup: false,
+      },
+      async uploadArtifact(): Promise<never> {
+        throw new Error('uploadArtifact should not be called in this test');
+      },
+      async listArtifacts(): Promise<readonly WorkflowArtifactDescriptor[]> {
+        throw new Error('listArtifacts should not be called when scoped lookups are unsupported');
+      },
+      async getArtifact(): Promise<never> {
+        throw new Error('getArtifact should not be called in this test');
+      },
+      async downloadArtifact(): Promise<never> {
+        throw new Error('downloadArtifact should not be called in this test');
+      },
+      async deleteArtifact(): Promise<void> {
+        throw new Error('deleteArtifact should not be called in this test');
+      },
+    };
+
+    await expect(
+      findDeltaArtifactByProducerJob(unsupportedArtifactBackend, 'worker-a', 123, 1, {
+        scope: {
+          token: 'test-token',
+          runId: 456,
+          repository: 'example/project',
+        },
+      }),
+    ).rejects.toThrow(/does not support cross-execution scope/u);
+  });
+
   it('rejects tampered payload content during verification', async () => {
     const stagedPackage = await createStagedDeltaFixture(temporaryDirectories);
     await writeFile(path.join(stagedPackage.rootDirectory, 'payload/000001.bin'), 'other');
@@ -253,6 +322,8 @@ describe('artifact exchange service', () => {
 });
 
 class FakeArtifactApi implements WorkflowArtifactBackend {
+  readonly capabilities = STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES;
+
   private nextId = 1;
 
   private readonly artifacts = new Map<

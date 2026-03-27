@@ -31,6 +31,7 @@ import { createCachePartitions, type CacheModel } from '../src/cache/model';
 import type { SummaryWriter } from '../src/ci/types';
 import { createPostActionSummaryLines, executePostAction } from '../src/post-flow';
 import {
+  CONSUMED_DELTA_ARTIFACT_NAMES_STATE,
   DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE,
   persistBaseCacheRestoreResult,
   persistPreBuildCacheManifest,
@@ -38,8 +39,14 @@ import {
   persistDeltaArtifactExecutionIdentity,
   persistConsumedDeltaArtifactNames,
 } from '../src/state/post-action';
-import type { WorkflowArtifactBackend } from '../src/storage/artifacts';
-import type { BaseCacheBackend } from '../src/storage/cache';
+import {
+  STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
+  type WorkflowArtifactBackend,
+} from '../src/storage/artifacts';
+import {
+  STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
+  type BaseCacheBackend,
+} from '../src/storage/cache';
 import { createTestGitHubProvider, createTestRuntimeHost } from './support/github-test-runtime';
 
 function createPostActionDependencies(options: {
@@ -472,6 +479,73 @@ describe('executePostAction', () => {
     });
   });
 
+  it('skips consumed artifact cleanup when the artifact backend does not support deletion', async () => {
+    await withWorkspace(async (workspace) => {
+      const gradleUserHome = path.join(workspace, '.gradle');
+      const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
+      const artifactBackend: WorkflowArtifactBackend = {
+        capabilities: {
+          ...STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
+          supportsDeletion: false,
+        },
+        uploadArtifact: artifactApi.uploadArtifact.bind(artifactApi),
+        listArtifacts: artifactApi.listArtifacts.bind(artifactApi),
+        getArtifact: artifactApi.getArtifact.bind(artifactApi),
+        downloadArtifact: artifactApi.downloadArtifact.bind(artifactApi),
+        deleteArtifact: artifactApi.deleteArtifact.bind(artifactApi),
+      };
+      const savedState = new Map<string, string>();
+      const summary = createSummaryCapture();
+
+      await writeGradleFile(
+        gradleUserHome,
+        'caches/modules-2/files-2.1/org/example/module.bin',
+        'initial',
+      );
+      await stageWorkerArtifactForCleanup(artifactBackend, workspace, 'worker-a');
+      const artifactNameToDelete = (await artifactBackend.listArtifacts())[0]!.name;
+      savedState.set('buildish-mammoth-cache-gradle-distributed-aggregate-state', 'true');
+      savedState.set(CONSUMED_DELTA_ARTIFACT_NAMES_STATE, JSON.stringify([artifactNameToDelete]));
+
+      const status = await executePostAction({
+        artifactBackend,
+        cacheBackend: createCacheApi({
+          saveCache: async () => 91,
+        }),
+        env: createTestEnv(workspace, gradleUserHome, 'aggregate'),
+        captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
+        ...createPostActionDependencies({
+          env: createTestEnv(workspace, gradleUserHome, 'aggregate'),
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          getState(name: string): string {
+            if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
+              return 'true';
+            }
+            return savedState.get(name) ?? '';
+          },
+          inputProvider: createInputProvider('distributed-aggregator'),
+          summaryWriter: summary.writer,
+        }),
+      });
+
+      expect(status.consumedDeltaCleanupResult).toEqual(
+        expect.objectContaining({
+          attemptedArtifactNames: [artifactNameToDelete],
+          deletedArtifactNames: [],
+          message:
+            'Consumed delta artifact cleanup skipped because the artifact backend does not support deletion.',
+          warnings: [
+            'Consumed delta artifact cleanup skipped because the artifact backend does not support deletion.',
+          ],
+        }),
+      );
+      expect(artifactApi.deletedArtifactNames).toEqual([]);
+      await expect(artifactBackend.listArtifacts()).resolves.toHaveLength(1);
+    });
+  });
+
   it('skips distributed-worker artifact upload when no cache changes were detected', async () => {
     await withWorkspace(async (workspace) => {
       const gradleUserHome = path.join(workspace, '.gradle');
@@ -588,6 +662,7 @@ function createInputProvider(
 
 function createCacheApi(options: { readonly saveCache: () => Promise<number> }): BaseCacheBackend {
   return {
+    capabilities: STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
     isFeatureAvailable(): boolean {
       return true;
     },
@@ -724,6 +799,8 @@ async function withWorkspace(testBody: (workspace: string) => Promise<void>): Pr
 }
 
 class FakeArtifactApi implements WorkflowArtifactBackend {
+  readonly capabilities = STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES;
+
   private nextId = 1;
   private readonly artifacts = new Map<
     number,

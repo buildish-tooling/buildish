@@ -314,6 +314,18 @@ async function cleanupConsumedDeltaArtifacts(
   }
 
   const artifactBackend = resolveArtifactBackend(dependencies);
+  if (!artifactBackend.capabilities.supportsDeletion) {
+    return {
+      attemptedArtifactNames: artifactNames,
+      deletedArtifactNames: [],
+      warnings: [
+        'Consumed delta artifact cleanup skipped because the artifact backend does not support deletion.',
+      ],
+      message:
+        'Consumed delta artifact cleanup skipped because the artifact backend does not support deletion.',
+    };
+  }
+
   const deleteResults = await Promise.allSettled(
     artifactNames.map(async (artifactName) => {
       await artifactBackend.deleteArtifact(artifactName);

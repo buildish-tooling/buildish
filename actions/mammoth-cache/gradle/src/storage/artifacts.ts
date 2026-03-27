@@ -49,8 +49,31 @@ export interface WorkflowArtifactDownloadResult {
   readonly digestMismatch: boolean;
 }
 
+/** Capability flags shared code can use to understand backend-specific artifact behavior. */
+export interface WorkflowArtifactBackendCapabilities {
+  /** Whether the backend may report artifact digests that can be passed back during download. */
+  readonly supportsReportedDigests: boolean;
+  /** Whether upload calls support explicit retention-day overrides. */
+  readonly supportsRetentionDays: boolean;
+  /** Whether uploaded artifacts can be deleted programmatically after use. */
+  readonly supportsDeletion: boolean;
+  /** Whether lookup/download operations can target executions outside the current run. */
+  readonly supportsCrossExecutionLookup: boolean;
+}
+
+/** Capability set for a feature-complete programmatic artifact backend such as GitHub Actions. */
+export const STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES: WorkflowArtifactBackendCapabilities =
+  {
+    supportsReportedDigests: true,
+    supportsRetentionDays: true,
+    supportsDeletion: true,
+    supportsCrossExecutionLookup: true,
+  };
+
 /** Provider-neutral artifact backend used by the distributed cache flow. */
 export interface WorkflowArtifactBackend {
+  /** Declares optional artifact features that shared orchestration may need to branch on. */
+  readonly capabilities: WorkflowArtifactBackendCapabilities;
   uploadArtifact(
     name: string,
     files: readonly string[],

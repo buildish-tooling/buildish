@@ -95,6 +95,9 @@ The immediate goal is not a large move. It is to make current modules depend on 
   - remove remaining temporary compatibility aliases once callers are migrated
   - keep shared status/error/reporting text provider-neutral as execution/cache/artifact flows evolve
   - document backend-varying capabilities explicitly: digest availability, retention, delete support, cross-run lookup scope
+- Current state:
+  - `BaseCacheBackend` and `WorkflowArtifactBackend` now expose explicit capability metadata
+  - shared cache/artifact/post-action flows branch on those capabilities for restore keys, explicit saves, retention overrides, cross-execution lookup, and deletion cleanup
 - This is shared cleanup, not provider implementation.
 
 ## Phase 6: add a CLI-friendly core entrypoint

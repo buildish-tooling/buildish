@@ -38,8 +38,14 @@ import {
   createMainActionSummaryLines,
   executeMainAction,
 } from '../src/main-flow';
-import type { WorkflowArtifactBackend } from '../src/storage/artifacts';
-import type { BaseCacheBackend } from '../src/storage/cache';
+import {
+  STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
+  type WorkflowArtifactBackend,
+} from '../src/storage/artifacts';
+import {
+  STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
+  type BaseCacheBackend,
+} from '../src/storage/cache';
 import {
   CONSUMED_DELTA_ARTIFACT_NAMES_STATE,
   PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
@@ -934,6 +940,7 @@ function createCacheApi(
   } = {},
 ): BaseCacheBackend {
   return {
+    capabilities: STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
     isFeatureAvailable(): boolean {
       return true;
     },
@@ -985,6 +992,8 @@ async function withWorkspace(testBody: (workspace: string) => Promise<void>): Pr
 }
 
 class FakeArtifactApi implements WorkflowArtifactBackend {
+  readonly capabilities = STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES;
+
   private nextId = 1;
   private readonly artifacts = new Map<
     number,

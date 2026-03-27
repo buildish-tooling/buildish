@@ -279,6 +279,7 @@ export async function uploadDeltaArtifactPackage(
   stagedPackage: StagedDeltaArtifactPackage,
   options: UploadDeltaArtifactPackageOptions = {},
 ): Promise<UploadedDeltaArtifactPackage> {
+  assertArtifactRetentionSupport(artifactBackend, options.retentionDays);
   const artifact = await artifactBackend.uploadArtifact(
     stagedPackage.artifactName,
     stagedPackage.files,
@@ -306,6 +307,7 @@ export async function findDeltaArtifactByProducerJob(
   runAttempt: number | null,
   options: ArtifactLookupOptions = {},
 ): Promise<WorkflowArtifactDescriptor> {
+  assertArtifactLookupScopeSupport(artifactBackend, options.scope, 'artifact lookup');
   const expectedPrefix = createDeltaArtifactNamePrefix(producerJobName, runId, runAttempt);
   const matches = (
     await artifactBackend.listArtifacts({ latest: true, scope: options.scope })
@@ -335,6 +337,7 @@ export async function downloadAndVerifyDeltaArtifactPackageByName(
   artifactName: string,
   options: DownloadDeltaArtifactPackageOptions = {},
 ): Promise<DownloadedDeltaArtifactPackage> {
+  assertArtifactLookupScopeSupport(artifactBackend, options.scope, 'artifact lookup');
   const artifact = await artifactBackend.getArtifact(artifactName, { scope: options.scope });
   return downloadAndVerifyDeltaArtifactPackage(artifactBackend, artifact, options);
 }
@@ -348,6 +351,7 @@ export async function downloadAndVerifyDeltaArtifactPackage(
   artifact: WorkflowArtifactDescriptor,
   options: DownloadDeltaArtifactPackageOptions = {},
 ): Promise<DownloadedDeltaArtifactPackage> {
+  assertArtifactLookupScopeSupport(artifactBackend, options.scope, 'artifact download');
   const parentDirectory = options.parentDirectory ?? os.tmpdir();
   const downloadDirectory = await mkdtemp(
     path.join(parentDirectory, 'buildish-mammoth-cache-gradle-delta-download-'),
@@ -373,6 +377,31 @@ export async function downloadAndVerifyDeltaArtifactPackage(
     metadata: verified.metadata,
     deltaManifest: verified.deltaManifest,
   };
+}
+
+function assertArtifactRetentionSupport(
+  artifactBackend: WorkflowArtifactBackend,
+  retentionDays: number | undefined,
+): void {
+  if (retentionDays === undefined || artifactBackend.capabilities.supportsRetentionDays) {
+    return;
+  }
+
+  throw new Error(
+    `Artifact backend does not support retention-day overrides (requested ${retentionDays}).`,
+  );
+}
+
+function assertArtifactLookupScopeSupport(
+  artifactBackend: WorkflowArtifactBackend,
+  scope: ArtifactLookupOptions['scope'],
+  operationName: string,
+): void {
+  if (!scope || artifactBackend.capabilities.supportsCrossExecutionLookup) {
+    return;
+  }
+
+  throw new Error(`Artifact backend does not support cross-execution scope for ${operationName}.`);
 }
 
 /**

@@ -159,7 +159,9 @@ export async function restoreBaseCache(
 ): Promise<BaseCacheRestoreResult> {
   const cacheBackend = resolveBaseCacheBackend(dependencies);
   const paths = createBaseCachePaths(cacheModel);
-  const restoreKeys = createBaseCacheRestoreKeys(config, cacheModel);
+  const restoreKeys = cacheBackend.capabilities.supportsRestoreKeys
+    ? createBaseCacheRestoreKeys(config, cacheModel)
+    : [];
 
   if (!cacheBackend.isFeatureAvailable()) {
     return {
@@ -260,6 +262,15 @@ export async function saveBaseCache(
       cacheModel.cacheKey,
       paths,
       'Base cache save skipped because the cache backend is unavailable.',
+    );
+  }
+
+  if (!cacheBackend.capabilities.supportsExplicitSave) {
+    return createSaveResult(
+      'feature-unavailable',
+      cacheModel.cacheKey,
+      paths,
+      'Base cache save skipped because the cache backend does not support explicit save operations.',
     );
   }
 

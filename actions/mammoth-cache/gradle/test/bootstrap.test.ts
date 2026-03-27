@@ -29,7 +29,10 @@ import {
 import type { BaseCacheRestoreResult } from '../src/cache/service';
 import type { CacheModel } from '../src/cache/model';
 import type { SummaryWriter } from '../src/ci/types';
-import type { BaseCacheBackend } from '../src/storage/cache';
+import {
+  STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
+  type BaseCacheBackend,
+} from '../src/storage/cache';
 import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from '../src/wrapper/types';
 import { createTestGitHubProvider, createTestRuntimeHost } from './support/github-test-runtime';
 
@@ -276,6 +279,7 @@ describe('bootstrap helpers', () => {
     let writeCalls = 0;
     const savedState = new Map<string, string>();
     const cacheBackend: BaseCacheBackend = {
+      capabilities: STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
       isFeatureAvailable(): boolean {
         return true;
       },
@@ -388,6 +392,7 @@ describe('bootstrap helpers', () => {
     const summaryLines: string[] = [];
     let writeCalls = 0;
     const cacheBackend: BaseCacheBackend = {
+      capabilities: STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
       isFeatureAvailable(): boolean {
         return true;
       },
@@ -461,6 +466,7 @@ describe('bootstrap helpers', () => {
   it('loads optional config-file values during bootstrap while allowing direct overrides', async () => {
     const summaryLines: string[] = [];
     const cacheBackend: BaseCacheBackend = {
+      capabilities: STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
       isFeatureAvailable(): boolean {
         throw new Error('cacheBackend should not be touched when config-file disables caching');
       },
@@ -570,6 +576,7 @@ describe('bootstrap helpers', () => {
           captureCommandOutput: async (): Promise<string> =>
             'openjdk version "21.0.4" 2024-07-16\n',
           cacheBackend: {
+            capabilities: STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
             isFeatureAvailable(): boolean {
               throw new Error('cacheBackend should not be touched when caching is disabled');
             },

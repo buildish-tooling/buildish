@@ -16,16 +16,18 @@
 
 import artifactClient, { type ArtifactClient } from '@actions/artifact';
 
-import type {
-  ArtifactLookupScope,
-  WorkflowArtifactBackend,
-  WorkflowArtifactDescriptor,
+import {
+  STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
+  type ArtifactLookupScope,
+  type WorkflowArtifactBackend,
+  type WorkflowArtifactDescriptor,
 } from '../../storage/artifacts';
 
 export function createGitHubWorkflowArtifactBackend(
   client: ArtifactClient = artifactClient,
 ): WorkflowArtifactBackend {
   return {
+    capabilities: STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
     async uploadArtifact(name, files, rootDirectory, options) {
       const response = await client.uploadArtifact(name, [...files], rootDirectory, options);
 

@@ -24,8 +24,14 @@ import { createGitHubPlatform } from '../src/ci/github';
 import type { SummaryWriter } from '../src/ci/types';
 import { executeMainAction } from '../src/main-flow';
 import { createPostActionSummaryLines, executePostAction } from '../src/post-flow';
-import type { WorkflowArtifactBackend } from '../src/storage/artifacts';
-import type { BaseCacheBackend } from '../src/storage/cache';
+import {
+  STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
+  type WorkflowArtifactBackend,
+} from '../src/storage/artifacts';
+import {
+  STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
+  type BaseCacheBackend,
+} from '../src/storage/cache';
 
 const RUN_ID = '92002';
 const RUN_ATTEMPT = '1';
@@ -361,6 +367,7 @@ async function runGradle(
 
 function unavailableCacheApi(): BaseCacheBackend {
   return {
+    capabilities: STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
     isFeatureAvailable(): boolean {
       return false;
     },
@@ -375,6 +382,11 @@ function unavailableCacheApi(): BaseCacheBackend {
 
 function unavailableArtifactApi(): WorkflowArtifactBackend {
   return {
+    capabilities: {
+      ...STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
+      supportsDeletion: false,
+      supportsCrossExecutionLookup: false,
+    },
     async uploadArtifact(): Promise<never> {
       throw new Error(
         'Artifact operations should not run in the build-reporting integration test.',

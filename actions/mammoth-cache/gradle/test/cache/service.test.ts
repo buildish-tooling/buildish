@@ -25,6 +25,10 @@ import {
 } from '../../src/cache/service';
 import type { CacheModel } from '../../src/cache/model';
 import type { NormalizedActionConfig } from '../../src/config/types';
+import {
+  STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
+  type BaseCacheBackend,
+} from '../../src/storage/cache';
 
 const baseConfig: NormalizedActionConfig = {
   phase: 'main',
@@ -62,6 +66,18 @@ const cacheModel: CacheModel = {
   ],
 };
 
+function createCacheBackend(
+  backend: Pick<BaseCacheBackend, 'isFeatureAvailable' | 'restoreCache' | 'saveCache'>,
+  capabilities = STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
+): BaseCacheBackend {
+  return {
+    capabilities,
+    isFeatureAvailable: backend.isFeatureAvailable,
+    restoreCache: backend.restoreCache,
+    saveCache: backend.saveCache,
+  };
+}
+
 describe('createBaseCachePaths', () => {
   it('appends exclude globs as negated cache patterns', () => {
     expect(createBaseCachePaths(cacheModel)).toEqual([
@@ -96,11 +112,11 @@ describe('createBaseCacheRestoreKeys', () => {
 describe('restoreBaseCache', () => {
   it('classifies exact cache hits', async () => {
     const result = await restoreBaseCache(baseConfig, cacheModel, {
-      cacheBackend: {
+      cacheBackend: createCacheBackend({
         isFeatureAvailable: () => true,
         restoreCache: async () => cacheModel.cacheKey,
         saveCache: async () => 0,
-      },
+      }),
     });
 
     expect(result.status).toBe('exact-hit');
@@ -111,12 +127,12 @@ describe('restoreBaseCache', () => {
 
   it('classifies partial cache hits', async () => {
     const result = await restoreBaseCache(baseConfig, cacheModel, {
-      cacheBackend: {
+      cacheBackend: createCacheBackend({
         isFeatureAvailable: () => true,
         restoreCache: async () =>
           'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
         saveCache: async () => 0,
-      },
+      }),
     });
 
     expect(result.status).toBe('partial-hit');
@@ -127,13 +143,38 @@ describe('restoreBaseCache', () => {
 
   it('returns a miss when no base cache is restored', async () => {
     const result = await restoreBaseCache(baseConfig, cacheModel, {
-      cacheBackend: {
+      cacheBackend: createCacheBackend({
         isFeatureAvailable: () => true,
         restoreCache: async () => undefined,
         saveCache: async () => 0,
-      },
+      }),
     });
 
+    expect(result.status).toBe('miss');
+  });
+
+  it('omits restore-key fallbacks when the cache backend does not support them', async () => {
+    let observedRestoreKeys: readonly string[] | undefined;
+
+    const result = await restoreBaseCache(baseConfig, cacheModel, {
+      cacheBackend: createCacheBackend(
+        {
+          isFeatureAvailable: () => true,
+          restoreCache: async (_paths, _primaryKey, restoreKeys) => {
+            observedRestoreKeys = restoreKeys;
+            return undefined;
+          },
+          saveCache: async () => 0,
+        },
+        {
+          ...STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
+          supportsRestoreKeys: false,
+        },
+      ),
+    });
+
+    expect(observedRestoreKeys).toEqual([]);
+    expect(result.restoreKeys).toEqual([]);
     expect(result.status).toBe('miss');
   });
 });
@@ -141,11 +182,11 @@ describe('restoreBaseCache', () => {
 describe('saveBaseCache', () => {
   it('skips saving in read-only mode', async () => {
     const result = await saveBaseCache({ ...baseConfig, readOnly: true }, cacheModel, true, {
-      cacheBackend: {
+      cacheBackend: createCacheBackend({
         isFeatureAvailable: () => true,
         restoreCache: async () => undefined,
         saveCache: async () => 999,
-      },
+      }),
     });
 
     expect(result.status).toBe('read-only');
@@ -157,11 +198,11 @@ describe('saveBaseCache', () => {
       cacheModel,
       true,
       {
-        cacheBackend: {
+        cacheBackend: createCacheBackend({
           isFeatureAvailable: () => true,
           restoreCache: async () => undefined,
           saveCache: async () => 999,
-        },
+        }),
       },
     );
 
@@ -170,20 +211,45 @@ describe('saveBaseCache', () => {
 
   it('reports saved cache IDs for eligible saves', async () => {
     const result = await saveBaseCache(baseConfig, cacheModel, true, {
-      cacheBackend: {
+      cacheBackend: createCacheBackend({
         isFeatureAvailable: () => true,
         restoreCache: async () => undefined,
         saveCache: async () => 77,
-      },
+      }),
     });
 
     expect(result.status).toBe('saved');
     expect(result.cacheId).toBe(77);
   });
 
+  it('skips saving when the cache backend does not support explicit saves', async () => {
+    let saveCalls = 0;
+
+    const result = await saveBaseCache(baseConfig, cacheModel, true, {
+      cacheBackend: createCacheBackend(
+        {
+          isFeatureAvailable: () => true,
+          restoreCache: async () => undefined,
+          saveCache: async () => {
+            saveCalls += 1;
+            return 77;
+          },
+        },
+        {
+          ...STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
+          supportsExplicitSave: false,
+        },
+      ),
+    });
+
+    expect(saveCalls).toBe(0);
+    expect(result.status).toBe('feature-unavailable');
+    expect(result.message).toMatch(/does not support explicit save operations/i);
+  });
+
   it('skips saving when no cache paths currently exist on disk', async () => {
     const result = await saveBaseCache(baseConfig, cacheModel, true, {
-      cacheBackend: {
+      cacheBackend: createCacheBackend({
         isFeatureAvailable: () => true,
         restoreCache: async () => undefined,
         saveCache: async () => {
@@ -191,7 +257,7 @@ describe('saveBaseCache', () => {
             'Path Validation Error: Path(s) specified in the action for caching do(es) not exist, hence no cache is being saved.',
           );
         },
-      },
+      }),
     });
 
     expect(result.status).toBe('missing-paths');
@@ -200,11 +266,11 @@ describe('saveBaseCache', () => {
 
   it('returns not-saved when the toolkit declines to create a new cache entry', async () => {
     const result = await saveBaseCache(baseConfig, cacheModel, true, {
-      cacheBackend: {
+      cacheBackend: createCacheBackend({
         isFeatureAvailable: () => true,
         restoreCache: async () => undefined,
         saveCache: async () => -1,
-      },
+      }),
     });
 
     expect(result.status).toBe('not-saved');
@@ -213,13 +279,13 @@ describe('saveBaseCache', () => {
   it('rethrows unrelated save failures', async () => {
     await expect(
       saveBaseCache(baseConfig, cacheModel, true, {
-        cacheBackend: {
+        cacheBackend: createCacheBackend({
           isFeatureAvailable: () => true,
           restoreCache: async () => undefined,
           saveCache: async () => {
             throw new Error('boom');
           },
-        },
+        }),
       }),
     ).rejects.toThrow('boom');
   });

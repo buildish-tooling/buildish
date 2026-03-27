@@ -16,10 +16,27 @@
 
 import * as toolkitCache from '@actions/cache';
 
-import type { BaseCacheBackend } from '../../storage/cache';
+import {
+  STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
+  type BaseCacheBackend,
+} from '../../storage/cache';
 
 export function createGitHubBaseCacheBackend(
-  cacheBackend: BaseCacheBackend = toolkitCache,
+  cacheBackend: Pick<
+    BaseCacheBackend,
+    'isFeatureAvailable' | 'restoreCache' | 'saveCache'
+  > = toolkitCache,
 ): BaseCacheBackend {
-  return cacheBackend;
+  return {
+    capabilities: STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
+    isFeatureAvailable(): boolean {
+      return cacheBackend.isFeatureAvailable();
+    },
+    async restoreCache(paths: string[], primaryKey: string, restoreKeys?: string[]) {
+      return await cacheBackend.restoreCache(paths, primaryKey, restoreKeys);
+    },
+    async saveCache(paths: string[], key: string) {
+      return await cacheBackend.saveCache(paths, key);
+    },
+  };
 }
