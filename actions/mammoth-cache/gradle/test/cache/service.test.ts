@@ -31,7 +31,7 @@ import {
 } from '../../src/storage/cache';
 
 const baseConfig: NormalizedActionConfig = {
-  phase: 'main',
+  phase: 'prepare',
   baseDirectory: '.',
   cacheEnabled: true,
   readOnly: false,

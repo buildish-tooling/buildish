@@ -209,19 +209,19 @@ describe('executeMainAction', () => {
       ).toContain('caches/modules-2/files-2.1/example/module.bin');
       expect(summary.lines).toEqual([]);
       const summaryText = createMainActionSummaryLines(status).join('\n');
-      expect(summaryText).toContain('## Apache Buildish main action');
+      expect(summaryText).toContain('## Apache Buildish prepare execution');
       expect(summaryText).toContain('- Restore cleanup: none');
       expect(summaryText).toContain('- Dependent delta reuse: 1 artifact(s) from 1 job(s)');
       expect(summaryText).toContain('- Pre-build manifest: persisted');
-      expect(summaryText).toContain('<summary>Main-phase details</summary>');
+      expect(summaryText).toContain('<summary>Prepare-phase details</summary>');
       expect(summaryText).toContain('- Downloaded delta artifacts: 1');
       expect(summaryText).toContain('- Applied delta changes: 1 added, 0 modified, 0 deleted.');
       expect(summaryText).toContain('- Delta apply warnings: 0');
       expect(summaryText).toContain('- Post-job artifact cleanup scheduled: 1');
       expect(infoMessages).toEqual(
         expect.arrayContaining([
-          '::group::Apache Buildish main action',
-          'Bootstrap: Prepared main phase for push on main in distributed-aggregator mode.',
+          '::group::Apache Buildish prepare execution',
+          'Bootstrap: Prepared prepare phase for push on main in distributed-aggregator mode.',
           "GitHub input 'github-token' present: no.",
           "GitHub environment 'GITHUB_TOKEN' available: no.",
           "GitHub input 'github-job-check-run-id': unset.",
@@ -442,10 +442,10 @@ describe('executeMainAction', () => {
       expect(status.preBuildManifestState).not.toBeNull();
       expect(savedState.get(PRE_BUILD_CACHE_MANIFEST_PATH_STATE)).toBeTruthy();
       const summaryText = createMainActionSummaryLines(status).join('\n');
-      expect(summaryText).toContain('## Apache Buildish main action');
+      expect(summaryText).toContain('## Apache Buildish prepare execution');
       expect(summaryText).toContain('- Restore cleanup: none');
       expect(summaryText).toContain('- Dependent delta reuse: none');
-      expect(summaryText).toContain('<summary>Main-phase details</summary>');
+      expect(summaryText).toContain('<summary>Prepare-phase details</summary>');
       expect(summaryText).toContain('- Downloaded delta artifacts: 0');
       expect(summaryText).toContain('- Pre-build manifest: persisted');
       expect(createMainActionOutputs(status)).toEqual({
@@ -587,7 +587,7 @@ describe('executeMainAction', () => {
       expect(restoreCalls).toBe(2);
       await expect(readFile(managedFile, 'utf8')).resolves.toBe('from-cache-2');
       const summaryText = createMainActionSummaryLines(status).join('\n');
-      expect(summaryText).toContain('## Apache Buildish main action');
+      expect(summaryText).toContain('## Apache Buildish prepare execution');
       expect(summaryText).toContain('- Restore cleanup: prune-managed (1 deleted)');
       expect(summaryText).toContain('- Restore cleanup status: pruned');
       expect(summaryText).toContain('- Restore cleanup deleted files: 1');
@@ -885,7 +885,7 @@ async function createTestCacheModel(
 
 function createTestConfig(gradleUserHome: string): NormalizedActionConfig {
   return {
-    phase: 'main',
+    phase: 'prepare',
     baseDirectory: '.',
     cacheEnabled: true,
     readOnly: false,

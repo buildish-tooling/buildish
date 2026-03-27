@@ -26,7 +26,7 @@ import type { CiJobContext } from '../../src/ci/types';
 import type { NormalizedActionConfig } from '../../src/config/types';
 
 const baseConfig: NormalizedActionConfig = {
-  phase: 'main',
+  phase: 'prepare',
   baseDirectory: '.',
   cacheEnabled: true,
   readOnly: false,

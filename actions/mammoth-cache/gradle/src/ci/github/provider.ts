@@ -18,6 +18,7 @@ import { writeFile } from 'node:fs/promises';
 
 import * as core from '@actions/core';
 
+import type { CoreExecutionPhase } from '../../core/lifecycle';
 import type { CiJobContext, CiPlatformAdapter, HttpHeadersByHost, SummaryWriter } from '../types';
 
 export interface GitHubPlatformOptions {
@@ -44,8 +45,8 @@ export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPla
     context,
     executionUrls,
     httpHeadersByHost,
-    createBootstrapDiagnosticsLines(phase: 'main' | 'post'): readonly string[] {
-      if (phase !== 'main') {
+    createBootstrapDiagnosticsLines(phase: CoreExecutionPhase): readonly string[] {
+      if (phase !== 'prepare') {
         return [];
       }
 

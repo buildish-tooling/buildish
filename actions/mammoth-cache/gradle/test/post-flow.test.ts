@@ -300,7 +300,7 @@ describe('executePostAction', () => {
       expect(infoMessages).toEqual(
         expect.arrayContaining([
           '::group::Apache Buildish Mammoth Cache for Gradle',
-          'Bootstrap: Prepared post phase for push on main in distributed-worker mode.',
+          'Bootstrap: Prepared finalize phase for push on main in distributed-worker mode.',
           'Base cache restore: exact-hit.',
           'Delta artifact: uploaded.',
           'Execution details: https://github.com/apache/buildish/actions/runs/101/job/987654321',

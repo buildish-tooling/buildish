@@ -109,7 +109,7 @@ export async function executePostAction(
   dependencies: PostActionDependencies,
 ): Promise<PostActionStatus> {
   const logInfo = dependencies.runtimeHost.info;
-  const bootstrap = await bootstrapPhase('post', dependencies);
+  const bootstrap = await bootstrapPhase('finalize', dependencies);
   const { workflowRunUrl, jobUrl } = bootstrap.ciExecutionUrls;
   const baseCacheRestoreResult = getPersistedBaseCacheRestoreResult(
     dependencies.runtimeHost.getState,
@@ -132,7 +132,7 @@ export async function executePostAction(
       gradleBuildReport: combinedGradleBuildReport,
       jobUrl,
       workflowRunUrl,
-      message: 'Post action flow completed without cache orchestration.',
+      message: 'Finalize execution completed without cache orchestration.',
     } satisfies PostActionStatus;
     await publishPostActionLogGroup(dependencies, status, logInfo);
     await replaceJobSummary(bootstrap.ciProvider, createPostActionSummaryLines(status));
@@ -163,7 +163,7 @@ export async function executePostAction(
       gradleBuildReport: combinedGradleBuildReport,
       jobUrl,
       workflowRunUrl,
-      message: 'Post action flow completed without a persisted pre-build cache manifest.',
+      message: 'Finalize execution completed without a persisted pre-build cache manifest.',
     } satisfies PostActionStatus;
     await publishPostActionLogGroup(dependencies, status, logInfo);
     await replaceJobSummary(bootstrap.ciProvider, createPostActionSummaryLines(status));
@@ -309,7 +309,7 @@ async function cleanupConsumedDeltaArtifacts(
       deletedArtifactNames: [],
       warnings: [],
       message:
-        'Consumed delta artifact cleanup skipped because no dependent artifact names were persisted during the main phase.',
+        'Consumed delta artifact cleanup skipped because no dependent artifact names were persisted during the prepare phase.',
     };
   }
 
@@ -397,10 +397,10 @@ function countDeltaEntries(deltaManifest: Parameters<typeof stageDeltaArtifactPa
 
 function createPostActionMessage(deltaArtifactResult: PostDeltaArtifactResult): string {
   if (deltaArtifactResult.status === 'uploaded') {
-    return 'Post action flow completed and uploaded the distributed worker delta artifact.';
+    return 'Finalize execution completed and uploaded the distributed worker delta artifact.';
   }
 
-  return 'Post action flow completed.';
+  return 'Finalize execution completed.';
 }
 
 export function createPostActionSummaryLines(status: PostActionStatus): readonly string[] {

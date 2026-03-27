@@ -23,12 +23,12 @@ const postFlowMock = vi.hoisted(() => ({
     bootstrap: { baseCacheResult: null },
     consumedDeltaCleanupResult: null,
     deltaArtifactResult: null,
-    message: 'Post action flow completed.',
+    message: 'Finalize execution completed.',
   })),
 }));
 
 const jobSingleRunMock = vi.hoisted(() => ({
-  decideSingleRunPostExecution: vi.fn(() => ({
+  decideSingleRunFinalizeExecution: vi.fn(() => ({
     shouldRun: true,
     message: 'Run post action.',
   })),
@@ -87,10 +87,10 @@ describe('post entrypoint', () => {
 
     await runPost(dependencies);
 
-    expect(jobSingleRunMock.decideSingleRunPostExecution).toHaveBeenCalledWith({
+    expect(jobSingleRunMock.decideSingleRunFinalizeExecution).toHaveBeenCalledWith({
       getState: runtimeHost.getState,
     });
     expect(postFlowMock.executePostAction).toHaveBeenCalledWith(dependencies);
-    expect(runtimeHost.info).toHaveBeenCalledWith('Post action flow completed.');
+    expect(runtimeHost.info).toHaveBeenCalledWith('Finalize execution completed.');
   });
 });

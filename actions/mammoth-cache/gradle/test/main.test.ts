@@ -23,13 +23,13 @@ const mainFlowMock = vi.hoisted(() => ({
   executeMainAction: vi.fn(async () => ({
     bootstrap: { baseCacheResult: null },
     dependentDeltaResult: null,
-    message: 'Main action flow completed.',
+    message: 'Prepare execution completed.',
     preBuildManifestState: null,
   })),
 }));
 
 const jobSingleRunMock = vi.hoisted(() => ({
-  claimSingleRunJobInvocation: vi.fn(async () => ({
+  claimSingleRunPrepareExecution: vi.fn(async () => ({
     accepted: true,
     message: 'Claimed ownership.',
   })),
@@ -88,7 +88,7 @@ describe('main entrypoint', () => {
 
     await runMain(dependencies);
 
-    expect(jobSingleRunMock.claimSingleRunJobInvocation).toHaveBeenCalledWith({
+    expect(jobSingleRunMock.claimSingleRunPrepareExecution).toHaveBeenCalledWith({
       ciContext: ciProvider.context,
       saveState: runtimeHost.saveState,
     });

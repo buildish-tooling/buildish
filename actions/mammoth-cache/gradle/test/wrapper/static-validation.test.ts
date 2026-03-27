@@ -120,7 +120,7 @@ describe('validateTargetWrapperProperties', () => {
 
 function createConfig(overrides: Partial<NormalizedActionConfig> = {}): NormalizedActionConfig {
   return {
-    phase: 'main',
+    phase: 'prepare',
     baseDirectory: '.',
     cacheEnabled: true,
     readOnly: false,

@@ -21,8 +21,8 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
-  claimSingleRunJobInvocation,
-  decideSingleRunPostExecution,
+  claimSingleRunPrepareExecution,
+  decideSingleRunFinalizeExecution,
   JOB_SINGLE_RUN_DUPLICATE_STATE,
   JOB_SINGLE_RUN_OWNER_TOKEN_STATE,
   resolveSingleRunGuardFilePath,
@@ -36,7 +36,7 @@ describe('job single-run guard', () => {
       const duplicateState = new Map<string, string>();
 
       await expect(
-        claimSingleRunJobInvocation({
+        claimSingleRunPrepareExecution({
           ciContext,
           saveState: ownerState.set.bind(ownerState),
           createOwnerToken: () => 'owner-token-a',
@@ -48,7 +48,7 @@ describe('job single-run guard', () => {
       );
 
       await expect(
-        claimSingleRunJobInvocation({
+        claimSingleRunPrepareExecution({
           ciContext,
           saveState: duplicateState.set.bind(duplicateState),
           createOwnerToken: () => 'owner-token-b',
@@ -68,7 +68,7 @@ describe('job single-run guard', () => {
       );
 
       expect(
-        decideSingleRunPostExecution({
+        decideSingleRunFinalizeExecution({
           getState: (name: string) => ownerState.get(name) ?? '',
         }),
       ).toEqual(
@@ -77,7 +77,7 @@ describe('job single-run guard', () => {
         }),
       );
       expect(
-        decideSingleRunPostExecution({
+        decideSingleRunFinalizeExecution({
           getState: (name: string) => duplicateState.get(name) ?? '',
         }),
       ).toEqual(
@@ -94,7 +94,7 @@ describe('job single-run guard', () => {
       const secondAttemptState = new Map<string, string>();
 
       await expect(
-        claimSingleRunJobInvocation({
+        claimSingleRunPrepareExecution({
           ciContext: createCiContext(runnerTemp, { runAttempt: 1 }),
           saveState: firstAttemptState.set.bind(firstAttemptState),
           createOwnerToken: () => 'attempt-1',
@@ -102,7 +102,7 @@ describe('job single-run guard', () => {
       ).resolves.toEqual(expect.objectContaining({ accepted: true }));
 
       await expect(
-        claimSingleRunJobInvocation({
+        claimSingleRunPrepareExecution({
           ciContext: createCiContext(runnerTemp, { runAttempt: 2 }),
           saveState: secondAttemptState.set.bind(secondAttemptState),
           createOwnerToken: () => 'attempt-2',
@@ -115,7 +115,7 @@ describe('job single-run guard', () => {
   });
 
   it('skips post execution when no main-phase ownership state was persisted', () => {
-    expect(decideSingleRunPostExecution({ getState: () => '' })).toEqual(
+    expect(decideSingleRunFinalizeExecution({ getState: () => '' })).toEqual(
       expect.objectContaining({
         shouldRun: false,
       }),
@@ -134,7 +134,7 @@ describe('job single-run guard', () => {
   it('rejects empty custom owner tokens', async () => {
     await withRunnerTemp(async (runnerTemp) => {
       await expect(
-        claimSingleRunJobInvocation({
+        claimSingleRunPrepareExecution({
           ciContext: createCiContext(runnerTemp),
           saveState: () => undefined,
           createOwnerToken: () => '   ',

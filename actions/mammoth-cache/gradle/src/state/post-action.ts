@@ -37,7 +37,7 @@ export const PRE_BUILD_CACHE_MANIFEST_PATH_STATE =
 export const CONSUMED_DELTA_ARTIFACT_NAMES_STATE =
   'buildish-mammoth-cache-gradle-consumed-delta-artifact-names';
 /**
- * Historical state key retained for wire compatibility between main/post phases.
+ * Historical state key retained for wire compatibility between prepare/finalize phases.
  */
 export const DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE =
   'buildish-mammoth-cache-gradle-delta-artifact-producer-identity';

@@ -110,7 +110,7 @@ describe('resolveActionInputsFromConfigFile', () => {
         });
 
         const config = normalizeActionConfig(rawInputs, {
-          phase: 'main',
+          phase: 'prepare',
           ciContext: { ...baseCiContext, workspace, actionPath: workspace },
           env: {},
         });
@@ -234,13 +234,13 @@ describe('resolveActionInputsFromConfigFile', () => {
 describe('normalizeActionConfig', () => {
   it('applies secure defaults for a push event', () => {
     const config = normalizeActionConfig(readActionInputs(emptyInputProvider()), {
-      phase: 'main',
+      phase: 'prepare',
       ciContext: baseCiContext,
       env: {},
     });
 
     expect(config).toMatchObject({
-      phase: 'main',
+      phase: 'prepare',
       baseDirectory: '.',
       cacheEnabled: true,
       readOnly: false,
@@ -274,7 +274,7 @@ describe('normalizeActionConfig', () => {
         }),
       ),
       {
-        phase: 'main',
+        phase: 'prepare',
         ciContext: baseCiContext,
         env: {},
       },
@@ -304,7 +304,7 @@ describe('normalizeActionConfig', () => {
           }),
         ),
         {
-          phase: 'main',
+          phase: 'prepare',
           ciContext: baseCiContext,
           env: {},
         },
@@ -326,7 +326,7 @@ describe('normalizeActionConfig', () => {
           }),
         ),
         {
-          phase: 'main',
+          phase: 'prepare',
           ciContext: baseCiContext,
           env: {},
         },
@@ -348,7 +348,7 @@ describe('normalizeActionConfig', () => {
           }),
         ),
         {
-          phase: 'main',
+          phase: 'prepare',
           ciContext: baseCiContext,
           env: {},
         },
@@ -369,7 +369,7 @@ describe('normalizeActionConfig', () => {
           }),
         ),
         {
-          phase: 'main',
+          phase: 'prepare',
           ciContext: baseCiContext,
           env: {},
         },
@@ -381,7 +381,7 @@ describe('normalizeActionConfig', () => {
     const config = normalizeActionConfig(
       readActionInputs(createInputProvider({ 'allow-duplicate-dependent-delta-paths': 'true' })),
       {
-        phase: 'main',
+        phase: 'prepare',
         ciContext: baseCiContext,
         env: {},
       },
@@ -392,7 +392,7 @@ describe('normalizeActionConfig', () => {
 
   it('defaults to read-only on pull requests', () => {
     const config = normalizeActionConfig(readActionInputs(emptyInputProvider()), {
-      phase: 'main',
+      phase: 'prepare',
       ciContext: { ...baseCiContext, eventName: 'pull_request', isPullRequest: true },
       env: {},
     });
@@ -402,7 +402,7 @@ describe('normalizeActionConfig', () => {
 
   it('defaults to read-only on pull_request_target events', () => {
     const config = normalizeActionConfig(readActionInputs(emptyInputProvider()), {
-      phase: 'main',
+      phase: 'prepare',
       ciContext: { ...baseCiContext, eventName: 'pull_request_target', isPullRequest: true },
       env: {},
     });
@@ -412,7 +412,7 @@ describe('normalizeActionConfig', () => {
 
   it('keeps workflow_dispatch writable by default', () => {
     const config = normalizeActionConfig(readActionInputs(emptyInputProvider()), {
-      phase: 'main',
+      phase: 'prepare',
       ciContext: {
         ...baseCiContext,
         eventName: 'workflow_dispatch',
@@ -427,7 +427,7 @@ describe('normalizeActionConfig', () => {
 
   it('keeps schedule runs writable by default', () => {
     const config = normalizeActionConfig(readActionInputs(emptyInputProvider()), {
-      phase: 'main',
+      phase: 'prepare',
       ciContext: {
         ...baseCiContext,
         eventName: 'schedule',
@@ -449,7 +449,7 @@ describe('normalizeActionConfig', () => {
         }),
       ),
       {
-        phase: 'main',
+        phase: 'prepare',
         ciContext: baseCiContext,
         env: {},
       },
@@ -470,7 +470,7 @@ describe('normalizeActionConfig', () => {
         }),
       ),
       {
-        phase: 'main',
+        phase: 'prepare',
         ciContext: baseCiContext,
         env: {},
       },
@@ -492,7 +492,7 @@ describe('normalizeActionConfig', () => {
           }),
         ),
         {
-          phase: 'main',
+          phase: 'prepare',
           ciContext: baseCiContext,
           env: {},
         },
@@ -505,7 +505,7 @@ describe('normalizeActionConfig', () => {
       normalizeActionConfig(
         readActionInputs(createInputProvider({ 'base-directory': 'C:\\workspace' })),
         {
-          phase: 'main',
+          phase: 'prepare',
           ciContext: baseCiContext,
           env: {},
         },
@@ -518,7 +518,7 @@ describe('normalizeActionConfig', () => {
       normalizeActionConfig(
         readActionInputs(createInputProvider({ 'base-directory': '\\Windows\\System32' })),
         {
-          phase: 'main',
+          phase: 'prepare',
           ciContext: baseCiContext,
           env: {},
         },
@@ -529,7 +529,7 @@ describe('normalizeActionConfig', () => {
   it('rejects unsupported setup-java usage in v1', () => {
     expect(() =>
       normalizeActionConfig(readActionInputs(createInputProvider({ 'setup-java': 'true' })), {
-        phase: 'main',
+        phase: 'prepare',
         ciContext: baseCiContext,
         env: {},
       }),

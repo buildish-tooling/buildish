@@ -14,33 +14,7 @@
  * limitations under the License.
  */
 
-import { executePostAction, type PostActionDependencies } from './post-flow';
-import { decideSingleRunPostExecution } from './runtime/job-single-run';
-
-export type PostEntrypointDependencies = PostActionDependencies;
-
-export async function runPost(dependencies: PostEntrypointDependencies): Promise<void> {
-  const { runtimeHost } = dependencies;
-  const postDecision = decideSingleRunPostExecution({
-    getState: runtimeHost.getState,
-  });
-  if (!postDecision.shouldRun) {
-    runtimeHost.info(postDecision.message);
-    return;
-  }
-
-  const status = await executePostAction(dependencies);
-  if (status.bootstrap.baseCacheResult) {
-    runtimeHost.info(status.bootstrap.baseCacheResult.message);
-  }
-  if (status.consumedDeltaCleanupResult) {
-    runtimeHost.info(status.consumedDeltaCleanupResult.message);
-    for (const warning of status.consumedDeltaCleanupResult.warnings) {
-      runtimeHost.warning(warning);
-    }
-  }
-  if (status.deltaArtifactResult) {
-    runtimeHost.info(status.deltaArtifactResult.message);
-  }
-  runtimeHost.info(status.message);
-}
+export {
+  type FinalizeEntrypointDependencies as PostEntrypointDependencies,
+  runFinalizeExecution as runPost,
+} from './core/lifecycle';

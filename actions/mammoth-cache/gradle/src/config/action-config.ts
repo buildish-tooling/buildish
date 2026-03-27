@@ -20,6 +20,7 @@ import * as path from 'node:path';
 import { parse as parseYaml } from 'yaml';
 
 import type { CiJobContext } from '../ci/types';
+import type { CoreExecutionPhase } from '../core/lifecycle';
 import {
   isAbsolutePosixOrWindowsPath,
   normalizeUserSuppliedRelativePath,
@@ -74,9 +75,9 @@ export interface NormalizeActionConfigOptions {
   /**
    * Action phase being normalized.
    *
-   * Valid values are `main` and `post`; this is supplied by bootstrap, not user input.
+   * Valid values are `prepare` and `finalize`; this is supplied by bootstrap, not user input.
    */
-  readonly phase: 'main' | 'post';
+  readonly phase: CoreExecutionPhase;
   /**
    * Provider-neutral CI context used for event-dependent defaults.
    *

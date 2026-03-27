@@ -35,6 +35,7 @@ import {
   escapeHtml,
   escapeSummaryText,
 } from './logging/summary';
+import type { CoreExecutionPhase } from './core/lifecycle';
 import type { RuntimeInputSource, RuntimeReporter, RuntimeStateStore } from './runtime-host/types';
 import type { BaseCacheBackend } from './storage/cache';
 import { provisionWrapperJars, type WrapperProvisionOptions } from './wrapper/download';
@@ -43,17 +44,14 @@ import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from './wr
 
 /**
  * Action execution phase.
- *
- * Valid values are `main` for the primary action entrypoint and `post` for the post-action
- * cleanup/save entrypoint.
  */
-export type BootstrapPhase = 'main' | 'post';
+export type BootstrapPhase = CoreExecutionPhase;
 
 /**
  * Bootstrap output shared by the action entrypoints and tests.
  */
 export interface BootstrapStatus {
-  /** Phase currently being prepared. Valid values are `main` and `post`. */
+  /** Phase currently being prepared. Valid values are `prepare` and `finalize`. */
   readonly phase: BootstrapPhase;
   /** Human-readable one-line status summary generated from the normalized context and config. */
   readonly message: string;
@@ -76,13 +74,13 @@ export interface BootstrapStatus {
   /**
    * Wrapper properties files validated during bootstrap.
    *
-   * Defaults to an empty array and is empty in the `post` phase.
+   * Defaults to an empty array and is empty in the `finalize` phase.
    */
   readonly validatedWrappers: readonly ValidatedWrapperPropertiesFile[];
   /**
    * Wrapper JAR provisioning results for validated wrappers.
    *
-   * Defaults to an empty array and is empty in the `post` phase.
+   * Defaults to an empty array and is empty in the `finalize` phase.
    */
   readonly provisionedWrappers: readonly ProvisionedWrapperJar[];
   /** Provider-specific bootstrap diagnostics rendered by the active CI adapter. */
@@ -130,7 +128,7 @@ export interface BootstrapDependencies {
 }
 
 /**
- * Shared startup path for both the main and post-action entrypoints.
+ * Shared startup path for both the prepare and finalize entrypoints.
  *
  * This is the only place that currently wires the active CI adapter, reads action inputs, and
  * normalizes runtime config.
@@ -157,11 +155,11 @@ export async function bootstrapPhase(
       })
     : null;
   const validatedWrappers =
-    phase === 'main'
+    phase === 'prepare'
       ? await validateTargetWrapperProperties(config, ciProvider.context.workspace)
       : [];
   const provisionedWrappers =
-    phase === 'main'
+    phase === 'prepare'
       ? await provisionWrapperJars(validatedWrappers, {
           fetchImpl: dependencies.fetchImpl,
           httpHeadersByHost: ciProvider.httpHeadersByHost,
@@ -280,8 +278,8 @@ export function createBootstrapLogLines(status: BootstrapStatus): readonly strin
     lines.push(...status.ciDiagnosticsLines);
   }
 
-  if (status.phase === 'post') {
-    lines.push('Wrapper provisioning is skipped during the post phase.');
+  if (status.phase === 'finalize') {
+    lines.push('Wrapper provisioning is skipped during the finalize phase.');
     return lines;
   }
 
@@ -298,8 +296,8 @@ export function createBootstrapLogLines(status: BootstrapStatus): readonly strin
 }
 
 function createWrapperProvisioningSummaryLines(status: BootstrapStatus): readonly string[] {
-  if (status.phase === 'post') {
-    return ['- Wrapper provisioning is skipped during the post phase.'];
+  if (status.phase === 'finalize') {
+    return ['- Wrapper provisioning is skipped during the finalize phase.'];
   }
 
   if (status.provisionedWrappers.length === 0) {
@@ -344,7 +342,7 @@ async function runBaseCachePhase(
     return null;
   }
 
-  if (phase === 'main') {
+  if (phase === 'prepare') {
     const restoreResult = await restoreBaseCache(config, cacheModel, {
       cacheBackend: dependencies.cacheBackend,
     });

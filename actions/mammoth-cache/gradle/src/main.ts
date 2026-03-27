@@ -14,42 +14,8 @@
  * limitations under the License.
  */
 
-import {
-  createMainActionOutputs,
-  executeMainAction,
-  type MainActionDependencies,
-} from './main-flow';
-import type { RuntimeOutputSink } from './runtime-host/types';
-import { claimSingleRunJobInvocation } from './runtime/job-single-run';
-
-export type MainEntrypointRuntimeHost = MainActionDependencies['runtimeHost'] & RuntimeOutputSink;
-
-export type MainEntrypointDependencies = Omit<MainActionDependencies, 'runtimeHost'> & {
-  readonly runtimeHost: MainEntrypointRuntimeHost;
-};
-
-export async function runMain(dependencies: MainEntrypointDependencies): Promise<void> {
-  const { ciProvider, runtimeHost } = dependencies;
-  const singleRunClaim = await claimSingleRunJobInvocation({
-    ciContext: ciProvider.context,
-    saveState: runtimeHost.saveState,
-  });
-  if (!singleRunClaim.accepted) {
-    throw new Error(singleRunClaim.message);
-  }
-
-  const status = await executeMainAction(dependencies);
-  for (const [name, value] of Object.entries(createMainActionOutputs(status))) {
-    runtimeHost.setOutput(name, value);
-  }
-  if (status.bootstrap.baseCacheResult) {
-    runtimeHost.info(status.bootstrap.baseCacheResult.message);
-  }
-  if (status.dependentDeltaResult) {
-    runtimeHost.info(status.dependentDeltaResult.message);
-    for (const warning of status.dependentDeltaResult.warnings) {
-      runtimeHost.warning(warning);
-    }
-  }
-  runtimeHost.info(status.message);
-}
+export {
+  type PrepareEntrypointDependencies as MainEntrypointDependencies,
+  type PrepareEntrypointRuntimeHost as MainEntrypointRuntimeHost,
+  runPrepareExecution as runMain,
+} from './core/lifecycle';

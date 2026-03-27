@@ -76,7 +76,7 @@ export async function executeMainAction(
   dependencies: MainActionDependencies,
 ): Promise<MainActionStatus> {
   const logInfo = dependencies.runtimeHost.info;
-  const bootstrap = await bootstrapPhase('main', dependencies);
+  const bootstrap = await bootstrapPhase('prepare', dependencies);
   await installGradleBuildResultCapture(bootstrap.config.gradleUserHome, bootstrap.ciContext).catch(
     (error: unknown) => {
       logInfo(
@@ -91,12 +91,12 @@ export async function executeMainAction(
       restoreCleanupResult: null,
       dependentDeltaResult: null,
       preBuildManifestState: null,
-      message: 'Main action flow completed without cache orchestration.',
+      message: 'Prepare execution completed without cache orchestration.',
     } satisfies MainActionStatus;
 
     await publishJobLogGroup(
       bootstrap.ciProvider,
-      'Apache Buildish main action',
+      'Apache Buildish prepare execution',
       createMainActionLogLines(status),
       logInfo,
     );
@@ -132,7 +132,7 @@ export async function executeMainAction(
 
   await publishJobLogGroup(
     bootstrap.ciProvider,
-    'Apache Buildish main action',
+    'Apache Buildish prepare execution',
     createMainActionLogLines(status),
     logInfo,
   );
@@ -293,23 +293,23 @@ async function cleanupDownloadedPackages(
 
 function createMainActionMessage(dependentDeltaResult: MainDependentDeltaResult | null): string {
   if (!dependentDeltaResult) {
-    return 'Main action flow completed and captured the pre-build cache manifest for post processing.';
+    return 'Prepare execution completed and captured the pre-build cache manifest for finalize processing.';
   }
 
-  return 'Main action flow completed and captured the pre-build cache manifest for post processing.';
+  return 'Prepare execution completed and captured the pre-build cache manifest for finalize processing.';
 }
 
 export function createMainActionSummaryLines(status: MainActionStatus): readonly string[] {
   const dependentDelta = status.dependentDeltaResult;
 
   return [
-    '## Apache Buildish main action',
+    '## Apache Buildish prepare execution',
     `- Restore cleanup: ${describeRestoreCleanupSummary(status.restoreCleanupResult)}`,
     `- Dependent delta reuse: ${describeDependentDeltaSummary(dependentDelta)}`,
     ...(status.preBuildManifestState
       ? ['- Pre-build manifest: persisted']
       : ['- Pre-build manifest: not persisted']),
-    ...createDetailsSection('Main-phase details', [
+    ...createDetailsSection('Prepare-phase details', [
       `- Dependent jobs configured: ${dependentDelta?.requestedJobs.length ?? 0}`,
       `- Downloaded delta artifacts: ${dependentDelta?.appliedArtifactCount ?? 0}`,
       ...(dependentDelta

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import type { CoreExecutionPhase } from '../core/lifecycle';
+
 /**
  * Normalized CI metadata consumed by later cache and coordination code.
  *
@@ -108,7 +110,7 @@ export interface CiPlatformAdapter {
   /** Provider-generated execution URLs for the current job/run, when available. */
   readonly executionUrls: CiExecutionUrls;
   /** Emits provider-specific diagnostic lines for the given action phase. */
-  createBootstrapDiagnosticsLines(phase: 'main' | 'post'): readonly string[];
+  createBootstrapDiagnosticsLines(phase: CoreExecutionPhase): readonly string[];
   /** Publishes the provided lines as a grouped log block using the provider-specific log surface. */
   publishLogGroup(
     title: string,

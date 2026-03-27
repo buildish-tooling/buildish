@@ -50,7 +50,7 @@ export interface JobSingleRunPostDecision {
   readonly message: string;
 }
 
-export async function claimSingleRunJobInvocation(
+export async function claimSingleRunPrepareExecution(
   dependencies: JobSingleRunDependencies,
 ): Promise<JobSingleRunClaimResult> {
   const guardFilePath = resolveSingleRunGuardFilePath(dependencies.ciContext);
@@ -74,7 +74,7 @@ export async function claimSingleRunJobInvocation(
       return {
         accepted: false,
         message:
-          'This action may run only once per CI job. Another Apache Buildish Mammoth Cache for Gradle invocation already claimed this job, so this duplicate usage is rejected and its post action will be skipped.',
+          'This action may run only once per CI job. Another Apache Buildish Mammoth Cache for Gradle invocation already claimed this job, so this duplicate usage is rejected and its finalize execution will be skipped.',
       };
     }
 
@@ -92,7 +92,7 @@ export async function claimSingleRunJobInvocation(
   };
 }
 
-export function decideSingleRunPostExecution(
+export function decideSingleRunFinalizeExecution(
   dependencies: Pick<JobSingleRunDependencies, 'getState'> = {},
 ): JobSingleRunPostDecision {
   const getState = dependencies.getState ?? (() => '');
@@ -100,7 +100,7 @@ export function decideSingleRunPostExecution(
     return {
       shouldRun: false,
       message:
-        'Skipping post action for this Apache Buildish Mammoth Cache for Gradle invocation because its main step was rejected as a duplicate usage in the same CI job.',
+        'Skipping finalize execution for this Apache Buildish Mammoth Cache for Gradle invocation because its prepare execution was rejected as a duplicate usage in the same CI job.',
     };
   }
 
@@ -108,14 +108,14 @@ export function decideSingleRunPostExecution(
     return {
       shouldRun: false,
       message:
-        'Skipping post action because this Apache Buildish Mammoth Cache for Gradle invocation did not claim single-run ownership for the current CI job.',
+        'Skipping finalize execution because this Apache Buildish Mammoth Cache for Gradle invocation did not claim single-run ownership for the current CI job.',
     };
   }
 
   return {
     shouldRun: true,
     message:
-      'Running post action for the owning Apache Buildish Mammoth Cache for Gradle invocation in this CI job.',
+      'Running finalize execution for the owning Apache Buildish Mammoth Cache for Gradle invocation in this CI job.',
   };
 }
 

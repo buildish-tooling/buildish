@@ -64,7 +64,7 @@ export interface BaseCacheRestoreResult {
 }
 
 /**
- * Result of saving the base cache from the action post phase.
+ * Result of saving the base cache from the action finalize phase.
  *
  * Non-`saved` statuses are intentional control-flow outcomes, not necessarily errors. In
  * particular, save is skipped in modes that would create unsafe or redundant concurrent writers.
@@ -76,7 +76,7 @@ export interface BaseCacheSaveResult {
    * Save outcome classification.
    *
    * Valid values:
-   * - `not-armed`: post phase was not paired with an armed main phase
+   * - `not-armed`: finalize phase was not paired with an armed prepare phase
    * - `read-only`: config forbids writes
    * - `distributed-worker`: worker jobs do not save shared base caches
    * - `feature-unavailable`: cache backend unavailable in this environment
@@ -92,7 +92,7 @@ export interface BaseCacheSaveResult {
     | 'missing-paths'
     | 'saved'
     | 'not-saved';
-  /** Primary cache key that the post phase attempted, or would have attempted, to save. */
+  /** Primary cache key that the finalize phase attempted, or would have attempted, to save. */
   readonly cacheKey: string;
   /** Cache identifier returned by the active backend when a new entry is successfully created. */
   readonly cacheId: number | null;
@@ -310,9 +310,9 @@ export async function saveBaseCache(
 }
 
 /**
- * Marks the post phase as eligible to consider a later base-cache save.
+ * Marks the finalize phase as eligible to consider a later base-cache save.
  *
- * Arming happens during the main phase after restore/setup work has completed, so the post phase can
+ * Arming happens during the prepare phase after restore/setup work has completed, so the finalize phase can
  * cheaply distinguish a legitimate paired execution from a standalone post invocation.
  */
 export function armBaseCachePostAction(saveState: (name: string, value: string) => void): void {
@@ -320,7 +320,7 @@ export function armBaseCachePostAction(saveState: (name: string, value: string) 
 }
 
 /**
- * Returns whether the post phase was armed by the main phase for a later base-cache save.
+ * Returns whether the finalize phase was armed by the prepare phase for a later base-cache save.
  */
 export function isBaseCachePostActionArmed(getState: (name: string) => string): boolean {
   return getState(POST_ACTION_ARMED_STATE) === 'true';

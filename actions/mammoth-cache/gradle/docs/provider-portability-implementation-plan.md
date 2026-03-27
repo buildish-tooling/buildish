@@ -66,6 +66,10 @@ The immediate goal is not a large move. It is to make current modules depend on 
   - `src/post.ts`
   - `src/bootstrap.ts`
   - `src/runtime/job-single-run.ts`
+- Current state:
+  - shared lifecycle phases now use `prepare` / `finalize`
+  - `src/core/lifecycle.ts` owns the provider-neutral lifecycle driver
+  - GitHub-facing `runMain()` / `runPost()` are now thin wrappers over that shared lifecycle driver
 - Why: Codeberg may need lifecycle adaptation; GitLab needs mapping to job scripts or `after_script`.
 
 ## Phase 3: generalize artifact lookup scope

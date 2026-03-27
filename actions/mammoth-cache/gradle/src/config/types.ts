@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import type { CoreExecutionPhase } from '../core/lifecycle';
+
 /**
  * Supported execution personalities for the action.
  *
@@ -149,9 +151,9 @@ export interface NormalizedActionConfig {
   /**
    * Current action phase.
    *
-   * Valid values are `main` and `post`; provided by bootstrap rather than user input.
+   * Valid values are `prepare` and `finalize`; provided by bootstrap rather than user input.
    */
-  readonly phase: 'main' | 'post';
+  readonly phase: CoreExecutionPhase;
   /**
    * Normalized repository-relative base directory.
    *

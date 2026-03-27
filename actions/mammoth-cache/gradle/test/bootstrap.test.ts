@@ -37,7 +37,7 @@ import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from '../s
 import { createTestGitHubProvider, createTestRuntimeHost } from './support/github-test-runtime';
 
 const config = {
-  phase: 'main',
+  phase: 'prepare',
   baseDirectory: '.',
   cacheEnabled: true,
   readOnly: false,
@@ -189,7 +189,7 @@ describe('bootstrap helpers', () => {
   it('creates a status message with config and CI context details', () => {
     expect(
       createBootstrapStatus(
-        'main',
+        'prepare',
         config,
         ciContext,
         cacheModel,
@@ -198,7 +198,7 @@ describe('bootstrap helpers', () => {
         provisionedWrappers,
       ),
     ).toEqual({
-      phase: 'main',
+      phase: 'prepare',
       config,
       ciContext,
       cacheModel,
@@ -207,14 +207,14 @@ describe('bootstrap helpers', () => {
       provisionedWrappers,
       ciDiagnosticsLines: [],
       ciExecutionUrls: { jobUrl: null, workflowRunUrl: null },
-      message: 'Prepared main phase for push on main in standalone mode.',
+      message: 'Prepared prepare phase for push on main in standalone mode.',
     });
   });
 
   it('renders summary lines for the bootstrap status', () => {
     const summaryText = createBootstrapSummaryLines(
       createBootstrapStatus(
-        'main',
+        'prepare',
         config,
         ciContext,
         cacheModel,
@@ -240,7 +240,7 @@ describe('bootstrap helpers', () => {
   it('renders log lines for the bootstrap status', () => {
     const logText = createBootstrapLogLines(
       createBootstrapStatus(
-        'main',
+        'prepare',
         config,
         ciContext,
         cacheModel,
@@ -256,7 +256,7 @@ describe('bootstrap helpers', () => {
     ).join('\n');
 
     expect(logText).toContain(
-      'Bootstrap: Prepared main phase for push on main in standalone mode.',
+      'Bootstrap: Prepared prepare phase for push on main in standalone mode.',
     );
     expect(logText).toContain('Base cache restore: exact-hit.');
     expect(logText).toContain('Wrapper provisioning: 1 ready (1 downloaded, 0 reused).');
@@ -272,7 +272,7 @@ describe('bootstrap helpers', () => {
     );
   });
 
-  it('bootstraps the main phase without publishing a job summary directly', async () => {
+  it('bootstraps the prepare phase without publishing a job summary directly', async () => {
     const wrapperJarBytes = Buffer.from('verified wrapper jar');
     const wrapperJarSha256 = createHash('sha256').update(wrapperJarBytes).digest('hex');
     const summaryLines: string[] = [];
@@ -300,7 +300,7 @@ describe('bootstrap helpers', () => {
       },
     };
     await withWorkspaceWithWrapper(async (workspace) => {
-      const status = await bootstrapPhase('main', {
+      const status = await bootstrapPhase('prepare', {
         env: {
           GITHUB_EVENT_NAME: 'push',
           GITHUB_REF: 'refs/heads/main',
@@ -366,7 +366,7 @@ describe('bootstrap helpers', () => {
         },
       });
 
-      expect(status.message).toBe('Prepared main phase for push on main in standalone mode.');
+      expect(status.message).toBe('Prepared prepare phase for push on main in standalone mode.');
       expect(status.cacheModel?.cacheKey).toMatch(
         /^buildish-mammoth-gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/,
       );
@@ -388,7 +388,7 @@ describe('bootstrap helpers', () => {
     });
   });
 
-  it('bootstraps the post phase and saves the base cache when armed', async () => {
+  it('bootstraps the finalize phase and saves the base cache when armed', async () => {
     const summaryLines: string[] = [];
     let writeCalls = 0;
     const cacheBackend: BaseCacheBackend = {
@@ -414,7 +414,7 @@ describe('bootstrap helpers', () => {
     };
 
     await withWorkspace({}, async (workspace) => {
-      const status = await bootstrapPhase('post', {
+      const status = await bootstrapPhase('finalize', {
         env: {
           GITHUB_EVENT_NAME: 'push',
           GITHUB_REF: 'refs/heads/main',
@@ -500,7 +500,7 @@ describe('bootstrap helpers', () => {
         ].join('\n'),
       },
       async (workspace) => {
-        const status = await bootstrapPhase('post', {
+        const status = await bootstrapPhase('finalize', {
           env: {
             GITHUB_EVENT_NAME: 'push',
             GITHUB_REF: 'refs/heads/main',
@@ -572,7 +572,7 @@ describe('bootstrap helpers', () => {
       vi.stubEnv('GRADLE_USER_HOME', customGradleUserHome);
 
       try {
-        const status = await bootstrapPhase('post', {
+        const status = await bootstrapPhase('finalize', {
           captureCommandOutput: async (): Promise<string> =>
             'openjdk version "21.0.4" 2024-07-16\n',
           cacheBackend: {

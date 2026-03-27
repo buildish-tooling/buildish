@@ -317,12 +317,12 @@ describe('createGitHubPlatform', () => {
       githubJobCheckRunId: '987654321',
     });
 
-    expect(platform.createBootstrapDiagnosticsLines('main')).toEqual([
+    expect(platform.createBootstrapDiagnosticsLines('prepare')).toEqual([
       "GitHub input 'github-token' present: yes.",
       "GitHub environment 'GITHUB_TOKEN' available: yes.",
       "GitHub input 'github-job-check-run-id': 987654321.",
     ]);
-    expect(platform.createBootstrapDiagnosticsLines('post')).toEqual([]);
+    expect(platform.createBootstrapDiagnosticsLines('finalize')).toEqual([]);
     expect(platform.executionUrls).toEqual({
       jobUrl: 'https://github.com/apache/buildish/actions/runs/101/job/987654321',
       workflowRunUrl: 'https://github.com/apache/buildish/actions/runs/101/attempts/2',
