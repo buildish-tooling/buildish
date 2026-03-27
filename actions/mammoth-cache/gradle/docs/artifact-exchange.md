@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
+TODO!! THIS DOC NEEDS TO BE ADAPTED - @AUGMENT: IGNORE THIS ONE!!
+
 # Distributed artifact exchange for Mammoth Cache for Gradle
 
 Apache Buildish Mammoth Cache for Gradle uses a distributed artifact-exchange format for cache deltas produced by worker jobs and later consumed by an aggregator job.
