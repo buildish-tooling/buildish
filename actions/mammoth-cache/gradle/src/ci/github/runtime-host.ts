@@ -16,9 +16,9 @@
 
 import * as core from '@actions/core';
 
-import type { ActionRuntimeHost } from '../runtime-host';
+import type { CompositeRuntimeHost } from '../../runtime-host/types';
 
-export function createGitHubRuntimeHost(): ActionRuntimeHost {
+export function createGitHubRuntimeHost(): CompositeRuntimeHost {
   return {
     getInput(name, options) {
       return core.getInput(name, options);

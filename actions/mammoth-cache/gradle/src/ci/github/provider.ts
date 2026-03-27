@@ -53,8 +53,6 @@ export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPla
   };
 }
 
-export const createGitHubCiProvider = createGitHubPlatform;
-
 export interface GitHubContextOptions {
   readonly env?: NodeJS.ProcessEnv;
   readonly eventPayload?: Record<string, unknown>;

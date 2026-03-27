@@ -16,8 +16,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { runPrepareExecution } from '../src/entrypoints/cli/prepare';
-import { runMain, type MainEntrypointDependencies } from '../src/main';
+import {
+  runPrepareExecution,
+  type PrepareEntrypointDependencies,
+} from '../src/entrypoints/cli/prepare';
 
 const mainFlowMock = vi.hoisted(() => ({
   createMainActionOutputs: vi.fn(() => ({ 'cache-key': 'cache-key-value' })),
@@ -39,13 +41,9 @@ const jobSingleRunMock = vi.hoisted(() => ({
 vi.mock('../src/main-flow', () => mainFlowMock);
 vi.mock('../src/runtime/job-single-run', () => jobSingleRunMock);
 
-describe('main entrypoint', () => {
+describe('prepare entrypoint', () => {
   afterEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('remains a thin adapter over the shared prepare entrypoint', () => {
-    expect(runMain).toBe(runPrepareExecution);
   });
 
   it('persists single-run ownership state for the post action', async () => {
@@ -90,11 +88,11 @@ describe('main entrypoint', () => {
       ciProvider,
       reportSink,
       env: process.env,
-      cacheBackend: {} as MainEntrypointDependencies['cacheBackend'],
-      artifactBackend: {} as MainEntrypointDependencies['artifactBackend'],
-    } satisfies MainEntrypointDependencies;
+      cacheBackend: {} as PrepareEntrypointDependencies['cacheBackend'],
+      artifactBackend: {} as PrepareEntrypointDependencies['artifactBackend'],
+    } satisfies PrepareEntrypointDependencies;
 
-    await runMain(dependencies);
+    await runPrepareExecution(dependencies);
 
     expect(jobSingleRunMock.claimSingleRunPrepareExecution).toHaveBeenCalledWith({
       ciContext: ciProvider.context,

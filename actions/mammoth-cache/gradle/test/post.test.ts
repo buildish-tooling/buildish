@@ -16,8 +16,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { runFinalizeExecution } from '../src/entrypoints/cli/finalize';
-import { runPost, type PostEntrypointDependencies } from '../src/post';
+import {
+  runFinalizeExecution,
+  type FinalizeEntrypointDependencies,
+} from '../src/entrypoints/cli/finalize';
 
 const postFlowMock = vi.hoisted(() => ({
   executePostAction: vi.fn(async () => ({
@@ -38,13 +40,9 @@ const jobSingleRunMock = vi.hoisted(() => ({
 vi.mock('../src/post-flow', () => postFlowMock);
 vi.mock('../src/runtime/job-single-run', () => jobSingleRunMock);
 
-describe('post entrypoint', () => {
+describe('finalize entrypoint', () => {
   afterEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('remains a thin adapter over the shared finalize entrypoint', () => {
-    expect(runPost).toBe(runFinalizeExecution);
   });
 
   it('loads persisted action state when deciding and executing post work', async () => {
@@ -89,11 +87,11 @@ describe('post entrypoint', () => {
       ciProvider,
       reportSink,
       env: process.env,
-      cacheBackend: {} as PostEntrypointDependencies['cacheBackend'],
-      artifactBackend: {} as PostEntrypointDependencies['artifactBackend'],
-    } satisfies PostEntrypointDependencies;
+      cacheBackend: {} as FinalizeEntrypointDependencies['cacheBackend'],
+      artifactBackend: {} as FinalizeEntrypointDependencies['artifactBackend'],
+    } satisfies FinalizeEntrypointDependencies;
 
-    await runPost(dependencies);
+    await runFinalizeExecution(dependencies);
 
     expect(jobSingleRunMock.decideSingleRunFinalizeExecution).toHaveBeenCalledWith({
       getState: runtimeHost.getState,

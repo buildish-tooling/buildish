@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { runMain } from '../../main';
+import { runPrepareExecution } from '../../entrypoints/cli/prepare';
 
 import {
   createGitHubBaseCacheBackend,
@@ -34,7 +34,7 @@ const ciProvider = createGitHubPlatform({
 });
 const reportSink = createGitHubReportSink({ env: process.env });
 
-void runMain({
+void runPrepareExecution({
   runtimeHost,
   ciProvider,
   reportSink,

@@ -36,12 +36,8 @@ export const PRE_BUILD_CACHE_MANIFEST_PATH_STATE =
   'buildish-mammoth-cache-gradle-pre-build-manifest-path';
 export const CONSUMED_DELTA_ARTIFACT_NAMES_STATE =
   'buildish-mammoth-cache-gradle-consumed-delta-artifact-names';
-/**
- * Historical state key retained for wire compatibility between prepare/finalize phases.
- */
 export const DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE =
-  'buildish-mammoth-cache-gradle-delta-artifact-producer-identity';
-export const DELTA_ARTIFACT_PRODUCER_IDENTITY_STATE = DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE;
+  'buildish-mammoth-cache-gradle-delta-artifact-execution-identity';
 export const BASE_CACHE_RESTORE_RESULT_STATE =
   'buildish-mammoth-cache-gradle-base-cache-restore-result';
 const BASE_CACHE_RESTORE_STATUSES = [
@@ -57,8 +53,6 @@ export interface PersistedDeltaArtifactExecutionIdentity {
   readonly runId: number | null;
   readonly runAttempt: number | null;
 }
-
-export type PersistedDeltaArtifactProducerIdentity = PersistedDeltaArtifactExecutionIdentity;
 
 export interface PersistedPreBuildCacheManifestState {
   readonly manifestPath: string;
@@ -131,13 +125,6 @@ export function persistDeltaArtifactExecutionIdentity(
   saveState(DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE, `${JSON.stringify(identity)}\n`);
 }
 
-export function persistDeltaArtifactProducerIdentity(
-  ciContext: CiJobContext,
-  saveState: (name: string, value: string) => void,
-): void {
-  persistDeltaArtifactExecutionIdentity(ciContext, saveState);
-}
-
 export function persistBaseCacheRestoreResult(
   result: BaseCacheRestoreResult,
   saveState: (name: string, value: string) => void,
@@ -155,25 +142,19 @@ export function getPersistedDeltaArtifactExecutionIdentity(
 
   const parsedIdentity = parseSerializedJsonObject(
     serializedIdentity,
-    'delta artifact producer identity state',
+    'delta artifact execution identity state',
   );
   return {
     jobName: validateNonEmptyStateString(
       parsedIdentity.jobName,
-      'delta artifact producer identity jobName',
+      'delta artifact execution identity jobName',
     ),
-    runId: validateNullableInteger(parsedIdentity.runId, 'delta artifact producer identity runId'),
+    runId: validateNullableInteger(parsedIdentity.runId, 'delta artifact execution identity runId'),
     runAttempt: validateNullableInteger(
       parsedIdentity.runAttempt,
-      'delta artifact producer identity runAttempt',
+      'delta artifact execution identity runAttempt',
     ),
   };
-}
-
-export function getPersistedDeltaArtifactProducerIdentity(
-  getState: (name: string) => string,
-): PersistedDeltaArtifactProducerIdentity | null {
-  return getPersistedDeltaArtifactExecutionIdentity(getState);
 }
 
 export function getPersistedBaseCacheRestoreResult(

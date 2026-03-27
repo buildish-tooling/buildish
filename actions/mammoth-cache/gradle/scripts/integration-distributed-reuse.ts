@@ -21,11 +21,11 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type { WorkflowArtifactDescriptor } from '../src/artifacts/service';
-import type { ActionRuntimeHost } from '../src/ci';
 import { createGitHubPlatform, createGitHubReportSink } from '../src/ci/github';
 import { createMainActionOutputs, executeMainAction } from '../src/main-flow';
 import { executePostAction } from '../src/post-flow';
 import type { SummaryWriter } from '../src/reporting/types';
+import type { CompositeRuntimeHost } from '../src/runtime-host/types';
 import {
   STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
   type WorkflowArtifactBackend,
@@ -288,7 +288,7 @@ function createGitHubActionDependencies(
   summaryWriter: SummaryWriter,
 ) {
   const inputProvider = createInputProvider(inputs);
-  const runtimeHost: ActionRuntimeHost = {
+  const runtimeHost: CompositeRuntimeHost = {
     getInput(name): string {
       return inputProvider.getInput(name);
     },

@@ -164,7 +164,7 @@ That shared prep is done. A future GitLab port still needs a concrete host that 
 
 GitHub Actions happens to provide a two-phase JavaScript-action lifecycle.
 
-The shared code now expresses that as `prepare` / `finalize`, and the current GitHub entrypoints are thin adapters over it. GitLab still needs a deliberate mapping to job scripts, `after_script`, or two explicit commands.
+The shared code now expresses that as `prepare` / `finalize`, and the current GitHub entrypoints call those shared entrypoints directly. GitLab still needs a deliberate mapping to job scripts, `after_script`, or two explicit commands.
 
 ### C. A CLI-friendly core entrypoint exists now
 

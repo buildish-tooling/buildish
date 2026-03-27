@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { runPost } from '../../post';
+import { runFinalizeExecution } from '../../entrypoints/cli/finalize';
 
 import {
   createGitHubBaseCacheBackend,
@@ -34,7 +34,7 @@ const ciProvider = createGitHubPlatform({
 });
 const reportSink = createGitHubReportSink({ env: process.env });
 
-void runPost({
+void runFinalizeExecution({
   runtimeHost,
   ciProvider,
   reportSink,

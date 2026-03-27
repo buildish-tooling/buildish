@@ -57,7 +57,7 @@ Several important portability concerns still remain.
 
 The runtime-host boundary now exists, which is good.
 
-But `ActionRuntimeHost` still directly models `@actions/core`-style semantics such as:
+But the current composite runtime host still directly models `@actions/core`-style semantics such as:
 
 - action inputs
 - step outputs

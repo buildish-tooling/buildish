@@ -15,11 +15,3 @@
  */
 
 export type { CiExecutionUrls, CiJobContext, CiPlatformAdapter, HttpHeadersByHost } from './types';
-export type {
-  ActionRuntimeHost,
-  RuntimeFailureReporter,
-  RuntimeInputSource,
-  RuntimeOutputSink,
-  RuntimeReporter,
-  RuntimeStateStore,
-} from './runtime-host';

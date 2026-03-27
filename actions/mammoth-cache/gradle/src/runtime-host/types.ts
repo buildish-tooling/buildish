@@ -41,10 +41,8 @@ export interface RuntimeFailureReporter {
   setFailed(message: string): void;
 }
 
-/**
- * Backward-compatible composite host used by current provider runtime implementations.
- */
-export type ActionRuntimeHost = RuntimeInputSource &
+/** Composite runtime host used by provider runtime implementations that need all capabilities. */
+export type CompositeRuntimeHost = RuntimeInputSource &
   RuntimeStateStore &
   RuntimeOutputSink &
   RuntimeReporter &
