@@ -54,7 +54,7 @@ The immediate goal is not a large move. It is to make current modules depend on 
 
 ## Phase 1: split the runtime host into capabilities
 
-- Current file: `src/ci/runtime-host.ts`
+- Current module: `src/runtime-host/types.ts`
 - Problem: a single composite runtime host bundles inputs, state, outputs, logging, warnings, and failure reporting into one provider runtime object.
 - Planned change:
   - add `src/runtime-host/types.ts` with `RuntimeInputSource`, `RuntimeStateStore`, `RuntimeOutputSink`, `RuntimeReporter`, and `RuntimePaths`

@@ -33,6 +33,7 @@ Implemented today:
 - action bootstrap entrypoints
 - runtime input parsing and validation
 - GitHub CI context abstraction
+- provider-neutral shared runtime-host capabilities and `prepare` / `finalize` entrypoints
 - local build, lint, test, and CI workflows
 
 Not implemented yet:
@@ -44,6 +45,9 @@ Not implemented yet:
 
 The action metadata and configuration surface are ready, but the core Gradle execution and cache-management behavior are
 still being built.
+
+Shared portability prep for additional CI providers is complete at the internal architecture level, but this package
+currently implements only the GitHub Actions runtime, storage, and packaging layers.
 
 ## Usage in workflows
 
