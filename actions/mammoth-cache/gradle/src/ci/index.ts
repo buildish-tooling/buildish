@@ -14,13 +14,7 @@
  * limitations under the License.
  */
 
-export type {
-  CiExecutionUrls,
-  CiJobContext,
-  CiPlatformAdapter,
-  HttpHeadersByHost,
-  SummaryWriter,
-} from './types';
+export type { CiExecutionUrls, CiJobContext, CiPlatformAdapter, HttpHeadersByHost } from './types';
 export type {
   ActionRuntimeHost,
   RuntimeFailureReporter,

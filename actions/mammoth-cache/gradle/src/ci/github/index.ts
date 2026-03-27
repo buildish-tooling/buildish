@@ -24,3 +24,4 @@ export {
 export { createGitHubRuntimeHost } from './runtime-host';
 export { createGitHubBaseCacheBackend } from './cache';
 export { createGitHubWorkflowArtifactBackend } from './artifacts';
+export { createGitHubReportSink, type GitHubReportSinkOptions } from '../../reporting/github';

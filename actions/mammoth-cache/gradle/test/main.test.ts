@@ -74,6 +74,8 @@ describe('main entrypoint', () => {
       httpHeadersByHost: new Map(),
       executionUrls: { jobUrl: null, workflowRunUrl: null },
       createBootstrapDiagnosticsLines: vi.fn(() => []),
+    };
+    const reportSink = {
       publishLogGroup: vi.fn(),
       publishSummary: vi.fn(async () => undefined),
       replaceSummary: vi.fn(async () => undefined),
@@ -81,6 +83,7 @@ describe('main entrypoint', () => {
     const dependencies = {
       runtimeHost,
       ciProvider,
+      reportSink,
       env: process.env,
       cacheBackend: {} as MainEntrypointDependencies['cacheBackend'],
       artifactBackend: {} as MainEntrypointDependencies['artifactBackend'],

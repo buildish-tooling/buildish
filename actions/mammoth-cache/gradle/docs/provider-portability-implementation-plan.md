@@ -90,6 +90,10 @@ The immediate goal is not a large move. It is to make current modules depend on 
   - move summary/log publishing into `src/reporting/types.ts`
   - add a report sink interface for grouped logs plus optional summary publication/replacement
 - Migration targets: `src/ci/types.ts`, `src/logging/summary.ts`, `src/main-flow.ts`, `src/post-flow.ts`.
+- Current state:
+  - grouped logs and summary publication now flow through `src/reporting/types.ts`
+  - GitHub-specific summary/group handling lives in `src/reporting/github.ts`
+  - shared bootstrap/main/post flows take an explicit `reportSink` instead of depending on reporting methods on the CI adapter
 - Why: Codeberg may support native summaries; GitLab likely needs logs plus generated-file or artifact reports.
 
 ## Phase 5: widen cache/artifact contracts where still GitHub-shaped

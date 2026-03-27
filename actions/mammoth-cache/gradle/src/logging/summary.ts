@@ -14,34 +14,34 @@
  * limitations under the License.
  */
 
-import type { CiPlatformAdapter } from '../ci/types';
+import type { ReportSink } from '../reporting/types';
 
 /**
  * Appends a follow-up summary section using the active CI provider summary surface.
  */
 export async function appendJobSummary(
-  ciProvider: Pick<CiPlatformAdapter, 'publishSummary'>,
+  reportSink: Pick<ReportSink, 'publishSummary'>,
   lines: readonly string[],
 ): Promise<void> {
   if (lines.length === 0) {
     return;
   }
 
-  await ciProvider.publishSummary(lines);
+  await reportSink.publishSummary(lines);
 }
 
 /**
  * Replaces the current provider-managed job summary when supported, falling back to append mode.
  */
 export async function replaceJobSummary(
-  ciProvider: Pick<CiPlatformAdapter, 'replaceSummary'>,
+  reportSink: Pick<ReportSink, 'replaceSummary'>,
   lines: readonly string[],
 ): Promise<void> {
   if (lines.length === 0) {
     return;
   }
 
-  await ciProvider.replaceSummary(lines);
+  await reportSink.replaceSummary(lines);
 }
 
 /**
@@ -49,7 +49,7 @@ export async function replaceJobSummary(
  * provider summary surface.
  */
 export async function publishJobLogGroup(
-  ciProvider: Pick<CiPlatformAdapter, 'publishLogGroup'>,
+  reportSink: Pick<ReportSink, 'publishLogGroup'>,
   title: string,
   lines: readonly string[],
   writeLine: (message: string) => void,
@@ -58,7 +58,7 @@ export async function publishJobLogGroup(
     return;
   }
 
-  ciProvider.publishLogGroup(title, lines, writeLine);
+  reportSink.publishLogGroup(title, lines, writeLine);
 }
 
 export function createDetailsSection(

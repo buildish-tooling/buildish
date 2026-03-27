@@ -72,16 +72,6 @@ export interface CiJobContext {
 }
 
 /**
- * Minimal interface for job summary writers.
- */
-export interface SummaryWriter {
-  /** Appends raw text to the job summary buffer. */
-  addRaw(text: string, addEol?: boolean): SummaryWriter;
-  /** Flushes the accumulated summary content to the provider. */
-  write(): Promise<unknown>;
-}
-
-/**
  * Exact-host HTTP headers that are safe to apply to outbound requests.
  *
  * Keys are lower-case host names without ports. Callers must only apply these headers to matching
@@ -111,14 +101,4 @@ export interface CiPlatformAdapter {
   readonly executionUrls: CiExecutionUrls;
   /** Emits provider-specific diagnostic lines for the given action phase. */
   createBootstrapDiagnosticsLines(phase: CoreExecutionPhase): readonly string[];
-  /** Publishes the provided lines as a grouped log block using the provider-specific log surface. */
-  publishLogGroup(
-    title: string,
-    lines: readonly string[],
-    writeLine: (message: string) => void,
-  ): void;
-  /** Publishes the provided markdown lines to the provider summary surface. */
-  publishSummary(lines: readonly string[]): Promise<void>;
-  /** Replaces the current provider-managed summary content when supported. */
-  replaceSummary(lines: readonly string[]): Promise<void>;
 }

@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 
-import { createGitHubPlatform, type GitHubPlatformOptions } from '../../src/ci/github';
+import {
+  createGitHubPlatform,
+  createGitHubReportSink,
+  type GitHubPlatformOptions,
+  type GitHubReportSinkOptions,
+} from '../../src/ci/github';
 import type { ActionRuntimeHost } from '../../src/ci';
 
 export interface TestRuntimeHostOptions {
@@ -78,4 +83,11 @@ export function createTestGitHubProvider(
       options.githubJobCheckRunId ??
       runtimeHost.getInput('github-job-check-run-id', { trimWhitespace: true }),
   });
+}
+
+export function createTestGitHubReportSink(
+  _runtimeHost: ActionRuntimeHost,
+  options: GitHubReportSinkOptions = {},
+) {
+  return createGitHubReportSink(options);
 }

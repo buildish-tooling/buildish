@@ -19,6 +19,7 @@ import { runPost } from '../../post';
 import {
   createGitHubBaseCacheBackend,
   createGitHubPlatform,
+  createGitHubReportSink,
   createGitHubRuntimeHost,
   createGitHubWorkflowArtifactBackend,
 } from './index';
@@ -31,10 +32,12 @@ const ciProvider = createGitHubPlatform({
     trimWhitespace: true,
   }),
 });
+const reportSink = createGitHubReportSink({ env: process.env });
 
 void runPost({
   runtimeHost,
   ciProvider,
+  reportSink,
   env: process.env,
   cacheBackend: createGitHubBaseCacheBackend(),
   artifactBackend: createGitHubWorkflowArtifactBackend(),

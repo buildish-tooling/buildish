@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
-import { writeFile } from 'node:fs/promises';
-
-import * as core from '@actions/core';
-
 import type { CoreExecutionPhase } from '../../core/lifecycle';
-import type { CiJobContext, CiPlatformAdapter, HttpHeadersByHost, SummaryWriter } from '../types';
+import type { CiJobContext, CiPlatformAdapter, HttpHeadersByHost } from '../types';
 
 export interface GitHubPlatformOptions {
   readonly env?: NodeJS.ProcessEnv;
   readonly eventPayload?: Record<string, unknown>;
   readonly eventPayloadReader?: (eventPath: string) => string;
-  readonly summaryWriter?: SummaryWriter;
   readonly githubTokenInput?: string;
   readonly githubJobCheckRunId?: string;
 }
@@ -39,7 +34,6 @@ export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPla
   });
   const executionUrls = createGitHubExecutionUrls(context, env, options.githubJobCheckRunId);
   const httpHeadersByHost = createGitHubHttpHeadersByHost(env, options.githubTokenInput);
-  const summaryWriter = options.summaryWriter ?? core.summary;
 
   return {
     context,
@@ -55,31 +49,6 @@ export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPla
         `GitHub environment 'GITHUB_TOKEN' available: ${env.GITHUB_TOKEN && env.GITHUB_TOKEN.trim().length > 0 ? 'yes' : 'no'}.`,
         `GitHub input 'github-job-check-run-id': ${options.githubJobCheckRunId && options.githubJobCheckRunId.trim().length > 0 ? options.githubJobCheckRunId.trim() : 'unset'}.`,
       ];
-    },
-    publishLogGroup(
-      title: string,
-      lines: readonly string[],
-      writeLine: (message: string) => void,
-    ): void {
-      writeLine(`::group::${title}`);
-      for (const line of lines) {
-        writeLine(line);
-      }
-      writeLine('::endgroup::');
-    },
-    async publishSummary(lines: readonly string[]): Promise<void> {
-      for (const line of lines) {
-        summaryWriter.addRaw(line, true);
-      }
-      await summaryWriter.write();
-    },
-    async replaceSummary(lines: readonly string[]): Promise<void> {
-      if (env.GITHUB_STEP_SUMMARY && env.GITHUB_STEP_SUMMARY.trim().length > 0) {
-        await writeFile(env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`, 'utf8');
-        return;
-      }
-
-      await this.publishSummary(lines);
     },
   };
 }

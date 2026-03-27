@@ -20,10 +20,10 @@ import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/prom
 import path from 'node:path';
 
 import type { ActionRuntimeHost } from '../src/ci';
-import { createGitHubPlatform } from '../src/ci/github';
-import type { SummaryWriter } from '../src/ci/types';
+import { createGitHubPlatform, createGitHubReportSink } from '../src/ci/github';
 import { executeMainAction } from '../src/main-flow';
 import { createPostActionSummaryLines, executePostAction } from '../src/post-flow';
+import type { SummaryWriter } from '../src/reporting/types';
 import {
   STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
   type WorkflowArtifactBackend,
@@ -317,6 +317,9 @@ function createGitHubActionDependencies(
       eventPayload: {
         repository: { default_branch: 'main' },
       },
+    }),
+    reportSink: createGitHubReportSink({
+      env: runtime.env,
       summaryWriter,
     }),
   };

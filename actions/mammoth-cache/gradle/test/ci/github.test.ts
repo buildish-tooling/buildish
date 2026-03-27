@@ -21,7 +21,8 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createGitHubContext, createGitHubPlatform } from '../../src/ci/github';
-import type { SummaryWriter } from '../../src/ci/types';
+import { createGitHubReportSink } from '../../src/reporting/github';
+import type { SummaryWriter } from '../../src/reporting/types';
 
 describe('createGitHubContext', () => {
   it('resolves push refs from branch refs', () => {
@@ -186,66 +187,6 @@ describe('createGitHubContext', () => {
 });
 
 describe('createGitHubPlatform', () => {
-  it('publishes summaries through the configured writer', async () => {
-    const summaryLines: Array<{ text: string; addEol: boolean | undefined }> = [];
-    let writeCalls = 0;
-    const writer: SummaryWriter = {
-      addRaw(text: string, addEol?: boolean): SummaryWriter {
-        summaryLines.push({ text, addEol });
-        return this;
-      },
-      async write(): Promise<void> {
-        writeCalls += 1;
-      },
-    };
-
-    const platform = createGitHubPlatform({
-      env: {
-        GITHUB_EVENT_NAME: 'push',
-        GITHUB_REF: 'refs/heads/main',
-        GITHUB_REPOSITORY: 'apache/buildish',
-        GITHUB_WORKFLOW: 'CI',
-        GITHUB_JOB: 'check',
-        RUNNER_OS: 'Linux',
-        RUNNER_ARCH: 'X64',
-      },
-      eventPayload: {
-        repository: { default_branch: 'main' },
-      },
-      summaryWriter: writer,
-    });
-
-    await platform.publishSummary(['first line', 'second line']);
-
-    expect(summaryLines).toEqual([
-      { text: 'first line', addEol: true },
-      { text: 'second line', addEol: true },
-    ]);
-    expect(writeCalls).toBe(1);
-  });
-
-  it('publishes grouped log lines with GitHub group markers', () => {
-    const messages: string[] = [];
-    const platform = createGitHubPlatform({
-      env: {
-        GITHUB_EVENT_NAME: 'push',
-        GITHUB_REF: 'refs/heads/main',
-        GITHUB_REPOSITORY: 'apache/buildish',
-        GITHUB_WORKFLOW: 'CI',
-        GITHUB_JOB: 'check',
-      },
-      eventPayload: {
-        repository: { default_branch: 'main' },
-      },
-    });
-
-    platform.publishLogGroup('Post action', ['first line', 'second line'], (message) => {
-      messages.push(message);
-    });
-
-    expect(messages).toEqual(['::group::Post action', 'first line', 'second line', '::endgroup::']);
-  });
-
   it('exposes exact-host GitHub API headers when a token is configured', () => {
     const platform = createGitHubPlatform({
       env: {
@@ -328,6 +269,62 @@ describe('createGitHubPlatform', () => {
       workflowRunUrl: 'https://github.com/apache/buildish/actions/runs/101/attempts/2',
     });
   });
+});
+
+describe('createGitHubReportSink', () => {
+  it('publishes summaries through the configured writer', async () => {
+    const summaryLines: Array<{ text: string; addEol: boolean | undefined }> = [];
+    let writeCalls = 0;
+    const writer: SummaryWriter = {
+      addRaw(text: string, addEol?: boolean): SummaryWriter {
+        summaryLines.push({ text, addEol });
+        return this;
+      },
+      async write(): Promise<void> {
+        writeCalls += 1;
+      },
+    };
+
+    const reportSink = createGitHubReportSink({
+      env: {
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_REPOSITORY: 'apache/buildish',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+        RUNNER_OS: 'Linux',
+        RUNNER_ARCH: 'X64',
+      },
+      summaryWriter: writer,
+    });
+
+    await reportSink.publishSummary(['first line', 'second line']);
+
+    expect(summaryLines).toEqual([
+      { text: 'first line', addEol: true },
+      { text: 'second line', addEol: true },
+    ]);
+    expect(writeCalls).toBe(1);
+  });
+
+  it('publishes grouped log lines with GitHub group markers', () => {
+    const messages: string[] = [];
+    const reportSink = createGitHubReportSink({
+      env: {
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_REPOSITORY: 'apache/buildish',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+      },
+    });
+
+    reportSink.publishLogGroup('Post action', ['first line', 'second line'], (message) => {
+      messages.push(message);
+    });
+
+    expect(messages).toEqual(['::group::Post action', 'first line', 'second line', '::endgroup::']);
+  });
 
   it('replaces the current summary file when the runner exposes a step-summary path', async () => {
     const summaryDir = await mkdtemp(path.join(os.tmpdir(), 'github-platform-summary-'));
@@ -344,7 +341,7 @@ describe('createGitHubPlatform', () => {
       },
     };
 
-    const platform = createGitHubPlatform({
+    const reportSink = createGitHubReportSink({
       env: {
         GITHUB_EVENT_NAME: 'push',
         GITHUB_REF: 'refs/heads/main',
@@ -353,13 +350,10 @@ describe('createGitHubPlatform', () => {
         GITHUB_JOB: 'check',
         GITHUB_STEP_SUMMARY: summaryPath,
       },
-      eventPayload: {
-        repository: { default_branch: 'main' },
-      },
       summaryWriter: writer,
     });
 
-    await platform.replaceSummary(['summary line']);
+    await reportSink.replaceSummary(['summary line']);
 
     expect(await readFile(summaryPath, 'utf8')).toBe('summary line\n');
     expect(summaryLines).toEqual([]);

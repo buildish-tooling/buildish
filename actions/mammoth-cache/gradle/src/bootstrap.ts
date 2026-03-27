@@ -36,6 +36,7 @@ import {
   escapeSummaryText,
 } from './logging/summary';
 import type { CoreExecutionPhase } from './core/lifecycle';
+import type { ReportSink } from './reporting/types';
 import type { RuntimeInputSource, RuntimeReporter, RuntimeStateStore } from './runtime-host/types';
 import type { BaseCacheBackend } from './storage/cache';
 import { provisionWrapperJars, type WrapperProvisionOptions } from './wrapper/download';
@@ -91,6 +92,7 @@ export interface BootstrapStatus {
 
 export interface BootstrapExecution extends BootstrapStatus {
   readonly ciProvider: CiPlatformAdapter;
+  readonly reportSink: ReportSink;
 }
 
 export type BootstrapRuntimeHost = RuntimeInputSource & RuntimeStateStore & RuntimeReporter;
@@ -105,6 +107,8 @@ export interface BootstrapDependencies {
   readonly runtimeHost: BootstrapRuntimeHost;
   /** Provider adapter for the active CI environment. */
   readonly ciProvider: CiPlatformAdapter;
+  /** Provider-specific reporting sink used for grouped logs and summaries. */
+  readonly reportSink: ReportSink;
   /**
    * Optional `fetch` override used by wrapper download tests.
    *
@@ -183,6 +187,7 @@ export async function bootstrapPhase(
   return {
     ...status,
     ciProvider,
+    reportSink: dependencies.reportSink,
   };
 }
 

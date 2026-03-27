@@ -31,7 +31,7 @@ import {
   deserializeCacheManifest,
 } from '../src/cache/manifest';
 import { createCacheModel, type CacheModel } from '../src/cache/model';
-import type { CiJobContext, SummaryWriter } from '../src/ci/types';
+import type { CiJobContext } from '../src/ci/types';
 import type { NormalizedActionConfig } from '../src/config/types';
 import {
   createMainActionOutputs,
@@ -46,11 +46,16 @@ import {
   STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
   type BaseCacheBackend,
 } from '../src/storage/cache';
+import type { SummaryWriter } from '../src/reporting/types';
 import {
   CONSUMED_DELTA_ARTIFACT_NAMES_STATE,
   PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
 } from '../src/state/post-action';
-import { createTestGitHubProvider, createTestRuntimeHost } from './support/github-test-runtime';
+import {
+  createTestGitHubProvider,
+  createTestGitHubReportSink,
+  createTestRuntimeHost,
+} from './support/github-test-runtime';
 
 function createMainActionDependencies(options: {
   readonly env: NodeJS.ProcessEnv;
@@ -71,6 +76,9 @@ function createMainActionDependencies(options: {
     ciProvider: createTestGitHubProvider(runtimeHost, {
       env: options.env,
       eventPayload: options.eventPayload,
+    }),
+    reportSink: createTestGitHubReportSink(runtimeHost, {
+      env: options.env,
       summaryWriter: options.summaryWriter,
     }),
   };

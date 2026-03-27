@@ -22,10 +22,10 @@ import path from 'node:path';
 
 import type { WorkflowArtifactDescriptor } from '../src/artifacts/service';
 import type { ActionRuntimeHost } from '../src/ci';
-import { createGitHubPlatform } from '../src/ci/github';
-import type { SummaryWriter } from '../src/ci/types';
+import { createGitHubPlatform, createGitHubReportSink } from '../src/ci/github';
 import { createMainActionOutputs, executeMainAction } from '../src/main-flow';
 import { executePostAction } from '../src/post-flow';
+import type { SummaryWriter } from '../src/reporting/types';
 import {
   STANDARD_WORKFLOW_ARTIFACT_BACKEND_CAPABILITIES,
   type WorkflowArtifactBackend,
@@ -317,6 +317,9 @@ function createGitHubActionDependencies(
       eventPayload: {
         repository: { default_branch: 'main' },
       },
+    }),
+    reportSink: createGitHubReportSink({
+      env: job.env,
       summaryWriter,
     }),
   };

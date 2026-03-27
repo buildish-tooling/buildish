@@ -95,7 +95,7 @@ export async function executeMainAction(
     } satisfies MainActionStatus;
 
     await publishJobLogGroup(
-      bootstrap.ciProvider,
+      bootstrap.reportSink,
       'Apache Buildish prepare execution',
       createMainActionLogLines(status),
       logInfo,
@@ -131,7 +131,7 @@ export async function executeMainAction(
   } satisfies MainActionStatus;
 
   await publishJobLogGroup(
-    bootstrap.ciProvider,
+    bootstrap.reportSink,
     'Apache Buildish prepare execution',
     createMainActionLogLines(status),
     logInfo,

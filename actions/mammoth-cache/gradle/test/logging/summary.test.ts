@@ -20,8 +20,8 @@ import * as path from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createGitHubPlatform } from '../../src/ci/github';
-import type { SummaryWriter } from '../../src/ci/types';
+import { createGitHubReportSink } from '../../src/reporting/github';
+import type { SummaryWriter } from '../../src/reporting/types';
 import { appendJobSummary, publishJobLogGroup, replaceJobSummary } from '../../src/logging/summary';
 
 const temporaryDirectories: string[] = [];
@@ -38,7 +38,10 @@ describe('appendJobSummary', () => {
   it('publishes each summary line through the configured writer', async () => {
     const capture = createSummaryCapture();
 
-    await appendJobSummary(createGitHubProvider(capture.writer), ['first line', 'second line']);
+    await appendJobSummary(createGitHubReportSinkForTest(capture.writer), [
+      'first line',
+      'second line',
+    ]);
 
     expect(capture.lines).toEqual([
       { text: 'first line', addEol: true },
@@ -50,7 +53,7 @@ describe('appendJobSummary', () => {
   it('does nothing when no summary lines were provided', async () => {
     const capture = createSummaryCapture();
 
-    await appendJobSummary(createGitHubProvider(capture.writer), []);
+    await appendJobSummary(createGitHubReportSinkForTest(capture.writer), []);
 
     expect(capture.lines).toEqual([]);
     expect(capture.writeCalls).toBe(0);
@@ -62,7 +65,7 @@ describe('publishJobLogGroup', () => {
     const messages: string[] = [];
 
     await publishJobLogGroup(
-      createGitHubProvider(createSummaryCapture().writer),
+      createGitHubReportSinkForTest(createSummaryCapture().writer),
       'Main action',
       ['first line', 'second line'],
       (message) => messages.push(message),
@@ -80,7 +83,7 @@ describe('replaceJobSummary', () => {
     const summaryPath = path.join(directory, 'step-summary.md');
 
     await replaceJobSummary(
-      createGitHubProvider(capture.writer, { GITHUB_STEP_SUMMARY: summaryPath }),
+      createGitHubReportSinkForTest(capture.writer, { GITHUB_STEP_SUMMARY: summaryPath }),
       ['replaced line', 'second line'],
     );
 
@@ -92,7 +95,10 @@ describe('replaceJobSummary', () => {
   it('falls back to the configured writer when no summary file is available', async () => {
     const capture = createSummaryCapture();
 
-    await replaceJobSummary(createGitHubProvider(capture.writer), ['first line', 'second line']);
+    await replaceJobSummary(createGitHubReportSinkForTest(capture.writer), [
+      'first line',
+      'second line',
+    ]);
 
     expect(capture.lines).toEqual([
       { text: 'first line', addEol: true },
@@ -102,8 +108,11 @@ describe('replaceJobSummary', () => {
   });
 });
 
-function createGitHubProvider(summaryWriter: SummaryWriter, envOverrides: NodeJS.ProcessEnv = {}) {
-  return createGitHubPlatform({
+function createGitHubReportSinkForTest(
+  summaryWriter: SummaryWriter,
+  envOverrides: NodeJS.ProcessEnv = {},
+) {
+  return createGitHubReportSink({
     env: {
       GITHUB_EVENT_NAME: 'push',
       GITHUB_REF: 'refs/heads/main',
@@ -113,9 +122,6 @@ function createGitHubProvider(summaryWriter: SummaryWriter, envOverrides: NodeJS
       RUNNER_OS: 'Linux',
       RUNNER_ARCH: 'X64',
       ...envOverrides,
-    },
-    eventPayload: {
-      repository: { default_branch: 'main' },
     },
     summaryWriter,
   });

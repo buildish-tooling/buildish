@@ -135,7 +135,7 @@ export async function executePostAction(
       message: 'Finalize execution completed without cache orchestration.',
     } satisfies PostActionStatus;
     await publishPostActionLogGroup(dependencies, status, logInfo);
-    await replaceJobSummary(bootstrap.ciProvider, createPostActionSummaryLines(status));
+    await replaceJobSummary(bootstrap.reportSink, createPostActionSummaryLines(status));
     return status;
   }
 
@@ -166,7 +166,7 @@ export async function executePostAction(
       message: 'Finalize execution completed without a persisted pre-build cache manifest.',
     } satisfies PostActionStatus;
     await publishPostActionLogGroup(dependencies, status, logInfo);
-    await replaceJobSummary(bootstrap.ciProvider, createPostActionSummaryLines(status));
+    await replaceJobSummary(bootstrap.reportSink, createPostActionSummaryLines(status));
     return status;
   }
 
@@ -195,7 +195,7 @@ export async function executePostAction(
   } satisfies PostActionStatus;
 
   await publishPostActionLogGroup(dependencies, status, logInfo);
-  await replaceJobSummary(bootstrap.ciProvider, createPostActionSummaryLines(status));
+  await replaceJobSummary(bootstrap.reportSink, createPostActionSummaryLines(status));
 
   return status;
 }
@@ -422,7 +422,7 @@ async function publishPostActionLogGroup(
   logInfo: (message: string) => void,
 ): Promise<void> {
   await publishJobLogGroup(
-    status.bootstrap.ciProvider,
+    status.bootstrap.reportSink,
     'Apache Buildish Mammoth Cache for Gradle',
     createPostActionLogLines(status),
     logInfo,

@@ -28,13 +28,17 @@ import {
 } from '../src/bootstrap';
 import type { BaseCacheRestoreResult } from '../src/cache/service';
 import type { CacheModel } from '../src/cache/model';
-import type { SummaryWriter } from '../src/ci/types';
+import type { SummaryWriter } from '../src/reporting/types';
 import {
   STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
   type BaseCacheBackend,
 } from '../src/storage/cache';
 import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from '../src/wrapper/types';
-import { createTestGitHubProvider, createTestRuntimeHost } from './support/github-test-runtime';
+import {
+  createTestGitHubProvider,
+  createTestGitHubReportSink,
+  createTestRuntimeHost,
+} from './support/github-test-runtime';
 
 const config = {
   phase: 'prepare',
@@ -94,6 +98,9 @@ function createBootstrapDependencies(options: {
     ciProvider: createTestGitHubProvider(runtimeHost, {
       env: options.env,
       eventPayload: options.eventPayload,
+    }),
+    reportSink: createTestGitHubReportSink(runtimeHost, {
+      env: options.env,
       summaryWriter: options.summaryWriter,
     }),
   };

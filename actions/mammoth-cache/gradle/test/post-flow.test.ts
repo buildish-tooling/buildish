@@ -28,8 +28,8 @@ import {
 } from '../src/artifacts/service';
 import { captureCacheManifest, computeCacheDelta } from '../src/cache/manifest';
 import { createCachePartitions, type CacheModel } from '../src/cache/model';
-import type { SummaryWriter } from '../src/ci/types';
 import { createPostActionSummaryLines, executePostAction } from '../src/post-flow';
+import type { SummaryWriter } from '../src/reporting/types';
 import {
   CONSUMED_DELTA_ARTIFACT_NAMES_STATE,
   DELTA_ARTIFACT_EXECUTION_IDENTITY_STATE,
@@ -47,7 +47,11 @@ import {
   STANDARD_BASE_CACHE_BACKEND_CAPABILITIES,
   type BaseCacheBackend,
 } from '../src/storage/cache';
-import { createTestGitHubProvider, createTestRuntimeHost } from './support/github-test-runtime';
+import {
+  createTestGitHubProvider,
+  createTestGitHubReportSink,
+  createTestRuntimeHost,
+} from './support/github-test-runtime';
 
 function createPostActionDependencies(options: {
   readonly env: NodeJS.ProcessEnv;
@@ -70,6 +74,9 @@ function createPostActionDependencies(options: {
     ciProvider: createTestGitHubProvider(runtimeHost, {
       env: options.env,
       eventPayload: options.eventPayload,
+    }),
+    reportSink: createTestGitHubReportSink(runtimeHost, {
+      env: options.env,
       summaryWriter: options.summaryWriter,
     }),
   };
