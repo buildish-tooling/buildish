@@ -153,17 +153,17 @@ inputs:
   github-token:
     description: >-
       Optional GitHub token used only for authenticated wrapper JAR downloads
-      against the GitHub API to reduce throttling. Defaults to `${{ github.token
-      }}` when GitHub exposes it; otherwise the action falls back to
-      `GITHUB_TOKEN` from the runner environment if present. Never written to
-      summaries or persisted action state.
+      against the GitHub API to reduce throttling. Defaults to the workflow
+      `github.token` context when GitHub exposes it; otherwise the action falls
+      back to `GITHUB_TOKEN` from the runner environment if present. Never
+      written to summaries or persisted action state.
     required: false
     default: ${{ github.token }}
   internal-job-check-run-id:
     description: >-
       Internal-use workflow job identifier for direct summary/log links.
-      Defaults to `${{ job.check_run_id }}` when GitHub exposes it. End users
-      normally should not set this manually.
+      Defaults to the current job check-run identifier when GitHub exposes it.
+      End users normally should not set this manually.
     required: false
     default: ${{ job.check_run_id }}
 outputs:
@@ -199,3 +199,4 @@ runs:
   using: node24
   main: dist/github/main/index.cjs
   post: dist/github/post/index.cjs
+  post-if: '!cancelled()'
