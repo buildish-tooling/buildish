@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-export type {
-  CiExecutionUrls,
-  CiJobContext,
-  CiPlatformAdapter,
-  HttpHeadersByHost,
-  SummaryWriter,
-} from './types';
-export type { ActionRuntimeHost } from './runtime-host';
+import * as toolkitCache from '@actions/cache';
+
+import type { BaseCacheApi } from '../../cache/service';
+
+export function createGitHubBaseCacheApi(cacheApi: BaseCacheApi = toolkitCache): BaseCacheApi {
+  return cacheApi;
+}

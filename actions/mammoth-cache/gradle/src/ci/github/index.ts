@@ -14,11 +14,13 @@
  * limitations under the License.
  */
 
-export type {
-  CiExecutionUrls,
-  CiJobContext,
-  CiPlatformAdapter,
-  HttpHeadersByHost,
-  SummaryWriter,
-} from './types';
-export type { ActionRuntimeHost } from './runtime-host';
+export {
+  createGitHubCiProvider,
+  createGitHubContext,
+  createGitHubPlatform,
+  type GitHubContextOptions,
+  type GitHubPlatformOptions,
+} from './provider';
+export { createGitHubRuntimeHost } from './runtime-host';
+export { createGitHubBaseCacheApi } from './cache';
+export { createGitHubWorkflowArtifactApi } from './artifacts';

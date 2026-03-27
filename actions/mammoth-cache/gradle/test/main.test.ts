@@ -16,13 +16,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const coreMock = vi.hoisted(() => ({
-  info: vi.fn(),
-  saveState: vi.fn(),
-  setFailed: vi.fn(),
-  setOutput: vi.fn(),
-  warning: vi.fn(),
-}));
+import { runMain, type MainEntrypointDependencies } from '../src/main';
 
 const mainFlowMock = vi.hoisted(() => ({
   createMainActionOutputs: vi.fn(() => ({ 'cache-key': 'cache-key-value' })),
@@ -41,21 +35,64 @@ const jobSingleRunMock = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('@actions/core', () => coreMock);
 vi.mock('../src/main-flow', () => mainFlowMock);
 vi.mock('../src/runtime/job-single-run', () => jobSingleRunMock);
 
 describe('main entrypoint', () => {
   afterEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
   });
 
   it('persists single-run ownership state for the post action', async () => {
-    await import('../src/main');
+    const runtimeHost = {
+      getInput: vi.fn(() => ''),
+      getState: vi.fn(() => ''),
+      saveState: vi.fn(),
+      setOutput: vi.fn(),
+      info: vi.fn(),
+      warning: vi.fn(),
+      setFailed: vi.fn(),
+    };
+    const ciProvider = {
+      context: {
+        eventName: 'push',
+        resolvedRefName: 'main',
+        safeRefName: 'main',
+        runnerOs: 'linux',
+        runnerArch: 'x64',
+        defaultBranch: 'main',
+        isPullRequest: false,
+        repository: 'apache/buildish',
+        workflowName: 'CI',
+        jobName: 'test',
+        runId: 123,
+        runAttempt: 1,
+        tempDirectory: '/tmp',
+        workspace: '/workspace',
+        actionPath: null,
+      },
+      httpHeadersByHost: new Map(),
+      executionUrls: { jobUrl: null, workflowRunUrl: null },
+      createBootstrapDiagnosticsLines: vi.fn(() => []),
+      publishLogGroup: vi.fn(),
+      publishSummary: vi.fn(async () => undefined),
+      replaceSummary: vi.fn(async () => undefined),
+    };
+    const dependencies = {
+      runtimeHost,
+      ciProvider,
+      env: process.env,
+      cacheApi: {} as MainEntrypointDependencies['cacheApi'],
+      artifactApi: {} as MainEntrypointDependencies['artifactApi'],
+    } satisfies MainEntrypointDependencies;
+
+    await runMain(dependencies);
 
     expect(jobSingleRunMock.claimSingleRunJobInvocation).toHaveBeenCalledWith({
-      saveState: coreMock.saveState,
+      ciContext: ciProvider.context,
+      saveState: runtimeHost.saveState,
     });
+    expect(mainFlowMock.executeMainAction).toHaveBeenCalledWith(dependencies);
+    expect(runtimeHost.setOutput).toHaveBeenCalledWith('cache-key', 'cache-key-value');
   });
 });

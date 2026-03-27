@@ -360,7 +360,6 @@ function createFixtureCacheModel(gradleUserHome: string): CacheModel {
 
 function createFixtureCiContext(): CiJobContext {
   return {
-    platform: 'github',
     eventName: 'push',
     resolvedRefName: 'main',
     safeRefName: 'main',

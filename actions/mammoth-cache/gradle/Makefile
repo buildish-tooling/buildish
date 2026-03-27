@@ -18,7 +18,7 @@
 NPM ?= npm
 NODE_MODULES_STAMP := node_modules/.buildish-mammoth-cache-gradle-installed
 BUILD_STAMP := dist/.buildish-mammoth-cache-gradle-built
-BUILD_INPUTS := action.yml package.json tsconfig.json $(shell find src -type f 2>/dev/null)
+BUILD_INPUTS := package.json tsconfig.json $(shell find src action-descriptors -type f 2>/dev/null)
 INTEGRATION_FIXTURE_INPUTS := $(shell find test/fixtures/integration -type f 2>/dev/null)
 INTEGRATION_BUILD_REPORTING_BUNDLE := build/integration-build-reporting.cjs
 INTEGRATION_DISTRIBUTED_REUSE_BUNDLE := build/integration-distributed-reuse.cjs

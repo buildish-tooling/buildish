@@ -22,6 +22,8 @@ import path from 'node:path';
 
 import type { WorkflowArtifactApi, WorkflowArtifactDescriptor } from '../src/artifacts/service';
 import type { BaseCacheApi } from '../src/cache/service';
+import type { ActionRuntimeHost } from '../src/ci';
+import { createGitHubPlatform } from '../src/ci/github';
 import type { SummaryWriter } from '../src/ci/types';
 import { createMainActionOutputs, executeMainAction } from '../src/main-flow';
 import { executePostAction } from '../src/post-flow';
@@ -247,13 +249,7 @@ async function executeActionMain(
     env: job.env,
     artifactApi,
     cacheApi: UNAVAILABLE_CACHE_API,
-    inputProvider: createInputProvider(inputs),
-    logInfo: (message) => console.log(`[${job.jobName}] ${message}`),
-    saveState: (name, value) => {
-      job.state.set(name, value);
-    },
-    getState: (name) => job.state.get(name) ?? '',
-    summaryWriter: createSummaryWriter(job.jobName),
+    ...createGitHubActionDependencies(job, inputs, createSummaryWriter(job.jobName)),
   });
 }
 
@@ -266,13 +262,7 @@ async function executeActionPost(
     env: job.env,
     artifactApi,
     cacheApi: UNAVAILABLE_CACHE_API,
-    inputProvider: createInputProvider(inputs),
-    logInfo: (message) => console.log(`[${job.jobName}] ${message}`),
-    saveState: (name, value) => {
-      job.state.set(name, value);
-    },
-    getState: (name) => job.state.get(name) ?? '',
-    summaryWriter: createSummaryWriter(`${job.jobName} post`),
+    ...createGitHubActionDependencies(job, inputs, createSummaryWriter(`${job.jobName} post`)),
   });
 }
 
@@ -281,6 +271,46 @@ function createInputProvider(values: Record<string, string>): { getInput(name: s
     getInput(name: string): string {
       return values[name] ?? '';
     },
+  };
+}
+
+function createGitHubActionDependencies(
+  job: LocalJobRuntime,
+  inputs: Record<string, string>,
+  summaryWriter: SummaryWriter,
+) {
+  const inputProvider = createInputProvider(inputs);
+  const runtimeHost: ActionRuntimeHost = {
+    getInput(name): string {
+      return inputProvider.getInput(name);
+    },
+    getState(name): string {
+      return job.state.get(name) ?? '';
+    },
+    saveState(name, value): void {
+      job.state.set(name, value);
+    },
+    setOutput(): void {},
+    info(message): void {
+      console.log(`[${job.jobName}] ${message}`);
+    },
+    warning(message): void {
+      console.warn(`[${job.jobName}] ${message}`);
+    },
+    setFailed(message): void {
+      throw new Error(message);
+    },
+  };
+
+  return {
+    runtimeHost,
+    ciProvider: createGitHubPlatform({
+      env: job.env,
+      eventPayload: {
+        repository: { default_branch: 'main' },
+      },
+      summaryWriter,
+    }),
   };
 }
 

@@ -16,12 +16,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const coreMock = vi.hoisted(() => ({
-  getState: vi.fn(() => 'persisted-state'),
-  info: vi.fn(),
-  setFailed: vi.fn(),
-  warning: vi.fn(),
-}));
+import { runPost, type PostEntrypointDependencies } from '../src/post';
 
 const postFlowMock = vi.hoisted(() => ({
   executePostAction: vi.fn(async () => ({
@@ -39,24 +34,63 @@ const jobSingleRunMock = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('@actions/core', () => coreMock);
 vi.mock('../src/post-flow', () => postFlowMock);
 vi.mock('../src/runtime/job-single-run', () => jobSingleRunMock);
 
 describe('post entrypoint', () => {
   afterEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
   });
 
   it('loads persisted action state when deciding and executing post work', async () => {
-    await import('../src/post');
+    const runtimeHost = {
+      getInput: vi.fn(() => ''),
+      getState: vi.fn(() => 'persisted-state'),
+      saveState: vi.fn(),
+      setOutput: vi.fn(),
+      info: vi.fn(),
+      warning: vi.fn(),
+      setFailed: vi.fn(),
+    };
+    const ciProvider = {
+      context: {
+        eventName: 'push',
+        resolvedRefName: 'main',
+        safeRefName: 'main',
+        runnerOs: 'linux',
+        runnerArch: 'x64',
+        defaultBranch: 'main',
+        isPullRequest: false,
+        repository: 'apache/buildish',
+        workflowName: 'CI',
+        jobName: 'test',
+        runId: 123,
+        runAttempt: 1,
+        tempDirectory: '/tmp',
+        workspace: '/workspace',
+        actionPath: null,
+      },
+      httpHeadersByHost: new Map(),
+      executionUrls: { jobUrl: null, workflowRunUrl: null },
+      createBootstrapDiagnosticsLines: vi.fn(() => []),
+      publishLogGroup: vi.fn(),
+      publishSummary: vi.fn(async () => undefined),
+      replaceSummary: vi.fn(async () => undefined),
+    };
+    const dependencies = {
+      runtimeHost,
+      ciProvider,
+      env: process.env,
+      cacheApi: {} as PostEntrypointDependencies['cacheApi'],
+      artifactApi: {} as PostEntrypointDependencies['artifactApi'],
+    } satisfies PostEntrypointDependencies;
+
+    await runPost(dependencies);
 
     expect(jobSingleRunMock.decideSingleRunPostExecution).toHaveBeenCalledWith({
-      getState: coreMock.getState,
+      getState: runtimeHost.getState,
     });
-    expect(postFlowMock.executePostAction).toHaveBeenCalledWith({
-      getState: coreMock.getState,
-    });
+    expect(postFlowMock.executePostAction).toHaveBeenCalledWith(dependencies);
+    expect(runtimeHost.info).toHaveBeenCalledWith('Post action flow completed.');
   });
 });

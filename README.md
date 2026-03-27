@@ -30,6 +30,17 @@ Use it in GitHub workflows as:
 ## Repository layout
 
 - `actions/mammoth-cache/gradle/` — Mammoth Cache for Gradle, the first action in the Mammoth Cache family
+- `tools/buildish-no-gradle-wrapper-jar/` — Buildish no-gradle-wrapper-jar helper tool
+
+> [!ALERT] This repository is a work-in-progress and is not yet ready for use.
+> 
+> We should use multiple GitHub repositories for the different actions and likely (most) plugins.
+> Especially GitHub/Codeberg/GitLab CI "actions" heavily rely on Git tags. Having different release
+> cadences for "all the actions" and "all the plugins" seems natural, but "telling" users of plugin "A"
+> that a new version exists just because GitHub action "B" did a release seems wrong. The only way to
+> avoid that seems to be to have separate repositories for each action/plugin.
+> 
+> This has a big impact on how we design/build the infrastructure for the web site, documentation, etc.
 
 ## License
 

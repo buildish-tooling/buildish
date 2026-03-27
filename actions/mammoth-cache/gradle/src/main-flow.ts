@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-import * as core from '@actions/core';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
-  createWorkflowArtifactApi,
   downloadAndVerifyDeltaArtifactPackage,
   findDeltaArtifactByProducerJob,
   type DownloadedDeltaArtifactPackage,
@@ -28,8 +26,8 @@ import {
 import {
   bootstrapPhase,
   createBootstrapLogLines,
+  type BootstrapExecution,
   type BootstrapDependencies,
-  type BootstrapStatus,
 } from './bootstrap';
 import {
   applyMergedDeltaPlan,
@@ -56,7 +54,7 @@ export interface MainDependentDeltaResult extends DeltaApplyResult {
 }
 
 export interface MainActionStatus {
-  readonly bootstrap: BootstrapStatus;
+  readonly bootstrap: BootstrapExecution;
   readonly restoreCleanupResult: RestoreCleanupResult | null;
   readonly dependentDeltaResult: MainDependentDeltaResult | null;
   readonly preBuildManifestState: PersistedPreBuildCacheManifestState | null;
@@ -71,13 +69,13 @@ export interface RestoreCleanupResult {
 }
 
 export interface MainActionDependencies extends BootstrapDependencies {
-  readonly artifactApi?: WorkflowArtifactApi;
+  readonly artifactApi: WorkflowArtifactApi;
 }
 
 export async function executeMainAction(
-  dependencies: MainActionDependencies = {},
+  dependencies: MainActionDependencies,
 ): Promise<MainActionStatus> {
-  const logInfo = dependencies.logInfo ?? core.info;
+  const logInfo = dependencies.runtimeHost.info;
   const bootstrap = await bootstrapPhase('main', dependencies);
   await installGradleBuildResultCapture(bootstrap.config.gradleUserHome, bootstrap.ciContext).catch(
     (error: unknown) => {
@@ -97,7 +95,7 @@ export async function executeMainAction(
     } satisfies MainActionStatus;
 
     await publishJobLogGroup(
-      dependencies,
+      bootstrap.ciProvider,
       'Apache Buildish main action',
       createMainActionLogLines(status),
       logInfo,
@@ -110,23 +108,17 @@ export async function executeMainAction(
   if (dependentDeltaResult) {
     persistConsumedDeltaArtifactNames(
       dependentDeltaResult.downloadedArtifactNames,
-      dependencies.saveState ?? core.saveState,
+      dependencies.runtimeHost.saveState,
     );
   }
   if (bootstrap.baseCacheResult?.operation === 'restore') {
-    persistBaseCacheRestoreResult(
-      bootstrap.baseCacheResult,
-      dependencies.saveState ?? core.saveState,
-    );
+    persistBaseCacheRestoreResult(bootstrap.baseCacheResult, dependencies.runtimeHost.saveState);
   }
-  persistDeltaArtifactProducerIdentity(
-    bootstrap.ciContext,
-    dependencies.saveState ?? core.saveState,
-  );
+  persistDeltaArtifactProducerIdentity(bootstrap.ciContext, dependencies.runtimeHost.saveState);
   const manifest = await captureCacheManifest(bootstrap.cacheModel);
   const preBuildManifestState = await persistPreBuildCacheManifest(
     manifest,
-    dependencies.saveState ?? core.saveState,
+    dependencies.runtimeHost.saveState,
     { env: dependencies.env, tempDirectory: bootstrap.ciContext.tempDirectory },
   );
 
@@ -139,7 +131,7 @@ export async function executeMainAction(
   } satisfies MainActionStatus;
 
   await publishJobLogGroup(
-    dependencies,
+    bootstrap.ciProvider,
     'Apache Buildish main action',
     createMainActionLogLines(status),
     logInfo,
@@ -149,7 +141,7 @@ export async function executeMainAction(
 }
 
 async function applyDependentJobDeltas(
-  bootstrap: BootstrapStatus,
+  bootstrap: BootstrapExecution,
   dependencies: MainActionDependencies,
 ): Promise<MainDependentDeltaResult | null> {
   const requestedJobs = bootstrap.config.dependentJobs;
@@ -157,7 +149,7 @@ async function applyDependentJobDeltas(
     return null;
   }
 
-  const artifactApi = dependencies.artifactApi ?? createWorkflowArtifactApi();
+  const { artifactApi } = dependencies;
   const downloadedPackages = await Promise.all(
     requestedJobs.map(async (jobName) => {
       const artifact = await findDeltaArtifactByProducerJob(
@@ -184,7 +176,7 @@ async function applyDependentJobDeltas(
 
 function assertCompatibleDependentDeltaArtifacts(
   downloadedPackages: readonly DownloadedDeltaArtifactPackage[],
-  bootstrap: BootstrapStatus,
+  bootstrap: BootstrapExecution,
 ): void {
   const currentCacheKey = bootstrap.cacheModel?.cacheKey;
   const currentRunner = `${bootstrap.ciContext.runnerOs}/${bootstrap.ciContext.runnerArch}`;
@@ -210,7 +202,7 @@ function assertCompatibleDependentDeltaArtifacts(
 }
 
 async function maybePruneManagedFilesAfterRestore(
-  bootstrap: BootstrapStatus,
+  bootstrap: BootstrapExecution,
   dependencies: MainActionDependencies,
 ): Promise<RestoreCleanupResult | null> {
   if (bootstrap.config.restoreCleanupMode === 'none' || !bootstrap.cacheModel) {

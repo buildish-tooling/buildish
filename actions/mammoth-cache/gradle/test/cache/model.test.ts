@@ -47,7 +47,6 @@ const baseConfig: NormalizedActionConfig = {
 };
 
 const baseCiContext: CiJobContext = {
-  platform: 'github',
   eventName: 'push',
   resolvedRefName: 'feature/cache model',
   safeRefName: 'feature-cache-model',

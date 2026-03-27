@@ -14,35 +14,37 @@
  * limitations under the License.
  */
 
-import * as core from '@actions/core';
-
-import { createMainActionOutputs, executeMainAction } from './main-flow';
+import {
+  createMainActionOutputs,
+  executeMainAction,
+  type MainActionDependencies,
+} from './main-flow';
 import { claimSingleRunJobInvocation } from './runtime/job-single-run';
 
-export async function runMain(): Promise<void> {
+export type MainEntrypointDependencies = MainActionDependencies;
+
+export async function runMain(dependencies: MainEntrypointDependencies): Promise<void> {
+  const { ciProvider, runtimeHost } = dependencies;
   const singleRunClaim = await claimSingleRunJobInvocation({
-    saveState: core.saveState,
+    ciContext: ciProvider.context,
+    saveState: runtimeHost.saveState,
   });
   if (!singleRunClaim.accepted) {
     throw new Error(singleRunClaim.message);
   }
 
-  const status = await executeMainAction();
+  const status = await executeMainAction(dependencies);
   for (const [name, value] of Object.entries(createMainActionOutputs(status))) {
-    core.setOutput(name, value);
+    runtimeHost.setOutput(name, value);
   }
   if (status.bootstrap.baseCacheResult) {
-    core.info(status.bootstrap.baseCacheResult.message);
+    runtimeHost.info(status.bootstrap.baseCacheResult.message);
   }
   if (status.dependentDeltaResult) {
-    core.info(status.dependentDeltaResult.message);
+    runtimeHost.info(status.dependentDeltaResult.message);
     for (const warning of status.dependentDeltaResult.warnings) {
-      core.warning(warning);
+      runtimeHost.warning(warning);
     }
   }
-  core.info(status.message);
+  runtimeHost.info(status.message);
 }
-
-void runMain().catch((error: unknown) => {
-  core.setFailed(error instanceof Error ? error.message : String(error));
-});

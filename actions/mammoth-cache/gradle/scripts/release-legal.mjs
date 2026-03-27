@@ -47,7 +47,7 @@ const rootLicensePath = path.join(repoRoot, 'LICENSE');
 const rootNoticePath = path.join(repoRoot, 'NOTICE');
 const packageLockPath = path.join(projectRoot, 'package-lock.json');
 
-const ENTRY_POINTS = ['src/main.ts', 'src/post.ts'];
+const ENTRY_POINTS = ['src/ci/github/main.ts', 'src/ci/github/post.ts'];
 const SECTION_SEPARATOR =
   '--------------------------------------------------------------------------------';
 const LICENSE_FILE_PATTERN = /^(license|licence|copying)([._-].*)?$/i;

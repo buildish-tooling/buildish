@@ -40,6 +40,33 @@ import {
   persistDeltaArtifactProducerIdentity,
   persistConsumedDeltaArtifactNames,
 } from '../src/state/post-action';
+import { createTestGitHubProvider, createTestRuntimeHost } from './support/github-test-runtime';
+
+function createPostActionDependencies(options: {
+  readonly env: NodeJS.ProcessEnv;
+  readonly eventPayload?: Record<string, unknown>;
+  readonly summaryWriter: SummaryWriter;
+  readonly inputProvider: { getInput(name: string): string };
+  readonly getState?: (name: string) => string;
+  readonly info?: (message: string) => void;
+}) {
+  const runtimeHost = createTestRuntimeHost({
+    getInput(name: string): string {
+      return options.inputProvider.getInput(name);
+    },
+    getState: options.getState,
+    info: options.info,
+  });
+
+  return {
+    runtimeHost,
+    ciProvider: createTestGitHubProvider(runtimeHost, {
+      env: options.env,
+      eventPayload: options.eventPayload,
+      summaryWriter: options.summaryWriter,
+    }),
+  };
+}
 
 describe('executePostAction', () => {
   it('uploads a delta artifact for distributed-worker jobs when cache contents changed', async () => {
@@ -66,17 +93,20 @@ describe('executePostAction', () => {
         cacheApi: createCacheApi({ saveCache: async () => 0 }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
-        eventPayload: {
-          repository: { default_branch: 'main' },
-        },
-        getState(name: string): string {
-          if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
-            return 'true';
-          }
-          return savedState.get(name) ?? '';
-        },
-        inputProvider: createInputProvider('distributed-worker'),
-        summaryWriter: summary.writer,
+        ...createPostActionDependencies({
+          env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          getState(name: string): string {
+            if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
+              return 'true';
+            }
+            return savedState.get(name) ?? '';
+          },
+          inputProvider: createInputProvider('distributed-worker'),
+          summaryWriter: summary.writer,
+        }),
       });
 
       expect(status.bootstrap.baseCacheResult).toEqual(
@@ -104,7 +134,7 @@ describe('executePostAction', () => {
       expect(summary.lines).toEqual([]);
       const summaryText = createPostActionSummaryLines(status).join('\n');
       expect(summaryText).toContain('## Apache Buildish Mammoth Cache for Gradle');
-      expect(summaryText).toContain('### Gradle builds');
+      expect(summaryText).toContain('Gradle builds');
       expect(summaryText).not.toContain('<summary>Cache details</summary>');
       expect(summaryText).not.toContain('Delta artifact');
       expect(summary.writeCalls).toBe(0);
@@ -146,17 +176,20 @@ describe('executePostAction', () => {
         cacheApi: createCacheApi({ saveCache: async () => 0 }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: createTestEnv(workspace, gradleUserHome, 'post-phase-job-name'),
-        eventPayload: {
-          repository: { default_branch: 'main' },
-        },
-        getState(name: string): string {
-          if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
-            return 'true';
-          }
-          return savedState.get(name) ?? '';
-        },
-        inputProvider: createInputProvider('distributed-worker'),
-        summaryWriter: summary.writer,
+        ...createPostActionDependencies({
+          env: createTestEnv(workspace, gradleUserHome, 'post-phase-job-name'),
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          getState(name: string): string {
+            if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
+              return 'true';
+            }
+            return savedState.get(name) ?? '';
+          },
+          inputProvider: createInputProvider('distributed-worker'),
+          summaryWriter: summary.writer,
+        }),
       });
 
       expect(status.deltaArtifactResult).toEqual(
@@ -223,20 +256,23 @@ describe('executePostAction', () => {
         cacheApi: createCacheApi({ saveCache: async () => 0 }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
-        eventPayload: {
-          repository: { default_branch: 'main' },
-        },
-        getState(name: string): string {
-          if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
-            return 'true';
-          }
-          return savedState.get(name) ?? '';
-        },
-        inputProvider: createInputProvider('distributed-worker', '987654321'),
-        logInfo(message: string): void {
-          infoMessages.push(message);
-        },
-        summaryWriter: createSummaryCapture().writer,
+        ...createPostActionDependencies({
+          env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          getState(name: string): string {
+            if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
+              return 'true';
+            }
+            return savedState.get(name) ?? '';
+          },
+          inputProvider: createInputProvider('distributed-worker', '987654321'),
+          info(message: string): void {
+            infoMessages.push(message);
+          },
+          summaryWriter: createSummaryCapture().writer,
+        }),
       });
 
       const publishedSummary = await readFile(path.join(workspace, 'step-summary.md'), 'utf8');
@@ -273,14 +309,19 @@ describe('executePostAction', () => {
     await withWorkspace(async (workspace) => {
       const gradleUserHome = path.join(workspace, '.gradle');
       const status = await executePostAction({
+        artifactApi: new FakeArtifactApi(path.join(workspace, 'artifact-store')),
+        cacheApi: createCacheApi({ saveCache: async () => 0 }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
-        inputProvider: createInputProvider('distributed-worker'),
-        summaryWriter: createSummaryCapture().writer,
+        ...createPostActionDependencies({
+          env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
+          inputProvider: createInputProvider('distributed-worker'),
+          summaryWriter: createSummaryCapture().writer,
+        }),
       });
 
       const summaryContent = createPostActionSummaryLines(status).join('\n');
-      expect(summaryContent).toContain('### Gradle builds');
+      expect(summaryContent).toContain('Gradle builds');
       expect(summaryContent).not.toContain('Workflow run:');
     });
   });
@@ -315,17 +356,20 @@ describe('executePostAction', () => {
         }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: createTestEnv(workspace, gradleUserHome, 'build'),
-        eventPayload: {
-          repository: { default_branch: 'main' },
-        },
-        getState(name: string): string {
-          if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
-            return 'true';
-          }
-          return savedState.get(name) ?? '';
-        },
-        inputProvider: createInputProvider('standalone'),
-        summaryWriter: summary.writer,
+        ...createPostActionDependencies({
+          env: createTestEnv(workspace, gradleUserHome, 'build'),
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          getState(name: string): string {
+            if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
+              return 'true';
+            }
+            return savedState.get(name) ?? '';
+          },
+          inputProvider: createInputProvider('standalone'),
+          summaryWriter: summary.writer,
+        }),
       });
 
       expect(saveCalls).toBe(1);
@@ -341,7 +385,7 @@ describe('executePostAction', () => {
       );
       const summaryText = createPostActionSummaryLines(status).join('\n');
       expect(summaryText).toContain('## Apache Buildish Mammoth Cache for Gradle');
-      expect(summaryText).toContain('### Gradle builds');
+      expect(summaryText).toContain('Gradle builds');
       expect(summaryText).not.toContain('Delta artifact');
       expect(summaryText).not.toContain('Post-build cache delta');
       expect(summary.writeCalls).toBe(0);
@@ -382,17 +426,20 @@ describe('executePostAction', () => {
         }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: createTestEnv(workspace, gradleUserHome, 'aggregate'),
-        eventPayload: {
-          repository: { default_branch: 'main' },
-        },
-        getState(name: string): string {
-          if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
-            return 'true';
-          }
-          return savedState.get(name) ?? '';
-        },
-        inputProvider: createInputProvider('distributed-aggregator'),
-        summaryWriter: summary.writer,
+        ...createPostActionDependencies({
+          env: createTestEnv(workspace, gradleUserHome, 'aggregate'),
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          getState(name: string): string {
+            if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
+              return 'true';
+            }
+            return savedState.get(name) ?? '';
+          },
+          inputProvider: createInputProvider('distributed-aggregator'),
+          summaryWriter: summary.writer,
+        }),
       });
 
       expect(saveCalls).toBe(1);
@@ -443,17 +490,20 @@ describe('executePostAction', () => {
         cacheApi: createCacheApi({ saveCache: async () => 0 }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
-        eventPayload: {
-          repository: { default_branch: 'main' },
-        },
-        getState(name: string): string {
-          if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
-            return 'true';
-          }
-          return savedState.get(name) ?? '';
-        },
-        inputProvider: createInputProvider('distributed-worker'),
-        summaryWriter: summary.writer,
+        ...createPostActionDependencies({
+          env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          getState(name: string): string {
+            if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
+              return 'true';
+            }
+            return savedState.get(name) ?? '';
+          },
+          inputProvider: createInputProvider('distributed-worker'),
+          summaryWriter: summary.writer,
+        }),
       });
 
       expect(status.deltaArtifactResult).toEqual(
@@ -500,7 +550,6 @@ function createTestEnv(
 
 function createTestCiContext(workspace: string) {
   return {
-    platform: 'github' as const,
     eventName: 'push',
     resolvedRefName: 'main',
     safeRefName: 'main',
@@ -521,15 +570,15 @@ function createTestCiContext(workspace: string) {
 
 function createInputProvider(
   jobMode: string,
-  internalJobCheckRunId = '',
+  githubJobCheckRunId = '',
 ): { getInput(name: string): string } {
   return {
     getInput(name: string): string {
       if (name === 'job-mode') {
         return jobMode;
       }
-      if (name === 'internal-job-check-run-id') {
-        return internalJobCheckRunId;
+      if (name === 'github-job-check-run-id') {
+        return githubJobCheckRunId;
       }
       return '';
     },
@@ -775,7 +824,6 @@ async function stageWorkerArtifactForCleanup(
   const deltaManifest = computeCacheDelta(previousManifest, currentManifest);
   const stagedPackage = await stageDeltaArtifactPackage(
     {
-      platform: 'github',
       eventName: 'push',
       resolvedRefName: 'main',
       safeRefName: 'main',

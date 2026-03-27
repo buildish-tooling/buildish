@@ -14,35 +14,34 @@
  * limitations under the License.
  */
 
-import { createCiPlatform, type CiPlatformOptions } from '../ci';
+import type { CiPlatformAdapter } from '../ci/types';
 
 /**
  * Appends a follow-up summary section using the active CI provider summary surface.
  */
 export async function appendJobSummary(
-  options: Pick<CiPlatformOptions, 'env' | 'eventPayload' | 'eventPayloadReader' | 'summaryWriter'>,
+  ciProvider: Pick<CiPlatformAdapter, 'publishSummary'>,
   lines: readonly string[],
 ): Promise<void> {
   if (lines.length === 0) {
     return;
   }
 
-  const platform = createCiPlatform(options);
-  await platform.publishSummary(lines);
+  await ciProvider.publishSummary(lines);
 }
 
 /**
  * Replaces the current provider-managed job summary when supported, falling back to append mode.
  */
 export async function replaceJobSummary(
-  options: Pick<CiPlatformOptions, 'env' | 'eventPayload' | 'eventPayloadReader' | 'summaryWriter'>,
+  ciProvider: Pick<CiPlatformAdapter, 'replaceSummary'>,
   lines: readonly string[],
 ): Promise<void> {
   if (lines.length === 0) {
     return;
   }
 
-  await createCiPlatform(options).replaceSummary(lines);
+  await ciProvider.replaceSummary(lines);
 }
 
 /**
@@ -50,7 +49,7 @@ export async function replaceJobSummary(
  * provider summary surface.
  */
 export async function publishJobLogGroup(
-  options: Pick<CiPlatformOptions, 'env' | 'eventPayload' | 'eventPayloadReader' | 'summaryWriter'>,
+  ciProvider: Pick<CiPlatformAdapter, 'publishLogGroup'>,
   title: string,
   lines: readonly string[],
   writeLine: (message: string) => void,
@@ -59,7 +58,7 @@ export async function publishJobLogGroup(
     return;
   }
 
-  createCiPlatform(options).publishLogGroup(title, lines, writeLine);
+  ciProvider.publishLogGroup(title, lines, writeLine);
 }
 
 export function createDetailsSection(

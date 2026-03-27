@@ -30,6 +30,7 @@ import type { BaseCacheApi, BaseCacheRestoreResult } from '../src/cache/service'
 import type { CacheModel } from '../src/cache/model';
 import type { SummaryWriter } from '../src/ci/types';
 import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from '../src/wrapper/types';
+import { createTestGitHubProvider, createTestRuntimeHost } from './support/github-test-runtime';
 
 const config = {
   phase: 'main',
@@ -53,7 +54,6 @@ const config = {
 } as const;
 
 const ciContext = {
-  platform: 'github',
   eventName: 'push',
   resolvedRefName: 'main',
   safeRefName: 'main',
@@ -70,6 +70,30 @@ const ciContext = {
   workspace: '/workspace',
   actionPath: '/workspace',
 } as const;
+
+function createBootstrapDependencies(options: {
+  readonly env?: NodeJS.ProcessEnv;
+  readonly eventPayload?: Record<string, unknown>;
+  readonly summaryWriter: SummaryWriter;
+  readonly inputs?: Readonly<Record<string, string>>;
+  readonly getState?: (name: string) => string;
+  readonly saveState?: (name: string, value: string) => void;
+}) {
+  const runtimeHost = createTestRuntimeHost({
+    inputs: options.inputs,
+    getState: options.getState,
+    saveState: options.saveState,
+  });
+
+  return {
+    runtimeHost,
+    ciProvider: createTestGitHubProvider(runtimeHost, {
+      env: options.env,
+      eventPayload: options.eventPayload,
+      summaryWriter: options.summaryWriter,
+    }),
+  };
+}
 
 const validatedWrappers: readonly ValidatedWrapperPropertiesFile[] = [
   {
@@ -221,7 +245,7 @@ describe('bootstrap helpers', () => {
         [
           "GitHub input 'github-token' present: yes.",
           "GitHub environment 'GITHUB_TOKEN' available: yes.",
-          "GitHub input 'internal-job-check-run-id': 987654321.",
+          "GitHub input 'github-job-check-run-id': 987654321.",
         ],
       ),
     ).join('\n');
@@ -234,7 +258,7 @@ describe('bootstrap helpers', () => {
     expect(logText).toContain("Execution context: workflow 'CI', job 'check', event 'push'");
     expect(logText).toContain("GitHub input 'github-token' present: yes.");
     expect(logText).toContain("GitHub environment 'GITHUB_TOKEN' available: yes.");
-    expect(logText).toContain("GitHub input 'internal-job-check-run-id': 987654321.");
+    expect(logText).toContain("GitHub input 'github-job-check-run-id': 987654321.");
     expect(logText).toContain(
       'Cache key: gradle-cache-2-21-linux-x64-feedcafe1234abcd-main; Java major: 21; cache partitions: 1.',
     );
@@ -281,9 +305,6 @@ describe('bootstrap helpers', () => {
           RUNNER_OS: 'Linux',
           RUNNER_ARCH: 'X64',
         },
-        eventPayload: {
-          repository: { default_branch: 'main' },
-        },
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         cacheApi,
         fetchImpl: async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -311,15 +332,28 @@ describe('bootstrap helpers', () => {
 
           throw new Error(`Unexpected fetch URL: ${url}`);
         },
-        inputProvider: {
-          getInput(name: string): string {
-            return name === 'github-token' ? 'ghs_bootstrap_token' : '';
+        ...createBootstrapDependencies({
+          env: {
+            GITHUB_EVENT_NAME: 'push',
+            GITHUB_REF: 'refs/heads/main',
+            GITHUB_REPOSITORY: 'apache/buildish',
+            GITHUB_WORKFLOW: 'CI',
+            GITHUB_JOB: 'check',
+            GITHUB_WORKSPACE: workspace,
+            RUNNER_OS: 'Linux',
+            RUNNER_ARCH: 'X64',
           },
-        },
-        saveState(name: string, value: string): void {
-          savedState.set(name, value);
-        },
-        summaryWriter,
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          inputs: {
+            'github-token': 'ghs_bootstrap_token',
+          },
+          saveState(name: string, value: string): void {
+            savedState.set(name, value);
+          },
+          summaryWriter,
+        }),
         verifyWrapperSignature: async (jarBytes: Uint8Array, armoredSignature: string) => {
           expect(Buffer.from(jarBytes)).toEqual(wrapperJarBytes);
           expect(armoredSignature).toBe(TEST_SIGNATURE_ARMORED);
@@ -336,7 +370,7 @@ describe('bootstrap helpers', () => {
       expect(status.ciDiagnosticsLines).toEqual([
         "GitHub input 'github-token' present: yes.",
         "GitHub environment 'GITHUB_TOKEN' available: no.",
-        "GitHub input 'internal-job-check-run-id': absent.",
+        "GitHub input 'github-job-check-run-id': unset.",
       ]);
       expect(status.ciExecutionUrls).toEqual({ jobUrl: null, workflowRunUrl: null });
       expect(summaryLines).toEqual([]);
@@ -384,20 +418,27 @@ describe('bootstrap helpers', () => {
           RUNNER_OS: 'Linux',
           RUNNER_ARCH: 'X64',
         },
-        eventPayload: {
-          repository: { default_branch: 'main' },
-        },
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         cacheApi,
-        getState(name: string): string {
-          return name === 'buildish-mammoth-cache-gradle-base-cache-armed' ? 'true' : '';
-        },
-        inputProvider: {
-          getInput(): string {
-            return '';
+        ...createBootstrapDependencies({
+          env: {
+            GITHUB_EVENT_NAME: 'push',
+            GITHUB_REF: 'refs/heads/main',
+            GITHUB_REPOSITORY: 'apache/buildish',
+            GITHUB_WORKFLOW: 'CI',
+            GITHUB_JOB: 'check',
+            GITHUB_WORKSPACE: workspace,
+            RUNNER_OS: 'Linux',
+            RUNNER_ARCH: 'X64',
           },
-        },
-        summaryWriter,
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          getState(name: string): string {
+            return name === 'buildish-mammoth-cache-gradle-base-cache-armed' ? 'true' : '';
+          },
+          summaryWriter,
+        }),
       });
 
       expect(status.baseCacheResult).toEqual(
@@ -460,26 +501,29 @@ describe('bootstrap helpers', () => {
             RUNNER_OS: 'Linux',
             RUNNER_ARCH: 'X64',
           },
-          eventPayload: {
-            repository: { default_branch: 'main' },
-          },
           captureCommandOutput: async (): Promise<string> =>
             'openjdk version "21.0.4" 2024-07-16\n',
           cacheApi,
-          inputProvider: {
-            getInput(name: string): string {
-              if (name === 'config-file') {
-                return '.github/buildish-mammoth-cache.yml';
-              }
-
-              if (name === 'read-only') {
-                return 'false';
-              }
-
-              return '';
+          ...createBootstrapDependencies({
+            env: {
+              GITHUB_EVENT_NAME: 'push',
+              GITHUB_REF: 'refs/heads/main',
+              GITHUB_REPOSITORY: 'apache/buildish',
+              GITHUB_WORKFLOW: 'CI',
+              GITHUB_JOB: 'check',
+              GITHUB_WORKSPACE: workspace,
+              RUNNER_OS: 'Linux',
+              RUNNER_ARCH: 'X64',
             },
-          },
-          summaryWriter,
+            eventPayload: {
+              repository: { default_branch: 'main' },
+            },
+            inputs: {
+              'config-file': '.github/buildish-mammoth-cache.yml',
+              'read-only': 'false',
+            },
+            summaryWriter,
+          }),
         });
 
         expect(status.config).toMatchObject({
@@ -519,9 +563,6 @@ describe('bootstrap helpers', () => {
 
       try {
         const status = await bootstrapPhase('post', {
-          eventPayload: {
-            repository: { default_branch: 'main' },
-          },
           captureCommandOutput: async (): Promise<string> =>
             'openjdk version "21.0.4" 2024-07-16\n',
           cacheApi: {
@@ -535,12 +576,16 @@ describe('bootstrap helpers', () => {
               throw new Error('saveCache should not be called when caching is disabled');
             },
           },
-          inputProvider: {
-            getInput(name: string): string {
-              return name === 'cache-enabled' ? 'false' : '';
+          ...createBootstrapDependencies({
+            env: process.env,
+            eventPayload: {
+              repository: { default_branch: 'main' },
             },
-          },
-          summaryWriter,
+            inputs: {
+              'cache-enabled': 'false',
+            },
+            summaryWriter,
+          }),
         });
 
         expect(status.config.gradleUserHome).toBe(customGradleUserHome);

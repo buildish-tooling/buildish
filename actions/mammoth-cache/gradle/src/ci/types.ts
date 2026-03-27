@@ -20,8 +20,6 @@
  * The goal is to isolate provider-specific environment parsing in a single adapter layer.
  */
 export interface CiJobContext {
-  /** CI provider identifier. Currently only `github` is supported. */
-  readonly platform: 'github';
   /** Raw event name from the CI provider, such as `push` or `pull_request`. */
   readonly eventName: string;
   /**

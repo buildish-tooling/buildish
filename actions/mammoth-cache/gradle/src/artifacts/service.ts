@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import artifactClient, { type ArtifactClient } from '@actions/artifact';
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { lstat, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -114,7 +113,6 @@ export interface WorkflowArtifactApi {
  * Producer metadata embedded in a delta artifact package.
  */
 export interface DeltaArtifactProducerMetadata {
-  readonly platform: CiJobContext['platform'];
   readonly repository: string;
   readonly workflowName: string;
   readonly jobName: string;
@@ -217,66 +215,6 @@ export interface DownloadDeltaArtifactPackageOptions extends ArtifactFindOptions
 }
 
 /**
- * Creates the default workflow artifact adapter used by the exchange layer.
- */
-export function createWorkflowArtifactApi(
-  client: ArtifactClient = artifactClient,
-): WorkflowArtifactApi {
-  return {
-    async uploadArtifact(name, files, rootDirectory, options) {
-      const response = await client.uploadArtifact(name, [...files], rootDirectory, options);
-
-      if (!response.id || typeof response.size !== 'number') {
-        throw new Error(
-          `Artifact upload for '${name}' did not return a valid artifact identifier.`,
-        );
-      }
-
-      return {
-        id: response.id,
-        name,
-        size: response.size,
-        digest: response.digest ?? null,
-      };
-    },
-    async listArtifacts(options) {
-      const response = await client.listArtifacts({
-        latest: options?.latest,
-        findBy: options?.findBy,
-      });
-
-      return response.artifacts.map(toArtifactDescriptor);
-    },
-    async getArtifact(name, options) {
-      const response = await client.getArtifact(
-        name,
-        options?.findBy ? { findBy: options.findBy } : undefined,
-      );
-      return toArtifactDescriptor(response.artifact);
-    },
-    async downloadArtifact(artifactId, options) {
-      const response = await client.downloadArtifact(artifactId, {
-        path: options?.path,
-        expectedHash: options?.expectedHash,
-        findBy: options?.findBy,
-      });
-
-      if (!response.downloadPath) {
-        throw new Error(`Artifact download for id '${artifactId}' did not return a download path.`);
-      }
-
-      return {
-        downloadPath: response.downloadPath,
-        digestMismatch: response.digestMismatch ?? false,
-      };
-    },
-    async deleteArtifact(name, options) {
-      await client.deleteArtifact(name, options?.findBy ? { findBy: options.findBy } : undefined);
-    },
-  };
-}
-
-/**
  * Creates the deterministic artifact-name prefix used to locate one worker delta by job identity.
  */
 export function createDeltaArtifactNamePrefix(
@@ -351,7 +289,6 @@ export async function stageDeltaArtifactPackage(
     artifactName,
     createdAt: new Date().toISOString(),
     producer: {
-      platform: ciContext.platform,
       repository: ciContext.repository,
       workflowName: ciContext.workflowName,
       jobName: ciContext.jobName,
@@ -868,20 +805,6 @@ function resolveArtifactPackagePath(rootDirectory: string, relativePath: string)
   return resolvedPath;
 }
 
-function toArtifactDescriptor(artifact: {
-  readonly id: number;
-  readonly name: string;
-  readonly size: number;
-  readonly digest?: string;
-}): WorkflowArtifactDescriptor {
-  return {
-    id: artifact.id,
-    name: artifact.name,
-    size: artifact.size,
-    digest: artifact.digest ?? null,
-  };
-}
-
 function validatePackageSchemaVersion(
   value: unknown,
 ): typeof DELTA_ARTIFACT_PACKAGE_SCHEMA_VERSION {
@@ -906,7 +829,6 @@ function validateProducerMetadata(value: unknown): DeltaArtifactProducerMetadata
   const producer = validateRecord(value, 'delta artifact metadata producer');
 
   return {
-    platform: validatePlatform(producer.platform),
     repository: validateString(producer.repository, 'delta artifact metadata producer.repository'),
     workflowName: validateString(
       producer.workflowName,
@@ -1029,14 +951,6 @@ async function hashFileSha256(filePath: string): Promise<string> {
 
 function sha256Hex(value: string): string {
   return createHash('sha256').update(value).digest('hex');
-}
-
-function validatePlatform(value: unknown): CiJobContext['platform'] {
-  if (value !== 'github') {
-    throw new Error(`Delta artifact producer platform must be 'github'.`);
-  }
-
-  return 'github';
 }
 
 function validateNullableInteger(value: unknown, label: string): number | null {

@@ -28,7 +28,6 @@ import {
 import type { CiJobContext } from '../../src/ci/types';
 
 const baseCiContext: CiJobContext = {
-  platform: 'github',
   eventName: 'push',
   resolvedRefName: 'main',
   safeRefName: 'main',
@@ -66,18 +65,7 @@ describe('readActionInputs', () => {
       cacheEnabled: 'false',
       jobMode: 'distributed-worker',
       githubToken: '',
-      internalJobCheckRunId: '',
     });
-  });
-
-  it('reads the internal workflow job identifier input when provided', () => {
-    const inputProvider: InputProvider = {
-      getInput(name: string): string {
-        return name === 'internal-job-check-run-id' ? '987654321' : '';
-      },
-    };
-
-    expect(readActionInputs(inputProvider).internalJobCheckRunId).toBe('987654321');
   });
 });
 
@@ -190,12 +178,10 @@ describe('resolveActionInputsFromConfigFile', () => {
     );
   });
 
-  it('rejects internal-job-check-run-id in config files', async () => {
+  it('rejects github-job-check-run-id in config files', async () => {
     await withWorkspace(
       {
-        '.github/buildish-mammoth-cache.yml': ['internal-job-check-run-id: 987654321', ''].join(
-          '\n',
-        ),
+        '.github/buildish-mammoth-cache.yml': ['github-job-check-run-id: 987654321', ''].join('\n'),
       },
       async (workspace) => {
         await expect(
@@ -207,7 +193,7 @@ describe('resolveActionInputsFromConfigFile', () => {
             ),
             { workspace },
           ),
-        ).rejects.toThrow(/must not contain internal-job-check-run-id/u);
+        ).rejects.toThrow(/contains unsupported key 'github-job-check-run-id'/u);
       },
     );
   });

@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-import * as core from '@actions/core';
-
-import { createCiPlatform, type CiPlatformOptions } from './ci';
+import type { ActionRuntimeHost } from './ci';
 import {
   armBaseCachePostAction,
   isBaseCachePostActionArmed,
@@ -25,13 +23,12 @@ import {
   type BaseCacheApi,
   type BaseCacheOperationResult,
 } from './cache/service';
-import type { CiExecutionUrls, CiJobContext } from './ci/types';
+import type { CiExecutionUrls, CiJobContext, CiPlatformAdapter } from './ci/types';
 import { createCacheModel, type CacheModel, type CommandOutputCapture } from './cache/model';
 import {
   normalizeActionConfig,
   readActionInputs,
   resolveActionInputsFromConfigFile,
-  type InputProvider,
 } from './config/action-config';
 import type { NormalizedActionConfig } from './config/types';
 import {
@@ -94,16 +91,20 @@ export interface BootstrapStatus {
   readonly ciExecutionUrls: CiExecutionUrls;
 }
 
+export interface BootstrapExecution extends BootstrapStatus {
+  readonly ciProvider: CiPlatformAdapter;
+}
+
 /**
  * Injectable dependencies for bootstrap-time environment/input discovery.
  */
-export interface BootstrapDependencies extends CiPlatformOptions {
-  /**
-   * Optional action-input provider override.
-   *
-   * Defaults to the GitHub Actions input API when omitted.
-   */
-  readonly inputProvider?: InputProvider;
+export interface BootstrapDependencies {
+  /** Optional environment map used by config resolution and persistence helpers. */
+  readonly env?: NodeJS.ProcessEnv;
+  /** Runtime host implementation used for inputs, logs, outputs, and state. */
+  readonly runtimeHost: ActionRuntimeHost;
+  /** Provider adapter for the active CI environment. */
+  readonly ciProvider: CiPlatformAdapter;
   /**
    * Optional `fetch` override used by wrapper download tests.
    *
@@ -116,36 +117,14 @@ export interface BootstrapDependencies extends CiPlatformOptions {
    * Defaults to the internal child-process implementation when omitted.
    */
   readonly captureCommandOutput?: CommandOutputCapture;
-  /**
-   * Optional cache-service override.
-   *
-   * Defaults to the `@actions/cache` toolkit module when omitted.
-   */
-  readonly cacheApi?: BaseCacheApi;
-  /**
-   * Optional informational logger override.
-   *
-   * Defaults to `@actions/core.info` when omitted.
-   */
-  readonly logInfo?: (message: string) => void;
+  /** Cache-service implementation for the active CI provider. */
+  readonly cacheApi: BaseCacheApi;
   /**
    * Optional detached-signature verifier override used by focused wrapper tests.
    *
    * Defaults to the pinned Gradle signing-key verifier when omitted.
    */
   readonly verifyWrapperSignature?: WrapperProvisionOptions['verifyWrapperSignature'];
-  /**
-   * Optional post-action state writer override.
-   *
-   * Defaults to `@actions/core.saveState` when omitted.
-   */
-  readonly saveState?: (name: string, value: string) => void;
-  /**
-   * Optional post-action state reader override.
-   *
-   * Defaults to `@actions/core.getState` when omitted.
-   */
-  readonly getState?: (name: string) => string;
 }
 
 /**
@@ -156,16 +135,11 @@ export interface BootstrapDependencies extends CiPlatformOptions {
  */
 export async function bootstrapPhase(
   phase: BootstrapPhase,
-  dependencies: BootstrapDependencies = {},
-): Promise<BootstrapStatus> {
+  dependencies: BootstrapDependencies,
+): Promise<BootstrapExecution> {
   const runtimeEnv = dependencies.env ?? process.env;
-  const directInputs = readActionInputs(dependencies.inputProvider);
-  const platform = createCiPlatform({
-    ...dependencies,
-    githubToken: dependencies.githubToken ?? directInputs.githubToken,
-    githubTokenInput: directInputs.githubToken,
-    internalJobCheckRunId: directInputs.internalJobCheckRunId,
-  });
+  const directInputs = readActionInputs(dependencies.runtimeHost);
+  const platform = dependencies.ciProvider;
   const rawInputs = await resolveActionInputsFromConfigFile(directInputs, {
     workspace: platform.context.workspace,
   });
@@ -189,7 +163,7 @@ export async function bootstrapPhase(
       ? await provisionWrapperJars(validatedWrappers, {
           fetchImpl: dependencies.fetchImpl,
           httpHeadersByHost: platform.httpHeadersByHost,
-          logRetry: dependencies.logInfo ?? core.info,
+          logRetry: dependencies.runtimeHost.info,
           verifyWrapperSignature: dependencies.verifyWrapperSignature,
         })
       : [];
@@ -206,7 +180,10 @@ export async function bootstrapPhase(
     platform.executionUrls,
   );
 
-  return status;
+  return {
+    ...status,
+    ciProvider: platform,
+  };
 }
 
 /**
@@ -370,14 +347,14 @@ async function runBaseCachePhase(
       cacheApi: dependencies.cacheApi,
     });
 
-    armBaseCachePostAction(dependencies.saveState ?? core.saveState);
+    armBaseCachePostAction(dependencies.runtimeHost.saveState);
     return restoreResult;
   }
 
   return await saveBaseCache(
     config,
     cacheModel,
-    isBaseCachePostActionArmed(dependencies.getState ?? core.getState),
+    isBaseCachePostActionArmed(dependencies.runtimeHost.getState),
     {
       cacheApi: dependencies.cacheApi,
     },

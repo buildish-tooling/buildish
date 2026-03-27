@@ -14,11 +14,16 @@
  * limitations under the License.
  */
 
-export type {
-  CiExecutionUrls,
-  CiJobContext,
-  CiPlatformAdapter,
-  HttpHeadersByHost,
-  SummaryWriter,
-} from './types';
-export type { ActionRuntimeHost } from './runtime-host';
+import type { InputProvider } from '../config/action-config';
+
+/**
+ * Runtime host surface used by provider-agnostic orchestration code.
+ */
+export interface ActionRuntimeHost extends InputProvider {
+  getState(name: string): string;
+  saveState(name: string, value: string): void;
+  setOutput(name: string, value: unknown): void;
+  info(message: string): void;
+  warning(message: string): void;
+  setFailed(message: string): void;
+}

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-import * as toolkitCache from '@actions/cache';
-
 import type { NormalizedActionConfig } from '../config/types';
 
 import { DEFAULT_CACHE_KEY_TEMPLATE, type CacheModel } from './model';
@@ -67,7 +65,7 @@ export interface BaseCacheApi {
  */
 export interface BaseCacheServiceDependencies {
   /** Cache implementation override used by tests and local smoke flows. */
-  readonly cacheApi?: BaseCacheApi;
+  readonly cacheApi: BaseCacheApi;
 }
 
 /**
@@ -193,9 +191,9 @@ export function createBaseCacheRestoreKeys(
 export async function restoreBaseCache(
   config: NormalizedActionConfig,
   cacheModel: CacheModel,
-  dependencies: BaseCacheServiceDependencies = {},
+  dependencies: BaseCacheServiceDependencies,
 ): Promise<BaseCacheRestoreResult> {
-  const cacheApi = dependencies.cacheApi ?? toolkitCache;
+  const { cacheApi } = dependencies;
   const paths = createBaseCachePaths(cacheModel);
   const restoreKeys = createBaseCacheRestoreKeys(config, cacheModel);
 
@@ -258,7 +256,7 @@ export async function saveBaseCache(
   config: NormalizedActionConfig,
   cacheModel: CacheModel,
   postActionArmed: boolean,
-  dependencies: BaseCacheServiceDependencies = {},
+  dependencies: BaseCacheServiceDependencies,
 ): Promise<BaseCacheSaveResult> {
   const paths = createBaseCachePaths(cacheModel);
 
@@ -289,7 +287,7 @@ export async function saveBaseCache(
     );
   }
 
-  const cacheApi = dependencies.cacheApi ?? toolkitCache;
+  const { cacheApi } = dependencies;
   if (!cacheApi.isFeatureAvailable()) {
     return createSaveResult(
       'feature-unavailable',

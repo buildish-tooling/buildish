@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-import * as core from '@actions/core';
 import { rm } from 'node:fs/promises';
 
 import {
-  createWorkflowArtifactApi,
   uploadDeltaArtifactPackage,
   stageDeltaArtifactPackage,
   type WorkflowArtifactApi,
@@ -26,8 +24,8 @@ import {
 import {
   bootstrapPhase,
   createBootstrapLogLines,
+  type BootstrapExecution,
   type BootstrapDependencies,
-  type BootstrapStatus,
 } from './bootstrap';
 import type { CacheDeltaManifest, CacheManifest } from './cache/manifest';
 import { captureCacheManifest, computeCacheDelta } from './cache/manifest';
@@ -88,7 +86,7 @@ interface PostCacheStatistics {
 }
 
 export interface PostActionStatus {
-  readonly bootstrap: BootstrapStatus;
+  readonly bootstrap: BootstrapExecution;
   readonly baseCacheRestoreResult: BaseCacheRestoreResult | null;
   readonly cacheStatistics: PostCacheStatistics | null;
   readonly consumedDeltaCleanupResult: PostConsumedDeltaCleanupResult | null;
@@ -107,17 +105,17 @@ export interface PostConsumedDeltaCleanupResult {
 }
 
 export interface PostActionDependencies extends BootstrapDependencies {
-  readonly artifactApi?: WorkflowArtifactApi;
+  readonly artifactApi: WorkflowArtifactApi;
 }
 
 export async function executePostAction(
-  dependencies: PostActionDependencies = {},
+  dependencies: PostActionDependencies,
 ): Promise<PostActionStatus> {
-  const logInfo = dependencies.logInfo ?? core.info;
+  const logInfo = dependencies.runtimeHost.info;
   const bootstrap = await bootstrapPhase('post', dependencies);
   const { workflowRunUrl, jobUrl } = bootstrap.ciExecutionUrls;
   const baseCacheRestoreResult = getPersistedBaseCacheRestoreResult(
-    dependencies.getState ?? (() => ''),
+    dependencies.runtimeHost.getState,
   );
   const consumedDeltaCleanupResult = await cleanupConsumedDeltaArtifacts(bootstrap, dependencies);
   const gradleBuildReport = await loadGradleBuildReport(bootstrap.ciContext);
@@ -140,12 +138,12 @@ export async function executePostAction(
       message: 'Post action flow completed without cache orchestration.',
     } satisfies PostActionStatus;
     await publishPostActionLogGroup(dependencies, status, logInfo);
-    await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
+    await replaceJobSummary(bootstrap.ciProvider, createPostActionSummaryLines(status));
     return status;
   }
 
   const preBuildManifest = await loadPersistedPreBuildCacheManifest(
-    dependencies.getState ?? (() => ''),
+    dependencies.runtimeHost.getState,
   );
   if (!preBuildManifest) {
     const status = {
@@ -171,7 +169,7 @@ export async function executePostAction(
       message: 'Post action flow completed without a persisted pre-build cache manifest.',
     } satisfies PostActionStatus;
     await publishPostActionLogGroup(dependencies, status, logInfo);
-    await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
+    await replaceJobSummary(bootstrap.ciProvider, createPostActionSummaryLines(status));
     return status;
   }
 
@@ -200,14 +198,14 @@ export async function executePostAction(
   } satisfies PostActionStatus;
 
   await publishPostActionLogGroup(dependencies, status, logInfo);
-  await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
+  await replaceJobSummary(bootstrap.ciProvider, createPostActionSummaryLines(status));
 
   return status;
 }
 
 async function uploadPostDeltaArtifact(
   deltaManifest: Parameters<typeof stageDeltaArtifactPackage>[2],
-  bootstrap: BootstrapStatus,
+  bootstrap: BootstrapExecution,
   dependencies: PostActionDependencies,
 ): Promise<PostDeltaArtifactResult> {
   const counts = countDeltaEntries(deltaManifest);
@@ -246,9 +244,9 @@ async function uploadPostDeltaArtifact(
     };
   }
 
-  const artifactApi = dependencies.artifactApi ?? createWorkflowArtifactApi();
+  const { artifactApi } = dependencies;
   const persistedProducerIdentity = getPersistedDeltaArtifactProducerIdentity(
-    dependencies.getState ?? (() => ''),
+    dependencies.runtimeHost.getState,
   );
   const deltaArtifactProducerContext = persistedProducerIdentity
     ? {
@@ -286,7 +284,7 @@ async function uploadPostDeltaArtifact(
 }
 
 async function cleanupConsumedDeltaArtifacts(
-  bootstrap: BootstrapStatus,
+  bootstrap: BootstrapExecution,
   dependencies: PostActionDependencies,
 ): Promise<PostConsumedDeltaCleanupResult | null> {
   if (bootstrap.config.jobMode !== 'distributed-aggregator') {
@@ -295,7 +293,7 @@ async function cleanupConsumedDeltaArtifacts(
 
   let artifactNames: readonly string[];
   try {
-    artifactNames = getPersistedConsumedDeltaArtifactNames(dependencies.getState ?? (() => ''));
+    artifactNames = getPersistedConsumedDeltaArtifactNames(dependencies.runtimeHost.getState);
   } catch (error) {
     return {
       attemptedArtifactNames: [],
@@ -318,7 +316,7 @@ async function cleanupConsumedDeltaArtifacts(
     };
   }
 
-  const artifactApi = dependencies.artifactApi ?? createWorkflowArtifactApi();
+  const { artifactApi } = dependencies;
   const deleteResults = await Promise.allSettled(
     artifactNames.map(async (artifactName) => {
       await artifactApi.deleteArtifact(artifactName);
@@ -405,7 +403,7 @@ async function publishPostActionLogGroup(
   logInfo: (message: string) => void,
 ): Promise<void> {
   await publishJobLogGroup(
-    dependencies,
+    status.bootstrap.ciProvider,
     'Apache Buildish Mammoth Cache for Gradle',
     createPostActionLogLines(status),
     logInfo,
@@ -689,7 +687,7 @@ function createPostCacheStatistics(
   deltaManifest: CacheDeltaManifest,
   baseCacheRestoreResult: BaseCacheRestoreResult | null,
   deltaArtifactResult: PostDeltaArtifactResult,
-  baseCacheSaveResult: BootstrapStatus['baseCacheResult'],
+  baseCacheSaveResult: BootstrapExecution['baseCacheResult'],
 ): PostCacheStatistics {
   const pulledBaseCache =
     baseCacheRestoreResult?.status === 'exact-hit' ||
@@ -802,7 +800,7 @@ function formatCacheStatisticCell(cell: PostCacheStatisticCell | null): string {
 }
 
 function getBaseCacheWarning(
-  result: BaseCacheRestoreResult | BootstrapStatus['baseCacheResult'] | null,
+  result: BaseCacheRestoreResult | BootstrapExecution['baseCacheResult'] | null,
 ): string | null {
   if (!result) {
     return null;

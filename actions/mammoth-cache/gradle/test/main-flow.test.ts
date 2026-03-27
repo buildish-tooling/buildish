@@ -44,6 +44,31 @@ import {
   CONSUMED_DELTA_ARTIFACT_NAMES_STATE,
   PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
 } from '../src/state/post-action';
+import { createTestGitHubProvider, createTestRuntimeHost } from './support/github-test-runtime';
+
+function createMainActionDependencies(options: {
+  readonly env: NodeJS.ProcessEnv;
+  readonly eventPayload: Record<string, unknown>;
+  readonly summaryWriter: SummaryWriter;
+  readonly inputs?: Readonly<Record<string, string>>;
+  readonly saveState?: (name: string, value: string) => void;
+  readonly info?: (message: string) => void;
+}) {
+  const runtimeHost = createTestRuntimeHost({
+    inputs: options.inputs,
+    saveState: options.saveState,
+    info: options.info,
+  });
+
+  return {
+    runtimeHost,
+    ciProvider: createTestGitHubProvider(runtimeHost, {
+      env: options.env,
+      eventPayload: options.eventPayload,
+      summaryWriter: options.summaryWriter,
+    }),
+  };
+}
 
 describe('executeMainAction', () => {
   it('downloads dependent job deltas, applies them, and persists the pre-build manifest', async () => {
@@ -104,9 +129,6 @@ describe('executeMainAction', () => {
           RUNNER_ARCH: 'X64',
           RUNNER_TEMP: path.join(workspace, 'runner-temp'),
         },
-        eventPayload: {
-          repository: { default_branch: 'main' },
-        },
         fetchImpl: async (input: string | URL | Request): Promise<Response> => {
           const url = String(input);
           if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
@@ -117,25 +139,37 @@ describe('executeMainAction', () => {
           }
           throw new Error(`Unexpected fetch URL: ${url}`);
         },
-        inputProvider: {
-          getInput(name: string): string {
-            switch (name) {
-              case 'job-mode':
-                return 'distributed-aggregator';
-              case 'dependent-jobs':
-                return 'worker-build';
-              default:
-                return '';
-            }
+        ...createMainActionDependencies({
+          env: {
+            GITHUB_EVENT_NAME: 'push',
+            GITHUB_REF: 'refs/heads/main',
+            GITHUB_REPOSITORY: 'apache/buildish',
+            GITHUB_WORKFLOW: 'CI',
+            GITHUB_JOB: 'aggregate',
+            GITHUB_RUN_ID: '101',
+            GITHUB_RUN_ATTEMPT: '2',
+            GITHUB_WORKSPACE: workspace,
+            GRADLE_USER_HOME: gradleUserHome,
+            HOME: workspace,
+            RUNNER_OS: 'Linux',
+            RUNNER_ARCH: 'X64',
+            RUNNER_TEMP: path.join(workspace, 'runner-temp'),
           },
-        },
-        logInfo(message: string): void {
-          infoMessages.push(message);
-        },
-        saveState(name: string, value: string): void {
-          savedState.set(name, value);
-        },
-        summaryWriter: summary.writer,
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          inputs: {
+            'job-mode': 'distributed-aggregator',
+            'dependent-jobs': 'worker-build',
+          },
+          info(message: string): void {
+            infoMessages.push(message);
+          },
+          saveState(name: string, value: string): void {
+            savedState.set(name, value);
+          },
+          summaryWriter: summary.writer,
+        }),
         verifyWrapperSignature: async () => {},
       });
 
@@ -184,7 +218,7 @@ describe('executeMainAction', () => {
           'Bootstrap: Prepared main phase for push on main in distributed-aggregator mode.',
           "GitHub input 'github-token' present: no.",
           "GitHub environment 'GITHUB_TOKEN' available: no.",
-          "GitHub input 'internal-job-check-run-id': absent.",
+          "GitHub input 'github-job-check-run-id': unset.",
           'Wrapper provisioning: 1 ready (0 downloaded, 1 reused).',
           `Downloaded dependent delta artifacts: ${status.dependentDeltaResult!.downloadedArtifactNames[0]}.`,
           `Persisted pre-build cache manifest to '${manifestPath}'.`,
@@ -269,9 +303,6 @@ describe('executeMainAction', () => {
             RUNNER_ARCH: 'X64',
             RUNNER_TEMP: path.join(workspace, 'runner-temp'),
           },
-          eventPayload: {
-            repository: { default_branch: 'main' },
-          },
           fetchImpl: async (input: string | URL | Request): Promise<Response> => {
             const url = String(input);
             if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
@@ -282,20 +313,32 @@ describe('executeMainAction', () => {
             }
             throw new Error(`Unexpected fetch URL: ${url}`);
           },
-          inputProvider: {
-            getInput(name: string): string {
-              switch (name) {
-                case 'job-mode':
-                  return 'distributed-aggregator';
-                case 'dependent-jobs':
-                  return 'worker-build';
-                default:
-                  return '';
-              }
+          ...createMainActionDependencies({
+            env: {
+              GITHUB_EVENT_NAME: 'push',
+              GITHUB_REF: 'refs/heads/main',
+              GITHUB_REPOSITORY: 'apache/buildish',
+              GITHUB_WORKFLOW: 'CI',
+              GITHUB_JOB: 'aggregate',
+              GITHUB_RUN_ID: '101',
+              GITHUB_RUN_ATTEMPT: '2',
+              GITHUB_WORKSPACE: workspace,
+              GRADLE_USER_HOME: gradleUserHome,
+              HOME: workspace,
+              RUNNER_OS: 'Linux',
+              RUNNER_ARCH: 'X64',
+              RUNNER_TEMP: path.join(workspace, 'runner-temp'),
             },
-          },
-          saveState(): void {},
-          summaryWriter: createSummaryCapture().writer,
+            eventPayload: {
+              repository: { default_branch: 'main' },
+            },
+            inputs: {
+              'job-mode': 'distributed-aggregator',
+              'dependent-jobs': 'worker-build',
+            },
+            saveState(): void {},
+            summaryWriter: createSummaryCapture().writer,
+          }),
           verifyWrapperSignature: async () => {},
         }),
       ).rejects.toThrow(/targets cache key 'mismatched-cache-key'/);
@@ -329,8 +372,10 @@ describe('executeMainAction', () => {
         ].join('\n'),
         'utf8',
       );
+      const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
 
       const status = await executeMainAction({
+        artifactApi,
         cacheApi: createCacheApi(),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: {
@@ -348,9 +393,6 @@ describe('executeMainAction', () => {
           RUNNER_ARCH: 'X64',
           RUNNER_TEMP: path.join(workspace, 'runner-temp'),
         },
-        eventPayload: {
-          repository: { default_branch: 'main' },
-        },
         fetchImpl: async (input: string | URL | Request): Promise<Response> => {
           const url = String(input);
           if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
@@ -361,15 +403,30 @@ describe('executeMainAction', () => {
           }
           throw new Error(`Unexpected fetch URL: ${url}`);
         },
-        inputProvider: {
-          getInput(): string {
-            return '';
+        ...createMainActionDependencies({
+          env: {
+            GITHUB_EVENT_NAME: 'push',
+            GITHUB_REF: 'refs/heads/main',
+            GITHUB_REPOSITORY: 'apache/buildish',
+            GITHUB_WORKFLOW: 'CI',
+            GITHUB_JOB: 'build',
+            GITHUB_RUN_ID: '101',
+            GITHUB_RUN_ATTEMPT: '2',
+            GITHUB_WORKSPACE: workspace,
+            GRADLE_USER_HOME: gradleUserHome,
+            HOME: workspace,
+            RUNNER_OS: 'Linux',
+            RUNNER_ARCH: 'X64',
+            RUNNER_TEMP: path.join(workspace, 'runner-temp'),
           },
-        },
-        saveState(name: string, value: string): void {
-          savedState.set(name, value);
-        },
-        summaryWriter: summary.writer,
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          saveState(name: string, value: string): void {
+            savedState.set(name, value);
+          },
+          summaryWriter: summary.writer,
+        }),
         verifyWrapperSignature: async () => {},
       });
 
@@ -442,8 +499,10 @@ describe('executeMainAction', () => {
       );
       await mkdir(path.dirname(managedFile), { recursive: true });
       await writeFile(managedFile, 'stale-local', 'utf8');
+      const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
 
       const status = await executeMainAction({
+        artifactApi,
         cacheApi: createCacheApi({
           matchedKeyMode: 'primary',
           onRestore: async () => {
@@ -468,9 +527,6 @@ describe('executeMainAction', () => {
           RUNNER_ARCH: 'X64',
           RUNNER_TEMP: path.join(workspace, 'runner-temp'),
         },
-        eventPayload: {
-          repository: { default_branch: 'main' },
-        },
         fetchImpl: async (input: string | URL | Request): Promise<Response> => {
           const url = String(input);
           if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
@@ -481,18 +537,33 @@ describe('executeMainAction', () => {
           }
           throw new Error(`Unexpected fetch URL: ${url}`);
         },
-        inputProvider: {
-          getInput(name: string): string {
-            if (name === 'restore-cleanup-mode') {
-              return 'prune-managed';
-            }
-            return '';
+        ...createMainActionDependencies({
+          env: {
+            GITHUB_EVENT_NAME: 'push',
+            GITHUB_REF: 'refs/heads/main',
+            GITHUB_REPOSITORY: 'apache/buildish',
+            GITHUB_WORKFLOW: 'CI',
+            GITHUB_JOB: 'build',
+            GITHUB_RUN_ID: '101',
+            GITHUB_RUN_ATTEMPT: '2',
+            GITHUB_WORKSPACE: workspace,
+            GRADLE_USER_HOME: gradleUserHome,
+            HOME: workspace,
+            RUNNER_OS: 'Linux',
+            RUNNER_ARCH: 'X64',
+            RUNNER_TEMP: path.join(workspace, 'runner-temp'),
           },
-        },
-        saveState(name: string, value: string): void {
-          savedState.set(name, value);
-        },
-        summaryWriter: summary.writer,
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          inputs: {
+            'restore-cleanup-mode': 'prune-managed',
+          },
+          saveState(name: string, value: string): void {
+            savedState.set(name, value);
+          },
+          summaryWriter: summary.writer,
+        }),
         verifyWrapperSignature: async () => {},
       });
 
@@ -571,9 +642,6 @@ describe('executeMainAction', () => {
             RUNNER_ARCH: 'X64',
             RUNNER_TEMP: path.join(workspace, 'runner-temp'),
           },
-          eventPayload: {
-            repository: { default_branch: 'main' },
-          },
           fetchImpl: async (input: string | URL | Request): Promise<Response> => {
             const url = String(input);
             if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
@@ -584,19 +652,31 @@ describe('executeMainAction', () => {
             }
             throw new Error(`Unexpected fetch URL: ${url}`);
           },
-          inputProvider: {
-            getInput(name: string): string {
-              switch (name) {
-                case 'job-mode':
-                  return 'distributed-aggregator';
-                case 'dependent-jobs':
-                  return 'windows-worker';
-                default:
-                  return '';
-              }
+          ...createMainActionDependencies({
+            env: {
+              GITHUB_EVENT_NAME: 'push',
+              GITHUB_REF: 'refs/heads/main',
+              GITHUB_REPOSITORY: 'apache/buildish',
+              GITHUB_WORKFLOW: 'CI',
+              GITHUB_JOB: 'aggregate',
+              GITHUB_RUN_ID: '101',
+              GITHUB_RUN_ATTEMPT: '2',
+              GITHUB_WORKSPACE: workspace,
+              GRADLE_USER_HOME: gradleUserHome,
+              HOME: workspace,
+              RUNNER_OS: 'Linux',
+              RUNNER_ARCH: 'X64',
+              RUNNER_TEMP: path.join(workspace, 'runner-temp'),
             },
-          },
-          summaryWriter: createSummaryCapture().writer,
+            eventPayload: {
+              repository: { default_branch: 'main' },
+            },
+            inputs: {
+              'job-mode': 'distributed-aggregator',
+              'dependent-jobs': 'windows-worker',
+            },
+            summaryWriter: createSummaryCapture().writer,
+          }),
           verifyWrapperSignature: async () => {},
         }),
       ).rejects.toThrow(/Cross-runner dependent delta reuse is not supported/u);
@@ -669,9 +749,6 @@ describe('executeMainAction', () => {
           HOME: workspace,
           RUNNER_TEMP: path.join(workspace, 'runner-temp'),
         },
-        eventPayload: {
-          repository: { default_branch: 'main' },
-        },
         fetchImpl: async (input: string | URL | Request): Promise<Response> => {
           const url = String(input);
           if (url.endsWith('gradle-8.14-wrapper.jar.sha256')) {
@@ -682,21 +759,32 @@ describe('executeMainAction', () => {
           }
           throw new Error(`Unexpected fetch URL: ${url}`);
         },
-        inputProvider: {
-          getInput(name: string): string {
-            switch (name) {
-              case 'job-mode':
-                return 'distributed-aggregator';
-              case 'dependent-jobs':
-                return 'worker-a,worker-b';
-              case 'allow-duplicate-dependent-delta-paths':
-                return 'true';
-              default:
-                return '';
-            }
+        ...createMainActionDependencies({
+          env: {
+            GITHUB_EVENT_NAME: 'push',
+            GITHUB_REF: 'refs/heads/main',
+            GITHUB_REPOSITORY: 'apache/buildish',
+            GITHUB_WORKFLOW: 'CI',
+            GITHUB_JOB: 'aggregate',
+            GITHUB_RUN_ID: '101',
+            GITHUB_RUN_ATTEMPT: '2',
+            GITHUB_WORKSPACE: workspace,
+            GRADLE_USER_HOME: gradleUserHome,
+            RUNNER_OS: 'Linux',
+            RUNNER_ARCH: 'X64',
+            HOME: workspace,
+            RUNNER_TEMP: path.join(workspace, 'runner-temp'),
           },
-        },
-        summaryWriter: createSummaryCapture().writer,
+          eventPayload: {
+            repository: { default_branch: 'main' },
+          },
+          inputs: {
+            'job-mode': 'distributed-aggregator',
+            'dependent-jobs': 'worker-a,worker-b',
+            'allow-duplicate-dependent-delta-paths': 'true',
+          },
+          summaryWriter: createSummaryCapture().writer,
+        }),
         verifyWrapperSignature: async () => {},
       });
 
@@ -817,7 +905,6 @@ function createCiContext(
   runnerArch = 'x64',
 ): CiJobContext {
   return {
-    platform: 'github',
     eventName: 'push',
     resolvedRefName: 'main',
     safeRefName: 'main',

@@ -14,38 +14,33 @@
  * limitations under the License.
  */
 
-import * as core from '@actions/core';
-
-import { executePostAction } from './post-flow';
+import { executePostAction, type PostActionDependencies } from './post-flow';
 import { decideSingleRunPostExecution } from './runtime/job-single-run';
 
-export async function runPost(): Promise<void> {
+export type PostEntrypointDependencies = PostActionDependencies;
+
+export async function runPost(dependencies: PostEntrypointDependencies): Promise<void> {
+  const { runtimeHost } = dependencies;
   const postDecision = decideSingleRunPostExecution({
-    getState: core.getState,
+    getState: runtimeHost.getState,
   });
   if (!postDecision.shouldRun) {
-    core.info(postDecision.message);
+    runtimeHost.info(postDecision.message);
     return;
   }
 
-  const status = await executePostAction({
-    getState: core.getState,
-  });
+  const status = await executePostAction(dependencies);
   if (status.bootstrap.baseCacheResult) {
-    core.info(status.bootstrap.baseCacheResult.message);
+    runtimeHost.info(status.bootstrap.baseCacheResult.message);
   }
   if (status.consumedDeltaCleanupResult) {
-    core.info(status.consumedDeltaCleanupResult.message);
+    runtimeHost.info(status.consumedDeltaCleanupResult.message);
     for (const warning of status.consumedDeltaCleanupResult.warnings) {
-      core.warning(warning);
+      runtimeHost.warning(warning);
     }
   }
   if (status.deltaArtifactResult) {
-    core.info(status.deltaArtifactResult.message);
+    runtimeHost.info(status.deltaArtifactResult.message);
   }
-  core.info(status.message);
+  runtimeHost.info(status.message);
 }
-
-void runPost().catch((error: unknown) => {
-  core.setFailed(error instanceof Error ? error.message : String(error));
-});

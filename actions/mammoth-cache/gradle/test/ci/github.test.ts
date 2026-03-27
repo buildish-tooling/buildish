@@ -25,8 +25,8 @@ import type { SummaryWriter } from '../../src/ci/types';
 
 describe('createGitHubContext', () => {
   it('resolves push refs from branch refs', () => {
-    const context = createGitHubContext(
-      {
+    const context = createGitHubContext({
+      env: {
         GITHUB_EVENT_NAME: 'push',
         GITHUB_REF: 'refs/heads/feature/cache-improvements',
         GITHUB_REPOSITORY: 'apache/buildish',
@@ -35,10 +35,10 @@ describe('createGitHubContext', () => {
         RUNNER_OS: 'Linux',
         RUNNER_ARCH: 'X64',
       },
-      {
+      eventPayload: {
         repository: { default_branch: 'main' },
       },
-    );
+    });
 
     expect(context.resolvedRefName).toBe('feature/cache-improvements');
     expect(context.safeRefName).toBe('feature-cache-improvements');
@@ -48,36 +48,36 @@ describe('createGitHubContext', () => {
   });
 
   it('uses the pull request base branch for pull_request events', () => {
-    const context = createGitHubContext(
-      {
+    const context = createGitHubContext({
+      env: {
         GITHUB_EVENT_NAME: 'pull_request',
         GITHUB_REPOSITORY: 'apache/buildish',
         GITHUB_WORKFLOW: 'CI',
         GITHUB_JOB: 'check',
       },
-      {
+      eventPayload: {
         repository: { default_branch: 'main' },
         pull_request: { base: { ref: 'release/1.0' } },
       },
-    );
+    });
 
     expect(context.isPullRequest).toBe(true);
     expect(context.resolvedRefName).toBe('release/1.0');
   });
 
   it('treats pull_request_target like a pull request for ref resolution and trust checks', () => {
-    const context = createGitHubContext(
-      {
+    const context = createGitHubContext({
+      env: {
         GITHUB_EVENT_NAME: 'pull_request_target',
         GITHUB_REPOSITORY: 'apache/buildish',
         GITHUB_WORKFLOW: 'CI',
         GITHUB_JOB: 'check',
       },
-      {
+      eventPayload: {
         repository: { default_branch: 'main' },
         pull_request: { base: { ref: 'stable/2.x' } },
       },
-    );
+    });
 
     expect(context.isPullRequest).toBe(true);
     expect(context.resolvedRefName).toBe('stable/2.x');
@@ -85,18 +85,18 @@ describe('createGitHubContext', () => {
   });
 
   it('uses the triggering branch for workflow_dispatch events', () => {
-    const context = createGitHubContext(
-      {
+    const context = createGitHubContext({
+      env: {
         GITHUB_EVENT_NAME: 'workflow_dispatch',
         GITHUB_REF: 'refs/heads/release/2026.03',
         GITHUB_REPOSITORY: 'apache/buildish',
         GITHUB_WORKFLOW: 'CI',
         GITHUB_JOB: 'check',
       },
-      {
+      eventPayload: {
         repository: { default_branch: 'main' },
       },
-    );
+    });
 
     expect(context.isPullRequest).toBe(false);
     expect(context.resolvedRefName).toBe('release/2026.03');
@@ -104,8 +104,8 @@ describe('createGitHubContext', () => {
   });
 
   it('honors caller-context overrides for reusable workflow runs', () => {
-    const context = createGitHubContext(
-      {
+    const context = createGitHubContext({
+      env: {
         GITHUB_EVENT_NAME: 'workflow_call',
         GITHUB_REPOSITORY: 'apache/buildish',
         GITHUB_WORKFLOW: 'CI',
@@ -115,10 +115,10 @@ describe('createGitHubContext', () => {
         BUILDISH_MAMMOTH_CACHE_GITHUB_DEFAULT_BRANCH_OVERRIDE: 'main',
         BUILDISH_MAMMOTH_CACHE_GITHUB_JOB_NAME_OVERRIDE: 'worker_a',
       },
-      {
+      eventPayload: {
         repository: { default_branch: 'ignored-default' },
       },
-    );
+    });
 
     expect(context.eventName).toBe('pull_request');
     expect(context.isPullRequest).toBe(true);
@@ -129,8 +129,8 @@ describe('createGitHubContext', () => {
   });
 
   it('normalizes runner metadata into cache-safe values', () => {
-    const context = createGitHubContext(
-      {
+    const context = createGitHubContext({
+      env: {
         GITHUB_EVENT_NAME: 'push',
         GITHUB_REF: 'refs/heads/main',
         GITHUB_REPOSITORY: 'apache/buildish',
@@ -139,18 +139,18 @@ describe('createGitHubContext', () => {
         RUNNER_OS: 'macOS',
         RUNNER_ARCH: 'AMD64',
       },
-      {
+      eventPayload: {
         repository: { default_branch: 'main' },
       },
-    );
+    });
 
     expect(context.runnerOs).toBe('macos');
     expect(context.runnerArch).toBe('x64');
   });
 
   it('normalizes Windows runner metadata into cache-safe values', () => {
-    const context = createGitHubContext(
-      {
+    const context = createGitHubContext({
+      env: {
         GITHUB_EVENT_NAME: 'push',
         GITHUB_REF: 'refs/heads/main',
         GITHUB_REPOSITORY: 'apache/buildish',
@@ -159,27 +159,27 @@ describe('createGitHubContext', () => {
         RUNNER_OS: 'Windows',
         RUNNER_ARCH: 'ARM64',
       },
-      {
+      eventPayload: {
         repository: { default_branch: 'main' },
       },
-    );
+    });
 
     expect(context.runnerOs).toBe('windows');
     expect(context.runnerArch).toBe('arm64');
   });
 
   it('falls back to the repository default branch for unsupported events', () => {
-    const context = createGitHubContext(
-      {
+    const context = createGitHubContext({
+      env: {
         GITHUB_EVENT_NAME: 'schedule',
         GITHUB_REPOSITORY: 'apache/buildish',
         GITHUB_WORKFLOW: 'CI',
         GITHUB_JOB: 'check',
       },
-      {
+      eventPayload: {
         repository: { default_branch: 'main' },
       },
-    );
+    });
 
     expect(context.resolvedRefName).toBe('main');
   });
@@ -258,7 +258,7 @@ describe('createGitHubPlatform', () => {
       eventPayload: {
         repository: { default_branch: 'main' },
       },
-      githubToken: '  ghs_test_token  ',
+      githubTokenInput: '  ghs_test_token  ',
     });
 
     expect(platform.httpHeadersByHost.get('api.github.com')).toEqual(
@@ -314,13 +314,13 @@ describe('createGitHubPlatform', () => {
         repository: { default_branch: 'main' },
       },
       githubTokenInput: 'ghs_input_token',
-      internalJobCheckRunId: '987654321',
+      githubJobCheckRunId: '987654321',
     });
 
     expect(platform.createBootstrapDiagnosticsLines('main')).toEqual([
       "GitHub input 'github-token' present: yes.",
       "GitHub environment 'GITHUB_TOKEN' available: yes.",
-      "GitHub input 'internal-job-check-run-id': 987654321.",
+      "GitHub input 'github-job-check-run-id': 987654321.",
     ]);
     expect(platform.createBootstrapDiagnosticsLines('post')).toEqual([]);
     expect(platform.executionUrls).toEqual({

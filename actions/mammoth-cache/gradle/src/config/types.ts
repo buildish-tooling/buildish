@@ -17,8 +17,8 @@
 /**
  * Supported execution personalities for the action.
  *
- * These values intentionally mirror the flat string inputs exposed from `action.yml`
- * so parsing can stay simple and explicit.
+ * These values intentionally mirror the flat string inputs exposed from the current
+ * GitHub action descriptor so parsing can stay simple and explicit.
  */
 export const JOB_MODES = ['standalone', 'distributed-worker', 'distributed-aggregator'] as const;
 /**
@@ -137,8 +137,6 @@ export interface RawActionInputs {
   readonly setupJava: string;
   /** Raw `github-token` input used only for authenticated GitHub-host fetches. */
   readonly githubToken: string;
-  /** Raw internal workflow job/check-run identifier used only for direct job links. */
-  readonly internalJobCheckRunId: string;
 }
 
 /**

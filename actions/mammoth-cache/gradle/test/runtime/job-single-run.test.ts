@@ -31,13 +31,13 @@ import {
 describe('job single-run guard', () => {
   it('accepts the first invocation, rejects the second, and suppresses duplicate post execution', async () => {
     await withRunnerTemp(async (runnerTemp) => {
-      const env = createGitHubEnv(runnerTemp);
+      const ciContext = createCiContext(runnerTemp);
       const ownerState = new Map<string, string>();
       const duplicateState = new Map<string, string>();
 
       await expect(
         claimSingleRunJobInvocation({
-          env,
+          ciContext,
           saveState: ownerState.set.bind(ownerState),
           createOwnerToken: () => 'owner-token-a',
         }),
@@ -49,7 +49,7 @@ describe('job single-run guard', () => {
 
       await expect(
         claimSingleRunJobInvocation({
-          env,
+          ciContext,
           saveState: duplicateState.set.bind(duplicateState),
           createOwnerToken: () => 'owner-token-b',
         }),
@@ -63,7 +63,7 @@ describe('job single-run guard', () => {
       expect(ownerState.get(JOB_SINGLE_RUN_OWNER_TOKEN_STATE)).toBe('owner-token-a');
       expect(duplicateState.get(JOB_SINGLE_RUN_DUPLICATE_STATE)).toBe('true');
       expect(duplicateState.get(JOB_SINGLE_RUN_OWNER_TOKEN_STATE)).toBe('');
-      await expect(readFile(resolveSingleRunGuardFilePath(env), 'utf8')).resolves.toContain(
+      await expect(readFile(resolveSingleRunGuardFilePath(ciContext), 'utf8')).resolves.toContain(
         'owner-token-a',
       );
 
@@ -95,7 +95,7 @@ describe('job single-run guard', () => {
 
       await expect(
         claimSingleRunJobInvocation({
-          env: createGitHubEnv(runnerTemp, { GITHUB_RUN_ATTEMPT: '1' }),
+          ciContext: createCiContext(runnerTemp, { runAttempt: 1 }),
           saveState: firstAttemptState.set.bind(firstAttemptState),
           createOwnerToken: () => 'attempt-1',
         }),
@@ -103,7 +103,7 @@ describe('job single-run guard', () => {
 
       await expect(
         claimSingleRunJobInvocation({
-          env: createGitHubEnv(runnerTemp, { GITHUB_RUN_ATTEMPT: '2' }),
+          ciContext: createCiContext(runnerTemp, { runAttempt: 2 }),
           saveState: secondAttemptState.set.bind(secondAttemptState),
           createOwnerToken: () => 'attempt-2',
         }),
@@ -121,20 +121,46 @@ describe('job single-run guard', () => {
       }),
     );
   });
+
+  it('falls back to the OS temp directory when the CI context does not expose one', () => {
+    const guardPath = resolveSingleRunGuardFilePath({
+      ...createCiContext('ignored-runner-temp'),
+      tempDirectory: null,
+    });
+
+    expect(path.dirname(path.dirname(guardPath))).toBe(path.resolve(os.tmpdir()));
+  });
+
+  it('rejects empty custom owner tokens', async () => {
+    await withRunnerTemp(async (runnerTemp) => {
+      await expect(
+        claimSingleRunJobInvocation({
+          ciContext: createCiContext(runnerTemp),
+          saveState: () => undefined,
+          createOwnerToken: () => '   ',
+        }),
+      ).rejects.toThrow(/owner tokens must not be empty/u);
+    });
+  });
 });
 
-function createGitHubEnv(
+function createCiContext(
   runnerTemp: string,
-  overrides: Partial<NodeJS.ProcessEnv> = {},
-): NodeJS.ProcessEnv {
+  overrides: Partial<{
+    repository: string;
+    workflowName: string;
+    jobName: string;
+    runId: number;
+    runAttempt: number;
+  }> = {},
+) {
   return {
-    RUNNER_TEMP: runnerTemp,
-    GITHUB_REPOSITORY: 'apache/buildish',
-    GITHUB_WORKFLOW: 'CI',
-    GITHUB_JOB: 'check',
-    GITHUB_RUN_ID: '12345',
-    GITHUB_RUN_ATTEMPT: '1',
-    ...overrides,
+    repository: overrides.repository ?? 'apache/buildish',
+    workflowName: overrides.workflowName ?? 'CI',
+    jobName: overrides.jobName ?? 'check',
+    runId: overrides.runId ?? 12345,
+    runAttempt: overrides.runAttempt ?? 1,
+    tempDirectory: runnerTemp,
   };
 }
 

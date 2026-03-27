@@ -45,10 +45,13 @@ implementable design.
 
 ### Action shape
 
-- `action.yml`
-  - `runs.using: node20`
-  - `main: dist/github/main.js`
-  - `post: dist/github/post.js`
+- `action-descriptors/github/very-temporary-unreleased-consumer-path/action.yml`
+  - `runs.using: node24`
+  - `main: ../../../dist/github/main/index.cjs`
+  - `post: ../../../dist/github/post/index.cjs`
+- `src/ci/github/main.ts`
+  - instantiate GitHub-specific runtime/cache/artifact adapters
+  - call `runMain()`
 - `src/main.ts`
   - parse inputs
   - validate configuration and environment
@@ -58,6 +61,9 @@ implementable design.
   - optionally download and apply dependent job deltas
   - capture pre-build cache manifest/state for post-step diffing
   - write state for post action
+- `src/ci/github/post.ts`
+  - instantiate GitHub-specific runtime/cache/artifact adapters
+  - call `runPost()`
 - `src/post.ts`
   - read saved state
   - re-scan cache contents
@@ -199,7 +205,7 @@ implementable design.
 
 ## Public API / configuration plan
 
-- Keep inputs flat and string-based in `action.yml`.
+- Keep inputs flat and string-based in the current GitHub action descriptor.
 - Avoid nested YAML objects in action inputs.
 - Use exact enum values, e.g.:
   - `standalone`
