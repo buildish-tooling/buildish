@@ -41,7 +41,7 @@ import {
   type PersistedPreBuildCacheManifestState,
 } from './state/post-action';
 import { installGradleBuildResultCapture } from './gradle/build-results';
-import { appendJobSummary, createDetailsSection, escapeSummaryText } from './logging/summary';
+import { createDetailsSection, escapeSummaryText, publishJobLogGroup } from './logging/summary';
 
 export interface MainDependentDeltaResult extends DeltaApplyResult {
   readonly requestedJobs: readonly string[];
@@ -74,20 +74,30 @@ export async function executeMainAction(
 ): Promise<MainActionStatus> {
   const logInfo = dependencies.logInfo ?? core.info;
   const bootstrap = await bootstrapPhase('main', dependencies);
-  await installGradleBuildResultCapture(bootstrap.config.gradleUserHome).catch((error: unknown) => {
-    logInfo(
-      `Gradle build reporting could not install capture hooks and will be skipped for this job: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  });
+  await installGradleBuildResultCapture(bootstrap.config.gradleUserHome, bootstrap.ciContext).catch(
+    (error: unknown) => {
+      logInfo(
+        `Gradle build reporting could not install capture hooks and will be skipped for this job: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    },
+  );
 
   if (!bootstrap.cacheModel) {
-    return {
+    const status = {
       bootstrap,
       restoreCleanupResult: null,
       dependentDeltaResult: null,
       preBuildManifestState: null,
       message: 'Main action flow completed without cache orchestration.',
-    };
+    } satisfies MainActionStatus;
+
+    await publishJobLogGroup(
+      dependencies,
+      'Apache Buildish main action',
+      createMainActionLogLines(status),
+      logInfo,
+    );
+    return status;
   }
 
   const restoreCleanupResult = await maybePruneManagedFilesAfterRestore(bootstrap, dependencies);
@@ -112,7 +122,7 @@ export async function executeMainAction(
   const preBuildManifestState = await persistPreBuildCacheManifest(
     manifest,
     dependencies.saveState ?? core.saveState,
-    { env: dependencies.env },
+    { env: dependencies.env, tempDirectory: bootstrap.ciContext.tempDirectory },
   );
 
   const status = {
@@ -123,8 +133,12 @@ export async function executeMainAction(
     message: createMainActionMessage(dependentDeltaResult),
   } satisfies MainActionStatus;
 
-  logMainActionDetails(status, logInfo);
-  await appendJobSummary(dependencies, createMainActionSummaryLines(status));
+  await publishJobLogGroup(
+    dependencies,
+    'Apache Buildish main action',
+    createMainActionLogLines(status),
+    logInfo,
+  );
 
   return status;
 }
@@ -309,29 +323,39 @@ export function createMainActionSummaryLines(status: MainActionStatus): readonly
   ];
 }
 
-function logMainActionDetails(status: MainActionStatus, logInfo: (message: string) => void): void {
+function createMainActionLogLines(status: MainActionStatus): readonly string[] {
+  const lines = [
+    `Restore cleanup: ${describeRestoreCleanupSummary(status.restoreCleanupResult)}.`,
+    `Dependent delta reuse: ${describeDependentDeltaSummary(status.dependentDeltaResult)}.`,
+    status.preBuildManifestState
+      ? 'Pre-build manifest: persisted.'
+      : 'Pre-build manifest: not persisted.',
+  ];
+
   if (status.restoreCleanupResult) {
-    logInfo(status.restoreCleanupResult.message);
+    lines.push(status.restoreCleanupResult.message);
   }
 
   if (status.dependentDeltaResult) {
     if (status.dependentDeltaResult.requestedJobs.length > 0) {
-      logInfo(
+      lines.push(
         `Configured dependent jobs: ${formatSummaryList(status.dependentDeltaResult.requestedJobs)}.`,
       );
     }
     if (status.dependentDeltaResult.downloadedArtifactNames.length > 0) {
-      logInfo(
+      lines.push(
         `Downloaded dependent delta artifacts: ${formatSummaryList(status.dependentDeltaResult.downloadedArtifactNames)}.`,
       );
     }
   }
 
   if (status.preBuildManifestState) {
-    logInfo(
+    lines.push(
       `Persisted pre-build cache manifest to '${status.preBuildManifestState.manifestPath}'.`,
     );
   }
+
+  return lines;
 }
 
 function describeRestoreCleanupSummary(result: RestoreCleanupResult | null): string {

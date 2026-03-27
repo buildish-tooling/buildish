@@ -17,7 +17,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { SummaryWriter } from '../../src/ci/types';
-import { appendJobSummary } from '../../src/logging/summary';
+import { appendJobSummary, publishJobLogGroup } from '../../src/logging/summary';
 
 describe('appendJobSummary', () => {
   it('publishes each summary line through the configured writer', async () => {
@@ -39,6 +39,21 @@ describe('appendJobSummary', () => {
 
     expect(capture.lines).toEqual([]);
     expect(capture.writeCalls).toBe(0);
+  });
+});
+
+describe('publishJobLogGroup', () => {
+  it('publishes grouped log lines through the configured CI adapter', async () => {
+    const messages: string[] = [];
+
+    await publishJobLogGroup(
+      createGitHubOptions(createSummaryCapture().writer),
+      'Main action',
+      ['first line', 'second line'],
+      (message) => messages.push(message),
+    );
+
+    expect(messages).toEqual(['::group::Main action', 'first line', 'second line', '::endgroup::']);
   });
 });
 

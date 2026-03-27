@@ -373,6 +373,7 @@ function createFixtureCiContext(): CiJobContext {
     jobName: 'Gradle Worker',
     runId: 12345,
     runAttempt: 2,
+    tempDirectory: null,
     workspace: '/tmp/workspace',
     actionPath: null,
   };

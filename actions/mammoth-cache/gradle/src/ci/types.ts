@@ -63,6 +63,8 @@ export interface CiJobContext {
   readonly runId: number | null;
   /** Numeric retry/attempt count for the workflow run, or `null` when unavailable. */
   readonly runAttempt: number | null;
+  /** Absolute provider-managed temp directory for the current job, or `null` when unavailable. */
+  readonly tempDirectory: string | null;
   /** Absolute workspace directory for the current job. */
   readonly workspace: string;
   /** Absolute action checkout path, or `null` when the provider does not expose one. */
@@ -95,6 +97,12 @@ export interface CiPlatformAdapter {
   readonly context: CiJobContext;
   /** Optional exact-host HTTP headers, such as GitHub API auth headers derived from CI tokens. */
   readonly httpHeadersByHost: HttpHeadersByHost;
+  /** Publishes the provided lines as a grouped log block using the provider-specific log surface. */
+  publishLogGroup(
+    title: string,
+    lines: readonly string[],
+    writeLine: (message: string) => void,
+  ): void;
   /** Publishes the provided markdown lines to the provider summary surface. */
   publishSummary(lines: readonly string[]): Promise<void>;
 }

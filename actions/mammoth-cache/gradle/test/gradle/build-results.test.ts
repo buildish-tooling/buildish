@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -22,6 +22,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   createGradleBuildSummaryLines,
+  installGradleBuildResultCapture,
   loadGradleBuildReport,
 } from '../../src/gradle/build-results';
 
@@ -87,7 +88,7 @@ describe('Gradle build reporting', () => {
       'utf8',
     );
 
-    const report = await loadGradleBuildReport({ RUNNER_TEMP: runnerTemp });
+    const report = await loadGradleBuildReport({ tempDirectory: runnerTemp });
 
     expect(report.builds).toEqual([
       expect.objectContaining({
@@ -161,6 +162,42 @@ describe('Gradle build reporting', () => {
       ),
     ).toBe(true);
     expect(lines.some((line) => line.startsWith('- Build 2: demo'))).toBe(true);
+  });
+
+  it('installs generated capture scripts with embedded capture root and Gradle 7 guard', async () => {
+    const runnerTemp = await createRunnerTemp(temporaryDirectories);
+    const gradleUserHome = path.join(runnerTemp, 'gradle-home');
+
+    await installGradleBuildResultCapture(gradleUserHome, { tempDirectory: runnerTemp });
+
+    const initScript = await readFile(
+      path.join(
+        gradleUserHome,
+        'init.d',
+        'buildish-mammoth-cache-gradle.build-result-capture.init.gradle',
+      ),
+      'utf8',
+    );
+    const servicePlugin = await readFile(
+      path.join(
+        gradleUserHome,
+        'init.d',
+        'buildish-mammoth-cache-gradle.build-result-capture-service.plugin.groovy',
+      ),
+      'utf8',
+    );
+
+    expect(initScript).toContain('Gradle build-result capture requires Gradle 7.0+');
+    expect(initScript).not.toContain('captureUsingBuildFinished');
+    expect(initScript).toContain(
+      `def captureRootDir = ${JSON.stringify(path.join(runnerTemp, '.buildish-mammoth-cache-gradle'))}`,
+    );
+    expect(servicePlugin).toContain(
+      `def captureRootDir = ${JSON.stringify(path.join(runnerTemp, '.buildish-mammoth-cache-gradle'))}`,
+    );
+    expect(servicePlugin).toContain(
+      'def captureInvocationNamespace = "buildish-mammoth-cache-gradle"',
+    );
   });
 });
 

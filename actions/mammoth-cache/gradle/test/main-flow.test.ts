@@ -35,7 +35,11 @@ import { createCacheModel, type CacheModel } from '../src/cache/model';
 import type { BaseCacheApi } from '../src/cache/service';
 import type { CiJobContext, SummaryWriter } from '../src/ci/types';
 import type { NormalizedActionConfig } from '../src/config/types';
-import { createMainActionOutputs, executeMainAction } from '../src/main-flow';
+import {
+  createMainActionOutputs,
+  createMainActionSummaryLines,
+  executeMainAction,
+} from '../src/main-flow';
 import {
   CONSUMED_DELTA_ARTIFACT_NAMES_STATE,
   PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
@@ -163,10 +167,11 @@ describe('executeMainAction', () => {
           .flatMap((partition) => partition.entries)
           .map((entry) => entry.relativePath),
       ).toContain('caches/modules-2/files-2.1/example/module.bin');
-      const summaryText = summary.lines.join('\n');
-      expect(summaryText).toContain('## Apache Buildish bootstrap');
-      expect(summaryText).toContain('<summary>Wrapper provisioning</summary>');
-      expect(summaryText).toContain('gradle/wrapper/gradle-wrapper.properties');
+      const bootstrapSummaryText = summary.lines.join('\n');
+      expect(bootstrapSummaryText).toContain('## Apache Buildish bootstrap');
+      expect(bootstrapSummaryText).toContain('<summary>Wrapper provisioning</summary>');
+      expect(bootstrapSummaryText).toContain('gradle/wrapper/gradle-wrapper.properties');
+      const summaryText = createMainActionSummaryLines(status).join('\n');
       expect(summaryText).toContain('## Apache Buildish main action');
       expect(summaryText).toContain('- Restore cleanup: none');
       expect(summaryText).toContain('- Dependent delta reuse: 1 artifact(s) from 1 job(s)');
@@ -178,8 +183,10 @@ describe('executeMainAction', () => {
       expect(summaryText).toContain('- Post-job artifact cleanup scheduled: 1');
       expect(infoMessages).toEqual(
         expect.arrayContaining([
+          '::group::Apache Buildish main action',
           `Downloaded dependent delta artifacts: ${status.dependentDeltaResult!.downloadedArtifactNames[0]}.`,
           `Persisted pre-build cache manifest to '${manifestPath}'.`,
+          '::endgroup::',
         ]),
       );
       expect(createMainActionOutputs(status)).toEqual({
@@ -198,7 +205,7 @@ describe('executeMainAction', () => {
         'downloaded-dependent-artifact-count': '1',
         'job-name': 'aggregate',
       });
-      expect(summary.writeCalls).toBe(2);
+      expect(summary.writeCalls).toBe(1);
     });
   });
 
@@ -367,7 +374,7 @@ describe('executeMainAction', () => {
       expect(status.dependentDeltaResult).toBeNull();
       expect(status.preBuildManifestState).not.toBeNull();
       expect(savedState.get(PRE_BUILD_CACHE_MANIFEST_PATH_STATE)).toBeTruthy();
-      const summaryText = summary.lines.join('\n');
+      const summaryText = createMainActionSummaryLines(status).join('\n');
       expect(summaryText).toContain('## Apache Buildish main action');
       expect(summaryText).toContain('- Restore cleanup: none');
       expect(summaryText).toContain('- Dependent delta reuse: none');
@@ -390,7 +397,7 @@ describe('executeMainAction', () => {
         'downloaded-dependent-artifact-count': '0',
         'job-name': 'build',
       });
-      expect(summary.writeCalls).toBe(2);
+      expect(summary.writeCalls).toBe(1);
     });
   });
 
@@ -496,7 +503,7 @@ describe('executeMainAction', () => {
       );
       expect(restoreCalls).toBe(2);
       await expect(readFile(managedFile, 'utf8')).resolves.toBe('from-cache-2');
-      const summaryText = summary.lines.join('\n');
+      const summaryText = createMainActionSummaryLines(status).join('\n');
       expect(summaryText).toContain('## Apache Buildish main action');
       expect(summaryText).toContain('- Restore cleanup: prune-managed (1 deleted)');
       expect(summaryText).toContain('- Restore cleanup status: pruned');
@@ -821,6 +828,7 @@ function createCiContext(
     jobName,
     runId,
     runAttempt,
+    tempDirectory: null,
     workspace,
     actionPath: null,
   };

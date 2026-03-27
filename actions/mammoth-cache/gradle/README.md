@@ -335,6 +335,7 @@ Common commands:
 - `make help`
 - `make build`
 - `make smoke-test`
+- `make integration-test-build-reporting`
 - `make integration-test-distributed-reuse`
 - `make test`
 - `make lint-check`
@@ -350,6 +351,7 @@ Equivalent npm script:
 - `npm run release-legal:check`
 - `npm run release-legal:write`
 - `npm run smoke-test`
+- `npm run integration-test:build-reporting`
 - `npm run integration-test:distributed-reuse`
 
 The Makefile verifies the expected `node` and `npm` versions before running user-facing targets.
@@ -415,6 +417,11 @@ that the aggregator resolves the expected jars without re-downloading those jar 
 
 On failure, the staged temporary directory is preserved and printed so you can inspect the generated Gradle homes,
 summaries, and aggregator log locally.
+
+`make integration-test-build-reporting` / `npm run integration-test:build-reporting` stages a temporary Gradle fixture,
+runs multiple Gradle invocations locally, and writes the final step-summary style build report to
+`build/integration-build-reporting-*/build-reporting-summary.md`. Set `BUILDISH_MAMMOTH_CACHE_KEEP_LOCAL_IT=1` to preserve
+the staged directory after a successful run for local inspection.
 
 ## License
 

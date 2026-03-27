@@ -362,6 +362,7 @@ function createFixtureCiContext(jobName: string): CiJobContext {
     jobName,
     runId: 12345,
     runAttempt: 2,
+    tempDirectory: null,
     workspace: '/tmp/workspace',
     actionPath: null,
   };

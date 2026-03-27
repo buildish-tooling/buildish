@@ -40,6 +40,7 @@ describe('createGitHubContext', () => {
     expect(context.safeRefName).toBe('feature-cache-improvements');
     expect(context.runnerOs).toBe('linux');
     expect(context.runnerArch).toBe('x64');
+    expect(context.tempDirectory).toBeNull();
   });
 
   it('uses the pull request base branch for pull_request events', () => {
@@ -217,6 +218,28 @@ describe('createGitHubPlatform', () => {
       { text: 'second line', addEol: true },
     ]);
     expect(writeCalls).toBe(1);
+  });
+
+  it('publishes grouped log lines with GitHub group markers', () => {
+    const messages: string[] = [];
+    const platform = createGitHubPlatform({
+      env: {
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_REPOSITORY: 'apache/buildish',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+      },
+      eventPayload: {
+        repository: { default_branch: 'main' },
+      },
+    });
+
+    platform.publishLogGroup('Post action', ['first line', 'second line'], (message) => {
+      messages.push(message);
+    });
+
+    expect(messages).toEqual(['::group::Post action', 'first line', 'second line', '::endgroup::']);
   });
 
   it('exposes exact-host GitHub API headers when a token is configured', () => {

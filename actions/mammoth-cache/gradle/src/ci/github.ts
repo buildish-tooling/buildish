@@ -70,6 +70,24 @@ export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPla
   return {
     context,
     httpHeadersByHost,
+    publishLogGroup(
+      title: string,
+      lines: readonly string[],
+      writeLine: (message: string) => void,
+    ): void {
+      if (lines.length === 0) {
+        return;
+      }
+
+      writeLine(`::group::${title}`);
+      try {
+        for (const line of lines) {
+          writeLine(line);
+        }
+      } finally {
+        writeLine('::endgroup::');
+      }
+    },
     async publishSummary(lines: readonly string[]): Promise<void> {
       for (const line of lines) {
         summaryWriter.addRaw(line, true);
@@ -156,6 +174,7 @@ export function createGitHubContext(
     ),
     runId: parseOptionalInteger(env.GITHUB_RUN_ID, 'GITHUB_RUN_ID'),
     runAttempt: parseOptionalInteger(env.GITHUB_RUN_ATTEMPT, 'GITHUB_RUN_ATTEMPT'),
+    tempDirectory: env.RUNNER_TEMP?.trim() || null,
     workspace: env.GITHUB_WORKSPACE?.trim() || process.cwd(),
     actionPath: env.GITHUB_ACTION_PATH?.trim() || null,
   };

@@ -61,6 +61,7 @@ export interface PersistedPreBuildCacheManifestState {
 export interface PersistPreBuildCacheManifestOptions {
   readonly env?: NodeJS.ProcessEnv;
   readonly parentDirectory?: string;
+  readonly tempDirectory?: string | null;
 }
 
 export interface LoadPersistedPreBuildCacheManifestOptions {
@@ -251,6 +252,11 @@ function resolveStateParentDirectory(options: PersistPreBuildCacheManifestOption
   const parentDirectory = options.parentDirectory?.trim();
   if (parentDirectory) {
     return path.resolve(parentDirectory);
+  }
+
+  const tempDirectory = options.tempDirectory?.trim();
+  if (tempDirectory) {
+    return path.resolve(tempDirectory);
   }
 
   const runnerTemp = options.env?.RUNNER_TEMP?.trim();

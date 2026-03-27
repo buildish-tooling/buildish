@@ -17,6 +17,7 @@
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import type { CiJobContext } from '../ci/types';
 import {
   parseSerializedJsonObject,
   validateNonNegativeNumber,
@@ -30,6 +31,9 @@ const INIT_SCRIPT_FILE_NAME = 'buildish-mammoth-cache-gradle.build-result-captur
 const SERVICE_PLUGIN_FILE_NAME =
   'buildish-mammoth-cache-gradle.build-result-capture-service.plugin.groovy';
 const SKIP_CAPTURE_ENVIRONMENT_VARIABLE = 'BUILDISH_MAMMOTH_CACHE_GRADLE_SKIP_BUILD_RESULT_CAPTURE';
+const DEFAULT_CAPTURE_INVOCATION_NAMESPACE = 'buildish-mammoth-cache-gradle';
+
+type BuildCaptureContext = Pick<CiJobContext, 'tempDirectory'>;
 
 export interface CapturedGradleBuild {
   readonly invocationKey: string;
@@ -64,15 +68,27 @@ interface CapturedBuildScanFile {
   readonly buildScanFailed: boolean;
 }
 
-export async function installGradleBuildResultCapture(gradleUserHome: string): Promise<void> {
+export async function installGradleBuildResultCapture(
+  gradleUserHome: string,
+  context: BuildCaptureContext = { tempDirectory: null },
+): Promise<void> {
   const initDirectory = path.join(gradleUserHome, 'init.d');
+  const captureRoot = resolveCaptureRoot(context);
   await mkdir(initDirectory, { recursive: true });
-  await writeFile(path.join(initDirectory, INIT_SCRIPT_FILE_NAME), INIT_SCRIPT_CONTENTS, {
-    encoding: 'utf8',
-  });
-  await writeFile(path.join(initDirectory, SERVICE_PLUGIN_FILE_NAME), SERVICE_PLUGIN_CONTENTS, {
-    encoding: 'utf8',
-  });
+  await writeFile(
+    path.join(initDirectory, INIT_SCRIPT_FILE_NAME),
+    createInitScriptContents(captureRoot),
+    {
+      encoding: 'utf8',
+    },
+  );
+  await writeFile(
+    path.join(initDirectory, SERVICE_PLUGIN_FILE_NAME),
+    createServicePluginContents(captureRoot),
+    {
+      encoding: 'utf8',
+    },
+  );
 }
 
 export async function cleanupGradleBuildResultCapture(
@@ -97,14 +113,14 @@ export async function cleanupGradleBuildResultCapture(
 }
 
 export async function loadGradleBuildReport(
-  env: NodeJS.ProcessEnv = process.env,
+  context: BuildCaptureContext = { tempDirectory: null },
 ): Promise<GradleBuildReport> {
   const warnings: string[] = [];
-  const resultsRoot = resolveCaptureRoot(env);
+  const resultsRoot = resolveCaptureRoot(context);
   if (!resultsRoot) {
     return {
       builds: [],
-      warnings: ['Gradle build reporting is unavailable because RUNNER_TEMP is not set.'],
+      warnings: ['Gradle build reporting is unavailable because the CI temp directory is not set.'],
     };
   }
 
@@ -324,9 +340,9 @@ function validateOptionalCapturedJavaVersion(value: unknown, label: string): str
   return validateString(value, label);
 }
 
-function resolveCaptureRoot(env: NodeJS.ProcessEnv): string | null {
-  const runnerTemp = env.RUNNER_TEMP?.trim();
-  return runnerTemp ? path.join(runnerTemp, CAPTURE_DIRECTORY_NAME) : null;
+function resolveCaptureRoot(context: BuildCaptureContext): string | null {
+  const tempDirectory = context.tempDirectory?.trim();
+  return tempDirectory ? path.join(tempDirectory, CAPTURE_DIRECTORY_NAME) : null;
 }
 
 function displayText(value: string, fallback: string): string {
@@ -350,13 +366,18 @@ function isMissingPathError(error: unknown): boolean {
   return !!(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT');
 }
 
-const INIT_SCRIPT_CONTENTS = `/*
+function createInitScriptContents(captureRoot: string | null): string {
+  const captureRootLiteral = captureRoot ? JSON.stringify(captureRoot) : 'null';
+
+  return `/*
  * Capture information for each executed Gradle build to display in the job summary.
  */
 import org.gradle.util.GradleVersion
 import org.slf4j.LoggerFactory
 
 def SKIP_BUILD_CAPTURE = "${SKIP_CAPTURE_ENVIRONMENT_VARIABLE}"
+def CAPTURE_ROOT_DIR = ${captureRootLiteral}
+def CAPTURE_INVOCATION_NAMESPACE = "${DEFAULT_CAPTURE_INVOCATION_NAMESPACE}"
 def BUILD_SCAN_PLUGIN_ID = "com.gradle.build-scan"
 def BUILD_SCAN_EXTENSION = "buildScan"
 def DEVELOCITY_PLUGIN_ID = "com.gradle.develocity"
@@ -373,15 +394,15 @@ def isTopLevelBuild = gradle.getParent() == null
 if (isTopLevelBuild) {
     def resultsWriter = new ResultsWriter()
     def version = GradleVersion.current().baseVersion
-    def atLeastGradle6 = version >= GradleVersion.version("6.0")
-    def atLeastGradle7 = version >= GradleVersion.version("7.0")
+    def minimumSupportedVersion = GradleVersion.version("7.0")
     def invocationId = "-" + java.util.UUID.randomUUID().toString()
 
-    if (atLeastGradle6 && atLeastGradle7) {
-        captureUsingBuildService(invocationId)
-    } else {
-        captureUsingBuildFinished(gradle, invocationId, resultsWriter)
+    if (version < minimumSupportedVersion) {
+        logger.warn("buildish/mammoth-cache/gradle: Gradle build-result capture requires Gradle 7.0+; current version is ${'$'}{GradleVersion.current().version}. Skipping capture.")
+        return
     }
+
+    captureUsingBuildService(invocationId)
 
     settingsEvaluated { settings ->
         def captureBuildScanLink = {
@@ -420,21 +441,6 @@ def captureUsingBuildService(invocationId) {
     apply from: '${SERVICE_PLUGIN_FILE_NAME}'
 }
 
-void captureUsingBuildFinished(gradle, String invocationId, ResultsWriter resultsWriter) {
-    gradle.buildFinished { result ->
-        def buildResults = [
-            capturedAtEpochMillis: System.currentTimeMillis(),
-            rootProjectName: rootProject.name,
-            requestedTasks: gradle.startParameter.taskNames.join(" "),
-            gradleVersion: GradleVersion.current().version,
-            javaVersion: System.getProperty("java.version") ?: "unknown",
-            buildFailed: result.failure != null,
-            configCacheHit: false
-        ]
-        resultsWriter.writeToResultsFile("${BUILD_RESULTS_SUBDIRECTORY}", invocationId, buildResults)
-    }
-}
-
 void captureUsingBuildScanPublished(buildScanExtension, String invocationId, ResultsWriter resultsWriter) {
     buildScanExtension.with {
         buildScanPublished { buildScan ->
@@ -459,16 +465,17 @@ class ResultsWriter {
     private final logger = LoggerFactory.getLogger("buildish/mammoth-cache/gradle")
 
     void writeToResultsFile(String subDir, String invocationId, def content) {
-        def runnerTempDir = System.getProperty("RUNNER_TEMP") ?: System.getenv("RUNNER_TEMP")
-        def githubActionStep = System.getProperty("GITHUB_ACTION") ?: System.getenv("GITHUB_ACTION")
-        if (!runnerTempDir || !githubActionStep) {
+        def captureRootDir = ${captureRootLiteral}
+        def captureInvocationNamespace = "${DEFAULT_CAPTURE_INVOCATION_NAMESPACE}"
+
+        if (!captureRootDir) {
             return
         }
 
         try {
-            def buildResultsDir = new File(runnerTempDir, "${CAPTURE_DIRECTORY_NAME}/" + subDir)
+            def buildResultsDir = new File(captureRootDir, subDir)
             buildResultsDir.mkdirs()
-            def buildResultsFile = new File(buildResultsDir, githubActionStep + invocationId + ".json")
+            def buildResultsFile = new File(buildResultsDir, captureInvocationNamespace + invocationId + ".json")
             if (!buildResultsFile.exists()) {
                 logger.lifecycle("buildish/mammoth-cache/gradle: Writing build results to ${'$'}{buildResultsFile}")
                 buildResultsFile << groovy.json.JsonOutput.toJson(content)
@@ -479,8 +486,12 @@ class ResultsWriter {
     }
 }
 `;
+}
 
-const SERVICE_PLUGIN_CONTENTS = `import org.gradle.api.provider.Property
+function createServicePluginContents(captureRoot: string | null): string {
+  const captureRootLiteral = captureRoot ? JSON.stringify(captureRoot) : 'null';
+
+  return `import org.gradle.api.provider.Property
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
 import org.gradle.tooling.events.*
@@ -530,6 +541,8 @@ abstract class BuildResultsRecorder implements BuildService<BuildResultsRecorder
 
     @Override
     public void close() {
+        def captureRootDir = ${captureRootLiteral}
+        def captureInvocationNamespace = "${DEFAULT_CAPTURE_INVOCATION_NAMESPACE}"
         def buildResults = [
             capturedAtEpochMillis: System.currentTimeMillis(),
             rootProjectName: getParameters().getRootProjectName().get(),
@@ -540,16 +553,14 @@ abstract class BuildResultsRecorder implements BuildService<BuildResultsRecorder
             configCacheHit: configCacheHit
         ]
 
-        def runnerTempDir = System.getProperty("RUNNER_TEMP") ?: System.getenv("RUNNER_TEMP")
-        def githubActionStep = System.getProperty("GITHUB_ACTION") ?: System.getenv("GITHUB_ACTION")
-        if (!runnerTempDir || !githubActionStep) {
+        if (!captureRootDir) {
             return
         }
 
         try {
-            def buildResultsDir = new File(runnerTempDir, "${CAPTURE_DIRECTORY_NAME}/${BUILD_RESULTS_SUBDIRECTORY}")
+            def buildResultsDir = new File(captureRootDir, "${BUILD_RESULTS_SUBDIRECTORY}")
             buildResultsDir.mkdirs()
-            def buildResultsFile = new File(buildResultsDir, githubActionStep + getParameters().getInvocationId().get() + ".json")
+            def buildResultsFile = new File(buildResultsDir, captureInvocationNamespace + getParameters().getInvocationId().get() + ".json")
             if (!buildResultsFile.exists()) {
                 logger.lifecycle("buildish/mammoth-cache/gradle: Writing build results to ${'$'}{buildResultsFile}")
                 buildResultsFile << groovy.json.JsonOutput.toJson(buildResults)
@@ -560,3 +571,4 @@ abstract class BuildResultsRecorder implements BuildService<BuildResultsRecorder
     }
 }
 `;
+}

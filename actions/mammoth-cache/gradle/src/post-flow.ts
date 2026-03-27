@@ -41,7 +41,7 @@ import {
   createHtmlTable,
   escapeHtml,
   escapeSummaryText,
-  replaceJobSummary,
+  publishJobLogGroup,
 } from './logging/summary';
 import {
   getPersistedBaseCacheRestoreResult,
@@ -120,7 +120,7 @@ export async function executePostAction(
     dependencies.getState ?? (() => ''),
   );
   const consumedDeltaCleanupResult = await cleanupConsumedDeltaArtifacts(bootstrap, dependencies);
-  const gradleBuildReport = await loadGradleBuildReport(dependencies.env ?? process.env);
+  const gradleBuildReport = await loadGradleBuildReport(bootstrap.ciContext);
   const cleanupWarnings = await cleanupGradleBuildResultCapture(bootstrap.config.gradleUserHome);
   const combinedGradleBuildReport = {
     builds: gradleBuildReport.builds,
@@ -139,8 +139,7 @@ export async function executePostAction(
       workflowRunUrl,
       message: 'Post action flow completed without cache orchestration.',
     } satisfies PostActionStatus;
-    logPostActionDetails(status, logInfo);
-    await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
+    await publishPostActionLogGroup(dependencies, status, logInfo);
     return status;
   }
 
@@ -170,8 +169,7 @@ export async function executePostAction(
       workflowRunUrl,
       message: 'Post action flow completed without a persisted pre-build cache manifest.',
     } satisfies PostActionStatus;
-    logPostActionDetails(status, logInfo);
-    await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
+    await publishPostActionLogGroup(dependencies, status, logInfo);
     return status;
   }
 
@@ -199,8 +197,7 @@ export async function executePostAction(
     message: createPostActionMessage(deltaArtifactResult),
   } satisfies PostActionStatus;
 
-  logPostActionDetails(status, logInfo);
-  await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
+  await publishPostActionLogGroup(dependencies, status, logInfo);
 
   return status;
 }
@@ -395,21 +392,7 @@ export function createPostActionSummaryLines(status: PostActionStatus): readonly
     `${getSummaryStatusIcon(overallStatus)} Overall status: ${getSummaryStatusLabel(overallStatus)}`,
   ];
 
-  if (summaryIssues.errors.length > 0) {
-    lines.push('', '### Errors');
-    for (const error of summaryIssues.errors) {
-      lines.push(`- ❌ ${escapeSummaryText(error)}`);
-    }
-  }
-
-  if (summaryIssues.warnings.length > 0) {
-    lines.push('', '### Warnings');
-    for (const warning of summaryIssues.warnings) {
-      lines.push(`- ⚠️ ${escapeSummaryText(warning)}`);
-    }
-  }
-
-  lines.push('', '### Gradle builds', ...createGradleBuildOverviewLines(status, buildSummary));
+  lines.push('', createGradleBuildSectionHeading(status), ...createGradleBuildSectionLines(status));
 
   const cacheDetails = createCacheDetailsSectionLines(status);
   if (cacheDetails.length > 0) {
@@ -421,7 +404,41 @@ export function createPostActionSummaryLines(status: PostActionStatus): readonly
   return lines;
 }
 
-function logPostActionDetails(status: PostActionStatus, logInfo: (message: string) => void): void {
+async function publishPostActionLogGroup(
+  dependencies: PostActionDependencies,
+  status: PostActionStatus,
+  logInfo: (message: string) => void,
+): Promise<void> {
+  await publishJobLogGroup(
+    dependencies,
+    'Apache Buildish Mammoth Cache for Gradle',
+    createPostActionLogLines(status),
+    logInfo,
+  );
+}
+
+function createPostActionLogLines(status: PostActionStatus): readonly string[] {
+  const buildSummary = summarizeGradleBuildReport(status.gradleBuildReport);
+  const summaryIssues = collectPostActionSummaryIssues(status, buildSummary);
+  const lines = [
+    `${getSummaryStatusIcon(determineOverallSummaryStatus(summaryIssues))} Overall status: ${getSummaryStatusLabel(determineOverallSummaryStatus(summaryIssues))}`,
+    `Captured Gradle builds: ${buildSummary.capturedBuildCount} (${buildSummary.successfulBuildCount} succeeded, ${buildSummary.failedBuildCount} failed).`,
+    `Build Scans: ${buildSummary.publishedBuildScanCount} published, ${buildSummary.failedBuildScanCount} failed, ${buildSummary.buildScanNotAttemptedCount} not attempted.`,
+  ];
+
+  if (status.jobUrl) {
+    lines.push(`Job logs: ${status.jobUrl}`);
+  } else if (status.workflowRunUrl) {
+    lines.push(`Workflow run: ${status.workflowRunUrl}`);
+  }
+
+  for (const error of summaryIssues.errors) {
+    lines.push(`Error: ${error}`);
+  }
+  for (const warning of summaryIssues.warnings) {
+    lines.push(`Warning: ${warning}`);
+  }
+
   if (status.deltaArtifactResult?.artifactName) {
     const detailParts = [`Uploaded delta artifact '${status.deltaArtifactResult.artifactName}'`];
     if (status.deltaArtifactResult.artifactId !== null) {
@@ -430,17 +447,17 @@ function logPostActionDetails(status: PostActionStatus, logInfo: (message: strin
     if (status.deltaArtifactResult.artifactSizeBytes !== null) {
       detailParts.push(formatByteCount(status.deltaArtifactResult.artifactSizeBytes));
     }
-    logInfo(formatUploadedArtifactLogMessage(detailParts));
+    lines.push(formatUploadedArtifactLogMessage(detailParts));
   }
 
   if (status.consumedDeltaCleanupResult?.attemptedArtifactNames.length) {
-    logInfo(
+    lines.push(
       `Attempted cleanup of consumed delta artifacts: ${status.consumedDeltaCleanupResult.attemptedArtifactNames.join(', ')}.`,
     );
   }
 
   if (status.consumedDeltaCleanupResult?.deletedArtifactNames.length) {
-    logInfo(
+    lines.push(
       `Deleted consumed delta artifacts: ${status.consumedDeltaCleanupResult.deletedArtifactNames.join(', ')}.`,
     );
   }
@@ -451,10 +468,12 @@ function logPostActionDetails(status: PostActionStatus, logInfo: (message: strin
       : build.buildScanFailed
         ? 'Build Scan failed'
         : 'Build Scan not attempted';
-    logInfo(
+    lines.push(
       `Captured Gradle build ${index + 1}: ${displaySummaryText(build.rootProjectName, '(unnamed root project)')} — ${displaySummaryText(build.requestedTasks, '(default tasks)')}; Gradle ${build.gradleVersion} / Java ${build.javaVersion}; configuration cache ${build.configCacheHit ? 'reused' : 'not reused'}; ${buildScanDetail}.`,
     );
   }
+
+  return lines;
 }
 
 function summarizeGradleBuildReport(report: GradleBuildReport): {
@@ -562,57 +581,30 @@ function getSummaryStatusLabel(status: 'success' | 'warning' | 'error'): string 
   return 'success';
 }
 
-function createGradleBuildOverviewLines(
-  status: PostActionStatus,
-  buildSummary: ReturnType<typeof summarizeGradleBuildReport>,
-): readonly string[] {
-  const lines = [
-    `- Captured builds: ${buildSummary.capturedBuildCount}`,
-    `- Outcomes: ${buildSummary.successfulBuildCount} succeeded, ${buildSummary.failedBuildCount} failed`,
-    `- Build Scans: ${buildSummary.publishedBuildScanCount} published, ${buildSummary.failedBuildScanCount} failed, ${buildSummary.buildScanNotAttemptedCount} not attempted`,
-  ];
+function createGradleBuildSectionHeading(status: PostActionStatus): string {
+  return status.jobUrl
+    ? `### ${createHtmlLink(status.jobUrl, 'Gradle builds')}`
+    : '### Gradle builds';
+}
 
-  if (status.jobUrl) {
-    const workflowLabel = [
-      status.bootstrap.ciContext.workflowName,
-      status.bootstrap.ciContext.jobName,
-    ]
-      .filter((value) => value.trim().length > 0)
-      .join(' / ');
-    lines.push(
-      `- Job logs: [${escapeSummaryText(workflowLabel || 'Current job')}](${status.jobUrl})`,
-    );
-  } else if (status.workflowRunUrl) {
-    const workflowLabel = [
-      status.bootstrap.ciContext.workflowName,
-      status.bootstrap.ciContext.jobName,
-    ]
-      .filter((value) => value.trim().length > 0)
-      .join(' / ');
-    lines.push(
-      `- Workflow run: [${escapeSummaryText(workflowLabel || 'Workflow run')}](${status.workflowRunUrl})`,
-    );
-  }
-
+function createGradleBuildSectionLines(status: PostActionStatus): readonly string[] {
   if (status.gradleBuildReport.builds.length === 0) {
-    lines.push('- No Gradle builds were captured in this job.');
-    return lines;
+    return ['- No Gradle builds were captured in this job.'];
   }
 
   return [
-    ...lines,
     ...createHtmlTable(
-      ['Build', 'Request', 'Toolchain', 'Configuration cache', 'Build Scan'],
-      status.gradleBuildReport.builds.map((build, index) => [
-        escapeHtml(`${build.buildFailed ? '❌' : '✅'} ${index + 1}`),
+      ['Outcome', 'Request', 'Toolchain', 'Configuration cache', 'Build Scan'],
+      status.gradleBuildReport.builds.map((build) => [
+        escapeHtml(build.buildFailed ? '❌' : '✅'),
         escapeHtml(
           `${displaySummaryText(build.rootProjectName, '(unnamed root project)')} — ${displaySummaryText(build.requestedTasks, '(default tasks)')}`,
         ),
         escapeHtml(`Gradle ${build.gradleVersion} / Java ${build.javaVersion}`),
         escapeHtml(build.configCacheHit ? 'reused' : 'not reused'),
         build.buildScanUri
-          ? createHtmlLink(build.buildScanUri, 'open')
-          : escapeHtml(build.buildScanFailed ? 'failed' : 'not attempted'),
+          ? createHtmlLink(build.buildScanUri, '🔗')
+          : escapeHtml(build.buildScanFailed ? '❌' : '—'),
       ]),
     ),
   ];

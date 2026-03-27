@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-import { writeFile } from 'node:fs/promises';
-
 import { createGitHubPlatform, type GitHubPlatformOptions } from '../ci/github';
 
 /**
@@ -37,27 +35,23 @@ export async function appendJobSummary(
 }
 
 /**
- * Replaces the current GitHub step summary when the runner exposes `GITHUB_STEP_SUMMARY`, falling
- * back to appending via the normal summary writer in environments that do not provide that file.
+ * Publishes a grouped log block through the active CI adapter so main/post details stay out of the
+ * provider summary surface.
  */
-export async function replaceJobSummary(
+export async function publishJobLogGroup(
   options: Pick<
     GitHubPlatformOptions,
     'env' | 'eventPayload' | 'eventPayloadReader' | 'summaryWriter'
   >,
+  title: string,
   lines: readonly string[],
+  writeLine: (message: string) => void,
 ): Promise<void> {
   if (lines.length === 0) {
     return;
   }
 
-  const summaryPath = options.env?.GITHUB_STEP_SUMMARY?.trim();
-  if (!summaryPath) {
-    await appendJobSummary(options, lines);
-    return;
-  }
-
-  await writeFile(summaryPath, `${lines.join('\n')}\n`, 'utf8');
+  createGitHubPlatform(options).publishLogGroup(title, lines, writeLine);
 }
 
 export function createDetailsSection(

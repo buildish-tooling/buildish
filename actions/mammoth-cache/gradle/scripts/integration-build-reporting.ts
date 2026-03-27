@@ -21,11 +21,18 @@ import path from 'node:path';
 
 import type { SummaryWriter } from '../src/ci/types';
 import { executeMainAction } from '../src/main-flow';
-import { executePostAction } from '../src/post-flow';
+import { createPostActionSummaryLines, executePostAction } from '../src/post-flow';
 
 const RUN_ID = '92002';
 const RUN_ATTEMPT = '1';
 const WORKFLOW_NAME = 'Local Build Reporting Integration Test';
+const SUMMARY_FILE_NAME = 'build-reporting-summary.md';
+
+interface GradleInvocation {
+  readonly args: readonly string[];
+  readonly expectedExitCode?: number;
+  readonly label: string;
+}
 
 async function main(): Promise<void> {
   if (process.platform === 'win32') {
@@ -47,10 +54,17 @@ async function main(): Promise<void> {
 
   const stagedRoot = await mkdtemp(path.join(buildRoot, 'integration-build-reporting-'));
   let keepStagedRoot = process.env.BUILDISH_MAMMOTH_CACHE_KEEP_LOCAL_IT === '1';
+  const summaryPath = path.join(stagedRoot, SUMMARY_FILE_NAME);
 
   try {
     const runtime = await stageProject(stagedRoot, fixtureSourceDirectory);
     const summary = createSummaryCapture();
+    const gradleInvocations: readonly GradleInvocation[] = [
+      { args: ['help'], label: 'Baseline help build' },
+      { args: ['publishFakeBuildScan'], label: 'Publish fake Build Scan' },
+      { args: ['publishFakeBuildScanFailure'], label: 'Fail fake Build Scan publication' },
+      { args: ['failingVerification'], expectedExitCode: 1, label: 'Fail verification task' },
+    ];
 
     await executeMainAction({
       cacheApi: unavailableCacheApi(),
@@ -67,9 +81,9 @@ async function main(): Promise<void> {
       summaryWriter: summary.writer,
     });
 
-    await runGradle(runtime, ['publishFakeBuildScan'], 'Publish fake Build Scan');
-    await runGradle(runtime, ['publishFakeBuildScanFailure'], 'Fail fake Build Scan publication');
-    await runGradle(runtime, ['failingVerification'], 'Fail verification task', 1);
+    for (const invocation of gradleInvocations) {
+      await runGradle(runtime, invocation.args, invocation.label, invocation.expectedExitCode ?? 0);
+    }
 
     const postStatus = await executePostAction({
       cacheApi: unavailableCacheApi(),
@@ -85,11 +99,16 @@ async function main(): Promise<void> {
       getState: (name) => runtime.state.get(name) ?? '',
       summaryWriter: summary.writer,
     });
+    await writeFile(
+      summaryPath,
+      `${createPostActionSummaryLines(postStatus).join('\n')}\n`,
+      'utf8',
+    );
 
-    assert.equal(postStatus.gradleBuildReport.builds.length, 3);
+    assert.equal(postStatus.gradleBuildReport.builds.length, 4);
     assert.equal(
       postStatus.gradleBuildReport.builds.filter((build) => !build.buildFailed).length,
-      2,
+      3,
     );
     assert.equal(
       postStatus.gradleBuildReport.builds.filter((build) => build.buildFailed).length,
@@ -106,22 +125,19 @@ async function main(): Promise<void> {
         (build) => build.requestedTasks === 'failingVerification',
       ),
     );
+    assert.ok(postStatus.gradleBuildReport.builds.some((build) => build.requestedTasks === 'help'));
 
-    const postSummary = summary.flushes.find((flush) =>
-      flush.some((line) => line === '## Apache Buildish post action'),
+    const summaryText = await readFile(summaryPath, 'utf8');
+    assert.match(summaryText, /## Apache Buildish Mammoth Cache for Gradle/u);
+    assert.match(summaryText, /### Gradle builds/u);
+    assert.match(summaryText, /<table>/u);
+    assert.match(summaryText, /mammoth-cache-gradle-it — help/u);
+    assert.match(
+      summaryText,
+      /<a href="https:\/\/scans\.gradle\.com\/s\/fake-published-scan">🔗<\/a>/u,
     );
-    assert.ok(postSummary, 'Expected a post-action summary flush.');
-    assert.ok(postSummary.some((line) => line === '### Performed Gradle builds'));
-    assert.ok(postSummary.some((line) => line === '- Captured Gradle builds: 3'));
-    assert.ok(
-      postSummary.some(
-        (line) =>
-          line === '  - Build Scan: published (https://scans.gradle.com/s/fake-published-scan)',
-      ),
-    );
-    assert.ok(postSummary.some((line) => line.includes('Build Scan: attempted but failed')));
-    assert.ok(postSummary.some((line) => line.includes('Build 3:')));
-    assert.ok(postSummary.some((line) => line.includes('failingVerification')));
+    assert.match(summaryText, /<td>❌<\/td>/u);
+    assert.match(summaryText, /mammoth-cache-gradle-it — failingVerification/u);
 
     const initScriptPath = path.join(
       runtime.gradleUserHome,
@@ -132,7 +148,7 @@ async function main(): Promise<void> {
 
     if (keepStagedRoot) {
       console.log(
-        `\nOK: build-reporting integration test passed. Staged root preserved at: ${stagedRoot}`,
+        `\nOK: build-reporting integration test passed. Staged root preserved at: ${stagedRoot}\nSummary report: ${summaryPath}`,
       );
     } else {
       console.log(
@@ -142,7 +158,7 @@ async function main(): Promise<void> {
   } catch (error) {
     keepStagedRoot = true;
     console.error(
-      `\nFAIL: build-reporting integration test failed. Staged root preserved at: ${stagedRoot}`,
+      `\nFAIL: build-reporting integration test failed. Staged root preserved at: ${stagedRoot}\nSummary report: ${summaryPath}`,
     );
     throw error;
   } finally {
