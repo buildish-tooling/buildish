@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+import { mkdtemp, readFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { createGitHubContext, createGitHubPlatform } from '../../src/ci/github';
@@ -291,5 +295,74 @@ describe('createGitHubPlatform', () => {
         ['x-github-api-version', '2022-11-28'],
       ]),
     );
+  });
+
+  it('exposes provider diagnostics and execution URLs through the adapter', () => {
+    const platform = createGitHubPlatform({
+      env: {
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_REPOSITORY: 'apache/buildish',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+        GITHUB_RUN_ID: '101',
+        GITHUB_RUN_ATTEMPT: '2',
+        GITHUB_SERVER_URL: 'https://github.com/',
+        GITHUB_TOKEN: 'ghs_env_token',
+      },
+      eventPayload: {
+        repository: { default_branch: 'main' },
+      },
+      githubTokenInput: 'ghs_input_token',
+      internalJobCheckRunId: '987654321',
+    });
+
+    expect(platform.createBootstrapDiagnosticsLines('main')).toEqual([
+      "GitHub input 'github-token' present: yes.",
+      "GitHub environment 'GITHUB_TOKEN' available: yes.",
+      "GitHub input 'internal-job-check-run-id': 987654321.",
+    ]);
+    expect(platform.createBootstrapDiagnosticsLines('post')).toEqual([]);
+    expect(platform.executionUrls).toEqual({
+      jobUrl: 'https://github.com/apache/buildish/actions/runs/101/job/987654321',
+      workflowRunUrl: 'https://github.com/apache/buildish/actions/runs/101/attempts/2',
+    });
+  });
+
+  it('replaces the current summary file when the runner exposes a step-summary path', async () => {
+    const summaryDir = await mkdtemp(path.join(os.tmpdir(), 'github-platform-summary-'));
+    const summaryPath = path.join(summaryDir, 'step-summary.md');
+    const summaryLines: Array<{ text: string; addEol: boolean | undefined }> = [];
+    let writeCalls = 0;
+    const writer: SummaryWriter = {
+      addRaw(text: string, addEol?: boolean): SummaryWriter {
+        summaryLines.push({ text, addEol });
+        return this;
+      },
+      async write(): Promise<void> {
+        writeCalls += 1;
+      },
+    };
+
+    const platform = createGitHubPlatform({
+      env: {
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_REF: 'refs/heads/main',
+        GITHUB_REPOSITORY: 'apache/buildish',
+        GITHUB_WORKFLOW: 'CI',
+        GITHUB_JOB: 'check',
+        GITHUB_STEP_SUMMARY: summaryPath,
+      },
+      eventPayload: {
+        repository: { default_branch: 'main' },
+      },
+      summaryWriter: writer,
+    });
+
+    await platform.replaceSummary(['summary line']);
+
+    expect(await readFile(summaryPath, 'utf8')).toBe('summary line\n');
+    expect(summaryLines).toEqual([]);
+    expect(writeCalls).toBe(0);
   });
 });

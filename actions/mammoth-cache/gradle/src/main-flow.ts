@@ -19,7 +19,7 @@ import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
-  createGitHubArtifactApi,
+  createWorkflowArtifactApi,
   downloadAndVerifyDeltaArtifactPackage,
   findDeltaArtifactByProducerJob,
   type DownloadedDeltaArtifactPackage,
@@ -157,7 +157,7 @@ async function applyDependentJobDeltas(
     return null;
   }
 
-  const artifactApi = dependencies.artifactApi ?? createGitHubArtifactApi();
+  const artifactApi = dependencies.artifactApi ?? createWorkflowArtifactApi();
   const downloadedPackages = await Promise.all(
     requestedJobs.map(async (jobName) => {
       const artifact = await findDeltaArtifactByProducerJob(

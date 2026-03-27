@@ -18,7 +18,7 @@ import * as core from '@actions/core';
 import { rm } from 'node:fs/promises';
 
 import {
-  createGitHubArtifactApi,
+  createWorkflowArtifactApi,
   uploadDeltaArtifactPackage,
   stageDeltaArtifactPackage,
   type WorkflowArtifactApi,
@@ -33,7 +33,6 @@ import type { CacheDeltaManifest, CacheManifest } from './cache/manifest';
 import { captureCacheManifest, computeCacheDelta } from './cache/manifest';
 import type { CacheModel } from './cache/model';
 import type { BaseCacheRestoreResult } from './cache/service';
-import { readActionInputs } from './config/action-config';
 import {
   cleanupGradleBuildResultCapture,
   loadGradleBuildReport,
@@ -116,8 +115,7 @@ export async function executePostAction(
 ): Promise<PostActionStatus> {
   const logInfo = dependencies.logInfo ?? core.info;
   const bootstrap = await bootstrapPhase('post', dependencies);
-  const workflowRunUrl = createWorkflowRunUrl(dependencies.env ?? process.env, bootstrap);
-  const jobUrl = await resolveCurrentGitHubJobUrl(dependencies, bootstrap);
+  const { workflowRunUrl, jobUrl } = bootstrap.ciExecutionUrls;
   const baseCacheRestoreResult = getPersistedBaseCacheRestoreResult(
     dependencies.getState ?? (() => ''),
   );
@@ -248,7 +246,7 @@ async function uploadPostDeltaArtifact(
     };
   }
 
-  const artifactApi = dependencies.artifactApi ?? createGitHubArtifactApi();
+  const artifactApi = dependencies.artifactApi ?? createWorkflowArtifactApi();
   const persistedProducerIdentity = getPersistedDeltaArtifactProducerIdentity(
     dependencies.getState ?? (() => ''),
   );
@@ -320,7 +318,7 @@ async function cleanupConsumedDeltaArtifacts(
     };
   }
 
-  const artifactApi = dependencies.artifactApi ?? createGitHubArtifactApi();
+  const artifactApi = dependencies.artifactApi ?? createWorkflowArtifactApi();
   const deleteResults = await Promise.allSettled(
     artifactNames.map(async (artifactName) => {
       await artifactApi.deleteArtifact(artifactName);
@@ -827,66 +825,6 @@ function getBaseCacheWarning(
   }
 
   return null;
-}
-
-function createWorkflowRunUrl(env: NodeJS.ProcessEnv, bootstrap: BootstrapStatus): string | null {
-  const runId = bootstrap.ciContext.runId;
-  if (runId === null) {
-    return null;
-  }
-
-  const repository = bootstrap.ciContext.repository.trim();
-  if (repository.length === 0) {
-    return null;
-  }
-
-  const attemptSegment =
-    bootstrap.ciContext.runAttempt === null ? '' : `/attempts/${bootstrap.ciContext.runAttempt}`;
-  const serverUrl = normalizeServerUrl(env.GITHUB_SERVER_URL);
-  return `${serverUrl}/${repository}/actions/runs/${runId}${attemptSegment}`;
-}
-
-function normalizeServerUrl(value: string | undefined): string {
-  const trimmedValue = value?.trim();
-  if (!trimmedValue) {
-    return 'https://github.com';
-  }
-
-  try {
-    const parsed = new URL(trimmedValue);
-    parsed.search = '';
-    parsed.hash = '';
-    return parsed.toString().replace(/\/+$/, '');
-  } catch {
-    return 'https://github.com';
-  }
-}
-
-async function resolveCurrentGitHubJobUrl(
-  dependencies: PostActionDependencies,
-  bootstrap: BootstrapStatus,
-): Promise<string | null> {
-  const runId = bootstrap.ciContext.runId;
-  const repository = bootstrap.ciContext.repository.trim();
-  const jobCheckRunId = parseJobCheckRunId(
-    readActionInputs(dependencies.inputProvider).internalJobCheckRunId,
-  );
-  if (runId === null || repository.length === 0 || jobCheckRunId === null) {
-    return null;
-  }
-
-  const serverUrl = normalizeServerUrl((dependencies.env ?? process.env).GITHUB_SERVER_URL);
-  return `${serverUrl}/${repository}/actions/runs/${runId}/job/${jobCheckRunId}`;
-}
-
-function parseJobCheckRunId(value: string): number | null {
-  const trimmedValue = value.trim();
-  if (!/^[1-9][0-9]*$/u.test(trimmedValue)) {
-    return null;
-  }
-
-  const parsed = Number.parseInt(trimmedValue, 10);
-  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 function formatByteCount(value: number): string {

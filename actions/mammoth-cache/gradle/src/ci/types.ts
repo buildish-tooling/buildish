@@ -90,6 +90,16 @@ export interface SummaryWriter {
 export type HttpHeadersByHost = ReadonlyMap<string, ReadonlyMap<string, string>>;
 
 /**
+ * Provider-generated links to the current job execution surfaces when available.
+ */
+export interface CiExecutionUrls {
+  /** Direct link to the current job's logs/details view, or `null` when unavailable. */
+  readonly jobUrl: string | null;
+  /** Direct link to the current workflow run, or `null` when unavailable. */
+  readonly workflowRunUrl: string | null;
+}
+
+/**
  * Provider-neutral CI adapter surface used by the bootstrap flow.
  */
 export interface CiPlatformAdapter {
@@ -97,6 +107,10 @@ export interface CiPlatformAdapter {
   readonly context: CiJobContext;
   /** Optional exact-host HTTP headers, such as GitHub API auth headers derived from CI tokens. */
   readonly httpHeadersByHost: HttpHeadersByHost;
+  /** Provider-generated execution URLs for the current job/run, when available. */
+  readonly executionUrls: CiExecutionUrls;
+  /** Emits provider-specific diagnostic lines for the given action phase. */
+  createBootstrapDiagnosticsLines(phase: 'main' | 'post'): readonly string[];
   /** Publishes the provided lines as a grouped log block using the provider-specific log surface. */
   publishLogGroup(
     title: string,
@@ -105,4 +119,6 @@ export interface CiPlatformAdapter {
   ): void;
   /** Publishes the provided markdown lines to the provider summary surface. */
   publishSummary(lines: readonly string[]): Promise<void>;
+  /** Replaces the current provider-managed summary content when supported. */
+  replaceSummary(lines: readonly string[]): Promise<void>;
 }

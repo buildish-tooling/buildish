@@ -176,6 +176,8 @@ describe('bootstrap helpers', () => {
       baseCacheResult: restoreResult,
       validatedWrappers,
       provisionedWrappers,
+      ciDiagnosticsLines: [],
+      ciExecutionUrls: { jobUrl: null, workflowRunUrl: null },
       message: 'Prepared main phase for push on main in standalone mode.',
     });
   });
@@ -216,11 +218,11 @@ describe('bootstrap helpers', () => {
         restoreResult,
         validatedWrappers,
         provisionedWrappers,
-        {
-          githubTokenPresentViaInput: true,
-          githubTokenAvailableViaEnvironment: true,
-          internalJobCheckRunId: '987654321',
-        },
+        [
+          "GitHub input 'github-token' present: yes.",
+          "GitHub environment 'GITHUB_TOKEN' available: yes.",
+          "GitHub input 'internal-job-check-run-id': 987654321.",
+        ],
       ),
     ).join('\n');
 
@@ -331,11 +333,12 @@ describe('bootstrap helpers', () => {
       expect(status.baseCacheResult?.status).toBe('exact-hit');
       expect(status.validatedWrappers).toHaveLength(1);
       expect(status.provisionedWrappers).toHaveLength(1);
-      expect(status.inputDiagnostics).toEqual({
-        githubTokenPresentViaInput: true,
-        githubTokenAvailableViaEnvironment: false,
-        internalJobCheckRunId: null,
-      });
+      expect(status.ciDiagnosticsLines).toEqual([
+        "GitHub input 'github-token' present: yes.",
+        "GitHub environment 'GITHUB_TOKEN' available: no.",
+        "GitHub input 'internal-job-check-run-id': absent.",
+      ]);
+      expect(status.ciExecutionUrls).toEqual({ jobUrl: null, workflowRunUrl: null });
       expect(summaryLines).toEqual([]);
       expect(savedState.get('buildish-mammoth-cache-gradle-base-cache-armed')).toBe('true');
       expect(writeCalls).toBe(0);

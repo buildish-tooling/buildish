@@ -16,7 +16,7 @@
 
 import * as core from '@actions/core';
 
-import { createGitHubPlatform, type GitHubPlatformOptions } from './ci/github';
+import { createCiPlatform, type CiPlatformOptions } from './ci';
 import {
   armBaseCachePostAction,
   isBaseCachePostActionArmed,
@@ -25,7 +25,7 @@ import {
   type BaseCacheApi,
   type BaseCacheOperationResult,
 } from './cache/service';
-import type { CiJobContext } from './ci/types';
+import type { CiExecutionUrls, CiJobContext } from './ci/types';
 import { createCacheModel, type CacheModel, type CommandOutputCapture } from './cache/model';
 import {
   normalizeActionConfig,
@@ -47,19 +47,10 @@ import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from './wr
 /**
  * Action execution phase.
  *
- * Valid values are `main` for the primary action entrypoint and `post` for the GitHub post-action
+ * Valid values are `main` for the primary action entrypoint and `post` for the post-action
  * cleanup/save entrypoint.
  */
 export type BootstrapPhase = 'main' | 'post';
-
-export interface BootstrapInputDiagnostics {
-  /** Whether `github-token` was present after direct input resolution. */
-  readonly githubTokenPresentViaInput: boolean;
-  /** Whether `GITHUB_TOKEN` is available from the runtime environment. */
-  readonly githubTokenAvailableViaEnvironment: boolean;
-  /** Directly resolved workflow job/check-run identifier, when present. */
-  readonly internalJobCheckRunId: string | null;
-}
 
 /**
  * Bootstrap output shared by the action entrypoints and tests.
@@ -97,14 +88,16 @@ export interface BootstrapStatus {
    * Defaults to an empty array and is empty in the `post` phase.
    */
   readonly provisionedWrappers: readonly ProvisionedWrapperJar[];
-  /** Optional runtime diagnostics about GitHub input/env token resolution. */
-  readonly inputDiagnostics?: BootstrapInputDiagnostics;
+  /** Provider-specific bootstrap diagnostics rendered by the active CI adapter. */
+  readonly ciDiagnosticsLines: readonly string[];
+  /** Provider-specific execution URLs for the current job/run when available. */
+  readonly ciExecutionUrls: CiExecutionUrls;
 }
 
 /**
  * Injectable dependencies for bootstrap-time environment/input discovery.
  */
-export interface BootstrapDependencies extends GitHubPlatformOptions {
+export interface BootstrapDependencies extends CiPlatformOptions {
   /**
    * Optional action-input provider override.
    *
@@ -158,8 +151,8 @@ export interface BootstrapDependencies extends GitHubPlatformOptions {
 /**
  * Shared startup path for both the main and post-action entrypoints.
  *
- * This is the only place that currently knows how to read GitHub metadata, read action
- * inputs, and normalize runtime config.
+ * This is the only place that currently wires the active CI adapter, reads action inputs, and
+ * normalizes runtime config.
  */
 export async function bootstrapPhase(
   phase: BootstrapPhase,
@@ -167,10 +160,11 @@ export async function bootstrapPhase(
 ): Promise<BootstrapStatus> {
   const runtimeEnv = dependencies.env ?? process.env;
   const directInputs = readActionInputs(dependencies.inputProvider);
-  const inputDiagnostics = createBootstrapInputDiagnostics(directInputs, runtimeEnv);
-  const platform = createGitHubPlatform({
+  const platform = createCiPlatform({
     ...dependencies,
     githubToken: dependencies.githubToken ?? directInputs.githubToken,
+    githubTokenInput: directInputs.githubToken,
+    internalJobCheckRunId: directInputs.internalJobCheckRunId,
   });
   const rawInputs = await resolveActionInputsFromConfigFile(directInputs, {
     workspace: platform.context.workspace,
@@ -208,7 +202,8 @@ export async function bootstrapPhase(
     baseCacheResult,
     validatedWrappers,
     provisionedWrappers,
-    inputDiagnostics,
+    platform.createBootstrapDiagnosticsLines(phase),
+    platform.executionUrls,
   );
 
   return status;
@@ -225,7 +220,8 @@ export function createBootstrapStatus(
   baseCacheResult: BaseCacheOperationResult | null = null,
   validatedWrappers: readonly ValidatedWrapperPropertiesFile[] = [],
   provisionedWrappers: readonly ProvisionedWrapperJar[] = [],
-  inputDiagnostics?: BootstrapInputDiagnostics,
+  ciDiagnosticsLines: readonly string[] = [],
+  ciExecutionUrls: CiExecutionUrls = { jobUrl: null, workflowRunUrl: null },
 ): BootstrapStatus {
   return {
     phase,
@@ -235,7 +231,8 @@ export function createBootstrapStatus(
     baseCacheResult,
     validatedWrappers,
     provisionedWrappers,
-    ...(inputDiagnostics ? { inputDiagnostics } : {}),
+    ciDiagnosticsLines,
+    ciExecutionUrls,
     message: `Prepared ${phase} phase for ${ciContext.eventName} on ${ciContext.safeRefName} in ${config.jobMode} mode.`,
   };
 }
@@ -278,7 +275,6 @@ export function createBootstrapSummaryLines(status: BootstrapStatus): readonly s
 }
 
 export function createBootstrapLogLines(status: BootstrapStatus): readonly string[] {
-  const inputDiagnostics = status.inputDiagnostics ?? createBootstrapInputDiagnostics();
   const downloadedWrapperCount = status.provisionedWrappers.filter(
     (wrapper) => wrapper.wasDownloaded,
   ).length;
@@ -301,14 +297,8 @@ export function createBootstrapLogLines(status: BootstrapStatus): readonly strin
     lines.push(status.baseCacheResult.message);
   }
 
-  if (status.phase === 'main') {
-    lines.push(
-      `GitHub input 'github-token' present: ${inputDiagnostics.githubTokenPresentViaInput ? 'yes' : 'no'}.`,
-      `GitHub environment 'GITHUB_TOKEN' available: ${inputDiagnostics.githubTokenAvailableViaEnvironment ? 'yes' : 'no'}.`,
-      inputDiagnostics.internalJobCheckRunId === null
-        ? "GitHub input 'internal-job-check-run-id': absent."
-        : `GitHub input 'internal-job-check-run-id': ${inputDiagnostics.internalJobCheckRunId}.`,
-    );
+  if (status.ciDiagnosticsLines.length > 0) {
+    lines.push(...status.ciDiagnosticsLines);
   }
 
   if (status.phase === 'post') {
@@ -346,23 +336,6 @@ function createWrapperProvisioningSummaryLines(status: BootstrapStatus): readonl
       escapeHtml(wrapper.wrapperSourceVersion),
     ]),
   );
-}
-
-function createBootstrapInputDiagnostics(
-  directInputs: Pick<
-    ReturnType<typeof readActionInputs>,
-    'githubToken' | 'internalJobCheckRunId'
-  > = { githubToken: '', internalJobCheckRunId: '' },
-  runtimeEnv: NodeJS.ProcessEnv = {},
-): BootstrapInputDiagnostics {
-  const githubToken = directInputs.githubToken.trim();
-  const internalJobCheckRunId = directInputs.internalJobCheckRunId.trim();
-
-  return {
-    githubTokenPresentViaInput: githubToken.length > 0,
-    githubTokenAvailableViaEnvironment: (runtimeEnv.GITHUB_TOKEN?.trim().length ?? 0) > 0,
-    internalJobCheckRunId: internalJobCheckRunId.length > 0 ? internalJobCheckRunId : null,
-  };
 }
 
 function createWrapperProvisioningLogMessage(wrapper: ProvisionedWrapperJar): string {

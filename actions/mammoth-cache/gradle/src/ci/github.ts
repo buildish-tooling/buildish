@@ -16,10 +16,17 @@
 
 import * as core from '@actions/core';
 import * as fs from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import * as os from 'node:os';
 
 import { isRecord } from '../validation';
-import type { CiJobContext, CiPlatformAdapter, HttpHeadersByHost, SummaryWriter } from './types';
+import type {
+  CiExecutionUrls,
+  CiJobContext,
+  CiPlatformAdapter,
+  HttpHeadersByHost,
+  SummaryWriter,
+} from './types';
 
 const METADATA_PATTERN = /^[A-Za-z0-9._/-]{0,200}$/;
 const DISPLAY_NAME_PATTERN = /^[A-Za-z0-9._ -]{0,100}$/;
@@ -51,6 +58,10 @@ export interface GitHubPlatformOptions {
    * becomes user-visible status data.
    */
   readonly githubToken?: string;
+  /** Directly resolved `github-token` action input used for provider diagnostics. */
+  readonly githubTokenInput?: string;
+  /** Directly resolved GitHub check-run identifier for the current workflow job. */
+  readonly internalJobCheckRunId?: string;
 }
 
 /**
@@ -66,10 +77,27 @@ export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPla
     options.githubToken ?? env.GITHUB_TOKEN,
     env.GITHUB_API_URL,
   );
+  const executionUrls = createGitHubExecutionUrls(context, env, options.internalJobCheckRunId);
 
   return {
     context,
     httpHeadersByHost,
+    executionUrls,
+    createBootstrapDiagnosticsLines(phase: 'main' | 'post'): readonly string[] {
+      if (phase !== 'main') {
+        return [];
+      }
+
+      const githubTokenInput = options.githubTokenInput?.trim() ?? '';
+      const internalJobCheckRunId = options.internalJobCheckRunId?.trim() ?? '';
+      return [
+        `GitHub input 'github-token' present: ${githubTokenInput ? 'yes' : 'no'}.`,
+        `GitHub environment 'GITHUB_TOKEN' available: ${(env.GITHUB_TOKEN?.trim().length ?? 0) > 0 ? 'yes' : 'no'}.`,
+        internalJobCheckRunId
+          ? `GitHub input 'internal-job-check-run-id': ${internalJobCheckRunId}.`
+          : "GitHub input 'internal-job-check-run-id': absent.",
+      ];
+    },
     publishLogGroup(
       title: string,
       lines: readonly string[],
@@ -89,13 +117,67 @@ export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPla
       }
     },
     async publishSummary(lines: readonly string[]): Promise<void> {
+      if (lines.length === 0) {
+        return;
+      }
+
       for (const line of lines) {
         summaryWriter.addRaw(line, true);
       }
 
       await summaryWriter.write();
     },
+    async replaceSummary(lines: readonly string[]): Promise<void> {
+      if (lines.length === 0) {
+        return;
+      }
+
+      const summaryPath = env.GITHUB_STEP_SUMMARY?.trim();
+      if (!summaryPath) {
+        await this.publishSummary(lines);
+        return;
+      }
+
+      await writeFile(summaryPath, `${lines.join('\n')}\n`, 'utf8');
+    },
   };
+}
+
+function createGitHubExecutionUrls(
+  context: CiJobContext,
+  env: NodeJS.ProcessEnv,
+  internalJobCheckRunId: string | undefined,
+): CiExecutionUrls {
+  return {
+    jobUrl: createGitHubJobUrl(context, env, internalJobCheckRunId),
+    workflowRunUrl: createGitHubWorkflowRunUrl(context, env),
+  };
+}
+
+function createGitHubWorkflowRunUrl(context: CiJobContext, env: NodeJS.ProcessEnv): string | null {
+  if (!context.repository || context.runId === null) {
+    return null;
+  }
+
+  const serverUrl = normalizeServerUrl(env.GITHUB_SERVER_URL);
+  const attemptSegment = context.runAttempt === null ? '' : `/attempts/${context.runAttempt}`;
+  return `${serverUrl}/${context.repository}/actions/runs/${context.runId}${attemptSegment}`;
+}
+
+function createGitHubJobUrl(
+  context: CiJobContext,
+  env: NodeJS.ProcessEnv,
+  internalJobCheckRunId: string | undefined,
+): string | null {
+  if (!context.repository || context.runId === null) {
+    return null;
+  }
+
+  const serverUrl = normalizeServerUrl(env.GITHUB_SERVER_URL);
+  const checkRunId = parseJobCheckRunId(internalJobCheckRunId);
+  return checkRunId !== null
+    ? `${serverUrl}/${context.repository}/actions/runs/${context.runId}/job/${checkRunId}`
+    : null;
 }
 
 export function createGitHubHttpHeadersByHost(
@@ -388,4 +470,31 @@ function readNestedString(
 
 function defaultRead(eventPath: string): string {
   return fs.readFileSync(eventPath, 'utf8');
+}
+
+function normalizeServerUrl(value: string | undefined): string {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return 'https://github.com';
+  }
+
+  try {
+    const url = new URL(trimmed);
+    url.pathname = url.pathname.replace(/\/$/u, '');
+    url.search = '';
+    url.hash = '';
+    return url.toString().replace(/\/$/u, '');
+  } catch {
+    return 'https://github.com';
+  }
+}
+
+function parseJobCheckRunId(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed || !/^[1-9][0-9]*$/u.test(trimmed)) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isSafeInteger(parsed) ? trimmed : null;
 }

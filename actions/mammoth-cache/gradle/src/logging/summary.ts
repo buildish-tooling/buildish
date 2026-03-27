@@ -14,50 +14,35 @@
  * limitations under the License.
  */
 
-import { writeFile } from 'node:fs/promises';
-
-import { createGitHubPlatform, type GitHubPlatformOptions } from '../ci/github';
+import { createCiPlatform, type CiPlatformOptions } from '../ci';
 
 /**
- * Appends a follow-up summary section using the same GitHub summary surface as bootstrap.
+ * Appends a follow-up summary section using the active CI provider summary surface.
  */
 export async function appendJobSummary(
-  options: Pick<
-    GitHubPlatformOptions,
-    'env' | 'eventPayload' | 'eventPayloadReader' | 'summaryWriter'
-  >,
+  options: Pick<CiPlatformOptions, 'env' | 'eventPayload' | 'eventPayloadReader' | 'summaryWriter'>,
   lines: readonly string[],
 ): Promise<void> {
   if (lines.length === 0) {
     return;
   }
 
-  const platform = createGitHubPlatform(options);
+  const platform = createCiPlatform(options);
   await platform.publishSummary(lines);
 }
 
 /**
- * Replaces the current GitHub step summary when the runner exposes `GITHUB_STEP_SUMMARY`, falling
- * back to appending via the normal summary writer in environments that do not provide that file.
+ * Replaces the current provider-managed job summary when supported, falling back to append mode.
  */
 export async function replaceJobSummary(
-  options: Pick<
-    GitHubPlatformOptions,
-    'env' | 'eventPayload' | 'eventPayloadReader' | 'summaryWriter'
-  >,
+  options: Pick<CiPlatformOptions, 'env' | 'eventPayload' | 'eventPayloadReader' | 'summaryWriter'>,
   lines: readonly string[],
 ): Promise<void> {
   if (lines.length === 0) {
     return;
   }
 
-  const summaryPath = options.env?.GITHUB_STEP_SUMMARY?.trim();
-  if (!summaryPath) {
-    await appendJobSummary(options, lines);
-    return;
-  }
-
-  await writeFile(summaryPath, `${lines.join('\n')}\n`, 'utf8');
+  await createCiPlatform(options).replaceSummary(lines);
 }
 
 /**
@@ -65,10 +50,7 @@ export async function replaceJobSummary(
  * provider summary surface.
  */
 export async function publishJobLogGroup(
-  options: Pick<
-    GitHubPlatformOptions,
-    'env' | 'eventPayload' | 'eventPayloadReader' | 'summaryWriter'
-  >,
+  options: Pick<CiPlatformOptions, 'env' | 'eventPayload' | 'eventPayloadReader' | 'summaryWriter'>,
   title: string,
   lines: readonly string[],
   writeLine: (message: string) => void,
@@ -77,7 +59,7 @@ export async function publishJobLogGroup(
     return;
   }
 
-  createGitHubPlatform(options).publishLogGroup(title, lines, writeLine);
+  createCiPlatform(options).publishLogGroup(title, lines, writeLine);
 }
 
 export function createDetailsSection(

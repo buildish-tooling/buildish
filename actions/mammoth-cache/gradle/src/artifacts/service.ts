@@ -217,9 +217,9 @@ export interface DownloadDeltaArtifactPackageOptions extends ArtifactFindOptions
 }
 
 /**
- * Creates the provider-neutral GitHub artifact adapter used by the exchange layer.
+ * Creates the default workflow artifact adapter used by the exchange layer.
  */
-export function createGitHubArtifactApi(
+export function createWorkflowArtifactApi(
   client: ArtifactClient = artifactClient,
 ): WorkflowArtifactApi {
   return {
