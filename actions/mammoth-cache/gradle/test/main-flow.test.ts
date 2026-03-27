@@ -167,10 +167,7 @@ describe('executeMainAction', () => {
           .flatMap((partition) => partition.entries)
           .map((entry) => entry.relativePath),
       ).toContain('caches/modules-2/files-2.1/example/module.bin');
-      const bootstrapSummaryText = summary.lines.join('\n');
-      expect(bootstrapSummaryText).toContain('## Apache Buildish bootstrap');
-      expect(bootstrapSummaryText).toContain('<summary>Wrapper provisioning</summary>');
-      expect(bootstrapSummaryText).toContain('gradle/wrapper/gradle-wrapper.properties');
+      expect(summary.lines).toEqual([]);
       const summaryText = createMainActionSummaryLines(status).join('\n');
       expect(summaryText).toContain('## Apache Buildish main action');
       expect(summaryText).toContain('- Restore cleanup: none');
@@ -184,6 +181,8 @@ describe('executeMainAction', () => {
       expect(infoMessages).toEqual(
         expect.arrayContaining([
           '::group::Apache Buildish main action',
+          'Bootstrap: Prepared main phase for push on main in distributed-aggregator mode.',
+          'Wrapper provisioning: 1 ready (0 downloaded, 1 reused).',
           `Downloaded dependent delta artifacts: ${status.dependentDeltaResult!.downloadedArtifactNames[0]}.`,
           `Persisted pre-build cache manifest to '${manifestPath}'.`,
           '::endgroup::',
@@ -205,7 +204,7 @@ describe('executeMainAction', () => {
         'downloaded-dependent-artifact-count': '1',
         'job-name': 'aggregate',
       });
-      expect(summary.writeCalls).toBe(1);
+      expect(summary.writeCalls).toBe(0);
     });
   });
 
@@ -397,7 +396,7 @@ describe('executeMainAction', () => {
         'downloaded-dependent-artifact-count': '0',
         'job-name': 'build',
       });
-      expect(summary.writeCalls).toBe(1);
+      expect(summary.writeCalls).toBe(0);
     });
   });
 

@@ -23,7 +23,12 @@ import {
   stageDeltaArtifactPackage,
   type WorkflowArtifactApi,
 } from './artifacts/service';
-import { bootstrapPhase, type BootstrapDependencies, type BootstrapStatus } from './bootstrap';
+import {
+  bootstrapPhase,
+  createBootstrapLogLines,
+  type BootstrapDependencies,
+  type BootstrapStatus,
+} from './bootstrap';
 import { createGitHubHttpHeadersByHost } from './ci/github';
 import type { CacheDeltaManifest, CacheManifest } from './cache/manifest';
 import { captureCacheManifest, computeCacheDelta } from './cache/manifest';
@@ -36,11 +41,9 @@ import {
   type GradleBuildReport,
 } from './gradle/build-results';
 import {
-  createDetailsSection,
   createHtmlLink,
   createHtmlTable,
   escapeHtml,
-  escapeSummaryText,
   publishJobLogGroup,
   replaceJobSummary,
 } from './logging/summary';
@@ -391,21 +394,13 @@ export function createPostActionSummaryLines(status: PostActionStatus): readonly
   const buildSummary = summarizeGradleBuildReport(status.gradleBuildReport);
   const summaryIssues = collectPostActionSummaryIssues(status, buildSummary);
   const overallStatus = determineOverallSummaryStatus(summaryIssues);
-  const lines = [
+  return [
     '## Apache Buildish Mammoth Cache for Gradle',
     `${getSummaryStatusIcon(overallStatus)} Overall status: ${getSummaryStatusLabel(overallStatus)}`,
+    '',
+    createGradleBuildSectionHeading(status),
+    ...createGradleBuildSectionLines(status),
   ];
-
-  lines.push('', createGradleBuildSectionHeading(status), ...createGradleBuildSectionLines(status));
-
-  const cacheDetails = createCacheDetailsSectionLines(status);
-  if (cacheDetails.length > 0) {
-    lines.push('', ...cacheDetails);
-  }
-
-  lines.push('', ...createExecutionContextSectionLines(status));
-
-  return lines;
 }
 
 async function publishPostActionLogGroup(
@@ -425,6 +420,7 @@ function createPostActionLogLines(status: PostActionStatus): readonly string[] {
   const buildSummary = summarizeGradleBuildReport(status.gradleBuildReport);
   const summaryIssues = collectPostActionSummaryIssues(status, buildSummary);
   const lines = [
+    ...createBootstrapLogLines(status.bootstrap),
     `${getSummaryStatusIcon(determineOverallSummaryStatus(summaryIssues))} Overall status: ${getSummaryStatusLabel(determineOverallSummaryStatus(summaryIssues))}`,
     `Captured Gradle builds: ${buildSummary.capturedBuildCount} (${buildSummary.successfulBuildCount} succeeded, ${buildSummary.failedBuildCount} failed).`,
     `Build Scans: ${buildSummary.publishedBuildScanCount} published, ${buildSummary.failedBuildScanCount} failed, ${buildSummary.buildScanNotAttemptedCount} not attempted.`,
@@ -466,6 +462,8 @@ function createPostActionLogLines(status: PostActionStatus): readonly string[] {
     );
   }
 
+  lines.push(...createCacheDetailLogLines(status), ...createExecutionContextLogLines(status));
+
   for (const [index, build] of status.gradleBuildReport.builds.entries()) {
     const buildScanDetail = build.buildScanUri
       ? `Build Scan ${build.buildScanUri}`
@@ -478,6 +476,43 @@ function createPostActionLogLines(status: PostActionStatus): readonly string[] {
   }
 
   return lines;
+}
+
+function createCacheDetailLogLines(status: PostActionStatus): readonly string[] {
+  if (!status.bootstrap.cacheModel) {
+    return [];
+  }
+
+  const lines = [
+    `Base cache restore: ${status.baseCacheRestoreResult?.status ?? 'not evaluated'}.`,
+    `Base cache save: ${status.bootstrap.baseCacheResult?.status ?? 'not evaluated'}.`,
+    `Delta artifact: ${status.deltaArtifactResult?.status ?? 'not evaluated'}.`,
+  ];
+
+  if (status.deltaArtifactResult) {
+    lines.push(
+      `Post-build cache delta: ${status.deltaArtifactResult.addedCount} added, ${status.deltaArtifactResult.modifiedCount} modified, ${status.deltaArtifactResult.deletedCount} deleted.`,
+    );
+  }
+
+  if (status.consumedDeltaCleanupResult) {
+    lines.push(
+      `Consumed delta cleanup: deleted ${status.consumedDeltaCleanupResult.deletedArtifactNames.length} of ${status.consumedDeltaCleanupResult.attemptedArtifactNames.length}.`,
+    );
+  }
+
+  if (status.cacheStatistics) {
+    lines.push(...createCacheStatisticsLogLines(status.cacheStatistics));
+  }
+
+  return lines;
+}
+
+function createExecutionContextLogLines(status: PostActionStatus): readonly string[] {
+  return [
+    `Post-action detail: ${status.message}`,
+    `Post-action cache context: cache key '${status.bootstrap.cacheModel?.cacheKey ?? 'disabled'}', Java major '${status.bootstrap.cacheModel?.javaMajor ?? 'n/a'}', cache partitions ${status.bootstrap.cacheModel?.partitions.length ?? 0}.`,
+  ];
 }
 
 function summarizeGradleBuildReport(report: GradleBuildReport): {
@@ -614,70 +649,26 @@ function createGradleBuildSectionLines(status: PostActionStatus): readonly strin
   ];
 }
 
-function createCacheDetailsSectionLines(status: PostActionStatus): readonly string[] {
-  if (!status.bootstrap.cacheModel) {
-    return [];
-  }
-
-  return createDetailsSection('Cache details', [
-    `- Base cache restore: ${escapeSummaryText(status.baseCacheRestoreResult?.status ?? 'not evaluated')}`,
-    `- Base cache save: ${escapeSummaryText(status.bootstrap.baseCacheResult?.status ?? 'not evaluated')}`,
-    `- Delta artifact: ${escapeSummaryText(status.deltaArtifactResult?.status ?? 'not evaluated')}`,
-    ...(status.deltaArtifactResult
-      ? [
-          `- Post-build cache delta: ${status.deltaArtifactResult.addedCount} added, ${status.deltaArtifactResult.modifiedCount} modified, ${status.deltaArtifactResult.deletedCount} deleted`,
-        ]
-      : []),
-    ...(status.consumedDeltaCleanupResult
-      ? [
-          `- Consumed delta cleanup: deleted ${status.consumedDeltaCleanupResult.deletedArtifactNames.length} of ${status.consumedDeltaCleanupResult.attemptedArtifactNames.length}`,
-        ]
-      : []),
-    ...(status.cacheStatistics ? createCacheStatisticsTableLines(status.cacheStatistics) : []),
-  ]);
-}
-
-function createExecutionContextSectionLines(status: PostActionStatus): readonly string[] {
-  return createDetailsSection('Execution context', [
-    `- Phase: ${escapeSummaryText(status.bootstrap.phase)}`,
-    `- Workflow: ${escapeSummaryText(status.bootstrap.ciContext.workflowName)}`,
-    `- Job: ${escapeSummaryText(status.bootstrap.ciContext.jobName)}`,
-    `- Event: ${escapeSummaryText(status.bootstrap.ciContext.eventName)}`,
-    `- Ref: ${escapeSummaryText(status.bootstrap.ciContext.resolvedRefName)}`,
-    `- Safe ref: ${escapeSummaryText(status.bootstrap.ciContext.safeRefName)}`,
-    `- Runner: ${escapeSummaryText(status.bootstrap.ciContext.runnerOs)}/${escapeSummaryText(status.bootstrap.ciContext.runnerArch)}`,
-    `- Job mode: ${escapeSummaryText(status.bootstrap.config.jobMode)}`,
-    `- Read only: ${status.bootstrap.config.readOnly ? 'yes' : 'no'}`,
-    `- Base cache enabled: ${status.bootstrap.cacheModel ? 'yes' : 'no'}`,
-    ...(status.bootstrap.cacheModel
-      ? [
-          `- Cache key: ${escapeSummaryText(status.bootstrap.cacheModel.cacheKey)}`,
-          `- Java major: ${escapeSummaryText(String(status.bootstrap.cacheModel.javaMajor))}`,
-          `- Cache partitions: ${status.bootstrap.cacheModel.partitions.length}`,
-        ]
-      : []),
-    `- Wrapper selection: ${escapeSummaryText(status.bootstrap.config.wrapperSelectionMode)}`,
-    `- Detail: ${escapeSummaryText(status.message)}`,
-  ]);
-}
-
-function createCacheStatisticsTableLines(cacheStatistics: PostCacheStatistics): readonly string[] {
+function createCacheStatisticsLogLines(cacheStatistics: PostCacheStatistics): readonly string[] {
   const hasAvailableRow = cacheStatistics.rows.some((row) => row.total !== null);
   if (!hasAvailableRow) {
     return [];
   }
 
   return [
-    '- Cache partition statistics (manifest-derived, uncompressed content sizes):',
-    ...createHtmlTable(
-      ['Snapshot', 'Total', ...cacheStatistics.partitionDisplayNames],
-      cacheStatistics.rows.map((row) => [
-        escapeHtml(row.label),
-        escapeHtml(formatCacheStatisticCell(row.total)),
-        ...row.partitions.map((cell) => escapeHtml(formatCacheStatisticCell(cell))),
-      ]),
-    ),
-    '- Note: base-cache rows reflect cache-manifest snapshots, not the compressed size of the backend cache entry.',
+    'Cache partition statistics (manifest-derived, uncompressed content sizes):',
+    ...cacheStatistics.rows
+      .filter((row) => row.total !== null)
+      .map((row) => {
+        const partitionSummary = row.partitions
+          .map(
+            (cell, index) =>
+              `${cacheStatistics.partitionDisplayNames[index] ?? `Partition ${index + 1}`}: ${formatCacheStatisticCell(cell)}`,
+          )
+          .join('; ');
+        return `- ${row.label}: total ${formatCacheStatisticCell(row.total)}; ${partitionSummary}`;
+      }),
+    'Note: base-cache rows reflect cache-manifest snapshots, not the compressed size of the backend cache entry.',
   ];
 }
 

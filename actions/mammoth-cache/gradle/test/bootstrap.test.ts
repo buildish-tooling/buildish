@@ -22,6 +22,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   bootstrapPhase,
+  createBootstrapLogLines,
   createBootstrapStatus,
   createBootstrapSummaryLines,
 } from '../src/bootstrap';
@@ -205,7 +206,34 @@ describe('bootstrap helpers', () => {
     );
   });
 
-  it('bootstraps the main phase and publishes a summary', async () => {
+  it('renders log lines for the bootstrap status', () => {
+    const logText = createBootstrapLogLines(
+      createBootstrapStatus(
+        'main',
+        config,
+        ciContext,
+        cacheModel,
+        restoreResult,
+        validatedWrappers,
+        provisionedWrappers,
+      ),
+    ).join('\n');
+
+    expect(logText).toContain(
+      'Bootstrap: Prepared main phase for push on main in standalone mode.',
+    );
+    expect(logText).toContain('Base cache restore: exact-hit.');
+    expect(logText).toContain('Wrapper provisioning: 1 ready (1 downloaded, 0 reused).');
+    expect(logText).toContain("Execution context: workflow 'CI', job 'check', event 'push'");
+    expect(logText).toContain(
+      'Cache key: gradle-cache-2-21-linux-x64-feedcafe1234abcd-main; Java major: 21; cache partitions: 1.',
+    );
+    expect(logText).toContain(
+      "Downloaded trusted wrapper JAR for 'gradle/wrapper/gradle-wrapper.properties'",
+    );
+  });
+
+  it('bootstraps the main phase without publishing a job summary directly', async () => {
     const wrapperJarBytes = Buffer.from('verified wrapper jar');
     const wrapperJarSha256 = createHash('sha256').update(wrapperJarBytes).digest('hex');
     const summaryLines: string[] = [];
@@ -295,21 +323,9 @@ describe('bootstrap helpers', () => {
       expect(status.baseCacheResult?.status).toBe('exact-hit');
       expect(status.validatedWrappers).toHaveLength(1);
       expect(status.provisionedWrappers).toHaveLength(1);
-      const summaryText = summaryLines.join('\n');
-      expect(summaryText).toContain('## Apache Buildish bootstrap');
-      expect(summaryText).toContain('- Base cache restore: exact-hit');
-      expect(summaryText).toContain('- Wrapper provisioning: 1 ready (1 downloaded, 0 reused)');
-      expect(summaryText).toContain('<summary>Execution context</summary>');
-      expect(summaryText).toContain('- Java major: 21');
-      expect(summaryText).toContain('<summary>Wrapper provisioning</summary>');
-      expect(summaryText).toContain('<table>');
-      expect(summaryText).toContain('gradle/wrapper/gradle-wrapper.properties');
-      expect(summaryText).toMatch(
-        /- Cache key: gradle\\-cache\\-2\\-21\\-linux\\-x64\\-[a-f0-9]{16}\\-main/u,
-      );
-      expect(summaryText).not.toContain('ghs_bootstrap_token');
+      expect(summaryLines).toEqual([]);
       expect(savedState.get('buildish-mammoth-cache-gradle-base-cache-armed')).toBe('true');
-      expect(writeCalls).toBe(1);
+      expect(writeCalls).toBe(0);
       await expect(
         readFile(path.join(workspace, 'gradle', 'wrapper', 'gradle-wrapper.jar')),
       ).resolves.toEqual(wrapperJarBytes);
@@ -376,16 +392,8 @@ describe('bootstrap helpers', () => {
           cacheId: 42,
         }),
       );
-      const summaryText = summaryLines.join('\n');
-      expect(summaryText).toContain('- Base cache save: saved');
-      expect(summaryText).toContain('<summary>Execution context</summary>');
-      expect(summaryText).toContain('<summary>Wrapper provisioning</summary>');
-      expect(summaryText).toContain('- Wrapper provisioning is skipped during the post phase.');
-      expect(summaryText).toContain(
-        "- Base cache detail: Base cache saved under key 'gradle\\-cache\\-2\\-21\\-linux\\-x64\\-",
-      );
-      expect(summaryText).toContain('\\(cache ID 42\\)\\.');
-      expect(writeCalls).toBe(1);
+      expect(summaryLines).toEqual([]);
+      expect(writeCalls).toBe(0);
     });
   });
 

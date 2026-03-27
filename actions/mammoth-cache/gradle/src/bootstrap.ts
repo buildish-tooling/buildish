@@ -148,7 +148,7 @@ export interface BootstrapDependencies extends GitHubPlatformOptions {
  * Shared startup path for both the main and post-action entrypoints.
  *
  * This is the only place that currently knows how to read GitHub metadata, read action
- * inputs, normalize runtime config, and publish a small job summary.
+ * inputs, and normalize runtime config.
  */
 export async function bootstrapPhase(
   phase: BootstrapPhase,
@@ -187,7 +187,6 @@ export async function bootstrapPhase(
           verifyWrapperSignature: dependencies.verifyWrapperSignature,
         })
       : [];
-  logWrapperProvisioningResults(provisionedWrappers, dependencies.logInfo ?? core.info);
   const baseCacheResult = await runBaseCachePhase(phase, config, cacheModel, dependencies);
   const status = createBootstrapStatus(
     phase,
@@ -198,8 +197,6 @@ export async function bootstrapPhase(
     validatedWrappers,
     provisionedWrappers,
   );
-
-  await platform.publishSummary(createBootstrapSummaryLines(status));
 
   return status;
 }
@@ -265,13 +262,44 @@ export function createBootstrapSummaryLines(status: BootstrapStatus): readonly s
   ];
 }
 
-function logWrapperProvisioningResults(
-  provisionedWrappers: readonly ProvisionedWrapperJar[],
-  logInfo: (message: string) => void,
-): void {
-  for (const wrapper of provisionedWrappers) {
-    logInfo(createWrapperProvisioningLogMessage(wrapper));
+export function createBootstrapLogLines(status: BootstrapStatus): readonly string[] {
+  const downloadedWrapperCount = status.provisionedWrappers.filter(
+    (wrapper) => wrapper.wasDownloaded,
+  ).length;
+  const reusedWrapperCount = status.provisionedWrappers.length - downloadedWrapperCount;
+  const lines = [
+    `Bootstrap: ${status.message}`,
+    `Base cache ${status.baseCacheResult?.operation ?? 'state'}: ${status.baseCacheResult?.status ?? (status.cacheModel ? 'not-run' : 'disabled')}.`,
+    `Wrapper provisioning: ${status.provisionedWrappers.length} ready (${downloadedWrapperCount} downloaded, ${reusedWrapperCount} reused).`,
+    `Execution context: workflow '${status.ciContext.workflowName}', job '${status.ciContext.jobName}', event '${status.ciContext.eventName}', ref '${status.ciContext.resolvedRefName}', safe ref '${status.ciContext.safeRefName}', runner '${status.ciContext.runnerOs}/${status.ciContext.runnerArch}', job mode '${status.config.jobMode}', read only ${status.config.readOnly ? 'yes' : 'no'}, cache ${status.config.cacheEnabled ? 'enabled' : 'disabled'}.`,
+    `Wrapper selection: ${status.config.wrapperSelectionMode}; wrapper files: ${status.validatedWrappers.length}.`,
+  ];
+
+  if (status.cacheModel) {
+    lines.push(
+      `Cache key: ${status.cacheModel.cacheKey}; Java major: ${status.cacheModel.javaMajor}; cache partitions: ${status.cacheModel.partitions.length}.`,
+    );
   }
+
+  if (status.baseCacheResult) {
+    lines.push(status.baseCacheResult.message);
+  }
+
+  if (status.phase === 'post') {
+    lines.push('Wrapper provisioning is skipped during the post phase.');
+    return lines;
+  }
+
+  if (status.provisionedWrappers.length === 0) {
+    lines.push('No Gradle wrapper properties files were selected for provisioning.');
+    return lines;
+  }
+
+  for (const wrapper of status.provisionedWrappers) {
+    lines.push(createWrapperProvisioningLogMessage(wrapper));
+  }
+
+  return lines;
 }
 
 function createWrapperProvisioningSummaryLines(status: BootstrapStatus): readonly string[] {

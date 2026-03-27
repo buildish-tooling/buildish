@@ -101,14 +101,13 @@ describe('executePostAction', () => {
       expect(
         downloaded.deltaManifest.partitions.some((partition) => partition.entries.length > 0),
       ).toBe(true);
-      const bootstrapSummaryText = summary.lines.join('\n');
-      expect(bootstrapSummaryText).toContain('## Apache Buildish bootstrap');
+      expect(summary.lines).toEqual([]);
       const summaryText = createPostActionSummaryLines(status).join('\n');
       expect(summaryText).toContain('## Apache Buildish Mammoth Cache for Gradle');
       expect(summaryText).toContain('### Gradle builds');
-      expect(summaryText).toContain('<summary>Cache details</summary>');
-      expect(summaryText).toContain('- Delta artifact: uploaded');
-      expect(summary.writeCalls).toBe(1);
+      expect(summaryText).not.toContain('<summary>Cache details</summary>');
+      expect(summaryText).not.toContain('Delta artifact');
+      expect(summary.writeCalls).toBe(0);
       await rm(downloaded.downloadDirectory, { recursive: true, force: true });
     });
   });
@@ -270,16 +269,20 @@ describe('executePostAction', () => {
         '### <a href="https://github.com/apache/buildish/actions/runs/101/job/987654321">Gradle builds</a>',
       );
       expect(summaryContent).toContain('Gradle 8.14.3 / Java 21.0.4');
-      expect(summaryContent).toContain('<summary>Cache details</summary>');
-      expect(summaryContent).toContain('Pulled base cache');
-      expect(summaryContent).toContain('Delta artifact');
-      expect(summaryContent).toContain('Uploaded base cache');
-      expect(summaryContent).toContain('manifest-derived, uncompressed content sizes');
+      expect(summaryContent).not.toContain('<summary>Cache details</summary>');
+      expect(summaryContent).not.toContain('Pulled base cache');
+      expect(summaryContent).not.toContain('Delta artifact');
+      expect(summaryContent).not.toContain('Uploaded base cache');
+      expect(summaryContent).not.toContain('manifest-derived, uncompressed content sizes');
       expect(summaryContent).not.toContain('### Warnings');
       expect(summaryContent).not.toContain('### Errors');
       expect(infoMessages).toEqual(
         expect.arrayContaining([
           '::group::Apache Buildish Mammoth Cache for Gradle',
+          'Bootstrap: Prepared post phase for push on main in distributed-worker mode.',
+          'Base cache restore: exact-hit.',
+          'Delta artifact: uploaded.',
+          'Cache partition statistics (manifest-derived, uncompressed content sizes):',
           expect.stringContaining("Uploaded delta artifact 'buildish-mammoth-cache-gradle-delta-"),
           'Captured Gradle build 1: platform — build --scan; Gradle 8.14.3 / Java 21.0.4; configuration cache reused; Build Scan https://scans.gradle.com/s/local-it-published.',
           '::endgroup::',
@@ -361,9 +364,9 @@ describe('executePostAction', () => {
       const summaryText = createPostActionSummaryLines(status).join('\n');
       expect(summaryText).toContain('## Apache Buildish Mammoth Cache for Gradle');
       expect(summaryText).toContain('### Gradle builds');
-      expect(summaryText).toContain('- Delta artifact: not\\-distributed\\-worker');
-      expect(summaryText).toContain('- Post-build cache delta: 0 added, 1 modified, 0 deleted');
-      expect(summary.writeCalls).toBe(1);
+      expect(summaryText).not.toContain('Delta artifact');
+      expect(summaryText).not.toContain('Post-build cache delta');
+      expect(summary.writeCalls).toBe(0);
       await expect(artifactApi.listArtifacts()).resolves.toHaveLength(0);
     });
   });
@@ -434,11 +437,11 @@ describe('executePostAction', () => {
       );
       const summaryText = createPostActionSummaryLines(status).join('\n');
       expect(summaryText).toContain('## Apache Buildish Mammoth Cache for Gradle');
-      expect(summaryText).toContain('<summary>Cache details</summary>');
-      expect(summaryText).toContain('- Consumed delta cleanup: deleted 1 of 1');
-      expect(summaryText).toContain('- Delta artifact: not\\-distributed\\-worker');
-      expect(summaryText).toContain('- Post-build cache delta: 0 added, 1 modified, 0 deleted');
-      expect(summary.writeCalls).toBe(1);
+      expect(summaryText).not.toContain('<summary>Cache details</summary>');
+      expect(summaryText).not.toContain('Consumed delta cleanup');
+      expect(summaryText).not.toContain('Delta artifact');
+      expect(summaryText).not.toContain('Post-build cache delta');
+      expect(summary.writeCalls).toBe(0);
       await expect(artifactApi.listArtifacts()).resolves.toHaveLength(0);
     });
   });
@@ -486,9 +489,9 @@ describe('executePostAction', () => {
       );
       const summaryText = createPostActionSummaryLines(status).join('\n');
       expect(summaryText).toContain('## Apache Buildish Mammoth Cache for Gradle');
-      expect(summaryText).toContain('- Delta artifact: no\\-changes');
-      expect(summaryText).toContain('- Post-build cache delta: 0 added, 0 modified, 0 deleted');
-      expect(summary.writeCalls).toBe(1);
+      expect(summaryText).not.toContain('Delta artifact');
+      expect(summaryText).not.toContain('Post-build cache delta');
+      expect(summary.writeCalls).toBe(0);
       await expect(artifactApi.listArtifacts()).resolves.toHaveLength(0);
     });
   });

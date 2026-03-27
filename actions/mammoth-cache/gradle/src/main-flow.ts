@@ -25,7 +25,12 @@ import {
   type DownloadedDeltaArtifactPackage,
   type WorkflowArtifactApi,
 } from './artifacts/service';
-import { bootstrapPhase, type BootstrapDependencies, type BootstrapStatus } from './bootstrap';
+import {
+  bootstrapPhase,
+  createBootstrapLogLines,
+  type BootstrapDependencies,
+  type BootstrapStatus,
+} from './bootstrap';
 import {
   applyMergedDeltaPlan,
   mergeDeltaArtifactPackages,
@@ -325,6 +330,7 @@ export function createMainActionSummaryLines(status: MainActionStatus): readonly
 
 function createMainActionLogLines(status: MainActionStatus): readonly string[] {
   const lines = [
+    ...createBootstrapLogLines(status.bootstrap),
     `Restore cleanup: ${describeRestoreCleanupSummary(status.restoreCleanupResult)}.`,
     `Dependent delta reuse: ${describeDependentDeltaSummary(status.dependentDeltaResult)}.`,
     status.preBuildManifestState
