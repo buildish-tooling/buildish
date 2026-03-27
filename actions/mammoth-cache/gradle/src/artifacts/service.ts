@@ -57,11 +57,6 @@ const DEFAULT_ARTIFACT_COMPRESSION_LEVEL = 1;
 const ARTIFACT_NAME_PATTERN = /^[A-Za-z0-9._-]{1,128}$/u;
 
 /**
- * Back-compat alias for provider-neutral artifact lookup options.
- */
-export type ArtifactFindOptions = ArtifactLookupOptions;
-
-/**
  * Back-compat alias for the provider-neutral artifact descriptor.
  */
 export type { WorkflowArtifactDescriptor };
@@ -166,7 +161,7 @@ export interface UploadDeltaArtifactPackageOptions {
 /**
  * Optional overrides used when downloading and verifying a delta artifact package.
  */
-export interface DownloadDeltaArtifactPackageOptions extends ArtifactFindOptions {
+export interface DownloadDeltaArtifactPackageOptions extends ArtifactLookupOptions {
   /** Parent directory beneath which a temporary extraction directory should be created. */
   readonly parentDirectory?: string;
 }
@@ -190,7 +185,7 @@ export function createDeltaArtifactNamePrefix(
  *
  * The hash suffix folds in the cache key and portable delta-manifest digest, keeping names stable,
  * human-readable, and unique for the supported distributed-job model where each worker job name is
- * unique within a workflow run.
+ * unique within one distributed execution.
  */
 export function createDeltaArtifactName(
   ciContext: CiJobContext,
@@ -302,14 +297,14 @@ export async function uploadDeltaArtifactPackage(
 }
 
 /**
- * Locates the single delta artifact produced by one worker job in a workflow run.
+ * Locates the single delta artifact produced by one worker job in one distributed execution.
  */
 export async function findDeltaArtifactByProducerJob(
   artifactBackend: WorkflowArtifactBackend,
   producerJobName: string,
   runId: number | null,
   runAttempt: number | null,
-  options: ArtifactFindOptions = {},
+  options: ArtifactLookupOptions = {},
 ): Promise<WorkflowArtifactDescriptor> {
   const expectedPrefix = createDeltaArtifactNamePrefix(producerJobName, runId, runAttempt);
   const matches = (

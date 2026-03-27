@@ -191,14 +191,17 @@ That would let GitLab invoke the same core logic from `.gitlab-ci.yml` instead o
 
 The current artifact contract is not quite abstracted at the right level for GitLab.
 
-As preparation, replace GitHub-oriented lookup coordinates with a provider-neutral scope object that can represent at least:
+The current provider-neutral scope is a real improvement, but GitLab may still need a broader artifact execution model than the current lookup object exposes.
+
+Today the shared lookup scope represents:
 
 - repository/project identity
 - workflow-run or pipeline identity
-- job identity
 - auth context
 
-That change belongs in shared code, because it is not GitLab-specific; it is the missing abstraction point for any non-GitHub backend.
+Producer-job identity is still expressed indirectly through artifact naming and distributed-job conventions rather than through the lookup scope itself.
+
+That remaining design choice belongs in shared code, because it is not GitLab-specific; it is the remaining abstraction point for any non-GitHub backend.
 
 ### E. Decouple reporting surfaces from provider-native summaries
 
@@ -232,7 +235,7 @@ The current cache/artifact seams are useful, but a GitLab prep pass should still
 Concretely, that means:
 
 - avoid GitHub-specific terminology in shared result/status text
-- move GitHub-specific artifact lookup coordinates out of `ArtifactFindOptions`
+- decide whether the current provider-neutral artifact lookup scope must widen for non-GitHub backends
 - make digest/retention/delete semantics explicit capabilities rather than assuming GitHub-style behavior
 
 After that, GitLab-specific backends can use:

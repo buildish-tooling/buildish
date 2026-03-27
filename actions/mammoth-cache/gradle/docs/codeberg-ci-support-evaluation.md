@@ -72,8 +72,8 @@ The code now has top-level seams for:
 However, some shared contracts still encode GitHub-oriented assumptions, for example:
 
 - cache availability/status wording still talks about the Actions cache runtime
-- `ArtifactFindOptions.findBy` is keyed by `workflowRunId`, `repositoryOwner`, and `repositoryName`
-- some artifact lookup/verification wording still assumes GitHub job naming or GitHub-provided digests
+- artifact lookup scope is provider-neutral now, but it still only models repository/run/auth lookup context
+- some artifact lookup/verification wording still assumes GitHub-style job naming or GitHub-provided digests
 
 So the seam is there, but Codeberg still needs a little shared cleanup beyond pure provider wiring.
 
@@ -104,7 +104,7 @@ If Codeberg executes JavaScript actions with enough GitHub compatibility, this m
 Besides the Codeberg-specific work itself (event/env mapping, URLs, headers, summary/log behavior), the remaining cross-cutting tasks are:
 
 1. Narrow the runtime-host contract so inputs, outputs, state handoff, failure reporting, and path discovery are not all assumed to come from one GitHub-Action-shaped surface.
-2. Generalize artifact lookup coordinates away from GitHub-specific `workflowRunId` / owner / repository fields toward a provider-neutral execution-scope object.
+2. Decide whether the current provider-neutral artifact lookup scope needs to widen beyond repository/run/auth context for non-GitHub backends.
 3. Isolate lifecycle assumptions so `main`/`post` is primarily a host concern rather than a shared-core assumption.
 4. Provide a provider-neutral consumer/package surface, or at least a CLI fallback, so packaging is not tied only to a GitHub action descriptor.
 5. Add explicit compatibility checks for `@actions/core`, `@actions/cache`, `@actions/artifact`, and JavaScript-action post behavior on the target Codeberg/Forgejo runtime.
@@ -129,7 +129,7 @@ This part should be straightforward.
 The smallest helpful shared cleanup would be:
 
 - split `ActionRuntimeHost` into narrower capabilities, or at least document which capabilities may be emulated by a non-GitHub host
-- replace `ArtifactFindOptions.findBy` with a provider-neutral execution-scope object
+- widen the current provider-neutral artifact lookup scope further if a target backend needs more than repository/run/auth lookup context
 - scrub remaining GitHub-specific wording from shared cache/artifact status and error surfaces
 
 Those are not Codeberg-specific features, but they lower the risk of the later provider port substantially.

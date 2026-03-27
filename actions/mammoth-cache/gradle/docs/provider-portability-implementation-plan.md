@@ -70,13 +70,13 @@ The immediate goal is not a large move. It is to make current modules depend on 
 
 ## Phase 3: generalize artifact lookup scope
 
-- Problem: `src/artifacts/service.ts` still exposes GitHub-shaped lookup coordinates via `ArtifactFindOptions.findBy` (`workflowRunId`, `repositoryOwner`, `repositoryName`).
-- Planned change:
-  - introduce `ArtifactExecutionScope` in `src/artifacts/service.ts` or `src/artifacts/types.ts`
-  - replace `findBy` with a provider-neutral lookup object carrying project, run/pipeline, job, and auth context
-  - keep the GitHub implementation as an adapter filling that structure from `CiJobContext`
-- Migration targets: `src/artifacts/service.ts`, `src/main-flow.ts`, `src/post-flow.ts`, GitHub artifact tests.
-- Why: Codeberg may reuse GitHub-like coordinates, but the shared contract should not require them; GitLab needs pipeline/job scope instead.
+- Completed:
+  - introduced provider-neutral artifact lookup types under `src/storage/artifacts.ts`
+  - replaced the old GitHub-shaped `findBy` wiring with `ArtifactLookupScope` / `ArtifactLookupOptions`
+  - kept the GitHub implementation as an adapter translating that scope into toolkit `findBy` coordinates
+- Remaining limitation:
+  - shared lookup scope is now provider-neutral, but it currently models repository/run/auth lookup context only; producer-job identity is still carried by artifact naming and distributed-job conventions
+- Why it still matters: Codeberg may reuse GitHub-like coordinates, but the shared contract no longer requires them; GitLab may still need broader pipeline/job identity and lifecycle work.
 
 ## Phase 4: separate provider metadata from report sinks
 
@@ -92,7 +92,7 @@ The immediate goal is not a large move. It is to make current modules depend on 
 
 - Planned change:
   - use `BaseCacheBackend` and `WorkflowArtifactBackend` consistently in shared code
-  - remove deprecated compatibility aliases once callers are migrated
+  - remove remaining temporary compatibility aliases once callers are migrated
   - scrub GitHub-specific wording from shared status/error text
   - document backend-varying capabilities explicitly: digest availability, retention, delete support, cross-run lookup scope
 - This is shared cleanup, not provider implementation.
