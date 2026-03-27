@@ -21,7 +21,6 @@ import {
   downloadAndVerifyDeltaArtifactPackage,
   findDeltaArtifactByProducerJob,
   type DownloadedDeltaArtifactPackage,
-  type WorkflowArtifactApi,
 } from './artifacts/service';
 import {
   bootstrapPhase,
@@ -45,6 +44,7 @@ import {
 } from './state/post-action';
 import { installGradleBuildResultCapture } from './gradle/build-results';
 import { createDetailsSection, escapeSummaryText, publishJobLogGroup } from './logging/summary';
+import type { WorkflowArtifactBackend } from './storage/artifacts';
 
 export interface MainDependentDeltaResult extends DeltaApplyResult {
   readonly requestedJobs: readonly string[];
@@ -69,7 +69,8 @@ export interface RestoreCleanupResult {
 }
 
 export interface MainActionDependencies extends BootstrapDependencies {
-  readonly artifactApi: WorkflowArtifactApi;
+  readonly artifactBackend?: WorkflowArtifactBackend;
+  readonly artifactApi?: WorkflowArtifactBackend;
 }
 
 export async function executeMainAction(
@@ -149,16 +150,16 @@ async function applyDependentJobDeltas(
     return null;
   }
 
-  const { artifactApi } = dependencies;
+  const artifactBackend = resolveArtifactBackend(dependencies);
   const downloadedPackages = await Promise.all(
     requestedJobs.map(async (jobName) => {
       const artifact = await findDeltaArtifactByProducerJob(
-        artifactApi,
+        artifactBackend,
         jobName,
         bootstrap.ciContext.runId,
         bootstrap.ciContext.runAttempt,
       );
-      return await downloadAndVerifyDeltaArtifactPackage(artifactApi, artifact);
+      return await downloadAndVerifyDeltaArtifactPackage(artifactBackend, artifact);
     }),
   );
 
@@ -172,6 +173,16 @@ async function applyDependentJobDeltas(
   } finally {
     await cleanupDownloadedPackages(downloadedPackages);
   }
+}
+
+function resolveArtifactBackend(
+  dependencies: Pick<MainActionDependencies, 'artifactBackend' | 'artifactApi'>,
+): WorkflowArtifactBackend {
+  const artifactBackend = dependencies.artifactBackend ?? dependencies.artifactApi;
+  if (!artifactBackend) {
+    throw new Error('Artifact backend dependency is required.');
+  }
+  return artifactBackend;
 }
 
 function assertCompatibleDependentDeltaArtifacts(

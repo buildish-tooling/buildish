@@ -16,11 +16,15 @@
 
 import artifactClient, { type ArtifactClient } from '@actions/artifact';
 
-import type { WorkflowArtifactApi, WorkflowArtifactDescriptor } from '../../artifacts/service';
+import type {
+  ArtifactLookupScope,
+  WorkflowArtifactBackend,
+  WorkflowArtifactDescriptor,
+} from '../../storage/artifacts';
 
-export function createGitHubWorkflowArtifactApi(
+export function createGitHubWorkflowArtifactBackend(
   client: ArtifactClient = artifactClient,
-): WorkflowArtifactApi {
+): WorkflowArtifactBackend {
   return {
     async uploadArtifact(name, files, rootDirectory, options) {
       const response = await client.uploadArtifact(name, [...files], rootDirectory, options);
@@ -41,7 +45,7 @@ export function createGitHubWorkflowArtifactApi(
     async listArtifacts(options) {
       const response = await client.listArtifacts({
         latest: options?.latest,
-        findBy: options?.findBy,
+        findBy: toGitHubFindBy(options?.scope),
       });
 
       return response.artifacts.map(toArtifactDescriptor);
@@ -49,7 +53,7 @@ export function createGitHubWorkflowArtifactApi(
     async getArtifact(name, options) {
       const response = await client.getArtifact(
         name,
-        options?.findBy ? { findBy: options.findBy } : undefined,
+        options?.scope ? { findBy: toGitHubFindBy(options.scope) } : undefined,
       );
       return toArtifactDescriptor(response.artifact);
     },
@@ -57,7 +61,7 @@ export function createGitHubWorkflowArtifactApi(
       const response = await client.downloadArtifact(artifactId, {
         path: options?.path,
         expectedHash: options?.expectedHash,
-        findBy: options?.findBy,
+        findBy: toGitHubFindBy(options?.scope),
       });
 
       if (!response.downloadPath) {
@@ -70,8 +74,41 @@ export function createGitHubWorkflowArtifactApi(
       };
     },
     async deleteArtifact(name, options) {
-      await client.deleteArtifact(name, options?.findBy ? { findBy: options.findBy } : undefined);
+      await client.deleteArtifact(
+        name,
+        options?.scope ? { findBy: toGitHubFindBy(options.scope) } : undefined,
+      );
     },
+  };
+}
+
+export const createGitHubWorkflowArtifactApi = createGitHubWorkflowArtifactBackend;
+
+function toGitHubFindBy(scope: ArtifactLookupScope | undefined):
+  | {
+      readonly token: string;
+      readonly workflowRunId: number;
+      readonly repositoryOwner: string;
+      readonly repositoryName: string;
+    }
+  | undefined {
+  if (!scope) {
+    return undefined;
+  }
+
+  const normalizedRepository = scope.repository.trim();
+  if (!/^[^/\s]+\/[^/\s]+$/u.test(normalizedRepository)) {
+    throw new Error(
+      `Artifact lookup scope repository '${scope.repository}' must use 'owner/name' form.`,
+    );
+  }
+  const [repositoryOwner, repositoryName] = normalizedRepository.split('/');
+
+  return {
+    token: scope.token,
+    workflowRunId: scope.runId,
+    repositoryOwner,
+    repositoryName,
   };
 }
 

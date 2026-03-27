@@ -16,11 +16,7 @@
 
 import { rm } from 'node:fs/promises';
 
-import {
-  uploadDeltaArtifactPackage,
-  stageDeltaArtifactPackage,
-  type WorkflowArtifactApi,
-} from './artifacts/service';
+import { uploadDeltaArtifactPackage, stageDeltaArtifactPackage } from './artifacts/service';
 import {
   bootstrapPhase,
   createBootstrapLogLines,
@@ -49,6 +45,7 @@ import {
   getPersistedConsumedDeltaArtifactNames,
   loadPersistedPreBuildCacheManifest,
 } from './state/post-action';
+import type { WorkflowArtifactBackend } from './storage/artifacts';
 
 const DELTA_ARTIFACT_RETENTION_DAYS = 7;
 
@@ -105,7 +102,8 @@ export interface PostConsumedDeltaCleanupResult {
 }
 
 export interface PostActionDependencies extends BootstrapDependencies {
-  readonly artifactApi: WorkflowArtifactApi;
+  readonly artifactBackend?: WorkflowArtifactBackend;
+  readonly artifactApi?: WorkflowArtifactBackend;
 }
 
 export async function executePostAction(
@@ -244,7 +242,7 @@ async function uploadPostDeltaArtifact(
     };
   }
 
-  const { artifactApi } = dependencies;
+  const artifactBackend = resolveArtifactBackend(dependencies);
   const persistedExecutionIdentity = getPersistedDeltaArtifactExecutionIdentity(
     dependencies.runtimeHost.getState,
   );
@@ -263,7 +261,7 @@ async function uploadPostDeltaArtifact(
   );
 
   try {
-    const uploadedPackage = await uploadDeltaArtifactPackage(artifactApi, stagedPackage, {
+    const uploadedPackage = await uploadDeltaArtifactPackage(artifactBackend, stagedPackage, {
       retentionDays: DELTA_ARTIFACT_RETENTION_DAYS,
     });
     return {
@@ -316,10 +314,10 @@ async function cleanupConsumedDeltaArtifacts(
     };
   }
 
-  const { artifactApi } = dependencies;
+  const artifactBackend = resolveArtifactBackend(dependencies);
   const deleteResults = await Promise.allSettled(
     artifactNames.map(async (artifactName) => {
-      await artifactApi.deleteArtifact(artifactName);
+      await artifactBackend.deleteArtifact(artifactName);
       return artifactName;
     }),
   );
@@ -344,6 +342,16 @@ async function cleanupConsumedDeltaArtifacts(
     warnings,
     message: `Consumed delta artifact cleanup deleted ${deletedArtifactNames.length} of ${artifactNames.length} persisted artifact(s).`,
   };
+}
+
+function resolveArtifactBackend(
+  dependencies: Pick<PostActionDependencies, 'artifactBackend' | 'artifactApi'>,
+): WorkflowArtifactBackend {
+  const artifactBackend = dependencies.artifactBackend ?? dependencies.artifactApi;
+  if (!artifactBackend) {
+    throw new Error('Artifact backend dependency is required.');
+  }
+  return artifactBackend;
 }
 
 function countDeltaEntries(deltaManifest: Parameters<typeof stageDeltaArtifactPackage>[2]): {

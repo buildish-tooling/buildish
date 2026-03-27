@@ -17,10 +17,10 @@
 import { runPost } from '../../post';
 
 import {
-  createGitHubBaseCacheApi,
+  createGitHubBaseCacheBackend,
   createGitHubPlatform,
   createGitHubRuntimeHost,
-  createGitHubWorkflowArtifactApi,
+  createGitHubWorkflowArtifactBackend,
 } from './index';
 
 const runtimeHost = createGitHubRuntimeHost();
@@ -36,8 +36,8 @@ void runPost({
   runtimeHost,
   ciProvider,
   env: process.env,
-  cacheApi: createGitHubBaseCacheApi(),
-  artifactApi: createGitHubWorkflowArtifactApi(),
+  cacheBackend: createGitHubBaseCacheBackend(),
+  artifactBackend: createGitHubWorkflowArtifactBackend(),
 }).catch((error: unknown) => {
   runtimeHost.setFailed(error instanceof Error ? error.message : String(error));
 });

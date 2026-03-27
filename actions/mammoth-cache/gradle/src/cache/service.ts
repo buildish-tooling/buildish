@@ -15,6 +15,7 @@
  */
 
 import type { NormalizedActionConfig } from '../config/types';
+import type { BaseCacheBackend } from '../storage/cache';
 
 import { DEFAULT_CACHE_KEY_TEMPLATE, type CacheModel } from './model';
 
@@ -24,48 +25,18 @@ const NO_CACHE_PATHS_FOUND_ERROR_FRAGMENT =
   'Path Validation Error: Path(s) specified in the action for caching do(es) not exist';
 
 /**
- * Minimal wrapper around `@actions/cache` so restore/save behavior can be tested deterministically.
- *
- * The production implementation is the toolkit module itself; tests inject lightweight fakes so
- * restore/save classification can be exercised without the GitHub cache runtime.
+ * Back-compat alias for the provider-neutral base-cache backend.
  */
-export interface BaseCacheApi {
-  /**
-   * Reports whether the GitHub cache runtime is usable in the current execution environment.
-   *
-   * Returns `false` in local smoke runs or unsupported runners; restore/save then degrade to a
-   * documented skip result instead of failing.
-   */
-  isFeatureAvailable(): boolean;
-  /**
-   * Attempts to restore the cache for the primary key and optional prefix fallback keys.
-   *
-   * @param paths Ordered include paths plus negated excludes in the `@actions/cache` format.
-   * @param primaryKey Exact cache key for the current job.
-   * @param restoreKeys Optional ordered prefix keys used after a primary-key miss.
-   * @returns The matched cache key, or `undefined` when nothing was restored.
-   */
-  restoreCache(
-    paths: string[],
-    primaryKey: string,
-    restoreKeys?: string[],
-  ): Promise<string | undefined>;
-  /**
-   * Attempts to create a new cache entry for the given key.
-   *
-   * @param paths Ordered include paths plus negated excludes in the `@actions/cache` format.
-   * @param key Exact cache key to reserve and save.
-   * @returns Positive cache ID on success; non-positive values indicate no new entry was created.
-   */
-  saveCache(paths: string[], key: string): Promise<number>;
-}
+export type BaseCacheApi = BaseCacheBackend;
 
 /**
  * Optional test seams for the base cache service.
  */
 export interface BaseCacheServiceDependencies {
-  /** Cache implementation override used by tests and local smoke flows. */
-  readonly cacheApi: BaseCacheApi;
+  /** Preferred provider-neutral cache backend dependency. */
+  readonly cacheBackend?: BaseCacheBackend;
+  /** Deprecated compatibility alias retained while callers migrate to `cacheBackend`. */
+  readonly cacheApi?: BaseCacheBackend;
 }
 
 /**
@@ -130,7 +101,7 @@ export interface BaseCacheSaveResult {
     | 'not-saved';
   /** Primary cache key that the post phase attempted, or would have attempted, to save. */
   readonly cacheKey: string;
-  /** Cache identifier returned by GitHub when a new entry is successfully created. */
+  /** Cache identifier returned by the active backend when a new entry is successfully created. */
   readonly cacheId: number | null;
   /** Ordered cache path list passed to `@actions/cache`, including negated excludes. */
   readonly paths: readonly string[];
@@ -142,7 +113,7 @@ export interface BaseCacheSaveResult {
 export type BaseCacheOperationResult = BaseCacheRestoreResult | BaseCacheSaveResult;
 
 /**
- * Creates the ordered include/exclude path list expected by `@actions/cache`.
+ * Creates the ordered include/exclude path list expected by the current base-cache backend.
  *
  * Excludes are emitted as negated patterns so the cache service never captures transient Gradle
  * state such as configuration cache content or lock files.
@@ -193,11 +164,11 @@ export async function restoreBaseCache(
   cacheModel: CacheModel,
   dependencies: BaseCacheServiceDependencies,
 ): Promise<BaseCacheRestoreResult> {
-  const { cacheApi } = dependencies;
+  const cacheBackend = resolveBaseCacheBackend(dependencies);
   const paths = createBaseCachePaths(cacheModel);
   const restoreKeys = createBaseCacheRestoreKeys(config, cacheModel);
 
-  if (!cacheApi.isFeatureAvailable()) {
+  if (!cacheBackend.isFeatureAvailable()) {
     return {
       operation: 'restore',
       status: 'feature-unavailable',
@@ -205,11 +176,13 @@ export async function restoreBaseCache(
       matchedKey: null,
       restoreKeys,
       paths,
-      message: 'Base cache restore skipped because the GitHub cache service is unavailable.',
+      message: 'Base cache restore skipped because the cache backend is unavailable.',
     };
   }
 
-  const matchedKey = await cacheApi.restoreCache([...paths], cacheModel.cacheKey, [...restoreKeys]);
+  const matchedKey = await cacheBackend.restoreCache([...paths], cacheModel.cacheKey, [
+    ...restoreKeys,
+  ]);
 
   if (!matchedKey) {
     return {
@@ -287,20 +260,20 @@ export async function saveBaseCache(
     );
   }
 
-  const { cacheApi } = dependencies;
-  if (!cacheApi.isFeatureAvailable()) {
+  const cacheBackend = resolveBaseCacheBackend(dependencies);
+  if (!cacheBackend.isFeatureAvailable()) {
     return createSaveResult(
       'feature-unavailable',
       cacheModel.cacheKey,
       paths,
-      'Base cache save skipped because the GitHub cache service is unavailable.',
+      'Base cache save skipped because the cache backend is unavailable.',
     );
   }
 
   let cacheId: number;
 
   try {
-    cacheId = await cacheApi.saveCache([...paths], cacheModel.cacheKey);
+    cacheId = await cacheBackend.saveCache([...paths], cacheModel.cacheKey);
   } catch (error) {
     if (isMissingCachePathsError(error)) {
       return createSaveResult(
@@ -367,6 +340,14 @@ function renderCacheKeyTemplate(
   return template.replaceAll(/\$\{([A-Za-z0-9]+)}/g, (match, placeholderName: string) => {
     return placeholderValues[placeholderName] ?? match;
   });
+}
+
+function resolveBaseCacheBackend(dependencies: BaseCacheServiceDependencies): BaseCacheBackend {
+  const cacheBackend = dependencies.cacheBackend ?? dependencies.cacheApi;
+  if (!cacheBackend) {
+    throw new Error('Base cache backend dependency is required.');
+  }
+  return cacheBackend;
 }
 
 function createSaveResult(

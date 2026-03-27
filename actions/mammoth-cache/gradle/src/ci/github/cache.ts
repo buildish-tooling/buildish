@@ -16,8 +16,12 @@
 
 import * as toolkitCache from '@actions/cache';
 
-import type { BaseCacheApi } from '../../cache/service';
+import type { BaseCacheBackend } from '../../storage/cache';
 
-export function createGitHubBaseCacheApi(cacheApi: BaseCacheApi = toolkitCache): BaseCacheApi {
-  return cacheApi;
+export function createGitHubBaseCacheBackend(
+  cacheBackend: BaseCacheBackend = toolkitCache,
+): BaseCacheBackend {
+  return cacheBackend;
 }
+
+export const createGitHubBaseCacheApi = createGitHubBaseCacheBackend;

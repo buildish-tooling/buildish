@@ -19,7 +19,6 @@ import {
   isBaseCachePostActionArmed,
   restoreBaseCache,
   saveBaseCache,
-  type BaseCacheApi,
   type BaseCacheOperationResult,
 } from './cache/service';
 import type { CiExecutionUrls, CiJobContext, CiPlatformAdapter } from './ci/types';
@@ -37,6 +36,7 @@ import {
   escapeSummaryText,
 } from './logging/summary';
 import type { RuntimeInputSource, RuntimeReporter, RuntimeStateStore } from './runtime-host/types';
+import type { BaseCacheBackend } from './storage/cache';
 import { provisionWrapperJars, type WrapperProvisionOptions } from './wrapper/download';
 import { validateTargetWrapperProperties } from './wrapper/static-validation';
 import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from './wrapper/types';
@@ -119,8 +119,10 @@ export interface BootstrapDependencies {
    * Defaults to the internal child-process implementation when omitted.
    */
   readonly captureCommandOutput?: CommandOutputCapture;
-  /** Cache-service implementation for the active CI provider. */
-  readonly cacheApi: BaseCacheApi;
+  /** Preferred provider-neutral base-cache backend for the active CI provider. */
+  readonly cacheBackend?: BaseCacheBackend;
+  /** Deprecated compatibility alias retained while callers migrate to `cacheBackend`. */
+  readonly cacheApi?: BaseCacheBackend;
   /**
    * Optional detached-signature verifier override used by focused wrapper tests.
    *
@@ -346,6 +348,7 @@ async function runBaseCachePhase(
 
   if (phase === 'main') {
     const restoreResult = await restoreBaseCache(config, cacheModel, {
+      cacheBackend: dependencies.cacheBackend,
       cacheApi: dependencies.cacheApi,
     });
 
@@ -358,6 +361,7 @@ async function runBaseCachePhase(
     cacheModel,
     isBaseCachePostActionArmed(dependencies.runtimeHost.getState),
     {
+      cacheBackend: dependencies.cacheBackend,
       cacheApi: dependencies.cacheApi,
     },
   );

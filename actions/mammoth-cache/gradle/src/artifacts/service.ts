@@ -30,6 +30,11 @@ import {
 } from '../cache/manifest';
 import type { CacheModel } from '../cache/model';
 import type { CiJobContext } from '../ci/types';
+import type {
+  ArtifactLookupOptions,
+  WorkflowArtifactBackend,
+  WorkflowArtifactDescriptor,
+} from '../storage/artifacts';
 import {
   parseSerializedJsonObject,
   validateArray,
@@ -52,62 +57,19 @@ const DEFAULT_ARTIFACT_COMPRESSION_LEVEL = 1;
 const ARTIFACT_NAME_PATTERN = /^[A-Za-z0-9._-]{1,128}$/u;
 
 /**
- * Provider-neutral selector for locating artifacts outside the current in-process toolkit scope.
+ * Back-compat alias for provider-neutral artifact lookup options.
  */
-export interface ArtifactFindOptions {
-  /**
-   * Cross-run lookup coordinates used by `@actions/artifact`'s REST-backed APIs.
-   *
-   * The current implementation expects a token with `actions:read` permissions when this block is
-   * provided. Omitting it keeps lookups scoped to the current workflow run.
-   */
-  readonly findBy?: {
-    readonly token: string;
-    readonly workflowRunId: number;
-    readonly repositoryOwner: string;
-    readonly repositoryName: string;
-  };
-}
+export type ArtifactFindOptions = ArtifactLookupOptions;
 
 /**
- * Minimal provider-neutral artifact metadata returned by the exchange layer.
+ * Back-compat alias for the provider-neutral artifact descriptor.
  */
-export interface WorkflowArtifactDescriptor {
-  readonly id: number;
-  readonly name: string;
-  readonly size: number;
-  readonly digest: string | null;
-}
+export type { WorkflowArtifactDescriptor };
 
 /**
- * Provider-neutral wrapper around the artifact operations used by the distributed cache flow.
+ * Back-compat alias for the provider-neutral artifact backend.
  */
-export interface WorkflowArtifactApi {
-  uploadArtifact(
-    name: string,
-    files: readonly string[],
-    rootDirectory: string,
-    options?: {
-      readonly retentionDays?: number;
-      readonly compressionLevel?: number;
-    },
-  ): Promise<WorkflowArtifactDescriptor>;
-  listArtifacts(
-    options?: ArtifactFindOptions & { readonly latest?: boolean },
-  ): Promise<readonly WorkflowArtifactDescriptor[]>;
-  getArtifact(name: string, options?: ArtifactFindOptions): Promise<WorkflowArtifactDescriptor>;
-  downloadArtifact(
-    artifactId: number,
-    options?: ArtifactFindOptions & {
-      readonly path?: string;
-      readonly expectedHash?: string;
-    },
-  ): Promise<{
-    readonly downloadPath: string;
-    readonly digestMismatch: boolean;
-  }>;
-  deleteArtifact(name: string, options?: ArtifactFindOptions): Promise<void>;
-}
+export type WorkflowArtifactApi = WorkflowArtifactBackend;
 
 /**
  * Producer metadata embedded in a delta artifact package.
@@ -323,11 +285,11 @@ export async function stageDeltaArtifactPackage(
  * Uploads a previously staged delta artifact package using the supplied artifact API.
  */
 export async function uploadDeltaArtifactPackage(
-  artifactApi: WorkflowArtifactApi,
+  artifactBackend: WorkflowArtifactBackend,
   stagedPackage: StagedDeltaArtifactPackage,
   options: UploadDeltaArtifactPackageOptions = {},
 ): Promise<UploadedDeltaArtifactPackage> {
-  const artifact = await artifactApi.uploadArtifact(
+  const artifact = await artifactBackend.uploadArtifact(
     stagedPackage.artifactName,
     stagedPackage.files,
     stagedPackage.rootDirectory,
@@ -348,7 +310,7 @@ export async function uploadDeltaArtifactPackage(
  * Locates the single delta artifact produced by one worker job in a workflow run.
  */
 export async function findDeltaArtifactByProducerJob(
-  artifactApi: WorkflowArtifactApi,
+  artifactBackend: WorkflowArtifactBackend,
   producerJobName: string,
   runId: number | null,
   runAttempt: number | null,
@@ -356,7 +318,7 @@ export async function findDeltaArtifactByProducerJob(
 ): Promise<WorkflowArtifactDescriptor> {
   const expectedPrefix = createDeltaArtifactNamePrefix(producerJobName, runId, runAttempt);
   const matches = (
-    await artifactApi.listArtifacts({ latest: true, findBy: options.findBy })
+    await artifactBackend.listArtifacts({ latest: true, scope: options.scope })
   ).filter((artifact) => artifact.name.startsWith(expectedPrefix));
 
   if (matches.length === 0) {
@@ -367,7 +329,7 @@ export async function findDeltaArtifactByProducerJob(
 
   if (matches.length > 1) {
     throw new Error(
-      `Multiple delta artifacts matched job '${producerJobName}' with prefix '${expectedPrefix}'. Distributed jobs must use unique GitHub job names.`,
+      `Multiple delta artifacts matched job '${producerJobName}' with prefix '${expectedPrefix}'. Distributed jobs must use unique producer job names.`,
     );
   }
 
@@ -375,22 +337,22 @@ export async function findDeltaArtifactByProducerJob(
 }
 
 /**
- * Downloads a named artifact, verifies the GitHub digest when available, and validates the package.
+ * Downloads a named artifact, verifies the reported digest when available, and validates the package.
  */
 export async function downloadAndVerifyDeltaArtifactPackageByName(
-  artifactApi: WorkflowArtifactApi,
+  artifactBackend: WorkflowArtifactBackend,
   artifactName: string,
   options: DownloadDeltaArtifactPackageOptions = {},
 ): Promise<DownloadedDeltaArtifactPackage> {
-  const artifact = await artifactApi.getArtifact(artifactName, { findBy: options.findBy });
-  return downloadAndVerifyDeltaArtifactPackage(artifactApi, artifact, options);
+  const artifact = await artifactBackend.getArtifact(artifactName, { scope: options.scope });
+  return downloadAndVerifyDeltaArtifactPackage(artifactBackend, artifact, options);
 }
 
 /**
- * Downloads an artifact by descriptor, verifies the GitHub digest when available, and validates the package.
+ * Downloads an artifact by descriptor, verifies the reported digest when available, and validates the package.
  */
 export async function downloadAndVerifyDeltaArtifactPackage(
-  artifactApi: WorkflowArtifactApi,
+  artifactBackend: WorkflowArtifactBackend,
   artifact: WorkflowArtifactDescriptor,
   options: DownloadDeltaArtifactPackageOptions = {},
 ): Promise<DownloadedDeltaArtifactPackage> {
@@ -398,16 +360,14 @@ export async function downloadAndVerifyDeltaArtifactPackage(
   const downloadDirectory = await mkdtemp(
     path.join(parentDirectory, 'buildish-mammoth-cache-gradle-delta-download-'),
   );
-  const downloadResult = await artifactApi.downloadArtifact(artifact.id, {
+  const downloadResult = await artifactBackend.downloadArtifact(artifact.id, {
     path: downloadDirectory,
     expectedHash: artifact.digest ?? undefined,
-    findBy: options.findBy,
+    scope: options.scope,
   });
 
   if (downloadResult.digestMismatch) {
-    throw new Error(
-      `Downloaded artifact '${artifact.name}' did not match the expected GitHub digest.`,
-    );
+    throw new Error(`Downloaded artifact '${artifact.name}' did not match the expected digest.`);
   }
 
   const verified = await verifyExtractedDeltaArtifactPackage(
