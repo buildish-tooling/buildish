@@ -42,6 +42,7 @@ import {
   escapeHtml,
   escapeSummaryText,
   publishJobLogGroup,
+  replaceJobSummary,
 } from './logging/summary';
 import {
   getPersistedBaseCacheRestoreResult,
@@ -140,6 +141,7 @@ export async function executePostAction(
       message: 'Post action flow completed without cache orchestration.',
     } satisfies PostActionStatus;
     await publishPostActionLogGroup(dependencies, status, logInfo);
+    await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
     return status;
   }
 
@@ -170,6 +172,7 @@ export async function executePostAction(
       message: 'Post action flow completed without a persisted pre-build cache manifest.',
     } satisfies PostActionStatus;
     await publishPostActionLogGroup(dependencies, status, logInfo);
+    await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
     return status;
   }
 
@@ -198,6 +201,7 @@ export async function executePostAction(
   } satisfies PostActionStatus;
 
   await publishPostActionLogGroup(dependencies, status, logInfo);
+  await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
 
   return status;
 }

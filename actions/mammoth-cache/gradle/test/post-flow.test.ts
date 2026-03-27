@@ -15,7 +15,7 @@
  */
 
 import { cp } from 'node:fs/promises';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
@@ -262,7 +262,9 @@ describe('executePostAction', () => {
         summaryWriter: createSummaryCapture().writer,
       });
 
+      const publishedSummary = await readFile(path.join(workspace, 'step-summary.md'), 'utf8');
       const summaryContent = createPostActionSummaryLines(status).join('\n');
+      expect(publishedSummary).toBe(`${summaryContent}\n`);
       expect(summaryContent).toContain('## Apache Buildish Mammoth Cache for Gradle');
       expect(summaryContent).toContain(
         '### <a href="https://github.com/apache/buildish/actions/runs/101/job/987654321">Gradle builds</a>',
@@ -505,6 +507,7 @@ function createTestEnv(
     GITHUB_JOB: jobName,
     GITHUB_RUN_ID: '101',
     GITHUB_RUN_ATTEMPT: '2',
+    GITHUB_STEP_SUMMARY: path.join(workspace, 'step-summary.md'),
     GITHUB_WORKSPACE: workspace,
     GRADLE_USER_HOME: gradleUserHome,
     HOME: workspace,

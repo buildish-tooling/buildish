@@ -14,10 +14,24 @@
  * limitations under the License.
  */
 
-import { describe, expect, it } from 'vitest';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+import { afterEach, describe, expect, it } from 'vitest';
 
 import type { SummaryWriter } from '../../src/ci/types';
-import { appendJobSummary, publishJobLogGroup } from '../../src/logging/summary';
+import { appendJobSummary, publishJobLogGroup, replaceJobSummary } from '../../src/logging/summary';
+
+const temporaryDirectories: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories.splice(0).map(async (directory) => {
+      await rm(directory, { recursive: true, force: true });
+    }),
+  );
+});
 
 describe('appendJobSummary', () => {
   it('publishes each summary line through the configured writer', async () => {
@@ -57,7 +71,37 @@ describe('publishJobLogGroup', () => {
   });
 });
 
-function createGitHubOptions(summaryWriter: SummaryWriter) {
+describe('replaceJobSummary', () => {
+  it('replaces the step summary file when GITHUB_STEP_SUMMARY is available', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'buildish-summary-'));
+    temporaryDirectories.push(directory);
+    const capture = createSummaryCapture();
+    const summaryPath = path.join(directory, 'step-summary.md');
+
+    await replaceJobSummary(
+      createGitHubOptions(capture.writer, { GITHUB_STEP_SUMMARY: summaryPath }),
+      ['replaced line', 'second line'],
+    );
+
+    await expect(readFile(summaryPath, 'utf8')).resolves.toBe('replaced line\nsecond line\n');
+    expect(capture.lines).toEqual([]);
+    expect(capture.writeCalls).toBe(0);
+  });
+
+  it('falls back to the configured writer when no summary file is available', async () => {
+    const capture = createSummaryCapture();
+
+    await replaceJobSummary(createGitHubOptions(capture.writer), ['first line', 'second line']);
+
+    expect(capture.lines).toEqual([
+      { text: 'first line', addEol: true },
+      { text: 'second line', addEol: true },
+    ]);
+    expect(capture.writeCalls).toBe(1);
+  });
+});
+
+function createGitHubOptions(summaryWriter: SummaryWriter, envOverrides: NodeJS.ProcessEnv = {}) {
   return {
     env: {
       GITHUB_EVENT_NAME: 'push',
@@ -67,6 +111,7 @@ function createGitHubOptions(summaryWriter: SummaryWriter) {
       GITHUB_JOB: 'check',
       RUNNER_OS: 'Linux',
       RUNNER_ARCH: 'X64',
+      ...envOverrides,
     },
     eventPayload: {
       repository: { default_branch: 'main' },
