@@ -33,7 +33,7 @@ This document describes the current implementation in `src/artifacts/service.ts`
 
 The artifact exchange module currently exposes:
 
-- `createGitHubArtifactApi()`
+- `createGitHubWorkflowArtifactBackend()`
 - `createDeltaArtifactName()` and `createDeltaArtifactNamePrefix()`
 - `stageDeltaArtifactPackage()`
 - `uploadDeltaArtifactPackage()`
@@ -41,7 +41,7 @@ The artifact exchange module currently exposes:
 - `downloadAndVerifyDeltaArtifactPackage()` / `downloadAndVerifyDeltaArtifactPackageByName()`
 - `verifyExtractedDeltaArtifactPackage()`
 
-This keeps the GitHub toolkit dependency isolated to one place while the rest of the action works with a narrow `WorkflowArtifactApi` interface that is easy to fake in tests.
+This keeps the GitHub toolkit dependency isolated to one place while the rest of the action works with a narrow `WorkflowArtifactBackend` interface that is easy to fake in tests.
 
 ## Artifact naming
 

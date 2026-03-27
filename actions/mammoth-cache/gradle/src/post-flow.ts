@@ -103,7 +103,6 @@ export interface PostConsumedDeltaCleanupResult {
 
 export interface PostActionDependencies extends BootstrapDependencies {
   readonly artifactBackend?: WorkflowArtifactBackend;
-  readonly artifactApi?: WorkflowArtifactBackend;
 }
 
 export async function executePostAction(
@@ -345,9 +344,9 @@ async function cleanupConsumedDeltaArtifacts(
 }
 
 function resolveArtifactBackend(
-  dependencies: Pick<PostActionDependencies, 'artifactBackend' | 'artifactApi'>,
+  dependencies: Pick<PostActionDependencies, 'artifactBackend'>,
 ): WorkflowArtifactBackend {
-  const artifactBackend = dependencies.artifactBackend ?? dependencies.artifactApi;
+  const { artifactBackend } = dependencies;
   if (!artifactBackend) {
     throw new Error('Artifact backend dependency is required.');
   }

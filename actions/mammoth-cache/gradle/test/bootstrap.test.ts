@@ -26,9 +26,10 @@ import {
   createBootstrapStatus,
   createBootstrapSummaryLines,
 } from '../src/bootstrap';
-import type { BaseCacheApi, BaseCacheRestoreResult } from '../src/cache/service';
+import type { BaseCacheRestoreResult } from '../src/cache/service';
 import type { CacheModel } from '../src/cache/model';
 import type { SummaryWriter } from '../src/ci/types';
+import type { BaseCacheBackend } from '../src/storage/cache';
 import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from '../src/wrapper/types';
 import { createTestGitHubProvider, createTestRuntimeHost } from './support/github-test-runtime';
 
@@ -274,7 +275,7 @@ describe('bootstrap helpers', () => {
     const summaryLines: string[] = [];
     let writeCalls = 0;
     const savedState = new Map<string, string>();
-    const cacheApi: BaseCacheApi = {
+    const cacheBackend: BaseCacheBackend = {
       isFeatureAvailable(): boolean {
         return true;
       },
@@ -307,7 +308,7 @@ describe('bootstrap helpers', () => {
           RUNNER_ARCH: 'X64',
         },
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
-        cacheApi,
+        cacheBackend,
         fetchImpl: async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
           const url = String(input);
 
@@ -386,7 +387,7 @@ describe('bootstrap helpers', () => {
   it('bootstraps the post phase and saves the base cache when armed', async () => {
     const summaryLines: string[] = [];
     let writeCalls = 0;
-    const cacheApi: BaseCacheApi = {
+    const cacheBackend: BaseCacheBackend = {
       isFeatureAvailable(): boolean {
         return true;
       },
@@ -420,7 +421,7 @@ describe('bootstrap helpers', () => {
           RUNNER_ARCH: 'X64',
         },
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
-        cacheApi,
+        cacheBackend,
         ...createBootstrapDependencies({
           env: {
             GITHUB_EVENT_NAME: 'push',
@@ -459,9 +460,9 @@ describe('bootstrap helpers', () => {
 
   it('loads optional config-file values during bootstrap while allowing direct overrides', async () => {
     const summaryLines: string[] = [];
-    const cacheApi: BaseCacheApi = {
+    const cacheBackend: BaseCacheBackend = {
       isFeatureAvailable(): boolean {
-        throw new Error('cacheApi should not be touched when config-file disables caching');
+        throw new Error('cacheBackend should not be touched when config-file disables caching');
       },
       async restoreCache(): Promise<string | undefined> {
         throw new Error('restoreCache should not be called when caching is disabled');
@@ -506,7 +507,7 @@ describe('bootstrap helpers', () => {
           },
           captureCommandOutput: async (): Promise<string> =>
             'openjdk version "21.0.4" 2024-07-16\n',
-          cacheApi,
+          cacheBackend,
           ...createBootstrapDependencies({
             env: {
               GITHUB_EVENT_NAME: 'push',
@@ -568,9 +569,9 @@ describe('bootstrap helpers', () => {
         const status = await bootstrapPhase('post', {
           captureCommandOutput: async (): Promise<string> =>
             'openjdk version "21.0.4" 2024-07-16\n',
-          cacheApi: {
+          cacheBackend: {
             isFeatureAvailable(): boolean {
-              throw new Error('cacheApi should not be touched when caching is disabled');
+              throw new Error('cacheBackend should not be touched when caching is disabled');
             },
             async restoreCache(): Promise<string | undefined> {
               throw new Error('restoreCache should not be called when caching is disabled');

@@ -24,12 +24,10 @@ import { describe, expect, it } from 'vitest';
 import {
   downloadAndVerifyDeltaArtifactPackage,
   stageDeltaArtifactPackage,
-  type WorkflowArtifactApi,
   type WorkflowArtifactDescriptor,
 } from '../src/artifacts/service';
 import { captureCacheManifest, computeCacheDelta } from '../src/cache/manifest';
 import { createCachePartitions, type CacheModel } from '../src/cache/model';
-import type { BaseCacheApi } from '../src/cache/service';
 import type { SummaryWriter } from '../src/ci/types';
 import { createPostActionSummaryLines, executePostAction } from '../src/post-flow';
 import {
@@ -40,6 +38,8 @@ import {
   persistDeltaArtifactExecutionIdentity,
   persistConsumedDeltaArtifactNames,
 } from '../src/state/post-action';
+import type { WorkflowArtifactBackend } from '../src/storage/artifacts';
+import type { BaseCacheBackend } from '../src/storage/cache';
 import { createTestGitHubProvider, createTestRuntimeHost } from './support/github-test-runtime';
 
 function createPostActionDependencies(options: {
@@ -89,8 +89,8 @@ describe('executePostAction', () => {
       );
 
       const status = await executePostAction({
-        artifactApi,
-        cacheApi: createCacheApi({ saveCache: async () => 0 }),
+        artifactBackend: artifactApi,
+        cacheBackend: createCacheApi({ saveCache: async () => 0 }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
         ...createPostActionDependencies({
@@ -172,8 +172,8 @@ describe('executePostAction', () => {
       );
 
       const status = await executePostAction({
-        artifactApi,
-        cacheApi: createCacheApi({ saveCache: async () => 0 }),
+        artifactBackend: artifactApi,
+        cacheBackend: createCacheApi({ saveCache: async () => 0 }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: createTestEnv(workspace, gradleUserHome, 'post-phase-job-name'),
         ...createPostActionDependencies({
@@ -252,8 +252,8 @@ describe('executePostAction', () => {
       );
 
       const status = await executePostAction({
-        artifactApi,
-        cacheApi: createCacheApi({ saveCache: async () => 0 }),
+        artifactBackend: artifactApi,
+        cacheBackend: createCacheApi({ saveCache: async () => 0 }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
         ...createPostActionDependencies({
@@ -309,8 +309,8 @@ describe('executePostAction', () => {
     await withWorkspace(async (workspace) => {
       const gradleUserHome = path.join(workspace, '.gradle');
       const status = await executePostAction({
-        artifactApi: new FakeArtifactApi(path.join(workspace, 'artifact-store')),
-        cacheApi: createCacheApi({ saveCache: async () => 0 }),
+        artifactBackend: new FakeArtifactApi(path.join(workspace, 'artifact-store')),
+        cacheBackend: createCacheApi({ saveCache: async () => 0 }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
         ...createPostActionDependencies({
@@ -347,8 +347,8 @@ describe('executePostAction', () => {
       );
 
       const status = await executePostAction({
-        artifactApi,
-        cacheApi: createCacheApi({
+        artifactBackend: artifactApi,
+        cacheBackend: createCacheApi({
           saveCache: async () => {
             saveCalls += 1;
             return 77;
@@ -417,8 +417,8 @@ describe('executePostAction', () => {
       persistConsumedDeltaArtifactNames([artifactNameToDelete], savedState.set.bind(savedState));
 
       const status = await executePostAction({
-        artifactApi,
-        cacheApi: createCacheApi({
+        artifactBackend: artifactApi,
+        cacheBackend: createCacheApi({
           saveCache: async () => {
             saveCalls += 1;
             return 91;
@@ -486,8 +486,8 @@ describe('executePostAction', () => {
       await persistPreBuildState(gradleUserHome, savedState, workspace);
 
       const status = await executePostAction({
-        artifactApi,
-        cacheApi: createCacheApi({ saveCache: async () => 0 }),
+        artifactBackend: artifactApi,
+        cacheBackend: createCacheApi({ saveCache: async () => 0 }),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: createTestEnv(workspace, gradleUserHome, 'worker-build'),
         ...createPostActionDependencies({
@@ -585,7 +585,7 @@ function createInputProvider(
   };
 }
 
-function createCacheApi(options: { readonly saveCache: () => Promise<number> }): BaseCacheApi {
+function createCacheApi(options: { readonly saveCache: () => Promise<number> }): BaseCacheBackend {
   return {
     isFeatureAvailable(): boolean {
       return true;
@@ -722,7 +722,7 @@ async function withWorkspace(testBody: (workspace: string) => Promise<void>): Pr
   }
 }
 
-class FakeArtifactApi implements WorkflowArtifactApi {
+class FakeArtifactApi implements WorkflowArtifactBackend {
   private nextId = 1;
   private readonly artifacts = new Map<
     number,
@@ -803,7 +803,7 @@ class FakeArtifactApi implements WorkflowArtifactApi {
 }
 
 async function stageWorkerArtifactForCleanup(
-  artifactApi: WorkflowArtifactApi,
+  artifactApi: WorkflowArtifactBackend,
   workspace: string,
   jobName: string,
 ): Promise<void> {

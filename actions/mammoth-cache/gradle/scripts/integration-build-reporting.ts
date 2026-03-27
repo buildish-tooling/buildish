@@ -19,12 +19,13 @@ import { spawn } from 'node:child_process';
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { WorkflowArtifactApi } from '../src/artifacts/service';
 import type { ActionRuntimeHost } from '../src/ci';
 import { createGitHubPlatform } from '../src/ci/github';
 import type { SummaryWriter } from '../src/ci/types';
 import { executeMainAction } from '../src/main-flow';
 import { createPostActionSummaryLines, executePostAction } from '../src/post-flow';
+import type { WorkflowArtifactBackend } from '../src/storage/artifacts';
+import type { BaseCacheBackend } from '../src/storage/cache';
 
 const RUN_ID = '92002';
 const RUN_ATTEMPT = '1';
@@ -70,8 +71,8 @@ async function main(): Promise<void> {
     ];
 
     await executeMainAction({
-      artifactApi: unavailableArtifactApi(),
-      cacheApi: unavailableCacheApi(),
+      artifactBackend: unavailableArtifactApi(),
+      cacheBackend: unavailableCacheApi(),
       captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
       env: runtime.env,
       ...createGitHubActionDependencies(
@@ -91,8 +92,8 @@ async function main(): Promise<void> {
     }
 
     const postStatus = await executePostAction({
-      artifactApi: unavailableArtifactApi(),
-      cacheApi: unavailableCacheApi(),
+      artifactBackend: unavailableArtifactApi(),
+      cacheBackend: unavailableCacheApi(),
       captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
       env: runtime.env,
       ...createGitHubActionDependencies(
@@ -358,7 +359,7 @@ async function runGradle(
   );
 }
 
-function unavailableCacheApi() {
+function unavailableCacheApi(): BaseCacheBackend {
   return {
     isFeatureAvailable(): boolean {
       return false;
@@ -372,7 +373,7 @@ function unavailableCacheApi() {
   };
 }
 
-function unavailableArtifactApi(): WorkflowArtifactApi {
+function unavailableArtifactApi(): WorkflowArtifactBackend {
   return {
     async uploadArtifact(): Promise<never> {
       throw new Error(

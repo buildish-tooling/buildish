@@ -82,8 +82,8 @@ describe('main entrypoint', () => {
       runtimeHost,
       ciProvider,
       env: process.env,
-      cacheApi: {} as MainEntrypointDependencies['cacheApi'],
-      artifactApi: {} as MainEntrypointDependencies['artifactApi'],
+      cacheBackend: {} as MainEntrypointDependencies['cacheBackend'],
+      artifactBackend: {} as MainEntrypointDependencies['artifactBackend'],
     } satisfies MainEntrypointDependencies;
 
     await runMain(dependencies);

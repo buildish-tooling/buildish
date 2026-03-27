@@ -109,7 +109,7 @@ This likely requires a deliberate redesign of lifecycle control for GitLab.
 
 ### 4. The cache backend seam exists, but the contract is still Actions-cache shaped
 
-The code now has a `BaseCacheApi` seam, but the contract and status model are still shaped around the Actions cache runtime.
+The code now has a `BaseCacheBackend` seam, but the contract and status model are still shaped around the Actions cache runtime.
 
 GitLab cache behavior is largely configured in `.gitlab-ci.yml` and handled by the runner. It is not the same as calling a GitHub Actions cache toolkit from inside a Node program.
 
@@ -123,7 +123,7 @@ At minimum, a GitLab port would need one of these decisions:
 
 ### 5. The artifact backend seam exists, but the lookup model is still GitHub-shaped
 
-The code now has a `WorkflowArtifactApi` seam, but the distributed delta flow still depends on artifact behavior shaped around GitHub workflow runs/jobs for:
+The code now has a `WorkflowArtifactBackend` seam, but the distributed delta flow still depends on artifact behavior shaped around GitHub workflow runs/jobs for:
 
 - upload
 - lookup
@@ -133,7 +133,7 @@ The code now has a `WorkflowArtifactApi` seam, but the distributed delta flow st
 
 GitLab has job artifacts and an artifacts API, but the API shape and lifecycle are different. Artifacts are naturally tied to jobs/pipelines and are usually declared in `.gitlab-ci.yml`.
 
-In particular, `ArtifactFindOptions.findBy` currently uses GitHub-oriented coordinates (`workflowRunId`, repository owner/name), which is exactly the sort of shared contract that needs widening before GitLab support becomes comfortable.
+In particular, cross-run artifact lookup still depends on provider coordinates that must map cleanly to GitLab pipeline/job identity, which is exactly the sort of shared contract that needs widening before GitLab support becomes comfortable.
 
 ### 6. The core is more provider-neutral now, but GitLab still needs a different execution model
 

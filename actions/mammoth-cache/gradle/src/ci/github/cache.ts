@@ -23,5 +23,3 @@ export function createGitHubBaseCacheBackend(
 ): BaseCacheBackend {
   return cacheBackend;
 }
-
-export const createGitHubBaseCacheApi = createGitHubBaseCacheBackend;

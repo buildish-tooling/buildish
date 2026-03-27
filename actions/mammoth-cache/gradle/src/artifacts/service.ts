@@ -67,11 +67,6 @@ export type ArtifactFindOptions = ArtifactLookupOptions;
 export type { WorkflowArtifactDescriptor };
 
 /**
- * Back-compat alias for the provider-neutral artifact backend.
- */
-export type WorkflowArtifactApi = WorkflowArtifactBackend;
-
-/**
  * Producer metadata embedded in a delta artifact package.
  */
 export interface DeltaArtifactProducerMetadata {

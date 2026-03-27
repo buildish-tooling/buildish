@@ -20,20 +20,21 @@ import { chmod, cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { WorkflowArtifactApi, WorkflowArtifactDescriptor } from '../src/artifacts/service';
-import type { BaseCacheApi } from '../src/cache/service';
+import type { WorkflowArtifactDescriptor } from '../src/artifacts/service';
 import type { ActionRuntimeHost } from '../src/ci';
 import { createGitHubPlatform } from '../src/ci/github';
 import type { SummaryWriter } from '../src/ci/types';
 import { createMainActionOutputs, executeMainAction } from '../src/main-flow';
 import { executePostAction } from '../src/post-flow';
+import type { WorkflowArtifactBackend } from '../src/storage/artifacts';
+import type { BaseCacheBackend } from '../src/storage/cache';
 
 const RUN_ID = '92001';
 const RUN_ATTEMPT = '1';
 const CACHE_KEY_PREFIX = `local-it-distributed-${RUN_ID}-${RUN_ATTEMPT}-`;
 const INTEGRATION_WORKFLOW_NAME = 'Local Distributed Reuse Integration Test';
 const FIXTURE_JOB_NAMES = ['worker_a', 'worker_b', 'aggregator'] as const;
-const UNAVAILABLE_CACHE_API: BaseCacheApi = {
+const UNAVAILABLE_CACHE_API: BaseCacheBackend = {
   isFeatureAvailable(): boolean {
     return false;
   },
@@ -215,7 +216,7 @@ async function stageJob(
 async function runWorkerJob(
   job: LocalJobRuntime,
   taskName: 'resolveWorkerA' | 'resolveWorkerB',
-  artifactApi: WorkflowArtifactApi,
+  artifactApi: WorkflowArtifactBackend,
 ): Promise<void> {
   const mainStatus = await executeActionMain(
     job,
@@ -243,12 +244,12 @@ async function runWorkerJob(
 async function executeActionMain(
   job: LocalJobRuntime,
   inputs: Record<string, string>,
-  artifactApi: WorkflowArtifactApi,
+  artifactApi: WorkflowArtifactBackend,
 ) {
   return await executeMainAction({
     env: job.env,
-    artifactApi,
-    cacheApi: UNAVAILABLE_CACHE_API,
+    artifactBackend: artifactApi,
+    cacheBackend: UNAVAILABLE_CACHE_API,
     ...createGitHubActionDependencies(job, inputs, createSummaryWriter(job.jobName)),
   });
 }
@@ -256,12 +257,12 @@ async function executeActionMain(
 async function executeActionPost(
   job: LocalJobRuntime,
   inputs: Record<string, string>,
-  artifactApi: WorkflowArtifactApi,
+  artifactApi: WorkflowArtifactBackend,
 ) {
   return await executePostAction({
     env: job.env,
-    artifactApi,
-    cacheApi: UNAVAILABLE_CACHE_API,
+    artifactBackend: artifactApi,
+    cacheBackend: UNAVAILABLE_CACHE_API,
     ...createGitHubActionDependencies(job, inputs, createSummaryWriter(`${job.jobName} post`)),
   });
 }
@@ -412,7 +413,7 @@ function normalizeRunnerArch(arch: string): string {
   }
 }
 
-class FakeArtifactApi implements WorkflowArtifactApi {
+class FakeArtifactApi implements WorkflowArtifactBackend {
   private nextId = 1;
   private readonly artifacts = new Map<
     number,

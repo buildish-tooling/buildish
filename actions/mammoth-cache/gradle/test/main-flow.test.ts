@@ -23,7 +23,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   stageDeltaArtifactPackage,
-  type WorkflowArtifactApi,
   type WorkflowArtifactDescriptor,
 } from '../src/artifacts/service';
 import {
@@ -32,7 +31,6 @@ import {
   deserializeCacheManifest,
 } from '../src/cache/manifest';
 import { createCacheModel, type CacheModel } from '../src/cache/model';
-import type { BaseCacheApi } from '../src/cache/service';
 import type { CiJobContext, SummaryWriter } from '../src/ci/types';
 import type { NormalizedActionConfig } from '../src/config/types';
 import {
@@ -40,6 +38,8 @@ import {
   createMainActionSummaryLines,
   executeMainAction,
 } from '../src/main-flow';
+import type { WorkflowArtifactBackend } from '../src/storage/artifacts';
+import type { BaseCacheBackend } from '../src/storage/cache';
 import {
   CONSUMED_DELTA_ARTIFACT_NAMES_STATE,
   PRE_BUILD_CACHE_MANIFEST_PATH_STATE,
@@ -111,8 +111,8 @@ describe('executeMainAction', () => {
       });
 
       const status = await executeMainAction({
-        artifactApi,
-        cacheApi: createCacheApi(),
+        artifactBackend: artifactApi,
+        cacheBackend: createCacheApi(),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: {
           GITHUB_EVENT_NAME: 'push',
@@ -286,8 +286,8 @@ describe('executeMainAction', () => {
 
       await expect(
         executeMainAction({
-          artifactApi,
-          cacheApi: createCacheApi(),
+          artifactBackend: artifactApi,
+          cacheBackend: createCacheApi(),
           captureCommandOutput: async (): Promise<string> =>
             'openjdk version "21.0.4" 2024-07-16\n',
           env: {
@@ -377,8 +377,8 @@ describe('executeMainAction', () => {
       const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
 
       const status = await executeMainAction({
-        artifactApi,
-        cacheApi: createCacheApi(),
+        artifactBackend: artifactApi,
+        cacheBackend: createCacheApi(),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: {
           GITHUB_EVENT_NAME: 'push',
@@ -506,8 +506,8 @@ describe('executeMainAction', () => {
       const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
 
       const status = await executeMainAction({
-        artifactApi,
-        cacheApi: createCacheApi({
+        artifactBackend: artifactApi,
+        cacheBackend: createCacheApi({
           matchedKeyMode: 'primary',
           onRestore: async () => {
             restoreCalls += 1;
@@ -627,8 +627,8 @@ describe('executeMainAction', () => {
 
       await expect(
         executeMainAction({
-          artifactApi,
-          cacheApi: createCacheApi(),
+          artifactBackend: artifactApi,
+          cacheBackend: createCacheApi(),
           captureCommandOutput: async (): Promise<string> =>
             'openjdk version "21.0.4" 2024-07-16\n',
           env: {
@@ -735,8 +735,8 @@ describe('executeMainAction', () => {
       });
 
       const status = await executeMainAction({
-        artifactApi,
-        cacheApi: createCacheApi(),
+        artifactBackend: artifactApi,
+        cacheBackend: createCacheApi(),
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: {
           GITHUB_EVENT_NAME: 'push',
@@ -811,7 +811,7 @@ describe('executeMainAction', () => {
 });
 
 async function stageWorkerDeltaArtifact(
-  artifactApi: WorkflowArtifactApi,
+  artifactApi: WorkflowArtifactBackend,
   workspace: string,
   options: {
     readonly jobName: string;
@@ -932,7 +932,7 @@ function createCacheApi(
     readonly matchedKeyMode?: 'miss' | 'primary';
     readonly onRestore?: () => Promise<void>;
   } = {},
-): BaseCacheApi {
+): BaseCacheBackend {
   return {
     isFeatureAvailable(): boolean {
       return true;
@@ -984,7 +984,7 @@ async function withWorkspace(testBody: (workspace: string) => Promise<void>): Pr
   }
 }
 
-class FakeArtifactApi implements WorkflowArtifactApi {
+class FakeArtifactApi implements WorkflowArtifactBackend {
   private nextId = 1;
   private readonly artifacts = new Map<
     number,

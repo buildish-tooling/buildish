@@ -70,7 +70,6 @@ export interface RestoreCleanupResult {
 
 export interface MainActionDependencies extends BootstrapDependencies {
   readonly artifactBackend?: WorkflowArtifactBackend;
-  readonly artifactApi?: WorkflowArtifactBackend;
 }
 
 export async function executeMainAction(
@@ -176,9 +175,9 @@ async function applyDependentJobDeltas(
 }
 
 function resolveArtifactBackend(
-  dependencies: Pick<MainActionDependencies, 'artifactBackend' | 'artifactApi'>,
+  dependencies: Pick<MainActionDependencies, 'artifactBackend'>,
 ): WorkflowArtifactBackend {
-  const artifactBackend = dependencies.artifactBackend ?? dependencies.artifactApi;
+  const { artifactBackend } = dependencies;
   if (!artifactBackend) {
     throw new Error('Artifact backend dependency is required.');
   }

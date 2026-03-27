@@ -81,8 +81,8 @@ describe('post entrypoint', () => {
       runtimeHost,
       ciProvider,
       env: process.env,
-      cacheApi: {} as PostEntrypointDependencies['cacheApi'],
-      artifactApi: {} as PostEntrypointDependencies['artifactApi'],
+      cacheBackend: {} as PostEntrypointDependencies['cacheBackend'],
+      artifactBackend: {} as PostEntrypointDependencies['artifactBackend'],
     } satisfies PostEntrypointDependencies;
 
     await runPost(dependencies);

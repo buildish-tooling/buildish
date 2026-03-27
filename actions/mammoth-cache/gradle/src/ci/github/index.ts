@@ -22,5 +22,5 @@ export {
   type GitHubPlatformOptions,
 } from './provider';
 export { createGitHubRuntimeHost } from './runtime-host';
-export { createGitHubBaseCacheApi, createGitHubBaseCacheBackend } from './cache';
-export { createGitHubWorkflowArtifactApi, createGitHubWorkflowArtifactBackend } from './artifacts';
+export { createGitHubBaseCacheBackend } from './cache';
+export { createGitHubWorkflowArtifactBackend } from './artifacts';

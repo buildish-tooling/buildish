@@ -25,18 +25,11 @@ const NO_CACHE_PATHS_FOUND_ERROR_FRAGMENT =
   'Path Validation Error: Path(s) specified in the action for caching do(es) not exist';
 
 /**
- * Back-compat alias for the provider-neutral base-cache backend.
- */
-export type BaseCacheApi = BaseCacheBackend;
-
-/**
  * Optional test seams for the base cache service.
  */
 export interface BaseCacheServiceDependencies {
   /** Preferred provider-neutral cache backend dependency. */
   readonly cacheBackend?: BaseCacheBackend;
-  /** Deprecated compatibility alias retained while callers migrate to `cacheBackend`. */
-  readonly cacheApi?: BaseCacheBackend;
 }
 
 /**
@@ -343,7 +336,7 @@ function renderCacheKeyTemplate(
 }
 
 function resolveBaseCacheBackend(dependencies: BaseCacheServiceDependencies): BaseCacheBackend {
-  const cacheBackend = dependencies.cacheBackend ?? dependencies.cacheApi;
+  const { cacheBackend } = dependencies;
   if (!cacheBackend) {
     throw new Error('Base cache backend dependency is required.');
   }

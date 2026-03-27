@@ -121,8 +121,6 @@ export interface BootstrapDependencies {
   readonly captureCommandOutput?: CommandOutputCapture;
   /** Preferred provider-neutral base-cache backend for the active CI provider. */
   readonly cacheBackend?: BaseCacheBackend;
-  /** Deprecated compatibility alias retained while callers migrate to `cacheBackend`. */
-  readonly cacheApi?: BaseCacheBackend;
   /**
    * Optional detached-signature verifier override used by focused wrapper tests.
    *
@@ -349,7 +347,6 @@ async function runBaseCachePhase(
   if (phase === 'main') {
     const restoreResult = await restoreBaseCache(config, cacheModel, {
       cacheBackend: dependencies.cacheBackend,
-      cacheApi: dependencies.cacheApi,
     });
 
     armBaseCachePostAction(dependencies.runtimeHost.saveState);
@@ -362,7 +359,6 @@ async function runBaseCachePhase(
     isBaseCachePostActionArmed(dependencies.runtimeHost.getState),
     {
       cacheBackend: dependencies.cacheBackend,
-      cacheApi: dependencies.cacheApi,
     },
   );
 }

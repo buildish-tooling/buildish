@@ -29,7 +29,6 @@ import {
   downloadAndVerifyDeltaArtifactPackage,
   findDeltaArtifactByProducerJob,
   stageDeltaArtifactPackage,
-  type WorkflowArtifactApi,
   type WorkflowArtifactDescriptor,
   uploadDeltaArtifactPackage,
   verifyExtractedDeltaArtifactPackage,
@@ -37,6 +36,7 @@ import {
 import { captureCacheManifest, computeCacheDelta } from '../../src/cache/manifest';
 import { createCachePartitions, type CacheModel } from '../../src/cache/model';
 import type { CiJobContext } from '../../src/ci/types';
+import type { WorkflowArtifactBackend } from '../../src/storage/artifacts';
 
 describe('artifact exchange service', () => {
   const temporaryDirectories = new Set<string>();
@@ -252,7 +252,7 @@ describe('artifact exchange service', () => {
   });
 });
 
-class FakeArtifactApi implements WorkflowArtifactApi {
+class FakeArtifactApi implements WorkflowArtifactBackend {
   private nextId = 1;
 
   private readonly artifacts = new Map<

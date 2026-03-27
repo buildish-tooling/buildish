@@ -96,7 +96,7 @@ describe('createBaseCacheRestoreKeys', () => {
 describe('restoreBaseCache', () => {
   it('classifies exact cache hits', async () => {
     const result = await restoreBaseCache(baseConfig, cacheModel, {
-      cacheApi: {
+      cacheBackend: {
         isFeatureAvailable: () => true,
         restoreCache: async () => cacheModel.cacheKey,
         saveCache: async () => 0,
@@ -111,7 +111,7 @@ describe('restoreBaseCache', () => {
 
   it('classifies partial cache hits', async () => {
     const result = await restoreBaseCache(baseConfig, cacheModel, {
-      cacheApi: {
+      cacheBackend: {
         isFeatureAvailable: () => true,
         restoreCache: async () =>
           'buildish-mammoth-gradle-cache-2-21-linux-x64-feedcafe1234abcd-main',
@@ -127,7 +127,7 @@ describe('restoreBaseCache', () => {
 
   it('returns a miss when no base cache is restored', async () => {
     const result = await restoreBaseCache(baseConfig, cacheModel, {
-      cacheApi: {
+      cacheBackend: {
         isFeatureAvailable: () => true,
         restoreCache: async () => undefined,
         saveCache: async () => 0,
@@ -141,7 +141,7 @@ describe('restoreBaseCache', () => {
 describe('saveBaseCache', () => {
   it('skips saving in read-only mode', async () => {
     const result = await saveBaseCache({ ...baseConfig, readOnly: true }, cacheModel, true, {
-      cacheApi: {
+      cacheBackend: {
         isFeatureAvailable: () => true,
         restoreCache: async () => undefined,
         saveCache: async () => 999,
@@ -157,7 +157,7 @@ describe('saveBaseCache', () => {
       cacheModel,
       true,
       {
-        cacheApi: {
+        cacheBackend: {
           isFeatureAvailable: () => true,
           restoreCache: async () => undefined,
           saveCache: async () => 999,
@@ -170,7 +170,7 @@ describe('saveBaseCache', () => {
 
   it('reports saved cache IDs for eligible saves', async () => {
     const result = await saveBaseCache(baseConfig, cacheModel, true, {
-      cacheApi: {
+      cacheBackend: {
         isFeatureAvailable: () => true,
         restoreCache: async () => undefined,
         saveCache: async () => 77,
@@ -183,7 +183,7 @@ describe('saveBaseCache', () => {
 
   it('skips saving when no cache paths currently exist on disk', async () => {
     const result = await saveBaseCache(baseConfig, cacheModel, true, {
-      cacheApi: {
+      cacheBackend: {
         isFeatureAvailable: () => true,
         restoreCache: async () => undefined,
         saveCache: async () => {
@@ -200,7 +200,7 @@ describe('saveBaseCache', () => {
 
   it('returns not-saved when the toolkit declines to create a new cache entry', async () => {
     const result = await saveBaseCache(baseConfig, cacheModel, true, {
-      cacheApi: {
+      cacheBackend: {
         isFeatureAvailable: () => true,
         restoreCache: async () => undefined,
         saveCache: async () => -1,
@@ -213,7 +213,7 @@ describe('saveBaseCache', () => {
   it('rethrows unrelated save failures', async () => {
     await expect(
       saveBaseCache(baseConfig, cacheModel, true, {
-        cacheApi: {
+        cacheBackend: {
           isFeatureAvailable: () => true,
           restoreCache: async () => undefined,
           saveCache: async () => {

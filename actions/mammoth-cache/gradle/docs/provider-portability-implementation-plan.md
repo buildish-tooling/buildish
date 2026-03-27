@@ -91,7 +91,8 @@ The immediate goal is not a large move. It is to make current modules depend on 
 ## Phase 5: widen cache/artifact contracts where still GitHub-shaped
 
 - Planned change:
-  - keep `BaseCacheApi` and `WorkflowArtifactApi`
+  - use `BaseCacheBackend` and `WorkflowArtifactBackend` consistently in shared code
+  - remove deprecated compatibility aliases once callers are migrated
   - scrub GitHub-specific wording from shared status/error text
   - document backend-varying capabilities explicitly: digest availability, retention, delete support, cross-run lookup scope
 - This is shared cleanup, not provider implementation.
