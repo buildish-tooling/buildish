@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import * as core from '@actions/core';
 import { rm } from 'node:fs/promises';
 
 import {
@@ -23,22 +24,32 @@ import {
   type WorkflowArtifactApi,
 } from './artifacts/service';
 import { bootstrapPhase, type BootstrapDependencies, type BootstrapStatus } from './bootstrap';
+import { createGitHubHttpHeadersByHost } from './ci/github';
 import type { CacheDeltaManifest, CacheManifest } from './cache/manifest';
 import { captureCacheManifest, computeCacheDelta } from './cache/manifest';
 import type { CacheModel } from './cache/model';
 import type { BaseCacheRestoreResult } from './cache/service';
+import { readActionInputs } from './config/action-config';
 import {
   cleanupGradleBuildResultCapture,
   loadGradleBuildReport,
   type GradleBuildReport,
 } from './gradle/build-results';
-import { replaceJobSummary } from './logging/summary';
+import {
+  createDetailsSection,
+  createHtmlLink,
+  createHtmlTable,
+  escapeHtml,
+  escapeSummaryText,
+  replaceJobSummary,
+} from './logging/summary';
 import {
   getPersistedBaseCacheRestoreResult,
   getPersistedDeltaArtifactProducerIdentity,
   getPersistedConsumedDeltaArtifactNames,
   loadPersistedPreBuildCacheManifest,
 } from './state/post-action';
+import { isRecord } from './validation';
 
 const DELTA_ARTIFACT_RETENTION_DAYS = 7;
 
@@ -82,6 +93,7 @@ export interface PostActionStatus {
   readonly consumedDeltaCleanupResult: PostConsumedDeltaCleanupResult | null;
   readonly deltaArtifactResult: PostDeltaArtifactResult | null;
   readonly gradleBuildReport: GradleBuildReport;
+  readonly jobUrl: string | null;
   readonly workflowRunUrl: string | null;
   readonly message: string;
 }
@@ -100,8 +112,10 @@ export interface PostActionDependencies extends BootstrapDependencies {
 export async function executePostAction(
   dependencies: PostActionDependencies = {},
 ): Promise<PostActionStatus> {
+  const logInfo = dependencies.logInfo ?? core.info;
   const bootstrap = await bootstrapPhase('post', dependencies);
   const workflowRunUrl = createWorkflowRunUrl(dependencies.env ?? process.env, bootstrap);
+  const jobUrl = await resolveCurrentGitHubJobUrl(dependencies, bootstrap);
   const baseCacheRestoreResult = getPersistedBaseCacheRestoreResult(
     dependencies.getState ?? (() => ''),
   );
@@ -121,9 +135,11 @@ export async function executePostAction(
       consumedDeltaCleanupResult,
       deltaArtifactResult: null,
       gradleBuildReport: combinedGradleBuildReport,
+      jobUrl,
       workflowRunUrl,
       message: 'Post action flow completed without cache orchestration.',
     } satisfies PostActionStatus;
+    logPostActionDetails(status, logInfo);
     await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
     return status;
   }
@@ -150,9 +166,11 @@ export async function executePostAction(
           'Delta artifact upload skipped because no persisted pre-build cache manifest was found in post-action state.',
       },
       gradleBuildReport: combinedGradleBuildReport,
+      jobUrl,
       workflowRunUrl,
       message: 'Post action flow completed without a persisted pre-build cache manifest.',
     } satisfies PostActionStatus;
+    logPostActionDetails(status, logInfo);
     await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
     return status;
   }
@@ -176,10 +194,12 @@ export async function executePostAction(
     consumedDeltaCleanupResult,
     deltaArtifactResult,
     gradleBuildReport: combinedGradleBuildReport,
+    jobUrl,
     workflowRunUrl,
     message: createPostActionMessage(deltaArtifactResult),
   } satisfies PostActionStatus;
 
+  logPostActionDetails(status, logInfo);
   await replaceJobSummary(dependencies, createPostActionSummaryLines(status));
 
   return status;
@@ -401,6 +421,42 @@ export function createPostActionSummaryLines(status: PostActionStatus): readonly
   return lines;
 }
 
+function logPostActionDetails(status: PostActionStatus, logInfo: (message: string) => void): void {
+  if (status.deltaArtifactResult?.artifactName) {
+    const detailParts = [`Uploaded delta artifact '${status.deltaArtifactResult.artifactName}'`];
+    if (status.deltaArtifactResult.artifactId !== null) {
+      detailParts.push(`ID ${status.deltaArtifactResult.artifactId}`);
+    }
+    if (status.deltaArtifactResult.artifactSizeBytes !== null) {
+      detailParts.push(formatByteCount(status.deltaArtifactResult.artifactSizeBytes));
+    }
+    logInfo(formatUploadedArtifactLogMessage(detailParts));
+  }
+
+  if (status.consumedDeltaCleanupResult?.attemptedArtifactNames.length) {
+    logInfo(
+      `Attempted cleanup of consumed delta artifacts: ${status.consumedDeltaCleanupResult.attemptedArtifactNames.join(', ')}.`,
+    );
+  }
+
+  if (status.consumedDeltaCleanupResult?.deletedArtifactNames.length) {
+    logInfo(
+      `Deleted consumed delta artifacts: ${status.consumedDeltaCleanupResult.deletedArtifactNames.join(', ')}.`,
+    );
+  }
+
+  for (const [index, build] of status.gradleBuildReport.builds.entries()) {
+    const buildScanDetail = build.buildScanUri
+      ? `Build Scan ${build.buildScanUri}`
+      : build.buildScanFailed
+        ? 'Build Scan failed'
+        : 'Build Scan not attempted';
+    logInfo(
+      `Captured Gradle build ${index + 1}: ${displaySummaryText(build.rootProjectName, '(unnamed root project)')} — ${displaySummaryText(build.requestedTasks, '(default tasks)')}; Gradle ${build.gradleVersion} / Java ${build.javaVersion}; configuration cache ${build.configCacheHit ? 'reused' : 'not reused'}; ${buildScanDetail}.`,
+    );
+  }
+}
+
 function summarizeGradleBuildReport(report: GradleBuildReport): {
   readonly capturedBuildCount: number;
   readonly successfulBuildCount: number;
@@ -516,7 +572,7 @@ function createGradleBuildOverviewLines(
     `- Build Scans: ${buildSummary.publishedBuildScanCount} published, ${buildSummary.failedBuildScanCount} failed, ${buildSummary.buildScanNotAttemptedCount} not attempted`,
   ];
 
-  if (status.workflowRunUrl) {
+  if (status.jobUrl) {
     const workflowLabel = [
       status.bootstrap.ciContext.workflowName,
       status.bootstrap.ciContext.jobName,
@@ -524,7 +580,17 @@ function createGradleBuildOverviewLines(
       .filter((value) => value.trim().length > 0)
       .join(' / ');
     lines.push(
-      `- Workflow logs: [${escapeSummaryText(workflowLabel || 'Workflow run')}](${status.workflowRunUrl})`,
+      `- Job logs: [${escapeSummaryText(workflowLabel || 'Current job')}](${status.jobUrl})`,
+    );
+  } else if (status.workflowRunUrl) {
+    const workflowLabel = [
+      status.bootstrap.ciContext.workflowName,
+      status.bootstrap.ciContext.jobName,
+    ]
+      .filter((value) => value.trim().length > 0)
+      .join(' / ');
+    lines.push(
+      `- Workflow run: [${escapeSummaryText(workflowLabel || 'Workflow run')}](${status.workflowRunUrl})`,
     );
   }
 
@@ -533,21 +599,23 @@ function createGradleBuildOverviewLines(
     return lines;
   }
 
-  for (const [index, build] of status.gradleBuildReport.builds.entries()) {
-    const buildIcon = build.buildFailed ? '❌' : '✅';
-    lines.push(
-      `- ${buildIcon} Build ${index + 1}: ${escapeSummaryText(build.rootProjectName)} — ${escapeSummaryText(build.requestedTasks)}`,
-    );
-
-    const buildDetailParts = [
-      `Gradle ${escapeSummaryText(build.gradleVersion)}`,
-      `configuration cache reused: ${build.configCacheHit ? 'yes' : 'no'}`,
-      `Build Scan: ${formatBuildScanDetail(build.buildScanFailed, build.buildScanUri)}`,
-    ];
-    lines.push(`  - ${buildDetailParts.join('; ')}`);
-  }
-
-  return lines;
+  return [
+    ...lines,
+    ...createHtmlTable(
+      ['Build', 'Request', 'Toolchain', 'Configuration cache', 'Build Scan'],
+      status.gradleBuildReport.builds.map((build, index) => [
+        escapeHtml(`${build.buildFailed ? '❌' : '✅'} ${index + 1}`),
+        escapeHtml(
+          `${displaySummaryText(build.rootProjectName, '(unnamed root project)')} — ${displaySummaryText(build.requestedTasks, '(default tasks)')}`,
+        ),
+        escapeHtml(`Gradle ${build.gradleVersion} / Java ${build.javaVersion}`),
+        escapeHtml(build.configCacheHit ? 'reused' : 'not reused'),
+        build.buildScanUri
+          ? createHtmlLink(build.buildScanUri, 'open')
+          : escapeHtml(build.buildScanFailed ? 'failed' : 'not attempted'),
+      ]),
+    ),
+  ];
 }
 
 function createCacheDetailsSectionLines(status: PostActionStatus): readonly string[] {
@@ -555,53 +623,44 @@ function createCacheDetailsSectionLines(status: PostActionStatus): readonly stri
     return [];
   }
 
-  const lines = [
-    ...createDetailsSection(
-      'Cache details',
-      [
-        `- Base cache restore: ${escapeSummaryText(status.baseCacheRestoreResult?.status ?? 'not evaluated')}`,
-        `- Base cache save: ${escapeSummaryText(status.bootstrap.baseCacheResult?.status ?? 'not evaluated')}`,
-        `- Delta artifact: ${escapeSummaryText(status.deltaArtifactResult?.status ?? 'not evaluated')}`,
-        ...(status.deltaArtifactResult
-          ? [
-              `- Post-build cache delta: ${status.deltaArtifactResult.addedCount} added, ${status.deltaArtifactResult.modifiedCount} modified, ${status.deltaArtifactResult.deletedCount} deleted`,
-            ]
-          : []),
-        ...(status.deltaArtifactResult?.artifactName
-          ? [
-              `- Uploaded delta artifact: ${escapeSummaryText(status.deltaArtifactResult.artifactName)} (ID ${status.deltaArtifactResult.artifactId ?? 'unknown'})`,
-              ...(status.deltaArtifactResult.artifactSizeBytes === null
-                ? []
-                : [
-                    `- Uploaded delta artifact archive size: ${formatByteCount(status.deltaArtifactResult.artifactSizeBytes)}`,
-                  ]),
-            ]
-          : []),
-        ...(status.consumedDeltaCleanupResult
-          ? [
-              `- Consumed delta cleanup: deleted ${status.consumedDeltaCleanupResult.deletedArtifactNames.length} of ${status.consumedDeltaCleanupResult.attemptedArtifactNames.length}`,
-            ]
-          : []),
-        ...(status.cacheStatistics ? createCacheStatisticsTableLines(status.cacheStatistics) : []),
-      ].flat(),
-    ),
-  ];
-
-  return lines;
+  return createDetailsSection('Cache details', [
+    `- Base cache restore: ${escapeSummaryText(status.baseCacheRestoreResult?.status ?? 'not evaluated')}`,
+    `- Base cache save: ${escapeSummaryText(status.bootstrap.baseCacheResult?.status ?? 'not evaluated')}`,
+    `- Delta artifact: ${escapeSummaryText(status.deltaArtifactResult?.status ?? 'not evaluated')}`,
+    ...(status.deltaArtifactResult
+      ? [
+          `- Post-build cache delta: ${status.deltaArtifactResult.addedCount} added, ${status.deltaArtifactResult.modifiedCount} modified, ${status.deltaArtifactResult.deletedCount} deleted`,
+        ]
+      : []),
+    ...(status.consumedDeltaCleanupResult
+      ? [
+          `- Consumed delta cleanup: deleted ${status.consumedDeltaCleanupResult.deletedArtifactNames.length} of ${status.consumedDeltaCleanupResult.attemptedArtifactNames.length}`,
+        ]
+      : []),
+    ...(status.cacheStatistics ? createCacheStatisticsTableLines(status.cacheStatistics) : []),
+  ]);
 }
 
 function createExecutionContextSectionLines(status: PostActionStatus): readonly string[] {
   return createDetailsSection('Execution context', [
+    `- Phase: ${escapeSummaryText(status.bootstrap.phase)}`,
     `- Workflow: ${escapeSummaryText(status.bootstrap.ciContext.workflowName)}`,
     `- Job: ${escapeSummaryText(status.bootstrap.ciContext.jobName)}`,
     `- Event: ${escapeSummaryText(status.bootstrap.ciContext.eventName)}`,
     `- Ref: ${escapeSummaryText(status.bootstrap.ciContext.resolvedRefName)}`,
+    `- Safe ref: ${escapeSummaryText(status.bootstrap.ciContext.safeRefName)}`,
+    `- Runner: ${escapeSummaryText(status.bootstrap.ciContext.runnerOs)}/${escapeSummaryText(status.bootstrap.ciContext.runnerArch)}`,
     `- Job mode: ${escapeSummaryText(status.bootstrap.config.jobMode)}`,
     `- Read only: ${status.bootstrap.config.readOnly ? 'yes' : 'no'}`,
     `- Base cache enabled: ${status.bootstrap.cacheModel ? 'yes' : 'no'}`,
     ...(status.bootstrap.cacheModel
-      ? [`- Cache key: ${escapeSummaryText(status.bootstrap.cacheModel.cacheKey)}`]
+      ? [
+          `- Cache key: ${escapeSummaryText(status.bootstrap.cacheModel.cacheKey)}`,
+          `- Java major: ${escapeSummaryText(String(status.bootstrap.cacheModel.javaMajor))}`,
+          `- Cache partitions: ${status.bootstrap.cacheModel.partitions.length}`,
+        ]
       : []),
+    `- Wrapper selection: ${escapeSummaryText(status.bootstrap.config.wrapperSelectionMode)}`,
     `- Detail: ${escapeSummaryText(status.message)}`,
   ]);
 }
@@ -612,28 +671,32 @@ function createCacheStatisticsTableLines(cacheStatistics: PostCacheStatistics): 
     return [];
   }
 
-  const headerCells = ['Snapshot', 'Total', ...cacheStatistics.partitionDisplayNames].map(
-    (label) => `<th>${escapeHtml(label)}</th>`,
-  );
-  const rowLines = cacheStatistics.rows.map((row) => {
-    const cells = [
-      row.label,
-      formatCacheStatisticCell(row.total),
-      ...row.partitions.map(formatCacheStatisticCell),
-    ];
-    return `    <tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`;
-  });
-
   return [
     '- Cache partition statistics (manifest-derived, uncompressed content sizes):',
-    '<table>',
-    `  <thead><tr>${headerCells.join('')}</tr></thead>`,
-    '  <tbody>',
-    ...rowLines,
-    '  </tbody>',
-    '</table>',
+    ...createHtmlTable(
+      ['Snapshot', 'Total', ...cacheStatistics.partitionDisplayNames],
+      cacheStatistics.rows.map((row) => [
+        escapeHtml(row.label),
+        escapeHtml(formatCacheStatisticCell(row.total)),
+        ...row.partitions.map((cell) => escapeHtml(formatCacheStatisticCell(cell))),
+      ]),
+    ),
     '- Note: base-cache rows reflect cache-manifest snapshots, not the compressed size of the backend cache entry.',
   ];
+}
+
+function displaySummaryText(value: string, fallback: string): string {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function formatUploadedArtifactLogMessage(detailParts: readonly string[]): string {
+  if (detailParts.length === 0) {
+    return 'Uploaded delta artifact.';
+  }
+
+  const [subject, ...details] = detailParts;
+  return details.length > 0 ? `${subject} (${details.join(', ')}).` : `${subject}.`;
 }
 
 function createPostCacheStatistics(
@@ -781,27 +844,6 @@ function getBaseCacheWarning(
   return null;
 }
 
-function createDetailsSection(title: string, bodyLines: readonly string[]): readonly string[] {
-  return [
-    '<details>',
-    `<summary>${escapeHtml(title)}</summary>`,
-    '',
-    ...bodyLines,
-    '',
-    '</details>',
-  ];
-}
-
-function formatBuildScanDetail(buildScanFailed: boolean, buildScanUri: string | null): string {
-  if (buildScanUri) {
-    return `[open](${buildScanUri})`;
-  }
-  if (buildScanFailed) {
-    return 'failed';
-  }
-  return 'not attempted';
-}
-
 function createWorkflowRunUrl(env: NodeJS.ProcessEnv, bootstrap: BootstrapStatus): string | null {
   const runId = bootstrap.ciContext.runId;
   if (runId === null) {
@@ -835,6 +877,127 @@ function normalizeServerUrl(value: string | undefined): string {
   }
 }
 
+async function resolveCurrentGitHubJobUrl(
+  dependencies: PostActionDependencies,
+  bootstrap: BootstrapStatus,
+): Promise<string | null> {
+  const runId = bootstrap.ciContext.runId;
+  const repository = bootstrap.ciContext.repository.trim();
+  const jobName = bootstrap.ciContext.jobName.trim();
+  if (runId === null || repository.length === 0 || jobName.length === 0) {
+    return null;
+  }
+
+  const githubToken = resolveGitHubApiToken(dependencies);
+  if (!githubToken) {
+    return null;
+  }
+
+  const jobsApiUrl = createGitHubJobsApiUrl(dependencies.env ?? process.env, bootstrap);
+  const headersByHost = createGitHubHttpHeadersByHost(
+    githubToken,
+    dependencies.env?.GITHUB_API_URL ?? process.env.GITHUB_API_URL,
+  );
+  const fetchImpl = dependencies.fetchImpl ?? fetch;
+
+  for (let page = 1; page <= 10; page += 1) {
+    const requestUrl = new URL(jobsApiUrl);
+    requestUrl.searchParams.set('per_page', '100');
+    requestUrl.searchParams.set('page', String(page));
+
+    const response = await fetchImpl(
+      requestUrl,
+      createRequestInitForUrl(requestUrl, headersByHost),
+    );
+    if (!response.ok) {
+      return null;
+    }
+
+    const jobs = extractGitHubWorkflowJobs(await response.json());
+    const matchingJobs = jobs.filter((job) => job.name === jobName);
+    if (matchingJobs.length === 1) {
+      return matchingJobs[0].htmlUrl;
+    }
+    if (matchingJobs.length > 1 || jobs.length < 100) {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function resolveGitHubApiToken(dependencies: PostActionDependencies): string | null {
+  const directToken = dependencies.githubToken?.trim();
+  if (directToken) {
+    return directToken;
+  }
+
+  const inputToken = readActionInputs(dependencies.inputProvider).githubToken.trim();
+  if (inputToken.length > 0) {
+    return inputToken;
+  }
+
+  const envToken = (dependencies.env ?? process.env).GITHUB_TOKEN?.trim();
+  return envToken && envToken.length > 0 ? envToken : null;
+}
+
+function createGitHubJobsApiUrl(env: NodeJS.ProcessEnv, bootstrap: BootstrapStatus): URL {
+  const apiBaseUrl = normalizeGitHubApiUrl(env.GITHUB_API_URL);
+  const runAttemptSegment =
+    bootstrap.ciContext.runAttempt === null ? '' : `/attempts/${bootstrap.ciContext.runAttempt}`;
+
+  return new URL(
+    `/repos/${bootstrap.ciContext.repository}/actions/runs/${bootstrap.ciContext.runId}${runAttemptSegment}/jobs`,
+    `${apiBaseUrl}/`,
+  );
+}
+
+function normalizeGitHubApiUrl(value: string | undefined): string {
+  const trimmedValue = value?.trim();
+  if (!trimmedValue) {
+    return 'https://api.github.com';
+  }
+
+  try {
+    const parsed = new URL(trimmedValue);
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    return 'https://api.github.com';
+  }
+}
+
+function createRequestInitForUrl(
+  url: URL,
+  httpHeadersByHost: ReadonlyMap<string, ReadonlyMap<string, string>>,
+): RequestInit {
+  if (url.protocol !== 'https:') {
+    return {};
+  }
+
+  const headers = httpHeadersByHost.get(url.hostname.toLowerCase());
+  return headers ? { headers: new Headers([...headers.entries()]) } : {};
+}
+
+function extractGitHubWorkflowJobs(
+  payload: unknown,
+): readonly { readonly name: string; readonly htmlUrl: string }[] {
+  if (!isRecord(payload) || !Array.isArray(payload.jobs)) {
+    return [];
+  }
+
+  return payload.jobs.flatMap((job) => {
+    if (!isRecord(job) || typeof job.name !== 'string' || typeof job.html_url !== 'string') {
+      return [];
+    }
+
+    const name = job.name.trim();
+    const htmlUrl = job.html_url.trim();
+    return name.length > 0 && htmlUrl.length > 0 ? [{ name, htmlUrl }] : [];
+  });
+}
+
 function formatByteCount(value: number): string {
   if (value < 1024) {
     return `${value} B`;
@@ -853,17 +1016,4 @@ function formatByteCount(value: number): string {
 
 function pluralize(word: string, count: number): string {
   return count === 1 ? word : `${word}s`;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
-function escapeSummaryText(value: string): string {
-  return value.replaceAll(/[\\`*_{}[\]()#+.!|-]/g, '\\$&');
 }

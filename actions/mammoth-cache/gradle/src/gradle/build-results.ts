@@ -37,6 +37,7 @@ export interface CapturedGradleBuild {
   readonly rootProjectName: string;
   readonly requestedTasks: string;
   readonly gradleVersion: string;
+  readonly javaVersion: string;
   readonly buildFailed: boolean;
   readonly configCacheHit: boolean;
   readonly buildScanUri: string | null;
@@ -53,6 +54,7 @@ interface CapturedBuildResultFile {
   readonly rootProjectName: string;
   readonly requestedTasks: string;
   readonly gradleVersion: string;
+  readonly javaVersion: string;
   readonly buildFailed: boolean;
   readonly configCacheHit: boolean;
 }
@@ -136,6 +138,7 @@ export async function loadGradleBuildReport(
         rootProjectName: buildResult.rootProjectName,
         requestedTasks: buildResult.requestedTasks,
         gradleVersion: buildResult.gradleVersion,
+        javaVersion: buildResult.javaVersion,
         buildFailed: buildResult.buildFailed,
         configCacheHit: buildResult.configCacheHit,
         buildScanUri: buildScan?.buildScanUri ?? null,
@@ -191,7 +194,7 @@ function createBuildSummaryLines(build: CapturedGradleBuild, index: number): rea
   return [
     `- Build ${index + 1}: ${escapeSummaryText(truncateSummaryText(title, 200))}`,
     `  - Outcome: ${build.buildFailed ? 'failed' : 'succeeded'}`,
-    `  - Gradle version: ${escapeSummaryText(build.gradleVersion)}`,
+    `  - Toolchain: Gradle ${escapeSummaryText(build.gradleVersion)} / Java ${escapeSummaryText(build.javaVersion)}`,
     `  - Configuration cache reused: ${build.configCacheHit ? 'yes' : 'no'}`,
     buildScanSummaryLine,
   ];
@@ -256,6 +259,10 @@ function validateCapturedBuildResultFile(
       parsed.gradleVersion,
       `Gradle build result file '${filePath}' gradleVersion`,
     ),
+    javaVersion: validateOptionalCapturedJavaVersion(
+      parsed.javaVersion,
+      `Gradle build result file '${filePath}' javaVersion`,
+    ),
     buildFailed: validateBoolean(
       parsed.buildFailed,
       `Gradle build result file '${filePath}' buildFailed`,
@@ -307,6 +314,14 @@ function validateBoolean(value: unknown, label: string): boolean {
   }
 
   return value;
+}
+
+function validateOptionalCapturedJavaVersion(value: unknown, label: string): string {
+  if (value === undefined) {
+    return 'unknown';
+  }
+
+  return validateString(value, label);
 }
 
 function resolveCaptureRoot(env: NodeJS.ProcessEnv): string | null {
@@ -412,6 +427,7 @@ void captureUsingBuildFinished(gradle, String invocationId, ResultsWriter result
             rootProjectName: rootProject.name,
             requestedTasks: gradle.startParameter.taskNames.join(" "),
             gradleVersion: GradleVersion.current().version,
+            javaVersion: System.getProperty("java.version") ?: "unknown",
             buildFailed: result.failure != null,
             configCacheHit: false
         ]
@@ -519,6 +535,7 @@ abstract class BuildResultsRecorder implements BuildService<BuildResultsRecorder
             rootProjectName: getParameters().getRootProjectName().get(),
             requestedTasks: getParameters().getRequestedTasks().get(),
             gradleVersion: GradleVersion.current().version,
+            javaVersion: System.getProperty("java.version") ?: "unknown",
             buildFailed: buildFailed,
             configCacheHit: configCacheHit
         ]

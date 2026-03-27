@@ -101,13 +101,12 @@ describe('executePostAction', () => {
       expect(
         downloaded.deltaManifest.partitions.some((partition) => partition.entries.length > 0),
       ).toBe(true);
-      expect(summary.lines).toContain('## Apache Buildish bootstrap');
-      expect(summary.lines).toContain('## Apache Buildish Mammoth Cache for Gradle');
-      expect(summary.lines).toContain('### Gradle builds');
-      expect(summary.lines).toContain('- Delta artifact: uploaded');
-      expect(summary.lines).toContain(
-        `- Uploaded delta artifact: ${artifacts[0]!.name.replaceAll('-', '\\-')} (ID ${artifacts[0]!.id})`,
-      );
+      const summaryText = summary.lines.join('\n');
+      expect(summaryText).toContain('## Apache Buildish bootstrap');
+      expect(summaryText).toContain('## Apache Buildish Mammoth Cache for Gradle');
+      expect(summaryText).toContain('### Gradle builds');
+      expect(summaryText).toContain('<summary>Cache details</summary>');
+      expect(summaryText).toContain('- Delta artifact: uploaded');
       expect(summary.writeCalls).toBe(2);
       await rm(downloaded.downloadDirectory, { recursive: true, force: true });
     });
@@ -185,7 +184,7 @@ describe('executePostAction', () => {
       const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
       const savedState = new Map<string, string>();
       const summaryPath = path.join(workspace, 'step-summary.md');
-      const bootstrapSummary = createSummaryCapture();
+      const infoMessages: string[] = [];
 
       await writeFile(summaryPath, 'bootstrap placeholder\n', 'utf8');
       await writeGradleFile(
@@ -206,6 +205,15 @@ describe('executePostAction', () => {
         },
         savedState.set.bind(savedState),
       );
+      await writeCapturedBuildResult(path.join(workspace, 'runner-temp'), {
+        invocationKey: 'build-1',
+        rootProjectName: 'platform',
+        requestedTasks: 'build --scan',
+        gradleVersion: '8.14.3',
+        javaVersion: '21.0.4',
+        configCacheHit: true,
+        buildScanUri: 'https://scans.gradle.com/s/local-it-published',
+      });
       await writeGradleFile(
         gradleUserHome,
         'caches/modules-2/files-2.1/org/example/module.bin',
@@ -218,10 +226,30 @@ describe('executePostAction', () => {
         captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
         env: {
           ...createTestEnv(workspace, gradleUserHome, 'worker-build'),
+          GITHUB_TOKEN: 'test-token',
           GITHUB_STEP_SUMMARY: summaryPath,
         },
         eventPayload: {
           repository: { default_branch: 'main' },
+        },
+        fetchImpl: async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+          const url = String(input);
+          if (url.includes('/actions/runs/101/attempts/2/jobs')) {
+            expect(init?.headers).toBeInstanceOf(Headers);
+            expect((init!.headers as Headers).get('authorization')).toBe('Bearer test-token');
+            return new Response(
+              JSON.stringify({
+                jobs: [
+                  {
+                    name: 'worker-build',
+                    html_url: 'https://github.com/apache/buildish/actions/runs/101/job/987654321',
+                  },
+                ],
+              }),
+              { status: 200 },
+            );
+          }
+          throw new Error(`Unexpected fetch URL: ${url}`);
         },
         getState(name: string): string {
           if (name === 'buildish-mammoth-cache-gradle-base-cache-armed') {
@@ -230,21 +258,53 @@ describe('executePostAction', () => {
           return savedState.get(name) ?? '';
         },
         inputProvider: createInputProvider('distributed-worker'),
-        summaryWriter: bootstrapSummary.writer,
+        logInfo(message: string): void {
+          infoMessages.push(message);
+        },
+        summaryWriter: createSummaryCapture().writer,
       });
 
       const summaryContent = await readFile(summaryPath, 'utf8');
       expect(summaryContent).toContain('## Apache Buildish Mammoth Cache for Gradle');
       expect(summaryContent).toContain('### Gradle builds');
       expect(summaryContent).toContain(
-        'Workflow logs: [CI / worker\\-build](https://github.com/apache/buildish/actions/runs/101/attempts/2)',
+        'Job logs: [CI / worker\\-build](https://github.com/apache/buildish/actions/runs/101/job/987654321)',
       );
+      expect(summaryContent).toContain('Gradle 8.14.3 / Java 21.0.4');
       expect(summaryContent).toContain('<summary>Cache details</summary>');
       expect(summaryContent).toContain('Pulled base cache');
       expect(summaryContent).toContain('Delta artifact');
       expect(summaryContent).toContain('Uploaded base cache');
       expect(summaryContent).toContain('manifest-derived, uncompressed content sizes');
       expect(summaryContent).not.toContain('## Apache Buildish bootstrap');
+      expect(infoMessages).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("Uploaded delta artifact 'buildish-mammoth-cache-gradle-delta-"),
+          'Captured Gradle build 1: platform — build --scan; Gradle 8.14.3 / Java 21.0.4; configuration cache reused; Build Scan https://scans.gradle.com/s/local-it-published.',
+        ]),
+      );
+    });
+  });
+
+  it('falls back to the workflow run URL when the current job URL cannot be resolved', async () => {
+    await withWorkspace(async (workspace) => {
+      const gradleUserHome = path.join(workspace, '.gradle');
+      const summaryPath = path.join(workspace, 'step-summary.md');
+
+      await executePostAction({
+        captureCommandOutput: async (): Promise<string> => 'openjdk version "21.0.4" 2024-07-16\n',
+        env: {
+          ...createTestEnv(workspace, gradleUserHome, 'worker-build'),
+          GITHUB_STEP_SUMMARY: summaryPath,
+        },
+        inputProvider: createInputProvider('distributed-worker'),
+        summaryWriter: createSummaryCapture().writer,
+      });
+
+      const summaryContent = await readFile(summaryPath, 'utf8');
+      expect(summaryContent).toContain(
+        'Workflow run: [CI / worker\\-build](https://github.com/apache/buildish/actions/runs/101/attempts/2)',
+      );
     });
   });
 
@@ -302,10 +362,11 @@ describe('executePostAction', () => {
           totalChangedCount: 1,
         }),
       );
-      expect(summary.lines).toContain('## Apache Buildish Mammoth Cache for Gradle');
-      expect(summary.lines).toContain('### Gradle builds');
-      expect(summary.lines).toContain('- Delta artifact: not\\-distributed\\-worker');
-      expect(summary.lines).toContain('- Post-build cache delta: 0 added, 1 modified, 0 deleted');
+      const summaryText = summary.lines.join('\n');
+      expect(summaryText).toContain('## Apache Buildish Mammoth Cache for Gradle');
+      expect(summaryText).toContain('### Gradle builds');
+      expect(summaryText).toContain('- Delta artifact: not\\-distributed\\-worker');
+      expect(summaryText).toContain('- Post-build cache delta: 0 added, 1 modified, 0 deleted');
       expect(summary.writeCalls).toBe(2);
       await expect(artifactApi.listArtifacts()).resolves.toHaveLength(0);
     });
@@ -375,11 +436,12 @@ describe('executePostAction', () => {
           warnings: [],
         }),
       );
-      expect(summary.lines).toContain('## Apache Buildish Mammoth Cache for Gradle');
-      expect(summary.lines).toContain('<details>');
-      expect(summary.lines).toContain('- Consumed delta cleanup: deleted 1 of 1');
-      expect(summary.lines).toContain('- Delta artifact: not\\-distributed\\-worker');
-      expect(summary.lines).toContain('- Post-build cache delta: 0 added, 1 modified, 0 deleted');
+      const summaryText = summary.lines.join('\n');
+      expect(summaryText).toContain('## Apache Buildish Mammoth Cache for Gradle');
+      expect(summaryText).toContain('<summary>Cache details</summary>');
+      expect(summaryText).toContain('- Consumed delta cleanup: deleted 1 of 1');
+      expect(summaryText).toContain('- Delta artifact: not\\-distributed\\-worker');
+      expect(summaryText).toContain('- Post-build cache delta: 0 added, 1 modified, 0 deleted');
       expect(summary.writeCalls).toBe(2);
       await expect(artifactApi.listArtifacts()).resolves.toHaveLength(0);
     });
@@ -426,10 +488,10 @@ describe('executePostAction', () => {
           totalChangedCount: 0,
         }),
       );
-      expect(summary.lines).toContain('## Apache Buildish Mammoth Cache for Gradle');
-      expect(summary.lines).toContain('### Gradle builds');
-      expect(summary.lines).toContain('- Delta artifact: no\\-changes');
-      expect(summary.lines).toContain('- Post-build cache delta: 0 added, 0 modified, 0 deleted');
+      const summaryText = summary.lines.join('\n');
+      expect(summaryText).toContain('## Apache Buildish Mammoth Cache for Gradle');
+      expect(summaryText).toContain('- Delta artifact: no\\-changes');
+      expect(summaryText).toContain('- Post-build cache delta: 0 added, 0 modified, 0 deleted');
       expect(summary.writeCalls).toBe(2);
       await expect(artifactApi.listArtifacts()).resolves.toHaveLength(0);
     });
@@ -563,6 +625,53 @@ async function writeGradleFile(
   const absolutePath = path.join(gradleUserHome, relativePath);
   await mkdir(path.dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, contents, 'utf8');
+}
+
+async function writeCapturedBuildResult(
+  gradleUserHome: string,
+  options: {
+    readonly invocationKey: string;
+    readonly rootProjectName: string;
+    readonly requestedTasks: string;
+    readonly gradleVersion: string;
+    readonly javaVersion: string;
+    readonly configCacheHit: boolean;
+    readonly buildScanUri: string | null;
+  },
+): Promise<void> {
+  const resultsDirectory = path.join(
+    gradleUserHome,
+    '.buildish-mammoth-cache-gradle',
+    'build-results',
+  );
+  const buildScansDirectory = path.join(
+    gradleUserHome,
+    '.buildish-mammoth-cache-gradle',
+    'build-scans',
+  );
+  await mkdir(resultsDirectory, { recursive: true });
+  await mkdir(buildScansDirectory, { recursive: true });
+  await writeFile(
+    path.join(resultsDirectory, `${options.invocationKey}.json`),
+    JSON.stringify({
+      capturedAtEpochMillis: 1_000,
+      rootProjectName: options.rootProjectName,
+      requestedTasks: options.requestedTasks,
+      gradleVersion: options.gradleVersion,
+      javaVersion: options.javaVersion,
+      buildFailed: false,
+      configCacheHit: options.configCacheHit,
+    }),
+    'utf8',
+  );
+
+  if (options.buildScanUri) {
+    await writeFile(
+      path.join(buildScansDirectory, `${options.invocationKey}.json`),
+      JSON.stringify({ buildScanUri: options.buildScanUri, buildScanFailed: false }),
+      'utf8',
+    );
+  }
 }
 
 async function withWorkspace(testBody: (workspace: string) => Promise<void>): Promise<void> {

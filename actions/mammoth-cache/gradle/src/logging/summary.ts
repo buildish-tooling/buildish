@@ -59,3 +59,49 @@ export async function replaceJobSummary(
 
   await writeFile(summaryPath, `${lines.join('\n')}\n`, 'utf8');
 }
+
+export function createDetailsSection(
+  title: string,
+  bodyLines: readonly string[],
+): readonly string[] {
+  return [
+    '<details>',
+    `<summary>${escapeHtml(title)}</summary>`,
+    '',
+    ...bodyLines,
+    '',
+    '</details>',
+  ];
+}
+
+export function createHtmlTable(
+  headers: readonly string[],
+  rows: readonly (readonly string[])[],
+): readonly string[] {
+  const headerCells = headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('');
+  return [
+    '<table>',
+    `  <thead><tr>${headerCells}</tr></thead>`,
+    '  <tbody>',
+    ...rows.map((row) => `    <tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`),
+    '  </tbody>',
+    '</table>',
+  ];
+}
+
+export function createHtmlLink(url: string, label: string): string {
+  return `<a href="${escapeHtml(url)}">${escapeHtml(label)}</a>`;
+}
+
+export function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+export function escapeSummaryText(value: string): string {
+  return value.replaceAll(/[\\`*_{}[\]()#+.!|-]/g, '\\$&');
+}

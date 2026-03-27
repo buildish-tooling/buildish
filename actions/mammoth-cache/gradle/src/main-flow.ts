@@ -41,7 +41,7 @@ import {
   type PersistedPreBuildCacheManifestState,
 } from './state/post-action';
 import { installGradleBuildResultCapture } from './gradle/build-results';
-import { appendJobSummary } from './logging/summary';
+import { appendJobSummary, createDetailsSection, escapeSummaryText } from './logging/summary';
 
 export interface MainDependentDeltaResult extends DeltaApplyResult {
   readonly requestedJobs: readonly string[];
@@ -72,9 +72,10 @@ export interface MainActionDependencies extends BootstrapDependencies {
 export async function executeMainAction(
   dependencies: MainActionDependencies = {},
 ): Promise<MainActionStatus> {
+  const logInfo = dependencies.logInfo ?? core.info;
   const bootstrap = await bootstrapPhase('main', dependencies);
   await installGradleBuildResultCapture(bootstrap.config.gradleUserHome).catch((error: unknown) => {
-    dependencies.logInfo?.(
+    logInfo(
       `Gradle build reporting could not install capture hooks and will be skipped for this job: ${error instanceof Error ? error.message : String(error)}`,
     );
   });
@@ -122,6 +123,7 @@ export async function executeMainAction(
     message: createMainActionMessage(dependentDeltaResult),
   } satisfies MainActionStatus;
 
+  logMainActionDetails(status, logInfo);
   await appendJobSummary(dependencies, createMainActionSummaryLines(status));
 
   return status;
@@ -277,33 +279,77 @@ function createMainActionMessage(dependentDeltaResult: MainDependentDeltaResult 
 }
 
 export function createMainActionSummaryLines(status: MainActionStatus): readonly string[] {
+  const dependentDelta = status.dependentDeltaResult;
+
   return [
     '## Apache Buildish main action',
-    ...(status.restoreCleanupResult
-      ? [
-          `- Restore cleanup mode: ${status.restoreCleanupResult.mode}`,
-          `- Restore cleanup status: ${status.restoreCleanupResult.status}`,
-          `- Restore cleanup deleted files: ${status.restoreCleanupResult.deletedFileCount}`,
-        ]
-      : ['- Restore cleanup mode: none']),
-    ...(status.dependentDeltaResult
-      ? [
-          `- Dependent jobs requested: ${formatSummaryList(status.dependentDeltaResult.requestedJobs)}`,
-          `- Downloaded delta artifacts: ${status.dependentDeltaResult.appliedArtifactCount}`,
-          `- Artifact names: ${formatSummaryList(status.dependentDeltaResult.downloadedArtifactNames)}`,
-          `- Applied delta changes: ${status.dependentDeltaResult.addedCount} added, ${status.dependentDeltaResult.modifiedCount} modified, ${status.dependentDeltaResult.deletedCount} deleted.`,
-          `- Delta apply warnings: ${status.dependentDeltaResult.warnings.length}`,
-          `- Post-job artifact cleanup scheduled: ${status.dependentDeltaResult.downloadedArtifactNames.length}`,
-          ...status.dependentDeltaResult.warnings.map((warning) => `- Warning: ${warning}`),
-        ]
-      : ['- Dependent jobs requested: none', '- Downloaded delta artifacts: 0']),
+    `- Restore cleanup: ${describeRestoreCleanupSummary(status.restoreCleanupResult)}`,
+    `- Dependent delta reuse: ${describeDependentDeltaSummary(dependentDelta)}`,
     ...(status.preBuildManifestState
-      ? [
-          '- Pre-build manifest persisted: yes',
-          `- Pre-build manifest path: ${status.preBuildManifestState.manifestPath}`,
-        ]
-      : ['- Pre-build manifest persisted: no']),
+      ? ['- Pre-build manifest: persisted']
+      : ['- Pre-build manifest: not persisted']),
+    ...createDetailsSection('Main-phase details', [
+      `- Dependent jobs configured: ${dependentDelta?.requestedJobs.length ?? 0}`,
+      `- Downloaded delta artifacts: ${dependentDelta?.appliedArtifactCount ?? 0}`,
+      ...(dependentDelta
+        ? [
+            `- Applied delta changes: ${dependentDelta.addedCount} added, ${dependentDelta.modifiedCount} modified, ${dependentDelta.deletedCount} deleted.`,
+            `- Delta apply warnings: ${dependentDelta.warnings.length}`,
+            `- Post-job artifact cleanup scheduled: ${dependentDelta.downloadedArtifactNames.length}`,
+          ]
+        : []),
+      ...(status.restoreCleanupResult
+        ? [
+            `- Restore cleanup mode: ${escapeSummaryText(status.restoreCleanupResult.mode)}`,
+            `- Restore cleanup status: ${escapeSummaryText(status.restoreCleanupResult.status)}`,
+            `- Restore cleanup deleted files: ${status.restoreCleanupResult.deletedFileCount}`,
+          ]
+        : []),
+    ]),
   ];
+}
+
+function logMainActionDetails(status: MainActionStatus, logInfo: (message: string) => void): void {
+  if (status.restoreCleanupResult) {
+    logInfo(status.restoreCleanupResult.message);
+  }
+
+  if (status.dependentDeltaResult) {
+    if (status.dependentDeltaResult.requestedJobs.length > 0) {
+      logInfo(
+        `Configured dependent jobs: ${formatSummaryList(status.dependentDeltaResult.requestedJobs)}.`,
+      );
+    }
+    if (status.dependentDeltaResult.downloadedArtifactNames.length > 0) {
+      logInfo(
+        `Downloaded dependent delta artifacts: ${formatSummaryList(status.dependentDeltaResult.downloadedArtifactNames)}.`,
+      );
+    }
+  }
+
+  if (status.preBuildManifestState) {
+    logInfo(
+      `Persisted pre-build cache manifest to '${status.preBuildManifestState.manifestPath}'.`,
+    );
+  }
+}
+
+function describeRestoreCleanupSummary(result: RestoreCleanupResult | null): string {
+  if (!result) {
+    return 'none';
+  }
+
+  return result.status === 'pruned'
+    ? `${result.mode} (${result.deletedFileCount} deleted)`
+    : `${result.mode} (${result.status})`;
+}
+
+function describeDependentDeltaSummary(result: MainDependentDeltaResult | null): string {
+  if (!result) {
+    return 'none';
+  }
+
+  return `${result.appliedArtifactCount} artifact(s) from ${result.requestedJobs.length} job(s)`;
 }
 
 export function createMainActionOutputs(status: MainActionStatus): Record<string, string> {

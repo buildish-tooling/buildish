@@ -51,6 +51,7 @@ describe('Gradle build reporting', () => {
         rootProjectName: 'demo',
         requestedTasks: 'check',
         gradleVersion: '8.14.3',
+        javaVersion: '21.0.4',
         buildFailed: true,
         configCacheHit: true,
       }),
@@ -63,6 +64,7 @@ describe('Gradle build reporting', () => {
         rootProjectName: 'demo',
         requestedTasks: 'build --scan',
         gradleVersion: '8.14.3',
+        javaVersion: '21.0.4',
         buildFailed: false,
         configCacheHit: false,
       }),
@@ -117,6 +119,7 @@ describe('Gradle build reporting', () => {
           rootProjectName: 'demo',
           requestedTasks: 'build --scan',
           gradleVersion: '8.14.3',
+          javaVersion: '21.0.4',
           buildFailed: false,
           configCacheHit: false,
           buildScanUri: 'https://scans.gradle.com/s/local-it-published',
@@ -128,6 +131,7 @@ describe('Gradle build reporting', () => {
           rootProjectName: 'demo',
           requestedTasks: 'publishFakeBuildScanFailure',
           gradleVersion: '8.14.3',
+          javaVersion: '21.0.4',
           buildFailed: false,
           configCacheHit: true,
           buildScanUri: null,
@@ -137,19 +141,17 @@ describe('Gradle build reporting', () => {
       warnings: ['sample warning'],
     });
 
-    expect(lines).toEqual(
-      expect.arrayContaining([
-        '### Performed Gradle builds',
-        '- Captured Gradle builds: 2',
-        '- Build outcomes: 2 succeeded, 0 failed',
-        '- Build scans: 1 published, 1 failed, 0 not attempted',
-        '- Build reporting warnings: 1',
-        '- Warning: sample warning',
-        '  - Outcome: succeeded',
-        '  - Configuration cache reused: no',
-        '  - Build Scan: attempted but failed',
-      ]),
-    );
+    const summaryText = lines.join('\n');
+    expect(summaryText).toContain('### Performed Gradle builds');
+    expect(summaryText).toContain('- Captured Gradle builds: 2');
+    expect(summaryText).toContain('- Build outcomes: 2 succeeded, 0 failed');
+    expect(summaryText).toContain('- Build scans: 1 published, 1 failed, 0 not attempted');
+    expect(summaryText).toContain('- Build reporting warnings: 1');
+    expect(summaryText).toContain('- Warning: sample warning');
+    expect(summaryText).toContain('  - Outcome: succeeded');
+    expect(summaryText).toContain('  - Toolchain: Gradle 8\\.14\\.3 / Java 21\\.0\\.4');
+    expect(summaryText).toContain('  - Configuration cache reused: no');
+    expect(summaryText).toContain('  - Build Scan: attempted but failed');
     expect(lines.some((line) => line.startsWith('- Build 1: demo'))).toBe(true);
     expect(lines.some((line) => line.includes('build') && line.includes('scan'))).toBe(true);
     expect(

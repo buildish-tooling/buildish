@@ -34,6 +34,12 @@ import {
   type InputProvider,
 } from './config/action-config';
 import type { NormalizedActionConfig } from './config/types';
+import {
+  createDetailsSection,
+  createHtmlTable,
+  escapeHtml,
+  escapeSummaryText,
+} from './logging/summary';
 import { provisionWrapperJars, type WrapperProvisionOptions } from './wrapper/download';
 import { validateTargetWrapperProperties } from './wrapper/static-validation';
 import type { ProvisionedWrapperJar, ValidatedWrapperPropertiesFile } from './wrapper/types';
@@ -226,30 +232,36 @@ export function createBootstrapStatus(
  * Builds the initial job summary section emitted during bootstrap.
  */
 export function createBootstrapSummaryLines(status: BootstrapStatus): readonly string[] {
+  const downloadedWrapperCount = status.provisionedWrappers.filter(
+    (wrapper) => wrapper.wasDownloaded,
+  ).length;
+  const reusedWrapperCount = status.provisionedWrappers.length - downloadedWrapperCount;
+
   return [
     '## Apache Buildish bootstrap',
-    `- Phase: ${status.phase}`,
-    `- Event: ${status.ciContext.eventName}`,
-    `- Ref: ${status.ciContext.resolvedRefName}`,
-    `- Safe ref: ${status.ciContext.safeRefName}`,
-    `- Runner: ${status.ciContext.runnerOs}/${status.ciContext.runnerArch}`,
-    `- Job mode: ${status.config.jobMode}`,
-    `- Read only: ${status.config.readOnly}`,
-    `- Cache enabled: ${status.config.cacheEnabled}`,
-    `- Cache key: ${status.cacheModel?.cacheKey ?? 'disabled'}`,
-    `- Java major: ${status.cacheModel?.javaMajor ?? 'n/a'}`,
-    `- Cache partitions: ${status.cacheModel?.partitions.length ?? 0}`,
-    ...(status.baseCacheResult
-      ? [
-          `- Base cache ${status.baseCacheResult.operation}: ${status.baseCacheResult.status}`,
-          `- Base cache detail: ${status.baseCacheResult.message}`,
-        ]
-      : []),
-    `- Wrapper selection: ${status.config.wrapperSelectionMode}`,
-    `- Wrapper files: ${status.validatedWrappers.length}`,
-    `- Wrapper JARs ready: ${status.provisionedWrappers.length}`,
-    '## Wrapper provisioning',
-    ...createWrapperProvisioningSummaryLines(status),
+    `- Base cache ${status.baseCacheResult?.operation ?? 'state'}: ${status.baseCacheResult?.status ?? (status.cacheModel ? 'not-run' : 'disabled')}`,
+    `- Wrapper provisioning: ${status.provisionedWrappers.length} ready (${downloadedWrapperCount} downloaded, ${reusedWrapperCount} reused)`,
+    ...createDetailsSection('Execution context', [
+      `- Phase: ${escapeSummaryText(status.phase)}`,
+      `- Workflow: ${escapeSummaryText(status.ciContext.workflowName)}`,
+      `- Job: ${escapeSummaryText(status.ciContext.jobName)}`,
+      `- Event: ${escapeSummaryText(status.ciContext.eventName)}`,
+      `- Ref: ${escapeSummaryText(status.ciContext.resolvedRefName)}`,
+      `- Safe ref: ${escapeSummaryText(status.ciContext.safeRefName)}`,
+      `- Runner: ${escapeSummaryText(`${status.ciContext.runnerOs}/${status.ciContext.runnerArch}`)}`,
+      `- Job mode: ${escapeSummaryText(status.config.jobMode)}`,
+      `- Read only: ${status.config.readOnly ? 'yes' : 'no'}`,
+      `- Cache enabled: ${status.config.cacheEnabled ? 'yes' : 'no'}`,
+      `- Cache key: ${escapeSummaryText(status.cacheModel?.cacheKey ?? 'disabled')}`,
+      `- Java major: ${escapeSummaryText(String(status.cacheModel?.javaMajor ?? 'n/a'))}`,
+      `- Cache partitions: ${status.cacheModel?.partitions.length ?? 0}`,
+      `- Wrapper selection: ${escapeSummaryText(status.config.wrapperSelectionMode)}`,
+      `- Wrapper files: ${status.validatedWrappers.length}`,
+      ...(status.baseCacheResult
+        ? [`- Base cache detail: ${escapeSummaryText(status.baseCacheResult.message)}`]
+        : []),
+    ]),
+    ...createDetailsSection('Wrapper provisioning', createWrapperProvisioningSummaryLines(status)),
   ];
 }
 
@@ -264,16 +276,21 @@ function logWrapperProvisioningResults(
 
 function createWrapperProvisioningSummaryLines(status: BootstrapStatus): readonly string[] {
   if (status.phase === 'post') {
-    return ['- Wrapper provisioning skipped during post phase.'];
+    return ['- Wrapper provisioning is skipped during the post phase.'];
   }
 
   if (status.provisionedWrappers.length === 0) {
     return ['- No Gradle wrapper properties files were selected for provisioning.'];
   }
 
-  return status.provisionedWrappers.map(
-    (wrapper) =>
-      `- ${wrapper.relativePath}: ${describeWrapperProvisioningAction(wrapper)} trusted wrapper JAR at ${wrapper.wrapperJarRelativePath} for Gradle ${wrapper.wrapperSourceVersion}.`,
+  return createHtmlTable(
+    ['Wrapper properties', 'Action', 'Wrapper JAR', 'Gradle'],
+    status.provisionedWrappers.map((wrapper) => [
+      escapeHtml(wrapper.relativePath),
+      escapeHtml(capitalize(describeWrapperProvisioningAction(wrapper))),
+      escapeHtml(wrapper.wrapperJarRelativePath),
+      escapeHtml(wrapper.wrapperSourceVersion),
+    ]),
   );
 }
 

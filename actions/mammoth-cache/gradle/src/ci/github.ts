@@ -62,7 +62,10 @@ export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPla
     options.eventPayload ?? readGitHubEventPayload(env, options.eventPayloadReader ?? defaultRead);
   const summaryWriter = options.summaryWriter ?? core.summary;
   const context = createGitHubContext(env, eventPayload);
-  const httpHeadersByHost = createGitHubHttpHeadersByHost(options.githubToken ?? env.GITHUB_TOKEN);
+  const httpHeadersByHost = createGitHubHttpHeadersByHost(
+    options.githubToken ?? env.GITHUB_TOKEN,
+    env.GITHUB_API_URL,
+  );
 
   return {
     context,
@@ -77,16 +80,21 @@ export function createGitHubPlatform(options: GitHubPlatformOptions = {}): CiPla
   };
 }
 
-function createGitHubHttpHeadersByHost(githubToken: string | undefined): HttpHeadersByHost {
+export function createGitHubHttpHeadersByHost(
+  githubToken: string | undefined,
+  apiUrl: string | undefined = undefined,
+): HttpHeadersByHost {
   const trimmedToken = githubToken?.trim();
 
   if (!trimmedToken) {
     return EMPTY_HTTP_HEADERS_BY_HOST;
   }
 
+  const apiHost = normalizeApiHost(apiUrl);
+
   return new Map([
     [
-      GITHUB_API_HOST,
+      apiHost,
       new Map([
         ['accept', GITHUB_API_ACCEPT],
         ['authorization', `Bearer ${trimmedToken}`],
@@ -95,6 +103,19 @@ function createGitHubHttpHeadersByHost(githubToken: string | undefined): HttpHea
       ]),
     ],
   ]);
+}
+
+function normalizeApiHost(apiUrl: string | undefined): string {
+  const trimmedApiUrl = apiUrl?.trim();
+  if (!trimmedApiUrl) {
+    return GITHUB_API_HOST;
+  }
+
+  try {
+    return new URL(trimmedApiUrl).hostname.toLowerCase();
+  } catch {
+    return GITHUB_API_HOST;
+  }
 }
 
 /**

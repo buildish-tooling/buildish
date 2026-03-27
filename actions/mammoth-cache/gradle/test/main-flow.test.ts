@@ -50,6 +50,7 @@ describe('executeMainAction', () => {
       const savedState = new Map<string, string>();
       const artifactApi = new FakeArtifactApi(path.join(workspace, 'artifact-store'));
       const summary = createSummaryCapture();
+      const infoMessages: string[] = [];
 
       await mkdir(path.join(workspace, 'gradle', 'wrapper'), { recursive: true });
       await mkdir(gradleUserHome, { recursive: true });
@@ -124,6 +125,9 @@ describe('executeMainAction', () => {
             }
           },
         },
+        logInfo(message: string): void {
+          infoMessages.push(message);
+        },
         saveState(name: string, value: string): void {
           savedState.set(name, value);
         },
@@ -159,20 +163,23 @@ describe('executeMainAction', () => {
           .flatMap((partition) => partition.entries)
           .map((entry) => entry.relativePath),
       ).toContain('caches/modules-2/files-2.1/example/module.bin');
-      expect(summary.lines).toEqual(
+      const summaryText = summary.lines.join('\n');
+      expect(summaryText).toContain('## Apache Buildish bootstrap');
+      expect(summaryText).toContain('<summary>Wrapper provisioning</summary>');
+      expect(summaryText).toContain('gradle/wrapper/gradle-wrapper.properties');
+      expect(summaryText).toContain('## Apache Buildish main action');
+      expect(summaryText).toContain('- Restore cleanup: none');
+      expect(summaryText).toContain('- Dependent delta reuse: 1 artifact(s) from 1 job(s)');
+      expect(summaryText).toContain('- Pre-build manifest: persisted');
+      expect(summaryText).toContain('<summary>Main-phase details</summary>');
+      expect(summaryText).toContain('- Downloaded delta artifacts: 1');
+      expect(summaryText).toContain('- Applied delta changes: 1 added, 0 modified, 0 deleted.');
+      expect(summaryText).toContain('- Delta apply warnings: 0');
+      expect(summaryText).toContain('- Post-job artifact cleanup scheduled: 1');
+      expect(infoMessages).toEqual(
         expect.arrayContaining([
-          '## Apache Buildish bootstrap',
-          '## Wrapper provisioning',
-          '- gradle/wrapper/gradle-wrapper.properties: reused trusted wrapper JAR at gradle/wrapper/gradle-wrapper.jar for Gradle 8.14.0.',
-          '## Apache Buildish main action',
-          '- Restore cleanup mode: none',
-          '- Dependent jobs requested: worker-build',
-          '- Downloaded delta artifacts: 1',
-          `- Artifact names: ${status.dependentDeltaResult!.downloadedArtifactNames[0]}`,
-          '- Applied delta changes: 1 added, 0 modified, 0 deleted.',
-          '- Delta apply warnings: 0',
-          '- Post-job artifact cleanup scheduled: 1',
-          '- Pre-build manifest persisted: yes',
+          `Downloaded dependent delta artifacts: ${status.dependentDeltaResult!.downloadedArtifactNames[0]}.`,
+          `Persisted pre-build cache manifest to '${manifestPath}'.`,
         ]),
       );
       expect(createMainActionOutputs(status)).toEqual({
@@ -360,15 +367,13 @@ describe('executeMainAction', () => {
       expect(status.dependentDeltaResult).toBeNull();
       expect(status.preBuildManifestState).not.toBeNull();
       expect(savedState.get(PRE_BUILD_CACHE_MANIFEST_PATH_STATE)).toBeTruthy();
-      expect(summary.lines).toEqual(
-        expect.arrayContaining([
-          '## Apache Buildish main action',
-          '- Restore cleanup mode: none',
-          '- Dependent jobs requested: none',
-          '- Downloaded delta artifacts: 0',
-          '- Pre-build manifest persisted: yes',
-        ]),
-      );
+      const summaryText = summary.lines.join('\n');
+      expect(summaryText).toContain('## Apache Buildish main action');
+      expect(summaryText).toContain('- Restore cleanup: none');
+      expect(summaryText).toContain('- Dependent delta reuse: none');
+      expect(summaryText).toContain('<summary>Main-phase details</summary>');
+      expect(summaryText).toContain('- Downloaded delta artifacts: 0');
+      expect(summaryText).toContain('- Pre-build manifest: persisted');
       expect(createMainActionOutputs(status)).toEqual({
         'cache-key': expect.stringMatching(/^gradle-cache-2-21-linux-x64-[a-f0-9]{16}-main$/),
         'base-cache-restore-status': 'miss',
@@ -491,14 +496,11 @@ describe('executeMainAction', () => {
       );
       expect(restoreCalls).toBe(2);
       await expect(readFile(managedFile, 'utf8')).resolves.toBe('from-cache-2');
-      expect(summary.lines).toEqual(
-        expect.arrayContaining([
-          '## Apache Buildish main action',
-          '- Restore cleanup mode: prune-managed',
-          '- Restore cleanup status: pruned',
-          '- Restore cleanup deleted files: 1',
-        ]),
-      );
+      const summaryText = summary.lines.join('\n');
+      expect(summaryText).toContain('## Apache Buildish main action');
+      expect(summaryText).toContain('- Restore cleanup: prune-managed (1 deleted)');
+      expect(summaryText).toContain('- Restore cleanup status: pruned');
+      expect(summaryText).toContain('- Restore cleanup deleted files: 1');
     });
   });
 
