@@ -740,6 +740,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
     )
 
     project_index_path.parent.mkdir(parents=True, exist_ok=True)
+    unreleased_index_path.parent.mkdir(parents=True, exist_ok=True)
     project_index_path.write_text(
         with_yaml_front_matter(
             build_project_markdown(project_result),

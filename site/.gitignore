@@ -20,6 +20,7 @@ __pycache__/
 /.preview/
 /.public/
 /.hugo_build.lock
+/.container-home/
 /resources/
 /node_modules/
 

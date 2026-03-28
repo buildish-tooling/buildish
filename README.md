@@ -30,6 +30,8 @@ Use it in GitHub workflows as:
 ## Repository layout
 
 - `actions/mammoth-cache/gradle/` — Mammoth Cache for Gradle, the first action in the Mammoth Cache family
+- `site/` — Hugo/Docsy site sources and staged-site tooling
+- `tools/site-build-image/` — reusable container image definition for site build/test workflows
 - `tools/buildish-no-gradle-wrapper-jar/` — Buildish no-gradle-wrapper-jar helper tool
 
 > [!ALERT] This repository is a work-in-progress and is not yet ready for use.

@@ -1,0 +1,73 @@
+<!--
+Copyright 2026 The Apache Software Foundation
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+# Apache Buildish site development
+
+The site uses Hugo + Docsy for rendering and `mvp.py` for staging generated project content.
+
+## Local native workflow
+
+From `site/`:
+
+- `make test`
+- `make build`
+- `make serve`
+
+The native workflow expects:
+
+- `uv`
+- Hugo extended
+- Node available via `nvm` using `.nvmrc`
+
+## Containerized workflow
+
+The repository includes a pinned build container so developers can build the site without installing the full local toolchain.
+
+The reusable builder-image definition lives in `../tools/site-build-image/`, while `site/Makefile` remains the main entrypoint for local site workflows.
+
+From `site/`:
+
+- `make container-image`
+- `make container-test`
+- `make container-build`
+
+Defaults:
+
+- `CONTAINER_ENGINE=podman`
+- `CONTAINER_IMAGE=buildish-site-build:local`
+
+You can override the engine if needed, for example:
+
+- `make CONTAINER_ENGINE=docker container-build`
+
+The containerized flow:
+
+- bind-mounts the repository into `/workspace`
+- writes generated outputs back into the working tree
+- keeps tool caches under `site/.container-home/`
+- installs Node dependencies with `npm ci --ignore-scripts`
+
+This split also makes it straightforward for future CI to rebuild or publish the builder image only when the builder-image inputs change.
+
+## Produced outputs
+
+Builds write to:
+
+- `site/.stage/`
+- `site/.preview/`
+- `site/.public/`
+
+These outputs are ignored by Git.

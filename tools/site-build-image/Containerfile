@@ -1,0 +1,59 @@
+#
+# Copyright 2026 The Apache Software Foundation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+FROM ghcr.io/astral-sh/uv:0.9.7@sha256:ba4857bf2a068e9bc0e64eed8563b065908a4cd6bfb66b531a9c424c8e25e142 AS uvbin
+
+FROM python:3.13-bookworm@sha256:345d669f21b1ab934cb67f2015a713ec041bb2ebb8e3f069484839361f64cc53
+
+ARG NODE_VERSION=24.13.0
+ARG NODE_SHA256_AMD64=e798599612f4bb71333a3397ab0d095fd62214e115aea45aa858a145fc72d67e
+ARG NODE_SHA256_ARM64=aa881151bd0f9f154a0424dd60a72e9ce10672619121658c278a24327ef46831
+ARG GO_VERSION=1.26.1
+ARG GO_SHA256_AMD64=031f088e5d955bab8657ede27ad4e3bc5b7c1ba281f05f245bcc304f327c987a
+ARG GO_SHA256_ARM64=a290581cfe4fe28ddd737dde3095f3dbeb7f2e4065cab4eae44dfc53b760c2f7
+ARG HUGO_VERSION=0.159.1
+ARG HUGO_SHA256_AMD64=cded0ffbc7540c5cee330c2ad24d678a0d4a693e9c590cc05c1d1d5556a21aa4
+ARG HUGO_SHA256_ARM64=210c5e22631fa6a6bad3b6c623f8997a70d2ac306d61ca326d5f31753165779d
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl git make xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=uvbin /uv /uvx /usr/local/bin/
+
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+      amd64) node_arch='x64'; node_sha="$NODE_SHA256_AMD64"; go_arch='amd64'; go_sha="$GO_SHA256_AMD64"; hugo_arch='amd64'; hugo_sha="$HUGO_SHA256_AMD64" ;; \
+      arm64) node_arch='arm64'; node_sha="$NODE_SHA256_ARM64"; go_arch='arm64'; go_sha="$GO_SHA256_ARM64"; hugo_arch='arm64'; hugo_sha="$HUGO_SHA256_ARM64" ;; \
+      *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSLo /tmp/node.tar.xz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
+    echo "${node_sha}  /tmp/node.tar.xz" | sha256sum -c -; \
+    tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1; \
+    rm -f /tmp/node.tar.xz; \
+    curl -fsSLo /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-${go_arch}.tar.gz"; \
+    echo "${go_sha}  /tmp/go.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/go.tar.gz -C /usr/local; \
+    ln -sf /usr/local/go/bin/go /usr/local/bin/go; \
+    ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt; \
+    rm -f /tmp/go.tar.gz; \
+    curl -fsSLo /tmp/hugo.tar.gz "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-${hugo_arch}.tar.gz"; \
+    echo "${hugo_sha}  /tmp/hugo.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/hugo.tar.gz -C /usr/local/bin hugo; \
+    rm -f /tmp/hugo.tar.gz; \
+    node --version; npm --version; go version; hugo version; uv --version
+
+WORKDIR /workspace/site
