@@ -44,11 +44,11 @@ markup:
     lineAnchors: ''
     lineNoStart: 1
     lineNos: true
-    lineNumbersInTable: true
+    lineNumbersInTable: false
     noClasses: true
     noHl: false
     # 'tango' == "Chroma" syntax highlighting theme
-    style: 'tango'
+    #style: 'tango'
     tabWidth: 4
   goldmark:
     parser:
