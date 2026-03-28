@@ -90,6 +90,8 @@ The MVP should generate a staged tree roughly like:
 - `site/.stage/content/projects/<slug>/lifecycle.yaml`
 - `site/.stage/data/projects.yaml`
 - `site/.stage/data/lifecycle.yaml`
+- `site/.stage/static/projects/<slug>/unreleased/assets/...` for optional
+  per-project static assets.
 
 This is enough to validate the aggregator contract without solving every
 production concern.

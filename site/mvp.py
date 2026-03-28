@@ -46,9 +46,11 @@ class ProjectBuildResult:
     raw_readme_path: str | None
     raw_unreleased_index_path: str | None
     raw_project_index_path: str | None
+    raw_assets_root_path: str | None
     unreleased_label: str
     default_branch: str | None
     navigation_section: str | None
+    asset_count: int
     latest_stable_version: str | None
     latest_stable_path: str | None
     release_lines: list[dict[str, Any]]
@@ -295,6 +297,11 @@ def build_project_markdown(result: ProjectBuildResult) -> str:
         f"- Local preview: {result.unreleased_label} docs are staged under "
         f"`content/projects/{result.slug}/unreleased/`."
     )
+    if result.asset_count and result.raw_assets_root_path:
+        lines.append(
+            f"- Staged assets: {result.asset_count} file(s) under "
+            f"[{result.raw_assets_root_path}]({result.raw_assets_root_path})."
+        )
     if result.latest_stable_version:
         latest_stable = f"`{result.latest_stable_version}`"
         if result.latest_stable_path:
@@ -327,6 +334,8 @@ def build_unreleased_index_markdown(result: ProjectBuildResult) -> str:
         lines.extend([f"Built from the local `{result.default_branch}` branch snapshot.", ""])
     if result.summary:
         lines.extend([result.summary, ""])
+    if result.asset_count and result.raw_assets_root_path:
+        lines.extend([f"- [Open staged assets]({result.raw_assets_root_path})", ""])
     if result.doc_links:
         lines.extend(["## Available docs", ""])
         lines.extend(f"- [{entry['label']}]({entry['href']})" for entry in result.doc_links)
@@ -404,6 +413,11 @@ def build_project_preview(result: ProjectBuildResult) -> str:
         if result.latest_stable_path:
             latest_stable = f"<a href='{html.escape(result.latest_stable_path)}'>{html.escape(result.latest_stable_version)}</a>"
         body.append(f"<p><strong>Latest stable:</strong> {latest_stable}</p>")
+    if result.asset_count and result.raw_assets_root_path:
+        body.append(
+            f"<p><strong>Staged assets:</strong> <a href='{html.escape(result.raw_assets_root_path)}'>"
+            f"{result.asset_count} file(s)</a></p>"
+        )
     if result.raw_project_index_path:
         body.append(f"<p><a href='{html.escape(result.raw_project_index_path)}'>Open staged project landing page</a></p>")
     if result.raw_unreleased_index_path:
@@ -474,6 +488,18 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
     )
     docs_relative = "" if docs_setting is None else str(docs_setting)
 
+    assets_setting = (
+        project["assetsRoot"]
+        if "assetsRoot" in project
+        else first_non_none(
+            content_fields.get("assetsRoot"),
+            project_fields.get("assetsRoot"),
+            metadata_fields.get("assetsRoot"),
+            defaults.get("assetsRoot"),
+        )
+    )
+    assets_relative = "" if assets_setting is None else str(assets_setting)
+
     unreleased_label = str(
         first_non_none(
             project.get("unreleasedLabel"),
@@ -500,6 +526,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
     project_root = stage_root / "content" / "projects" / slug
     unreleased_root = project_root / "unreleased"
     docs_root = unreleased_root / "docs"
+    staged_assets_root = stage_root / "static" / "projects" / slug / "unreleased" / "assets"
 
     staged_readme_path = project_root / "source-readme.md"
     raw_readme_path = None
@@ -509,6 +536,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         raw_readme_path = relative_web_path(staged_readme_path.relative_to(repo_root))
 
     copied_docs: list[Path] = []
+    copied_assets: list[Path] = []
     if available:
         docs_path = safe_relative_path(repo_path, str(docs_relative), f"docsRoot for {slug}") if docs_relative else None
         if docs_path and docs_path.is_dir():
@@ -520,6 +548,10 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
                 fallback_readme = docs_root / "readme.md"
                 fallback_readme.write_text(readme_text, encoding="utf-8")
                 copied_docs = [Path("readme.md")]
+
+        assets_path = safe_relative_path(repo_path, str(assets_relative), f"assetsRoot for {slug}") if assets_relative else None
+        if assets_path and assets_path.is_dir():
+            copied_assets = copy_tree_without_symlinks(assets_path, staged_assets_root)
     else:
         warnings.append("Local repository directory is missing; project was skipped for raw docs staging.")
 
@@ -537,6 +569,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
 
     raw_unreleased_index_path = relative_web_path(unreleased_index_path.relative_to(repo_root))
     raw_project_index_path = relative_web_path(project_index_path.relative_to(repo_root))
+    raw_assets_root_path = relative_web_path(staged_assets_root.relative_to(repo_root)) if copied_assets else None
 
     tag_pattern = compile_tag_pattern(tag_pattern_text, slug, warnings)
     latest_stable_version, latest_stable_path, release_lines, alias_mappings = normalize_lifecycle(
@@ -559,9 +592,11 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         raw_readme_path=raw_readme_path,
         raw_unreleased_index_path=raw_unreleased_index_path,
         raw_project_index_path=raw_project_index_path,
+        raw_assets_root_path=raw_assets_root_path,
         unreleased_label=unreleased_label,
         default_branch=str(default_branch) if default_branch else None,
         navigation_section=str(navigation_section) if navigation_section else None,
+        asset_count=len(copied_assets),
         latest_stable_version=latest_stable_version,
         latest_stable_path=latest_stable_path,
         release_lines=release_lines,
@@ -588,6 +623,11 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
                 "defaultBranch": default_branch,
                 "readmePath": readme_relative,
                 "docsRoot": docs_relative or None,
+                "assetsRoot": assets_relative or None,
+            },
+            "assets": {
+                "count": len(copied_assets),
+                "path": raw_assets_root_path,
             },
         },
     )
@@ -680,6 +720,8 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
                     "defaultBranch": result.default_branch,
                     "navigationSection": result.navigation_section,
                     "unreleasedLabel": result.unreleased_label,
+                    "assetCount": result.asset_count,
+                    "assetsPath": result.raw_assets_root_path,
                     "latestStable": result.latest_stable_version,
                 }
                 for result in results

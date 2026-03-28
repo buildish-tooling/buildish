@@ -39,6 +39,7 @@ class SiteMvpTest(unittest.TestCase):
                     "metadataFile": "site/project.yaml",
                     "readmePath": "README.md",
                     "docsRoot": "site/docs",
+                    "assetsRoot": "site/assets",
                     "unreleasedLabel": "Unreleased",
                     "tagPattern": r"^v[0-9]+\.[0-9]+\.[0-9]+$",
                     "navigationSection": "sub-projects",
@@ -54,6 +55,7 @@ class SiteMvpTest(unittest.TestCase):
             mammoth = workspace / "buildish-mammoth-cache-gradle"
             (mammoth / "site").mkdir(parents=True)
             (mammoth / "site" / "docs").mkdir(parents=True)
+            (mammoth / "site" / "assets" / "images").mkdir(parents=True)
             (mammoth / "README.md").write_text(
                 "# Apache Buildish Mammoth Cache for Gradle\n\nSecure Gradle wrapper provisioning.\n",
                 encoding="utf-8",
@@ -68,7 +70,7 @@ class SiteMvpTest(unittest.TestCase):
                             "repository": "https://github.com/apache/buildish-mammoth-cache-gradle",
                             "defaultBranch": "trunk",
                         },
-                        "content": {"readmePath": "README.md", "docsRoot": "site/docs"},
+                        "content": {"readmePath": "README.md", "docsRoot": "site/docs", "assetsRoot": "site/assets"},
                         "versioning": {"unreleasedLabel": "Preview"},
                         "lifecycle": {
                             "latestStable": "v1.3.5",
@@ -84,6 +86,7 @@ class SiteMvpTest(unittest.TestCase):
                     default_flow_style=False,
                 )
             (mammoth / "site" / "docs" / "wrapper-provisioning.md").write_text("# Wrapper provisioning\n", encoding="utf-8")
+            (mammoth / "site" / "assets" / "images" / "logo.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>\n", encoding="utf-8")
 
             no_wrapper = workspace / "buildish-no-gradle-wrapper-jar"
             (no_wrapper / "site").mkdir(parents=True)
@@ -113,12 +116,14 @@ class SiteMvpTest(unittest.TestCase):
 
             self.assertEqual(2, len(results))
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "wrapper-provisioning.md").exists())
+            self.assertTrue((repo_root / "site" / ".stage" / "static" / "projects" / "mammoth-cache-gradle" / "unreleased" / "assets" / "images" / "logo.svg").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "no-gradle-wrapper-jar" / "unreleased" / "index.md").exists())
             self.assertTrue((repo_root / "site" / ".preview" / "index.html").exists())
 
             project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "index.md").read_text(encoding="utf-8")
             self.assertIn("Secure Gradle wrapper provisioning.", project_index)
             self.assertIn("Open Preview docs", project_index)
+            self.assertIn("Staged assets: 1 file(s)", project_index)
             self.assertIn("Latest stable: `v1.3.5`", project_index)
             self.assertIn("`v1` — maintained; latest `v1.3.5`", project_index)
 
@@ -130,6 +135,9 @@ class SiteMvpTest(unittest.TestCase):
             self.assertIn("metadataFile: site/project.yaml", version_metadata)
             self.assertIn("label: Preview", version_metadata)
             self.assertIn("defaultBranch: trunk", version_metadata)
+            self.assertIn("assetsRoot: site/assets", version_metadata)
+            self.assertIn("count: 1", version_metadata)
+            self.assertIn("path: /site/.stage/static/projects/mammoth-cache-gradle/unreleased/assets", version_metadata)
 
             lifecycle_metadata = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "lifecycle.yaml").read_text(encoding="utf-8")
             self.assertIn("version: v1.3.5", lifecycle_metadata)
@@ -148,6 +156,7 @@ class SiteMvpTest(unittest.TestCase):
             no_wrapper_project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "no-gradle-wrapper-jar" / "index.md").read_text(encoding="utf-8")
             self.assertNotIn("Latest stable:", no_wrapper_project_index)
             self.assertNotIn("## Release lines", no_wrapper_project_index)
+            self.assertNotIn("Staged assets:", no_wrapper_project_index)
 
     def test_rejects_metadata_path_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -194,6 +203,44 @@ class SiteMvpTest(unittest.TestCase):
             }
             with (repo_root / "site" / "projects.yaml").open("w", encoding="utf-8") as handle:
                 yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
+
+            with self.assertRaisesRegex(ValueError, "escapes allowed root"):
+                mvp.build(repo_root)
+
+    def test_rejects_assets_path_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            repo_root = workspace / "buildish"
+            repo_root.mkdir()
+            (repo_root / "site").mkdir(parents=True)
+            catalog = {
+                "schemaVersion": 1,
+                "defaults": {
+                    "metadataFile": "site/project.yaml",
+                    "readmePath": "README.md",
+                    "docsRoot": "site/docs",
+                    "assetsRoot": "site/assets",
+                },
+                "projects": [{"slug": "mammoth-cache-gradle", "localDir": "buildish-mammoth-cache-gradle"}],
+            }
+            with (repo_root / "site" / "projects.yaml").open("w", encoding="utf-8") as handle:
+                yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
+
+            mammoth = workspace / "buildish-mammoth-cache-gradle"
+            (mammoth / "site").mkdir(parents=True)
+            with (mammoth / "site" / "project.yaml").open("w", encoding="utf-8") as handle:
+                yaml.safe_dump(
+                    {
+                        "schemaVersion": 1,
+                        "project": {"displayName": "Bad assets metadata"},
+                        "content": {"readmePath": "README.md", "assetsRoot": "../escape"},
+                    },
+                    handle,
+                    sort_keys=False,
+                    default_flow_style=False,
+                )
+
+            (mammoth / "README.md").write_text("# Test\n", encoding="utf-8")
 
             with self.assertRaisesRegex(ValueError, "escapes allowed root"):
                 mvp.build(repo_root)
