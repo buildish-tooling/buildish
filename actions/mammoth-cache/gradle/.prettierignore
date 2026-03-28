@@ -17,7 +17,7 @@
 build/
 coverage/
 dist/
-IMPLEMENTATION-PLAN.md
+docs/IMPLEMENTATION-PLAN.md
 lib/
 node_modules/
 package-lock.json

@@ -17,7 +17,7 @@ limitations under the License.
 # Apache Buildish Mammoth Cache for Gradle
 
 Apache Buildish Mammoth Cache for Gradle provides secure Gradle wrapper provisioning plus local and distributed cache
-management for GitHub Actions today.
+management for GitHub Actions today, prepared for Codeberg/Forgejo and GitLab CI in the future.
 
 The shared core is structured so future provider integrations can target GitHub, Codeberg/Forgejo, and GitLab without
 rewriting the wrapper, cache, or distributed-delta logic.
@@ -27,36 +27,7 @@ Use it in workflows as `apache/buildish/actions/mammoth-cache/gradle@<ref>`.
 This action lives in `actions/mammoth-cache/gradle/` so the `actions/mammoth-cache/` family can grow with sibling
 actions for other build tools over time.
 
-## Current status
-
-Mammoth Cache for Gradle is under active development.
-
-Implemented today:
-
-- shared `prepare` / `finalize` lifecycle entrypoints and orchestration
-- provider-neutral CI/runtime/reporting/storage seams
-- Gradle wrapper discovery, static validation, download, and checksum verification
-- base cache restore/save orchestration
-- distributed worker / aggregator delta exchange, merge, and cleanup
-- grouped-log and summary reporting through provider report sinks
-- GitHub consumer packaging under `action-descriptors/github/**` and `dist/github/**`
-
-Remaining portability architecture work is limited to **new provider implementations**, not more speculative shared-core
-rewrites:
-
-- Codeberg / Forgejo: validate toolkit/runtime compatibility and add provider-specific adapter/descriptor wiring where
-  GitHub reuse is insufficient
-- GitLab: add a GitLab-facing runtime/report/cache/artifact implementation around the existing shared
-  `prepare` / `finalize` core
-
-Only the GitHub consumer path is implemented and bundled today. For the remaining cross-provider work, see:
-
-- `IMPLEMENTATION-PLAN.md`
-- `docs/provider-portability-implementation-plan.md`
-- `docs/codeberg-ci-support-evaluation.md`
-- `docs/gitlab-ci-support-evaluation.md`
-
-## Usage in workflows
+## Usage in GitHub workflows
 
 Until the first public release exists, use a repository ref you control for testing.
 
@@ -240,6 +211,8 @@ The action resolves the Gradle user home into ordered logical partitions:
 - `build-cache` — the local Gradle build cache
 - `wrapper-dists` — wrapper-downloaded Gradle distributions
 
+See [The Gradle User Home Caches Directory](docs/gradle-cache-contents.md) for more details on what each partition covers.
+
 Built-ins keep a deterministic order. Custom partitions are appended after the active built-ins in the order supplied by
 `cache-partitions`.
 
@@ -334,6 +307,35 @@ That example:
 
 This is intentionally narrower than “delete everything outside the include patterns” because the action does not own all
 of `GRADLE_USER_HOME`, especially on long-lived self-hosted runners.
+
+## Current status
+
+Mammoth Cache for Gradle is under active development.
+
+Implemented today:
+
+- shared `prepare` / `finalize` lifecycle entrypoints and orchestration
+- provider-neutral CI/runtime/reporting/storage seams
+- Gradle wrapper discovery, static validation, download, and checksum verification
+- base cache restore/save orchestration
+- distributed worker / aggregator delta exchange, merge, and cleanup
+- grouped-log and summary reporting through provider report sinks
+- GitHub consumer packaging under `descriptors/github/**` and `dist/github/**`
+
+Remaining portability architecture work is limited to **new provider implementations**, not more speculative shared-core
+rewrites:
+
+- Codeberg / Forgejo: validate toolkit/runtime compatibility and add provider-specific adapter/descriptor wiring where
+  GitHub reuse is insufficient
+- GitLab: add a GitLab-facing runtime/report/cache/artifact implementation around the existing shared
+  `prepare` / `finalize` core
+
+Only the GitHub consumer path is implemented and bundled today. For the remaining cross-provider work, see:
+
+- `IMPLEMENTATION-PLAN.md`
+- `docs/provider-portability-implementation-plan.md`
+- `docs/codeberg-ci-support-evaluation.md`
+- `docs/gitlab-ci-support-evaluation.md`
 
 ## Development
 

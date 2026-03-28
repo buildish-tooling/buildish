@@ -47,7 +47,7 @@ provider-portability work for GitHub, Codeberg/Forgejo, and GitLab.
 - base cache restore/save orchestration
 - distributed worker / aggregator delta packaging, upload, download, merge, and cleanup
 - grouped-log and summary reporting
-- GitHub consumer packaging under `action-descriptors/github/**` and `dist/github/**`
+- GitHub consumer packaging under `descriptors/github/**` and `dist/github/**`
 
 ## Remaining architecture work
 

@@ -32,7 +32,7 @@ The current shared seams are already in place:
 - `src/storage/cache.ts`: capability-based base-cache backend
 - `src/storage/artifacts.ts`: capability-based artifact backend
 
-GitHub is the only implemented provider today and lives under `src/ci/github/**` plus `action-descriptors/github/**`.
+GitHub is the only implemented provider today and lives under `src/ci/github/**` plus `descriptors/github/**`.
 
 ## Shared refactor status
 
