@@ -190,8 +190,18 @@ def extract_title_and_summary(markdown_text: str, fallback_title: str) -> tuple[
     return title, " ".join(summary_lines).strip()
 
 
+def humanized_stem(path: Path) -> str:
+    return path.stem.replace("-", " ").replace("_", " ").strip().title()
+
+
 def relative_web_path(path: Path) -> str:
     return "/" + path.as_posix().lstrip("/")
+
+
+def with_yaml_front_matter(markdown: str, **fields: Any) -> str:
+    front_matter = yaml.safe_dump(fields, sort_keys=False, default_flow_style=False).rstrip()
+    body = markdown.lstrip()
+    return f"---\n{front_matter}\n---\n\n{body}"
 
 
 def public_project_path(slug: str) -> str:
@@ -383,6 +393,17 @@ def build_root_index_markdown(results: list[ProjectBuildResult]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def build_projects_index_markdown(results: list[ProjectBuildResult]) -> str:
+    lines = ["# Projects", "", "## Local sub-projects", ""]
+    for result in results:
+        status = "available" if result.available else "missing"
+        lines.append(f"- [{result.display_name}]({public_project_path(result.slug)}) — {status}")
+        if result.summary:
+            lines.append(f"  - {result.summary}")
+        lines.append(f"  - [Open {result.unreleased_label} docs]({public_unreleased_path(result.slug)})")
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def html_page(title: str, body: str) -> str:
     return """<!doctype html>
 <html lang=\"en\">
@@ -560,7 +581,15 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
     raw_readme_path = None
     if readme_text:
         staged_readme_path.parent.mkdir(parents=True, exist_ok=True)
-        staged_readme_path.write_text(readme_text, encoding="utf-8")
+        staged_readme_path.write_text(
+            with_yaml_front_matter(
+                readme_text,
+                title=f"{display_name} source README",
+                linkTitle="Source README",
+                type="docs",
+            ),
+            encoding="utf-8",
+        )
         raw_readme_path = public_source_readme_path(slug)
 
     copied_docs: list[Path] = []
@@ -583,8 +612,28 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
     else:
         warnings.append("Local repository directory is missing; project was skipped for raw docs staging.")
 
+    if copied_docs:
+        docs_root.mkdir(parents=True, exist_ok=True)
+        (docs_root / "_index.md").write_text(
+            with_yaml_front_matter(
+                f"# {display_name} {unreleased_label} docs\n",
+                title=f"{display_name} {unreleased_label} docs",
+                linkTitle="Docs",
+                type="docs",
+            ),
+            encoding="utf-8",
+        )
+
     doc_links: list[dict[str, str]] = []
     for copied in copied_docs:
+        staged_doc_path = docs_root / copied
+        if copied.suffix.lower() in {".md", ".markdown"} and staged_doc_path.is_file():
+            doc_text = staged_doc_path.read_text(encoding="utf-8")
+            doc_title, _ = extract_title_and_summary(doc_text, humanized_stem(copied))
+            staged_doc_path.write_text(
+                with_yaml_front_matter(doc_text, title=doc_title, linkTitle=doc_title, type="docs"),
+                encoding="utf-8",
+            )
         if copied.suffix.lower() not in {".md", ".markdown", ".adoc", ".asciidoc"}:
             continue
         raw_path = public_content_page_path(["projects", slug, "unreleased", "docs"], copied)
@@ -633,8 +682,19 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
     )
 
     project_index_path.parent.mkdir(parents=True, exist_ok=True)
-    project_index_path.write_text(build_project_markdown(project_result), encoding="utf-8")
-    unreleased_index_path.write_text(build_unreleased_index_markdown(project_result), encoding="utf-8")
+    project_index_path.write_text(
+        with_yaml_front_matter(build_project_markdown(project_result), title=display_name, linkTitle="Overview", type="docs"),
+        encoding="utf-8",
+    )
+    unreleased_index_path.write_text(
+        with_yaml_front_matter(
+            build_unreleased_index_markdown(project_result),
+            title=f"{display_name} {unreleased_label}",
+            linkTitle=unreleased_label,
+            type="docs",
+        ),
+        encoding="utf-8",
+    )
 
     write_yaml_like(
         version_metadata_path,
@@ -712,7 +772,11 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
 
     root_index = stage_root / "content" / "_index.md"
     root_index.parent.mkdir(parents=True, exist_ok=True)
-    root_index.write_text(build_root_index_markdown(results), encoding="utf-8")
+    root_index.write_text(with_yaml_front_matter(build_root_index_markdown(results), title="Apache Buildish site MVP"), encoding="utf-8")
+
+    projects_index = stage_root / "content" / "projects" / "_index.md"
+    projects_index.parent.mkdir(parents=True, exist_ok=True)
+    projects_index.write_text(with_yaml_front_matter(build_projects_index_markdown(results), title="Projects"), encoding="utf-8")
 
     write_yaml_like(
         stage_root / "manifest.yaml",

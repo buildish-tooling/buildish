@@ -1,0 +1,23 @@
+{
+  "name": "buildish-site-docsy",
+  "version": "0.1.0",
+  "description": "Local Docsy/PostCSS tooling for the Apache Buildish site",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Apache Buildish",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "private": true,
+  "devDependencies": {
+    "autoprefixer": "^10.4.27",
+    "jquery": "^4.0.0",
+    "mermaid": "^11.13.0",
+    "postcss-cli": "^11.0.1"
+  }
+}

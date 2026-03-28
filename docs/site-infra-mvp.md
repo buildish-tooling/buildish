@@ -41,8 +41,9 @@ unreleased-only in practice**. Release snapshot staging is intentionally
 deferred until the project has real tagged releases to publish.
 
 The local `make -C site build` flow now stages content into `site/.stage/` and
-then renders it with a small local Hugo site shell that consumes staged
-`content/`, `data/`, and `static/` directly.
+then renders it with local Hugo using Docsy as a Hugo module. The renderer
+consumes staged `content/`, `data/`, and `static/` directly, while local Node /
+PostCSS tooling is provided from `site/` for Docsy asset compilation.
 
 ## MVP goals
 

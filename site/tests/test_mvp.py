@@ -115,18 +115,24 @@ class SiteMvpTest(unittest.TestCase):
             results = mvp.build(repo_root)
 
             self.assertEqual(2, len(results))
+            self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "_index.md").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "wrapper-provisioning.md").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "static" / "projects" / "mammoth-cache-gradle" / "unreleased" / "assets" / "images" / "logo.svg").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "no-gradle-wrapper-jar" / "unreleased" / "_index.md").exists())
             self.assertTrue((repo_root / "site" / ".preview" / "index.html").exists())
 
             project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "_index.md").read_text(encoding="utf-8")
+            self.assertIn("title: Apache Buildish Mammoth Cache for Gradle", project_index)
             self.assertIn("Secure Gradle wrapper provisioning.", project_index)
             self.assertIn("Open Preview docs", project_index)
             self.assertIn("Staged assets: 1 file(s)", project_index)
             self.assertIn("/projects/mammoth-cache-gradle/unreleased/", project_index)
             self.assertIn("Latest stable: `v1.3.5`", project_index)
             self.assertIn("`v1` — maintained; latest `v1.3.5`", project_index)
+
+            projects_index = (repo_root / "site" / ".stage" / "content" / "projects" / "_index.md").read_text(encoding="utf-8")
+            self.assertIn("title: Projects", projects_index)
+            self.assertIn("Open Preview docs", projects_index)
 
             preview_index = (repo_root / "site" / ".preview" / "index.html").read_text(encoding="utf-8")
             self.assertIn("Apache Buildish Mammoth Cache for Gradle", preview_index)

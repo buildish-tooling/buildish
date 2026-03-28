@@ -16,11 +16,11 @@
 baseURL: http://127.0.0.1:1313/
 title: Apache Buildish site MVP
 languageCode: en-us
+enableRobotsTXT: true
 contentDir: .stage/content
 dataDir: .stage/data
 staticDir:
   - .stage/static
-layoutDir: layouts
 publishDir: .public
 disableKinds:
   - taxonomy
@@ -31,3 +31,21 @@ markup:
   goldmark:
     renderer:
       unsafe: false
+params:
+  ui:
+    breadcrumb_disable: false
+    navbar_logo: false
+    sidebar_menu_foldable: true
+    sidebar_menu_compact: true
+    sidebar_search_disable: true
+    showLightDarkModeMenu: true
+module:
+  proxy: direct
+  hugoVersion:
+    extended: true
+    min: 0.155.3
+  imports:
+    - path: github.com/google/docsy
+      disable: false
+    - path: github.com/google/docsy/dependencies
+      disable: false
