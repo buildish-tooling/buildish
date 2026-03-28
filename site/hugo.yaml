@@ -27,18 +27,65 @@ disableKinds:
   - term
   - RSS
   - sitemap
+
 markup:
+  highlight:
+    # See https://www.docsy.dev/docs/content/lookandfeel/#code-highlighting-with-chroma
+    # See https://gohugo.io/content-management/syntax-highlighting/
+    #
+    # "Prism" syntax highlighting looks a bit nicer, but quite some code blocks become a bit
+    # too big (horizontally), so users would have to scroll horizontally to see the code.
+    # 'lineNumbersInTable=true' is "required" (for UX reasons) as well.
+    anchorLineNos: false
+    codeFences: true
+    guessSyntax: false
+    hl_Lines: ""
+    hl_inline: false
+    lineAnchors: ''
+    lineNoStart: 1
+    lineNos: true
+    lineNumbersInTable: true
+    noClasses: true
+    noHl: false
+    # 'tango' == "Chroma" syntax highlighting theme
+    style: 'tango'
+    tabWidth: 4
   goldmark:
+    parser:
+      autoHeadingID: true
+      autoHeadingIDType: github
+      attribute:
+        # See https://gohugo.io/render-hooks/blockquotes/#alerts
+        block: true
     renderer:
       unsafe: false
+
 params:
+  author:
+    name: 'Apache Buildish contributors'
+
+  #github_repo: https://github.com/apache/buildish
+  #github_project_repo: https://github.com/apache/buildish
+  #github_branch: main
+  #github_subdir: site
+  privacy_policy: https://privacy.apache.org/policies/privacy-policy-public.html
+
   ui:
     breadcrumb_disable: false
     navbar_logo: false
     sidebar_menu_foldable: true
     sidebar_menu_compact: true
     sidebar_search_disable: true
-    showLightDarkModeMenu: true
+    showLightDarkModeMenu: false
+  plantuml:
+    # Disabled for now, loads external JS, see ASF data policy
+    # https://privacy.apache.org/policies/website-policy.html
+    enable: false
+  markmap:
+    # Disabled for now, loads external JS, see ASF data policy
+    # https://privacy.apache.org/policies/website-policy.html
+    enable: false
+
 module:
   proxy: direct
   hugoVersion:
@@ -49,3 +96,17 @@ module:
       disable: false
     - path: github.com/google/docsy/dependencies
       disable: false
+
+privacy:
+  googleAnalytics:
+    disable: true
+  instagram:
+    simple: true
+  x: # was 'twitter'
+    enableDNT: true
+    simple: true
+  vimeo:
+    enableDNT: true
+    simple: true
+  youtube:
+    privacyEnhanced: true
