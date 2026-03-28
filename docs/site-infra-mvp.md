@@ -25,14 +25,29 @@ local proof of concept for the site infrastructure proposed in
 The goal is to learn quickly with the smallest useful implementation, not to
 ship the full production design in one step.
 
+The current local scaffold uses a small Python project under `site/`, managed
+with `uv`, with `PyYAML` for catalog and generated metadata handling.
+
+The local aggregator reads the central `site/projects.yaml` catalog and, when a
+sub-project checkout is present, merges per-project metadata from that
+repository's `site/project.yaml`.
+
+The MVP now also consumes small nested metadata sections from `site/project.yaml`
+for project identity, content roots, unreleased labeling, and release-line
+lifecycle annotations.
+
+The current implementation should be treated as **unreleased-first and
+unreleased-only in practice**. Release snapshot staging is intentionally
+deferred until the project has real tagged releases to publish.
+
 ## MVP goals
 
 - Prove the aggregator + renderer split works in practice.
 - Build and serve a local site from the main repository plus locally available
   sub-project repositories.
 - Validate the proposed `site/projects.yaml` catalog shape.
-- Validate the proposed staged tree under `.site-stage/`.
-- Validate the `unreleased` + exact-release version model.
+- Validate the proposed staged tree under `site/.stage/`.
+- Validate the `unreleased` version path and metadata contract.
 - Keep the implementation small enough to iterate on quickly.
 
 ## Explicit non-goals for the MVP
@@ -40,6 +55,7 @@ ship the full production design in one step.
 - Production publication to `buildish.apache.org`.
 - Cross-repository trigger/authentication design.
 - Full release automation.
+- Release snapshot staging before real release tags exist.
 - Full search, sitemap, and redirect behavior.
 - Full AsciiDoc feature support.
 - Perfect theme or navigation design.
@@ -51,7 +67,6 @@ The MVP should intentionally stay narrow:
 - one main repository site shell,
 - one or two sub-project repositories discovered from the local workspace,
 - `unreleased` docs for those projects,
-- optionally one exact release snapshot for one project,
 - Hugo + Docsy as the renderer,
 - local build and local serve only.
 
@@ -65,18 +80,16 @@ The MVP should assume only these inputs exist:
 - `site/projects.yaml` in the main repository,
 - `site/project.yaml` in each participating sub-project,
 - `site/docs/` in each participating sub-project,
-- optional `site/assets/` in each participating sub-project,
-- optional locally available release snapshot content.
+- optional `site/assets/` in each participating sub-project.
 
 ## Minimal output contract
 
 The MVP should generate a staged tree roughly like:
 
-- `.site-stage/content/projects/<slug>/unreleased/...`
-- `.site-stage/content/projects/<slug>/releases/<exact-version>/...`
-- `.site-stage/content/projects/<slug>/lifecycle.yaml`
-- `.site-stage/data/projects.yaml`
-- `.site-stage/data/lifecycle.yaml`
+- `site/.stage/content/projects/<slug>/unreleased/...`
+- `site/.stage/content/projects/<slug>/lifecycle.yaml`
+- `site/.stage/data/projects.yaml`
+- `site/.stage/data/lifecycle.yaml`
 
 This is enough to validate the aggregator contract without solving every
 production concern.
@@ -86,17 +99,19 @@ production concern.
 1. Add a minimal `site/projects.yaml` with one or two example projects.
 2. Add a tiny discovery mechanism for sibling checkout directories.
 3. Read each participating project's `site/project.yaml` with defaults applied.
-4. Copy or stage `site/docs/` content into `.site-stage/` under the canonical
+4. Copy or stage `site/docs/` content into `site/.stage/` under the canonical
    project/version paths.
 5. Generate minimal `version.yaml` and `lifecycle.yaml` files.
 6. Render the staged tree with Hugo + Docsy.
-7. Add a `bin/site` wrapper with commands such as `build` and `serve`.
+7. Add a `site/Makefile` with targets such as `build`, `serve`, `clean`, and
+   `test`.
 
 ## Suggested simplifications
 
 To keep the MVP fast and low-risk, it is reasonable to defer or simplify:
 
 - use scheduled/publication concerns later; focus on local builds first,
+- defer release snapshot staging until real exact-version tags exist,
 - skip alias-tag redirects,
 - skip search indexing of versioned content,
 - skip advanced lifecycle badges,
@@ -109,9 +124,8 @@ The MVP should be considered successful if it can:
 
 - discover at least one local sub-project repository,
 - build a staged tree with `unreleased` content,
-- optionally include one exact release snapshot,
 - render a working local site,
-- show a project landing page with links to `unreleased` and release docs,
+- show a project landing page with a clear `unreleased` docs entry point,
 - run repeatedly without depending on ad hoc manual edits.
 
 ## Security baseline for the MVP

@@ -1,0 +1,13 @@
+schemaVersion: 1
+defaults:
+  metadataFile: site/project.yaml
+  docsRoot: site/docs
+  readmePath: README.md
+  unreleasedLabel: Unreleased
+  tagPattern: ^v[0-9]+\.[0-9]+\.[0-9]+$
+  navigationSection: sub-projects
+projects:
+  - slug: mammoth-cache-gradle
+    localDir: buildish-mammoth-cache-gradle
+  - slug: no-gradle-wrapper-jar
+    localDir: buildish-no-gradle-wrapper-jar

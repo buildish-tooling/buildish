@@ -30,6 +30,9 @@ section.
 For implementation-oriented experiments and a local proof of concept, see
 [`site-infra-mvp.md`](site-infra-mvp.md).
 
+The current local MVP is intentionally unreleased-only in practice; release
+snapshot staging should wait until real tagged releases exist.
+
 ## Table of contents
 
 - [Status](#status)
@@ -1116,10 +1119,11 @@ versions of:
 - Node/npm if required,
 - AsciiDoc-related tooling if required.
 
-Developers should invoke the site tooling through a wrapper script such as
-`bin/site`, not via raw `docker` or `podman` commands.
+Developers should invoke the site tooling through a stable project-local
+entrypoint such as `make -C site build`, not via raw `docker` or `podman`
+commands.
 
-The wrapper script should handle:
+That entrypoint should handle:
 
 - engine detection (`docker`, `podman`, macOS-compatible runtimes),
 - cache directory mounting,
