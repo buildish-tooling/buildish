@@ -38,6 +38,14 @@ The native workflow expects:
 project READMEs/docs/assets that live outside `site/`. Use `make stage-watch` if you want
 to run only the staging watcher without starting Hugo.
 
+Known local-dev behavior:
+
+- changes to `site/projects.yaml` can take a short while to appear in the running Hugo server
+- newly added projects usually show up correctly after the watcher restages content
+- removed project routes can linger briefly in an already-running `make serve` session even after they disappear from the staged catalog
+
+Treat that last case as an accepted development-only inconvenience. A fresh `make build` or a restarted `make serve` reflects the current catalog cleanly.
+
 ## Current sub-project contract
 
 The currently implemented catalog and sub-project metadata contract is documented in

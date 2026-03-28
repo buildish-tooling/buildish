@@ -66,7 +66,6 @@ class SiteMvpTest(unittest.TestCase):
                 "schemaVersion": 1,
                 "defaults": {
                     "metadataFile": "site/project.yaml",
-                    "readmePath": "README.md",
                     "docsRoot": "site/docs",
                     "assetsRoot": "site/assets",
                     "unreleasedLabel": "Unreleased",
@@ -76,11 +75,33 @@ class SiteMvpTest(unittest.TestCase):
                 "projects": [
                     {"slug": "mammoth-cache-gradle", "localDir": "buildish-mammoth-cache-gradle"},
                     {"slug": "no-gradle-wrapper-jar", "localDir": "buildish-no-gradle-wrapper-jar", "weight": 5},
+                    {"slug": "site", "localDir": "buildish", "weight": 100},
                 ],
             }
             with (repo_root / "site" / "projects.yaml").open("w", encoding="utf-8") as handle:
                 yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
             self.seed_authored_site_content(repo_root)
+            (repo_root / "docs").mkdir()
+            (repo_root / "docs" / "_index.md").write_text(
+                "# Apache Buildish Site Documentation\n\nSite implementation and infrastructure docs.\n",
+                encoding="utf-8",
+            )
+            with (repo_root / "site" / "project.yaml").open("w", encoding="utf-8") as handle:
+                yaml.safe_dump(
+                    {
+                        "schemaVersion": 1,
+                        "project": {
+                            "slug": "site",
+                            "displayName": "Apache Buildish Site",
+                            "repository": "https://github.com/apache/buildish",
+                        },
+                        "content": {"docsRoot": "docs", "assetsRoot": None},
+                        "navigation": {"section": "sub-projects"},
+                    },
+                    handle,
+                    sort_keys=False,
+                    default_flow_style=False,
+                )
 
             mammoth = workspace / "buildish-mammoth-cache-gradle"
             (mammoth / "site").mkdir(parents=True)
@@ -100,7 +121,7 @@ class SiteMvpTest(unittest.TestCase):
                             "repository": "https://github.com/apache/buildish-mammoth-cache-gradle",
                             "defaultBranch": "trunk",
                         },
-                        "content": {"readmePath": "README.md", "docsRoot": "site/docs", "assetsRoot": "site/assets"},
+                        "content": {"docsRoot": "site/docs", "assetsRoot": "site/assets"},
                         "versioning": {"unreleasedLabel": "Preview"},
                         "lifecycle": {
                             "latestStable": "v1.3.5",
@@ -115,15 +136,16 @@ class SiteMvpTest(unittest.TestCase):
                     sort_keys=False,
                     default_flow_style=False,
                 )
+            (mammoth / "site" / "docs" / "_index.md").write_text(
+                "# Mammoth overview\n\nSecure Gradle wrapper provisioning.\n",
+                encoding="utf-8",
+            )
             (mammoth / "site" / "docs" / "wrapper-provisioning.md").write_text("# Wrapper provisioning\n", encoding="utf-8")
             (mammoth / "site" / "assets" / "images" / "logo.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>\n", encoding="utf-8")
 
             no_wrapper = workspace / "buildish-no-gradle-wrapper-jar"
             (no_wrapper / "site").mkdir(parents=True)
-            (no_wrapper / "README.md").write_text(
-                "# Buildish no-gradle-wrapper-jar\n\nHelper scripts for Gradle wrapper usage.\n",
-                encoding="utf-8",
-            )
+            (no_wrapper / "site" / "docs").mkdir()
             with (no_wrapper / "site" / "project.yaml").open("w", encoding="utf-8") as handle:
                 yaml.safe_dump(
                     {
@@ -134,21 +156,26 @@ class SiteMvpTest(unittest.TestCase):
                             "repository": "https://github.com/apache/buildish-no-gradle-wrapper-jar",
                             "defaultBranch": "main",
                         },
-                        "content": {"readmePath": "README.md", "docsRoot": None},
+                        "content": {"docsRoot": "site/docs"},
                         "navigation": {"section": "sub-projects"},
                     },
                     handle,
                     sort_keys=False,
                     default_flow_style=False,
                 )
+            (no_wrapper / "site" / "docs" / "_index.md").write_text(
+                "# No wrapper JAR\n\nHelper scripts for Gradle wrapper usage.\n",
+                encoding="utf-8",
+            )
 
             results = mvp.build(repo_root)
 
-            self.assertEqual(2, len(results))
+            self.assertEqual(3, len(results))
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "_index.md").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "wrapper-provisioning.md").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "static" / "projects" / "mammoth-cache-gradle" / "unreleased" / "assets" / "images" / "logo.svg").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "no-gradle-wrapper-jar" / "unreleased" / "_index.md").exists())
+            self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "site" / "unreleased" / "docs" / "_index.md").exists())
             self.assertTrue((repo_root / "site" / ".preview" / "index.html").exists())
 
             staged_root_index = (repo_root / "site" / ".stage" / "content" / "_index.md").read_text(encoding="utf-8")
@@ -205,6 +232,7 @@ class SiteMvpTest(unittest.TestCase):
             preview_index = (repo_root / "site" / ".preview" / "index.html").read_text(encoding="utf-8")
             self.assertIn("Apache Buildish (Incubating)", preview_index)
             self.assertIn("Apache Buildish Mammoth Cache for Gradle", preview_index)
+            self.assertIn("Apache Buildish Site", preview_index)
 
             version_metadata = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "version.yaml").read_text(encoding="utf-8")
             self.assertIn("metadataLoaded: true", version_metadata)
@@ -233,9 +261,25 @@ class SiteMvpTest(unittest.TestCase):
             no_wrapper_project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "no-gradle-wrapper-jar" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("weight: 5", no_wrapper_project_index)
             self.assertNotIn("linkTitle:", no_wrapper_project_index)
+            self.assertIn("Helper scripts for Gradle wrapper usage.", no_wrapper_project_index)
             self.assertNotIn("Latest stable:", no_wrapper_project_index)
             self.assertNotIn("## Release lines", no_wrapper_project_index)
             self.assertNotIn("Staged assets:", no_wrapper_project_index)
+
+            site_project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "site" / "_index.md").read_text(encoding="utf-8")
+            self.assertIn("title: Apache Buildish Site", site_project_index)
+            self.assertIn("weight: 100", site_project_index)
+            self.assertIn("Site implementation and infrastructure docs.", site_project_index)
+            self.assertNotIn("Staged assets:", site_project_index)
+
+            site_unreleased_index = (repo_root / "site" / ".stage" / "content" / "projects" / "site" / "unreleased" / "_index.md").read_text(encoding="utf-8")
+            self.assertIn("## Docs", site_unreleased_index)
+            self.assertIn("[Apache Buildish Site Documentation](/projects/site/unreleased/docs/)", site_unreleased_index)
+            self.assertNotIn("Open staged assets", site_unreleased_index)
+
+            site_version_metadata = (repo_root / "site" / ".stage" / "content" / "projects" / "site" / "unreleased" / "version.yaml").read_text(encoding="utf-8")
+            self.assertIn("assetsRoot: null", site_version_metadata)
+            self.assertIn("count: 0", site_version_metadata)
 
     def test_rejects_metadata_path_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -245,7 +289,7 @@ class SiteMvpTest(unittest.TestCase):
             (repo_root / "site").mkdir()
             catalog = {
                 "schemaVersion": 1,
-                "defaults": {"metadataFile": "site/project.yaml", "readmePath": "README.md", "docsRoot": "site/docs"},
+                "defaults": {"metadataFile": "site/project.yaml", "docsRoot": "site/docs"},
                 "projects": [{"slug": "mammoth-cache-gradle", "localDir": "buildish-mammoth-cache-gradle"}],
             }
             with (repo_root / "site" / "projects.yaml").open("w", encoding="utf-8") as handle:
@@ -258,14 +302,12 @@ class SiteMvpTest(unittest.TestCase):
                     {
                         "schemaVersion": 1,
                         "project": {"displayName": "Bad metadata"},
-                        "content": {"docsRoot": "../escape", "readmePath": "README.md"},
+                        "content": {"docsRoot": "../escape"},
                     },
                     handle,
                     sort_keys=False,
                     default_flow_style=False,
                 )
-
-            (mammoth / "README.md").write_text("# Test\n", encoding="utf-8")
 
             with self.assertRaisesRegex(ValueError, "escapes allowed root"):
                 mvp.build(repo_root)
@@ -277,7 +319,7 @@ class SiteMvpTest(unittest.TestCase):
             (repo_root / "site").mkdir(parents=True)
             catalog = {
                 "schemaVersion": 1,
-                "defaults": {"metadataFile": "site/project.yaml", "readmePath": "README.md", "docsRoot": "site/docs"},
+                "defaults": {"metadataFile": "site/project.yaml", "docsRoot": "site/docs"},
                 "projects": [{"slug": "bad-project", "displayName": "Bad", "localDir": "../escape"}],
             }
             with (repo_root / "site" / "projects.yaml").open("w", encoding="utf-8") as handle:
@@ -296,7 +338,6 @@ class SiteMvpTest(unittest.TestCase):
                 "schemaVersion": 1,
                 "defaults": {
                     "metadataFile": "site/project.yaml",
-                    "readmePath": "README.md",
                     "docsRoot": "site/docs",
                     "assetsRoot": "site/assets",
                 },
@@ -312,14 +353,12 @@ class SiteMvpTest(unittest.TestCase):
                     {
                         "schemaVersion": 1,
                         "project": {"displayName": "Bad assets metadata"},
-                        "content": {"readmePath": "README.md", "assetsRoot": "../escape"},
+                        "content": {"assetsRoot": "../escape"},
                     },
                     handle,
                     sort_keys=False,
                     default_flow_style=False,
                 )
-
-            (mammoth / "README.md").write_text("# Test\n", encoding="utf-8")
 
             with self.assertRaisesRegex(ValueError, "escapes allowed root"):
                 mvp.build(repo_root)
@@ -340,17 +379,29 @@ class SiteMvpTest(unittest.TestCase):
             self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "mermaid.esm.min.mjs").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "lunr.min.js").exists())
 
+    def test_extract_title_and_summary_ignores_headings_inside_fenced_code_blocks(self) -> None:
+        markdown = """<!--\ncomment\n-->\n\nThis page currently carries content moved from the project README.\n\n```yaml\n# .github/buildish-mammoth-gradle.yml\njob-mode: distributed-worker\n```\n\n## Next section\n"""
+
+        title, summary = mvp.extract_title_and_summary(markdown, "[FROM README] Usage examples")
+
+        self.assertEqual("[FROM README] Usage examples", title)
+        self.assertEqual("Temporary home for usage examples.", mvp.normalize_markdown_doc(
+            "---\ntitle: \"[FROM README] Usage examples\"\ndescription: Temporary home for usage examples.\n---\n\n" + markdown,
+            "Usage examples",
+            type="docs",
+        )[2])
+
     def test_collect_watch_roots_includes_catalog_project_inputs_and_missing_repo_parent(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             repo_root = workspace / "buildish"
             repo_root.mkdir()
             (repo_root / "site" / "content").mkdir(parents=True)
+            (repo_root / "site" / "mvp.py").write_text("# watcher stub\n", encoding="utf-8")
             catalog = {
                 "schemaVersion": 1,
                 "defaults": {
                     "metadataFile": "site/project.yaml",
-                    "readmePath": "README.md",
                     "docsRoot": "site/docs",
                     "assetsRoot": "site/assets",
                 },
@@ -365,7 +416,6 @@ class SiteMvpTest(unittest.TestCase):
             mammoth = workspace / "buildish-mammoth-cache-gradle"
             (mammoth / "site" / "docs").mkdir(parents=True)
             (mammoth / "site" / "assets").mkdir(parents=True)
-            (mammoth / "README.md").write_text("# Mammoth\n", encoding="utf-8")
             with (mammoth / "site" / "project.yaml").open("w", encoding="utf-8") as handle:
                 yaml.safe_dump({"schemaVersion": 1, "project": {"displayName": "Mammoth"}}, handle, sort_keys=False, default_flow_style=False)
 
@@ -373,8 +423,8 @@ class SiteMvpTest(unittest.TestCase):
 
             self.assertIn((repo_root / "site" / "projects.yaml").resolve(), watch_roots)
             self.assertIn((repo_root / "site" / "content").resolve(), watch_roots)
+            self.assertIn((repo_root / "site" / "mvp.py").resolve(), watch_roots)
             self.assertIn((mammoth / "site" / "project.yaml").resolve(), watch_roots)
-            self.assertIn((mammoth / "README.md").resolve(), watch_roots)
             self.assertIn((mammoth / "site" / "docs").resolve(), watch_roots)
             self.assertIn((mammoth / "site" / "assets").resolve(), watch_roots)
             self.assertIn(workspace.resolve(), watch_roots)

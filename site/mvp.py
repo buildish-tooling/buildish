@@ -56,7 +56,6 @@ class ProjectBuildResult:
     local_dir: str
     repo_path: Path
     summary: str
-    raw_readme_path: str | None
     raw_unreleased_index_path: str | None
     raw_project_index_path: str | None
     raw_assets_root_path: str | None
@@ -100,6 +99,13 @@ def first_non_none(*values: Any) -> Any:
     for value in values:
         if value is not None:
             return value
+    return None
+
+
+def first_defined_mapping_value(key: str, *mappings: dict[str, Any]) -> Any:
+    for mapping in mappings:
+        if key in mapping:
+            return mapping[key]
     return None
 
 
@@ -219,22 +225,10 @@ def project_watch_roots(repo_root: Path, project: dict[str, Any], defaults: dict
     if metadata_path is not None:
         watch_roots.add(watchable_existing_path(metadata_path, repo_path))
 
-    readme_setting = first_non_none(
-        project.get("readmePath"),
-        content_fields.get("readmePath"),
-        project_fields.get("readmePath"),
-        metadata_fields.get("readmePath"),
-        defaults.get("readmePath"),
-        "README.md",
-    )
-    readme_path = safe_relative_path(repo_path, str(readme_setting), f"README for {slug}")
-    if readme_path is not None:
-        watch_roots.add(watchable_existing_path(readme_path, repo_path))
-
     docs_setting = (
         project["docsRoot"]
         if "docsRoot" in project
-        else first_non_none(content_fields.get("docsRoot"), project_fields.get("docsRoot"), metadata_fields.get("docsRoot"), defaults.get("docsRoot"))
+        else first_defined_mapping_value("docsRoot", content_fields, project_fields, metadata_fields, defaults)
     )
     if docs_setting is not None:
         docs_path = safe_relative_path(repo_path, str(docs_setting), f"docsRoot for {slug}")
@@ -244,12 +238,7 @@ def project_watch_roots(repo_root: Path, project: dict[str, Any], defaults: dict
     assets_setting = (
         project["assetsRoot"]
         if "assetsRoot" in project
-        else first_non_none(
-            content_fields.get("assetsRoot"),
-            project_fields.get("assetsRoot"),
-            metadata_fields.get("assetsRoot"),
-            defaults.get("assetsRoot"),
-        )
+        else first_defined_mapping_value("assetsRoot", content_fields, project_fields, metadata_fields, defaults)
     )
     if assets_setting is not None:
         assets_path = safe_relative_path(repo_path, str(assets_setting), f"assetsRoot for {slug}")
@@ -269,6 +258,7 @@ def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
     watch_roots: set[Path] = {
         watchable_existing_path(site_root / "projects.yaml", site_root),
         watchable_existing_path(site_root / "content", site_root),
+        watchable_existing_path(site_root / "mvp.py", site_root),
     }
 
     for source_relative, _ in STAGED_VENDOR_ASSETS:
@@ -346,8 +336,24 @@ def extract_title_and_summary(markdown_text: str, fallback_title: str) -> tuple[
     title = fallback_title
     summary_lines: list[str] = []
     saw_title = False
+    in_fenced_block = False
+    fence_marker = ""
 
     for raw_line in cleaned.splitlines():
+        stripped = raw_line.lstrip()
+        if stripped.startswith(("```", "~~~")):
+            marker = stripped[:3]
+            if not in_fenced_block:
+                in_fenced_block = True
+                fence_marker = marker
+            elif marker == fence_marker:
+                in_fenced_block = False
+                fence_marker = ""
+            continue
+
+        if in_fenced_block:
+            continue
+
         line = raw_line.strip()
         if not saw_title and line.startswith("# "):
             title = line[2:].strip()
@@ -363,6 +369,30 @@ def extract_title_and_summary(markdown_text: str, fallback_title: str) -> tuple[
             break
 
     return title, " ".join(summary_lines).strip()
+
+
+def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: Any) -> tuple[str, str, str]:
+    existing_fields, body = split_markdown_front_matter(markdown_text)
+
+    existing_title = existing_fields.get("title")
+    effective_fallback_title = fallback_title
+    if isinstance(existing_title, str) and existing_title.strip():
+        effective_fallback_title = existing_title.strip()
+
+    title, summary = extract_title_and_summary(body, effective_fallback_title)
+    existing_description = existing_fields.get("description")
+    if not summary and isinstance(existing_description, str):
+        summary = existing_description.strip()
+
+    updated_fields = dict(existing_fields)
+    updated_fields.update(fields)
+    updated_fields["title"] = title
+    if summary:
+        updated_fields["description"] = summary
+    else:
+        updated_fields.pop("description", None)
+
+    return with_yaml_front_matter(strip_leading_markdown_h1(body), **updated_fields), title, summary
 
 
 def humanized_stem(path: Path) -> str:
@@ -401,10 +431,6 @@ def public_project_path(slug: str) -> str:
 
 def public_unreleased_path(slug: str) -> str:
     return f"/projects/{slug}/unreleased/"
-
-
-def public_source_readme_path(slug: str) -> str:
-    return f"/projects/{slug}/source-readme/"
 
 
 def public_assets_root_path(slug: str) -> str:
@@ -552,10 +578,15 @@ def build_unreleased_index_markdown(result: ProjectBuildResult) -> str:
         lines.extend([f"Built from the local `{result.default_branch}` branch snapshot.", ""])
     if result.summary:
         lines.extend([result.summary, ""])
+    if result.doc_links:
+        lines.extend(["## Docs", ""])
+        for doc_link in result.doc_links:
+            lines.append(f"- [{doc_link['label']}]({doc_link['href']})")
+        lines.append("")
     if result.asset_count and result.raw_assets_root_path:
         lines.extend([f"- [Open staged assets]({result.raw_assets_root_path})", ""])
     if not result.doc_links:
-        lines.extend([f"This project currently uses its README as the {result.unreleased_label} docs entry point.", ""])
+        lines.extend([f"No staged {result.unreleased_label.lower()} docs pages are currently available for this project.", ""])
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -701,32 +732,17 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         defaults.get("navigationSection"),
     )
 
-    readme_setting = first_non_none(
-        project.get("readmePath"),
-        content_fields.get("readmePath"),
-        project_fields.get("readmePath"),
-        metadata_fields.get("readmePath"),
-        defaults.get("readmePath"),
-        "README.md",
-    )
-    readme_relative = str(readme_setting)
-
     docs_setting = (
         project["docsRoot"]
         if "docsRoot" in project
-        else first_non_none(content_fields.get("docsRoot"), project_fields.get("docsRoot"), metadata_fields.get("docsRoot"), defaults.get("docsRoot"))
+        else first_defined_mapping_value("docsRoot", content_fields, project_fields, metadata_fields, defaults)
     )
     docs_relative = "" if docs_setting is None else str(docs_setting)
 
     assets_setting = (
         project["assetsRoot"]
         if "assetsRoot" in project
-        else first_non_none(
-            content_fields.get("assetsRoot"),
-            project_fields.get("assetsRoot"),
-            metadata_fields.get("assetsRoot"),
-            defaults.get("assetsRoot"),
-        )
+        else first_defined_mapping_value("assetsRoot", content_fields, project_fields, metadata_fields, defaults)
     )
     assets_relative = "" if assets_setting is None else str(assets_setting)
 
@@ -749,32 +765,12 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         )
     )
 
-    readme_path = safe_relative_path(repo_path, readme_relative, f"README for {slug}")
-    readme_text = read_text_if_exists(readme_path) if available else ""
-    _, summary = extract_title_and_summary(readme_text, display_name)
+    summary = ""
 
     project_root = stage_root / "content" / "projects" / slug
     unreleased_root = project_root / "unreleased"
     docs_root = unreleased_root / "docs"
     staged_assets_root = stage_root / "static" / "projects" / slug / "unreleased" / "assets"
-
-    staged_readme_path = project_root / "source-readme.md"
-    raw_readme_path = None
-    if readme_text:
-        staged_readme_path.parent.mkdir(parents=True, exist_ok=True)
-        _, readme_summary = extract_title_and_summary(readme_text, f"{display_name} source README")
-        readme_body = strip_leading_markdown_h1(readme_text)
-        staged_readme_path.write_text(
-            with_yaml_front_matter(
-                readme_body,
-                title=f"{display_name} source README",
-                weight=20,
-                type="docs",
-                **({"description": readme_summary} if readme_summary else {}),
-            ),
-            encoding="utf-8",
-        )
-        raw_readme_path = public_source_readme_path(slug)
 
     copied_docs: list[Path] = []
     copied_assets: list[Path] = []
@@ -783,12 +779,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         if docs_path and docs_path.is_dir():
             copied_docs = copy_tree_without_symlinks(docs_path, docs_root)
         else:
-            warnings.append("No docs directory found; using the README as the unreleased docs entry point.")
-            if readme_text:
-                docs_root.mkdir(parents=True, exist_ok=True)
-                fallback_readme = docs_root / "readme.md"
-                fallback_readme.write_text(readme_text, encoding="utf-8")
-                copied_docs = [Path("readme.md")]
+            warnings.append("No docs directory found; skipping unreleased docs staging.")
 
         assets_path = safe_relative_path(repo_path, str(assets_relative), f"assetsRoot for {slug}") if assets_relative else None
         if assets_path and assets_path.is_dir():
@@ -796,39 +787,26 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
     else:
         warnings.append("Local repository directory is missing; project was skipped for raw docs staging.")
 
-    if copied_docs:
-        docs_root.mkdir(parents=True, exist_ok=True)
-        (docs_root / "_index.md").write_text(
-            with_yaml_front_matter(
-                f"Browsable {unreleased_label.lower()} docs staged for {display_name}.\n",
-                title=f"{display_name} {unreleased_label} docs",
-                weight=10,
-                type="docs",
-                description=f"Browsable {unreleased_label.lower()} docs staged for {display_name}.",
-            ),
-            encoding="utf-8",
-        )
-
     doc_links: list[dict[str, str]] = []
     for copied in copied_docs:
         staged_doc_path = docs_root / copied
+        doc_title = humanized_stem(copied)
         if copied.suffix.lower() in {".md", ".markdown"} and staged_doc_path.is_file():
             doc_text = staged_doc_path.read_text(encoding="utf-8")
-            doc_title, doc_summary = extract_title_and_summary(doc_text, humanized_stem(copied))
-            doc_body = strip_leading_markdown_h1(doc_text)
+            normalized_doc, doc_title, doc_summary = normalize_markdown_doc(doc_text, humanized_stem(copied), type="docs")
             staged_doc_path.write_text(
-                with_yaml_front_matter(
-                    doc_body,
-                    title=doc_title,
-                    type="docs",
-                    **({"description": doc_summary} if doc_summary else {}),
-                ),
+                normalized_doc,
                 encoding="utf-8",
             )
+            if copied == Path("_index.md"):
+                summary = doc_summary
         if copied.suffix.lower() not in {".md", ".markdown", ".adoc", ".asciidoc"}:
             continue
         raw_path = public_content_page_path(["projects", slug, "unreleased", "docs"], copied)
-        doc_links.append({"label": copied.with_suffix("").as_posix().replace("-", " "), "href": raw_path})
+        doc_links.append({"label": doc_title, "href": raw_path})
+
+    if copied_docs and not (docs_root / "_index.md").is_file():
+        warnings.append("Docs root is missing _index.md; add a site-oriented docs landing page.")
 
     unreleased_index_path = unreleased_root / "_index.md"
     project_index_path = project_root / "_index.md"
@@ -857,7 +835,6 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         local_dir=local_dir,
         repo_path=repo_path,
         summary=summary,
-        raw_readme_path=raw_readme_path,
         raw_unreleased_index_path=raw_unreleased_index_path,
         raw_project_index_path=raw_project_index_path,
         raw_assets_root_path=raw_assets_root_path,
@@ -908,7 +885,6 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
                 "metadataFile": metadata_relative,
                 "metadataLoaded": metadata_path is not None,
                 "defaultBranch": default_branch,
-                "readmePath": readme_relative,
                 "docsRoot": docs_relative or None,
                 "assetsRoot": assets_relative or None,
             },

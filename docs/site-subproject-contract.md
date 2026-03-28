@@ -38,7 +38,6 @@ Current supported top-level fields:
 Current supported `defaults` fields:
 
 - `metadataFile`
-- `readmePath`
 - `docsRoot`
 - `assetsRoot`
 - `unreleasedLabel`
@@ -49,7 +48,7 @@ Each `projects[]` entry currently supports:
 
 - required: `slug`, `localDir`
 - optional: `displayName`, `repository`, `defaultBranch`, `weight`
-- optional overrides: `metadataFile`, `readmePath`, `docsRoot`, `assetsRoot`
+- optional overrides: `metadataFile`, `docsRoot`, `assetsRoot`
 - optional publication/navigation hints: `unreleasedLabel`, `tagPattern`, `navigationSection`
 
 ## Sub-project metadata file
@@ -65,7 +64,6 @@ Preferred structure:
   - `repository`
   - `defaultBranch`
 - `content`
-  - `readmePath`
   - `docsRoot`
   - `assetsRoot`
 - `versioning`
@@ -96,12 +94,13 @@ while the sub-project metadata controls content-local structure.
 
 For each available sub-project repository, the current MVP stages:
 
-- the configured README file, defaulting to `README.md`
 - the configured docs tree, defaulting to `site/docs`
 - the configured asset tree, defaulting to `site/assets`
 
-If the docs tree is missing but the README exists, the README is used as the
-unreleased docs entry point.
+The docs tree should include a site-oriented `_index.md` landing page.
+
+If the docs tree is missing, unreleased docs staging is skipped for that
+project.
 
 ## Lifecycle inputs
 
@@ -131,7 +130,6 @@ The current aggregator enforces these guardrails:
 The current MVP generates, at minimum:
 
 - `site/.stage/content/projects/<slug>/_index.md`
-- `site/.stage/content/projects/<slug>/source-readme.md`
 - `site/.stage/content/projects/<slug>/unreleased/docs/...`
 - `site/.stage/content/projects/<slug>/unreleased/version.yaml`
 - `site/.stage/content/projects/<slug>/lifecycle.yaml`

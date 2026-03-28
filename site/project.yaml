@@ -14,18 +14,12 @@
 # limitations under the License.
 
 schemaVersion: 1
-defaults:
-  metadataFile: site/project.yaml
-  docsRoot: site/docs
-  assetsRoot: site/assets
-  unreleasedLabel: Unreleased
-  tagPattern: ^v[0-9]+\.[0-9]+\.[0-9]+$
-  navigationSection: sub-projects
-projects:
-  - slug: mammoth-cache-gradle
-    localDir: buildish-mammoth-cache-gradle
-  - slug: no-gradle-wrapper-jar
-    localDir: buildish-no-gradle-wrapper-jar
-  - slug: site
-    localDir: buildish
-    weight: 100
+project:
+  slug: site
+  displayName: Apache Buildish Site
+  repository: https://github.com/apache/buildish
+content:
+  docsRoot: docs
+  assetsRoot: null
+navigation:
+  section: sub-projects
