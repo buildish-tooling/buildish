@@ -33,9 +33,6 @@ import yaml
 DEFAULT_TAG_PATTERN = r"^v[0-9]+\.[0-9]+\.[0-9]+$"
 VALID_RELEASE_LINE_STATUSES = {"maintained", "eol"}
 SITE_TITLE = "Apache Buildish (Incubating)"
-PROJECT_HEADLINE = "Apache Buildish develops build automation, CI integrations, and supporting tooling."
-PROJECT_REPOSITORY_URL = "https://github.com/apache/buildish"
-PROJECT_DEV_MAILING_LIST = "dev@buildish.apache.org"
 
 
 @dataclass(frozen=True)
@@ -248,9 +245,20 @@ def with_yaml_front_matter(markdown: str, **fields: Any) -> str:
     return f"---\n{front_matter}\n---\n\n{body}"
 
 
-def write_markdown_page(path: Path, markdown: str, **fields: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(with_yaml_front_matter(markdown, **fields), encoding="utf-8")
+def split_markdown_front_matter(markdown: str) -> tuple[dict[str, Any], str]:
+    match = re.match(r"^---\n(.*?)\n---\n?", markdown, flags=re.DOTALL)
+    if match is None:
+        return {}, markdown
+    front_matter = yaml.safe_load(match.group(1)) or {}
+    if not isinstance(front_matter, dict):
+        raise ValueError("Expected markdown front matter to be a mapping")
+    return front_matter, markdown[match.end() :]
+
+
+def update_markdown_front_matter(markdown: str, **fields: Any) -> str:
+    existing_fields, body = split_markdown_front_matter(markdown)
+    existing_fields.update(fields)
+    return with_yaml_front_matter(body, **existing_fields)
 
 
 def public_project_path(slug: str) -> str:
@@ -417,19 +425,6 @@ def build_unreleased_index_markdown(result: ProjectBuildResult) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def build_root_index_markdown(results: list[ProjectBuildResult]) -> str:
-    available = sum(1 for result in results if result.available)
-    total = len(results)
-    lines = [
-        "Apache Buildish is an incubating Apache umbrella project for build engineering, CI provider integrations, and the tooling that supports reliable developer workflows.",
-        "",
-        "Use this site to explore staged subprojects, learn what the umbrella project is building toward, and find the best way to join the community.",
-        "",
-        f"Currently staged local projects: {available}/{total} available.",
-    ]
-    return "\n".join(lines).rstrip() + "\n"
-
-
 def split_paragraphs(text: str) -> list[str]:
     paragraphs: list[str] = []
     for chunk in text.strip().split("\n\n"):
@@ -439,83 +434,20 @@ def split_paragraphs(text: str) -> list[str]:
     return paragraphs
 
 
-def build_projects_index_markdown(results: list[ProjectBuildResult]) -> str:
-    available = sum(1 for result in results if result.available)
-    total = len(results)
-    lines = [f"Local sub-projects staged from the catalog: {available}/{total} available."]
-    return "\n".join(lines).rstrip() + "\n"
+def stage_authored_site_content(site_root: Path, stage_root: Path, incubator_disclaimer_paragraphs: list[str]) -> None:
+    source_content_root = site_root / "content"
+    if source_content_root.is_dir():
+        copy_tree_without_symlinks(source_content_root, stage_root / "content")
 
-
-def build_security_report_markdown() -> str:
-    lines = [
-        "Report suspected vulnerabilities privately; do not disclose them in public issues, pull requests, or mailing lists.",
-        "",
-        "Follow the [Apache Software Foundation security guidance](https://www.apache.org/security/) when reporting a vulnerability affecting Apache Buildish.",
-        "",
-        "Include the affected component, versions, reproduction details, impact, and any suggested mitigations to help the report be triaged quickly.",
-    ]
-    return "\n".join(lines).rstrip() + "\n"
-
-
-def build_about_markdown() -> str:
-    lines = [
-        "Apache Buildish is an incubating Apache project focused on build automation, CI integrations, and supporting developer tooling.",
-        "",
-        "The umbrella project is intended to host practical tools, reusable build components, and provider-facing integrations that help development teams build, test, and ship software more consistently.",
-        "",
-        "This MVP site brings together umbrella-project information and staged documentation from local Buildish subprojects so contributors can review structure, content, and navigation before the site grows further.",
-    ]
-    return "\n".join(lines).rstrip() + "\n"
-
-
-def build_community_index_markdown() -> str:
-    lines = [
-        "Apache Buildish is built in the open. Use this section to find project communication channels, contribution entry points, and security reporting guidance.",
-        "",
-        "- [Community & Contact](/community/contact/)",
-        f"- [Source Code]({PROJECT_REPOSITORY_URL})",
-        "- [Get Involved](/community/get-involved/)",
-        "- [Security Report](/community/security-report/)",
-    ]
-    return "\n".join(lines).rstrip() + "\n"
-
-
-def build_contact_markdown() -> str:
-    lines = [
-        "Apache Buildish coordinates development in public and welcomes early feedback while the project is incubating.",
-        "",
-        "## Project channels",
-        "",
-        f"- Source repository: [{PROJECT_REPOSITORY_URL}]({PROJECT_REPOSITORY_URL})",
-        f"- Development mailing list: [{PROJECT_DEV_MAILING_LIST}](mailto:{PROJECT_DEV_MAILING_LIST})",
-        "",
-        "## How to reach the project",
-        "",
-        "Use the development mailing list for design discussion, contributor onboarding questions, release planning, and general project feedback.",
-        "",
-        "Use the source repository for code, issue tracking, pull requests, and implementation-oriented discussion tied to specific changes.",
-        "",
-        "For private vulnerability reports, follow the [Security Report](/community/security-report/) guidance instead of opening a public issue.",
-    ]
-    return "\n".join(lines).rstrip() + "\n"
-
-
-def build_get_involved_markdown() -> str:
-    lines = [
-        "Apache Buildish is looking for feedback on project structure, docs, workflows, and tooling ideas while the site and subprojects take shape.",
-        "",
-        "## Ways to contribute",
-        "",
-        "- Try the staged subprojects and share what works or what feels rough.",
-        f"- Join the [development mailing list](mailto:{PROJECT_DEV_MAILING_LIST}) to discuss ideas and priorities.",
-        f"- Browse the [source repository]({PROJECT_REPOSITORY_URL}) for issues, pull requests, and project structure.",
-        "- Improve docs, examples, naming, onboarding notes, and contributor guidance.",
-        "",
-        "## Early focus areas",
-        "",
-        "Early contributors can help validate the umbrella-project site, shape CI integration patterns, improve build automation ergonomics, and tighten the handoff between project docs and implementation repositories.",
-    ]
-    return "\n".join(lines).rstrip() + "\n"
+    root_index = stage_root / "content" / "_index.md"
+    if root_index.is_file():
+        root_index.write_text(
+            update_markdown_front_matter(
+                root_index.read_text(encoding="utf-8"),
+                incubator_disclaimer_paragraphs=incubator_disclaimer_paragraphs,
+            ),
+            encoding="utf-8",
+        )
 
 
 def html_page(title: str, body: str) -> str:
@@ -904,74 +836,7 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
     results = [stage_project(resolved_repo_root, stage_root, project, defaults, index) for index, project in enumerate(projects, start=1)]
     incubator_disclaimer = read_text_if_exists(resolved_repo_root / "DISCLAIMER").strip()
     incubator_disclaimer_paragraphs = split_paragraphs(incubator_disclaimer)
-
-    root_index = stage_root / "content" / "_index.md"
-    write_markdown_page(
-        root_index,
-        build_root_index_markdown(results),
-        title=SITE_TITLE,
-        description=PROJECT_HEADLINE,
-        incubator_disclaimer_paragraphs=incubator_disclaimer_paragraphs,
-    )
-
-    projects_index = stage_root / "content" / "projects" / "_index.md"
-    write_markdown_page(
-        projects_index,
-        build_projects_index_markdown(results),
-        title="Projects",
-        description="Browsable project sections staged from the local catalog.",
-        type="docs",
-    )
-
-    about_page = stage_root / "content" / "about.md"
-    write_markdown_page(
-        about_page,
-        build_about_markdown(),
-        title="About Apache Buildish",
-        description=PROJECT_HEADLINE,
-        type="docs",
-        weight=5,
-    )
-
-    community_index_page = stage_root / "content" / "community" / "_index.md"
-    write_markdown_page(
-        community_index_page,
-        build_community_index_markdown(),
-        title="Community",
-        description="Community links, contributor entry points, and contact information for Apache Buildish.",
-        type="docs",
-        weight=20,
-    )
-
-    contact_page = stage_root / "content" / "community" / "contact.md"
-    write_markdown_page(
-        contact_page,
-        build_contact_markdown(),
-        title="Community & Contact",
-        description="How to reach the Apache Buildish project and where to find its public development channels.",
-        type="docs",
-        weight=10,
-    )
-
-    get_involved_page = stage_root / "content" / "community" / "get-involved.md"
-    write_markdown_page(
-        get_involved_page,
-        build_get_involved_markdown(),
-        title="Get Involved",
-        description="Ways contributors can participate in Apache Buildish while the project is taking shape.",
-        type="docs",
-        weight=20,
-    )
-
-    security_report_page = stage_root / "content" / "community" / "security-report.md"
-    write_markdown_page(
-        security_report_page,
-        build_security_report_markdown(),
-        title="Security Report",
-        description="How to report suspected Apache Buildish security vulnerabilities.",
-        type="docs",
-        weight=30,
-    )
+    stage_authored_site_content(site_root, stage_root, incubator_disclaimer_paragraphs)
 
     write_yaml_like(
         stage_root / "manifest.yaml",

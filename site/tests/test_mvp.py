@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import shutil
 import sys
 import tempfile
 import unittest
@@ -27,6 +28,11 @@ import mvp
 
 
 class SiteMvpTest(unittest.TestCase):
+    @staticmethod
+    def seed_authored_site_content(repo_root: Path) -> None:
+        source_content = Path(__file__).resolve().parents[1] / "content"
+        shutil.copytree(source_content, repo_root / "site" / "content", dirs_exist_ok=True)
+
     def test_build_stages_docs_and_lifecycle_from_project_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -62,6 +68,7 @@ class SiteMvpTest(unittest.TestCase):
             }
             with (repo_root / "site" / "projects.yaml").open("w", encoding="utf-8") as handle:
                 yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
+            self.seed_authored_site_content(repo_root)
 
             mammoth = workspace / "buildish-mammoth-cache-gradle"
             (mammoth / "site").mkdir(parents=True)
@@ -133,7 +140,7 @@ class SiteMvpTest(unittest.TestCase):
             self.assertTrue((repo_root / "site" / ".preview" / "index.html").exists())
 
             staged_root_index = (repo_root / "site" / ".stage" / "content" / "_index.md").read_text(encoding="utf-8")
-            self.assertIn("Apache Buildish is an incubating Apache umbrella project", staged_root_index)
+            self.assertIn("Apache Buildish is an incubating Apache umbrella project focused on practical tooling", staged_root_index)
             self.assertNotIn("redirect_url:", staged_root_index)
             self.assertNotIn("## Incubation status", staged_root_index)
             root_front_matter = yaml.safe_load(staged_root_index.split("---", 2)[1])
@@ -156,7 +163,7 @@ class SiteMvpTest(unittest.TestCase):
             projects_index = (repo_root / "site" / ".stage" / "content" / "projects" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("title: Projects", projects_index)
             self.assertIn("type: docs", projects_index)
-            self.assertIn("Local sub-projects staged from the catalog", projects_index)
+            self.assertIn("Browse staged subprojects", projects_index)
             self.assertNotIn("\n# Projects\n", projects_index)
 
             security_report_page = (repo_root / "site" / ".stage" / "content" / "community" / "security-report.md").read_text(encoding="utf-8")
@@ -165,7 +172,7 @@ class SiteMvpTest(unittest.TestCase):
 
             about_page = (repo_root / "site" / ".stage" / "content" / "about.md").read_text(encoding="utf-8")
             self.assertIn("title: About Apache Buildish", about_page)
-            self.assertIn("build automation, CI integrations, and supporting developer tooling", about_page)
+            self.assertIn("build automation, CI integrations, and supporting tooling", about_page)
 
             community_index = (repo_root / "site" / ".stage" / "content" / "community" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("title: Community", community_index)
