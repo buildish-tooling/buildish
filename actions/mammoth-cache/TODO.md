@@ -26,8 +26,20 @@ limitations under the License.
    - Explicitly document the bootstrap process in the docs/ directory.
    - If diagrams help, use Mermaid
    - All types and functions must have JSDoc comments.
-2. Add the "buildish helper tool" to the top-level README
-3. Add release workflows
+2. Cleanup the code base
+   - MANUALLY inspect all files
+   - Check validate*() functions for duplicates
+3. Validate that the action build-results (INIT_SCRIPT_CONTENTS + SERVICE_PLUGIN_CONTENTS in actions/mammoth-cache/gradle/src/gradle/build-results.ts)
+   are not too close to the Gradle action's code.
+   - The scripts look a bit GitHub CI specific, using `RUNNER_TEMP` and `GITHUB_ACTION` system properties.
+   - Why are those not env vars?
+4. Site + logo!
+   - We need a logo for the project!
+   - Leverage the work done in Polaris, use Hugo.
+   - But come up with better Docker builds for the site.
+   - Respect that different plugins/actions/tools have different release cadences.
+   - Also respect that different plugins/actions/tools have different documentation needs.
+5. Add release workflows
    - Use version tags. "full" version tags like v1.2.3 become actual GitHub releases.
      We can provide "moving" tags like v1, v1.2 as well. Those would then point to the latest release in their
      respective series.
@@ -35,19 +47,6 @@ limitations under the License.
      See https://docs.github.com/en/actions/how-tos/create-and-publish-actions/using-immutable-releases-and-tags-to-manage-your-actions-releases
    - As the action's `dist/` folder is .gitignore'd, we need to ensure that the release workflow ensure that the
      `dist/` folder is included in the Git commit for the release tag.
-4. Cleanup the code base
-   - MANUALLY inspect all files
-   - Check validate*() functions for duplicates
-5. Site + logo!
-   - We need a logo for the project!
-   - Leverage the work done in Polaris, use Hugo.
-   - But come up with better Docker builds for the site.
-   - Respect that different plugins/actions/tools have different release cadences.
-   - Also respect that different plugins/actions/tools have different documentation needs.
-6. Validate that the action build-results (INIT_SCRIPT_CONTENTS + SERVICE_PLUGIN_CONTENTS in actions/mammoth-cache/gradle/src/gradle/build-results.ts)
-   are not too close to the Gradle action's code.
-   - The scripts look a bit GitHub CI specific, using `RUNNER_TEMP` and `GITHUB_ACTION` system properties.
-   - Why are those not env vars?
 
 ## Deferred / explicitly out of scope for v1
 
