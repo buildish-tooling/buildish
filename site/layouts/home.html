@@ -14,9 +14,46 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 {{ define "main" }}
+{{ $projectsPage := .Site.GetPage "/projects" }}
+{{ $projectSections := slice }}
+{{ with $projectsPage }}{{ $projectSections = (where .Pages "Kind" "section").ByWeight }}{{ end }}
 <div class="td-content">
   <h1>{{ .Title }}</h1>
   {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
   {{ .Content }}
+  <p class="mb-4">
+    <a class="btn btn-primary me-2 mb-2" href="{{ "/projects/" | relURL }}">Browse projects</a>
+    <a class="btn btn-outline-secondary mb-2" href="{{ "/community/security-report/" | relURL }}">Security report</a>
+  </p>
+  {{ with $projectsPage }}
+  <h2>Projects</h2>
+  <div class="section-index">
+    <div class="row">
+      {{ range $projectSections }}
+      <div class="col-12 col-md-6">
+        <div class="entry">
+          <h5><a href="{{ .RelPermalink }}">{{ .Title }}</a></h5>
+          {{ with .Description }}<p>{{ . | markdownify }}</p>{{ end }}
+        </div>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+  {{ with .Params.incubator_disclaimer_paragraphs }}
+  <hr class="my-5">
+  <div class="buildish-incubator-disclaimer d-flex flex-column flex-md-row gap-4 align-items-start">
+    <a class="buildish-incubator-disclaimer__logo" href="https://incubator.apache.org/" target="_blank" rel="noopener" aria-label="Apache Incubator">
+      <span class="visually-hidden">Apache Incubator</span>
+      {{ partial "apache-incubator-logo.html" . }}
+    </a>
+    <div class="buildish-incubator-disclaimer__content">
+      <h2>Incubation status</h2>
+      {{ range . }}
+      <p>{{ . }}</p>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
 </div>
 {{ end }}

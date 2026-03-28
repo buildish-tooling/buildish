@@ -20,7 +20,11 @@ limitations under the License.
 {{ end -}}
 
 {{ $outputFormat := partial "outputformat.html" . -}}
-{{ if and hugo.IsProduction (ne $outputFormat "print") -}}
+{{ $redirectTarget := "" }}
+{{ with .Params.redirect_url }}{{ $redirectTarget = . | relURL | absURL }}{{ end }}
+{{ if $redirectTarget -}}
+<meta name="robots" content="noindex, follow">
+{{ else if and hugo.IsProduction (ne $outputFormat "print") -}}
 <meta name="robots" content="index, follow">
 {{ else -}}
 <meta name="robots" content="noindex, nofollow">
@@ -29,7 +33,12 @@ limitations under the License.
 {{ partialCached "favicons.html" . }}
 <title>{{- if .IsHome -}}{{ .Site.Title }}{{ else -}}{{ with .Title }}{{ . }} | {{ end -}}{{ .Site.Title }}{{ end -}}</title>
 <meta name="description" content="{{ partial "page-description.html" . }}">
+{{ with $redirectTarget -}}
+<meta http-equiv="refresh" content="0; url={{ . }}">
+<link rel="canonical" href="{{ . | safeURL }}">
+{{ else -}}
 <link rel="canonical" href="{{ .Permalink | safeURL }}">
+{{ end -}}
 {{ template "_internal/opengraph.html" . -}}
 {{ template "_internal/schema.html" . -}}
 {{ template "_internal/twitter_cards.html" . -}}

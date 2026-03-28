@@ -33,6 +33,17 @@ class SiteMvpTest(unittest.TestCase):
             repo_root = workspace / "buildish"
             repo_root.mkdir()
             (repo_root / "site").mkdir()
+            (repo_root / "DISCLAIMER").write_text(
+                "Apache Buildish (Incubating) is an effort undergoing incubation at The Apache\n"
+                "Software Foundation (ASF), sponsored by the Apache Incubator PMC.\n\n"
+                "Incubation is required of all newly accepted projects until a further review\n"
+                "indicates that the infrastructure, communications, and decision making process\n"
+                "have stabilized in a manner consistent with other successful ASF projects.\n\n"
+                "While incubation status is not necessarily a reflection of the completeness\n"
+                "or stability of the code, it does indicate that the project has yet to be\n"
+                "fully endorsed by the ASF.\n",
+                encoding="utf-8",
+            )
             catalog = {
                 "schemaVersion": 1,
                 "defaults": {
@@ -121,6 +132,15 @@ class SiteMvpTest(unittest.TestCase):
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "no-gradle-wrapper-jar" / "unreleased" / "_index.md").exists())
             self.assertTrue((repo_root / "site" / ".preview" / "index.html").exists())
 
+            staged_root_index = (repo_root / "site" / ".stage" / "content" / "_index.md").read_text(encoding="utf-8")
+            self.assertIn("Apache Buildish (Incubating) brings staged project documentation", staged_root_index)
+            self.assertNotIn("redirect_url:", staged_root_index)
+            self.assertNotIn("## Incubation status", staged_root_index)
+            root_front_matter = yaml.safe_load(staged_root_index.split("---", 2)[1])
+            self.assertEqual(3, len(root_front_matter["incubator_disclaimer_paragraphs"]))
+            self.assertIn("Apache Buildish (Incubating) is an effort undergoing incubation", root_front_matter["incubator_disclaimer_paragraphs"][0])
+            self.assertIn("While incubation status is not necessarily a reflection", root_front_matter["incubator_disclaimer_paragraphs"][2])
+
             project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("title: Apache Buildish Mammoth Cache for Gradle", project_index)
             self.assertIn("weight: 10", project_index)
@@ -133,8 +153,13 @@ class SiteMvpTest(unittest.TestCase):
 
             projects_index = (repo_root / "site" / ".stage" / "content" / "projects" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("title: Projects", projects_index)
+            self.assertIn("type: docs", projects_index)
             self.assertIn("Local sub-projects staged from the catalog", projects_index)
             self.assertNotIn("\n# Projects\n", projects_index)
+
+            security_report_page = (repo_root / "site" / ".stage" / "content" / "community" / "security-report.md").read_text(encoding="utf-8")
+            self.assertIn("title: Security Report", security_report_page)
+            self.assertIn("do not disclose them in public issues", security_report_page)
 
             staged_doc = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "wrapper-provisioning.md").read_text(encoding="utf-8")
             self.assertNotIn("\n# Wrapper provisioning\n", staged_doc)

@@ -409,17 +409,42 @@ def build_unreleased_index_markdown(result: ProjectBuildResult) -> str:
 
 
 def build_root_index_markdown(results: list[ProjectBuildResult]) -> str:
-    lines = ["Local projects staged from the catalog.", "", "## Local projects", ""]
-    for result in results:
-        status = "available" if result.available else "missing"
-        lines.append(f"- [{result.display_name}]({public_project_path(result.slug)}) — {status}")
+    available = sum(1 for result in results if result.available)
+    total = len(results)
+    lines = [
+        "Apache Buildish (Incubating) brings staged project documentation and related site resources together in one place.",
+        "",
+        "Use the navigation bar to explore projects, community information, ASF links, and local search.",
+        "",
+        f"Currently staged local projects: {available}/{total} available.",
+    ]
     return "\n".join(lines).rstrip() + "\n"
+
+
+def split_paragraphs(text: str) -> list[str]:
+    paragraphs: list[str] = []
+    for chunk in text.strip().split("\n\n"):
+        lines = [line.strip() for line in chunk.splitlines() if line.strip()]
+        if lines:
+            paragraphs.append(" ".join(lines))
+    return paragraphs
 
 
 def build_projects_index_markdown(results: list[ProjectBuildResult]) -> str:
     available = sum(1 for result in results if result.available)
     total = len(results)
     lines = [f"Local sub-projects staged from the catalog: {available}/{total} available."]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def build_security_report_markdown() -> str:
+    lines = [
+        "Report suspected vulnerabilities privately; do not disclose them in public issues, pull requests, or mailing lists.",
+        "",
+        "Follow the [Apache Software Foundation security guidance](https://www.apache.org/security/) when reporting a vulnerability affecting Apache Buildish.",
+        "",
+        "Include the affected component, versions, reproduction details, impact, and any suggested mitigations to help the report be triaged quickly.",
+    ]
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -807,6 +832,8 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
     preview_root.mkdir(parents=True, exist_ok=True)
 
     results = [stage_project(resolved_repo_root, stage_root, project, defaults, index) for index, project in enumerate(projects, start=1)]
+    incubator_disclaimer = read_text_if_exists(resolved_repo_root / "DISCLAIMER").strip()
+    incubator_disclaimer_paragraphs = split_paragraphs(incubator_disclaimer)
 
     root_index = stage_root / "content" / "_index.md"
     root_index.parent.mkdir(parents=True, exist_ok=True)
@@ -814,7 +841,8 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
         with_yaml_front_matter(
             build_root_index_markdown(results),
             title="Apache Buildish site MVP",
-            description="Local staging preview for the Apache Buildish site.",
+            description="Documentation and staged project resources for Apache Buildish.",
+            incubator_disclaimer_paragraphs=incubator_disclaimer_paragraphs,
         ),
         encoding="utf-8",
     )
@@ -826,6 +854,19 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
             build_projects_index_markdown(results),
             title="Projects",
             description="Browsable project sections staged from the local catalog.",
+            type="docs",
+        ),
+        encoding="utf-8",
+    )
+
+    security_report_page = stage_root / "content" / "community" / "security-report.md"
+    security_report_page.parent.mkdir(parents=True, exist_ok=True)
+    security_report_page.write_text(
+        with_yaml_front_matter(
+            build_security_report_markdown(),
+            title="Security Report",
+            description="How to report suspected Apache Buildish security vulnerabilities.",
+            type="docs",
         ),
         encoding="utf-8",
     )

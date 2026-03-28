@@ -22,3 +22,42 @@
     padding-top: calc(1.5rem + 4rem);
   }
 }
+
+.td-navbar .navbar-brand__logo {
+  align-items: center;
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  margin-right: 0.65rem;
+  width: 2rem;
+
+  svg {
+    display: block;
+    height: 100%;
+    width: 100%;
+  }
+}
+
+.buildish-incubator-disclaimer {
+  background: #2c3136;
+  border-radius: 0.5rem;
+  color: #fff;
+  padding: 1.25rem;
+
+  h2,
+  p {
+    color: inherit;
+  }
+
+  &__logo {
+    display: inline-flex;
+    width: 220px;
+    flex: 0 0 auto;
+  }
+
+  &__logo svg {
+    display: block;
+    height: auto;
+    width: 100%;
+  }
+}

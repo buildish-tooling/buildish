@@ -1,0 +1,76 @@
+{{/*
+Copyright 2026 The Apache Software Foundation
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{ $p := . -}}
+{{ $baseURL := urls.Parse .Site.BaseURL -}}
+{{ $projectsPage := .Site.GetPage "/projects" -}}
+{{ $projectSections := slice -}}
+{{ with $projectsPage }}{{ $projectSections = (where .Pages "Kind" "section").ByWeight }}{{ end -}}
+
+<nav class="td-navbar js-navbar-scroll" data-bs-theme="dark">
+<div class="td-navbar-container container-fluid flex-column flex-md-row">
+  <a class="navbar-brand" href="{{ .Site.Home.RelPermalink }}"><span class="navbar-brand__logo navbar-logo" aria-hidden="true">{{ partial "apache-buildish-navbar-logo.html" . }}</span><span class="navbar-brand__name">{{ .Site.Title }}</span></a>
+  <div class="td-navbar__main td-navbar-nav-scroll td-navbar-nav-scroll--indicator" id="main_navbar">
+    <div class="scroll-indicator scroll-left"></div>
+    <ul class="navbar-nav">
+      {{ range .Site.Menus.main -}}
+      {{ $menu := . -}}
+      {{ $href := "" -}}
+      {{ with $menu.Page -}}
+      {{ $href = .RelPermalink }}
+      {{ else -}}
+      {{ if $menu.URL -}}{{ $href = $menu.URL | relLangURL }}{{ end -}}
+      {{ end -}}
+      {{ $isProjects := eq $menu.Identifier "projects" -}}
+      {{ $hasChildren := or $menu.HasChildren (and $isProjects (gt (len $projectSections) 0)) -}}
+      {{ $active := or ($p.IsMenuCurrent "main" $menu) ($p.HasMenuCurrent "main" $menu) -}}
+      {{ if and $isProjects $projectsPage }}{{ $active = or $active (eq $p.RelPermalink $projectsPage.RelPermalink) ($p.IsDescendant $projectsPage) }}{{ end -}}
+      {{ if $hasChildren }}
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle{{ if $active }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>{{ $menu.Name }}</span></a>
+        <ul class="dropdown-menu">
+          {{ if $isProjects }}
+          <li><a class="dropdown-item{{ if and $projectsPage (eq $p.RelPermalink $projectsPage.RelPermalink) }} active{{ end }}" href="{{ with $projectsPage }}{{ .RelPermalink }}{{ else }}{{ "/projects/" | relURL }}{{ end }}">All projects</a></li>
+          {{ if gt (len $projectSections) 0 }}<li><hr class="dropdown-divider"></li>{{ end }}
+          {{ range $projectSections }}
+          <li><a class="dropdown-item{{ if or (eq $p.RelPermalink .RelPermalink) ($p.IsDescendant .) }} active{{ end }}" href="{{ .RelPermalink }}">{{ .Title }}</a></li>
+          {{ end }}
+          {{ else }}
+          {{ range $menu.Children }}
+          {{ $childHref := "" }}
+          {{ with .Page }}{{ $childHref = .RelPermalink }}{{ else }}{{ $childHref = .URL | relLangURL }}{{ end }}
+          {{ $childActive := or ($p.IsMenuCurrent "main" .) ($p.HasMenuCurrent "main" .) }}
+          {{ $parsedChildURL := urls.Parse .URL }}
+          {{ $isExternal := and .URL $parsedChildURL.Host (ne $baseURL.Host $parsedChildURL.Host) }}
+          <li><a class="dropdown-item{{ if $childActive }} active{{ end }}" href="{{ $childHref }}"{{ if $isExternal }} target="_blank" rel="noopener"{{ end }}>{{ .Name }}</a></li>
+          {{ end }}
+          {{ end }}
+        </ul>
+      </li>
+      {{ else }}
+      {{ $parsedMenuURL := urls.Parse $menu.URL }}
+      {{ $isExternal := and $menu.URL $parsedMenuURL.Host (ne $baseURL.Host $parsedMenuURL.Host) }}
+      <li class="nav-item"><a class="nav-link{{ if $active }} active{{ end }}" href="{{ $href }}"{{ if $isExternal }} target="_blank" rel="noopener"{{ end }}><span>{{ $menu.Name }}</span></a></li>
+      {{ end }}
+      {{ end -}}
+      {{ if .Site.Params.versions -}}<li class="nav-item dropdown d-none d-lg-block">{{ partial "navbar-version-selector.html" . -}}</li>{{ end -}}
+      {{ if (gt (len .Site.Home.Translations) 0) -}}<li class="nav-item dropdown d-none d-lg-block">{{ partial "navbar-lang-selector.html" . -}}</li>{{ end -}}
+      {{ if .Site.Params.ui.showLightDarkModeMenu -}}<li class="td-light-dark-menu nav-item dropdown">{{ partial "theme-toggler" . }}</li>{{ end -}}
+    </ul>
+    <div class="scroll-indicator scroll-right"></div>
+  </div>
+  <div class="td-navbar__search d-none d-lg-block">{{ partial "search-input.html" . }}</div>
+</div>
+</nav>

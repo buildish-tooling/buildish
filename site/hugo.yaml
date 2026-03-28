@@ -21,6 +21,7 @@ contentDir: .stage/content
 dataDir: .stage/data
 staticDir:
   - .stage/static
+  - static
 publishDir: .public
 disableKinds:
   - taxonomy
@@ -62,6 +63,7 @@ markup:
 params:
   author:
     name: 'Apache Buildish contributors'
+  offlineSearch: true
 
   #github_repo: https://github.com/apache/buildish
   #github_project_repo: https://github.com/apache/buildish
@@ -109,3 +111,52 @@ privacy:
     simple: true
   youtube:
     privacyEnhanced: true
+
+menu:
+  main:
+    - identifier: projects
+      name: Projects
+      weight: 10
+    - identifier: community
+      name: Community
+      weight: 20
+    - identifier: security-report
+      name: Security Report
+      pageRef: /community/security-report
+      parent: community
+      weight: 10
+    - identifier: asf
+      name: The ASF
+      weight: 30
+    - name: Foundation
+      url: https://www.apache.org/
+      parent: asf
+      weight: 10
+    - name: License
+      url: https://www.apache.org/licenses/
+      parent: asf
+      weight: 20
+    - name: Code of Conduct
+      url: https://www.apache.org/foundation/policies/conduct
+      parent: asf
+      weight: 30
+    - name: Events
+      url: https://www.apache.org/events/current-event
+      parent: asf
+      weight: 40
+    - name: Privacy
+      url: https://privacy.apache.org/policies/privacy-policy-public.html
+      parent: asf
+      weight: 50
+    - name: Security
+      url: https://www.apache.org/security/
+      parent: asf
+      weight: 60
+    - name: Sponsorship
+      url: https://www.apache.org/foundation/sponsorship.html
+      parent: asf
+      weight: 70
+    - name: Thanks
+      url: https://www.apache.org/foundation/thanks.html
+      parent: asf
+      weight: 80
