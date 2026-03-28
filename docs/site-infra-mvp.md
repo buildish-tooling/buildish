@@ -153,6 +153,11 @@ If the MVP works well, the next step should be to harden it by adding:
 - better lifecycle metadata generation,
 - stricter content validation,
 - AsciiDoc support validation,
+- a true live-edit `hugo serve` workflow that watches real source inputs,
+  re-stages content automatically, and serializes rebuilds to avoid overlapping
+  stage/render races,
+- a cleaner effective landing-page experience, including a proper `/projects/`
+  landing page and, where hosting supports it, an HTTP-level redirect from `/`,
 - containerized pinned tooling,
 - CI builds,
 - later, a discussion about publication automation.

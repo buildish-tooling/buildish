@@ -23,6 +23,36 @@
   }
 }
 
+.buildish-home-hero {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  margin-bottom: 2rem;
+  text-align: center;
+
+  @media (min-width: 992px) {
+    align-items: flex-start;
+    flex-direction: row;
+    text-align: left;
+  }
+
+  &__logo {
+    flex: 0 0 auto;
+    width: 11rem;
+
+    @media (min-width: 992px) {
+      width: 14rem;
+    }
+  }
+
+  &__logo svg {
+    display: block;
+    height: auto;
+    width: 100%;
+  }
+}
+
 .td-navbar .navbar-brand__logo {
   align-items: center;
   display: inline-flex;

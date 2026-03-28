@@ -133,10 +133,12 @@ class SiteMvpTest(unittest.TestCase):
             self.assertTrue((repo_root / "site" / ".preview" / "index.html").exists())
 
             staged_root_index = (repo_root / "site" / ".stage" / "content" / "_index.md").read_text(encoding="utf-8")
-            self.assertIn("Apache Buildish (Incubating) brings staged project documentation", staged_root_index)
+            self.assertIn("Apache Buildish is an incubating Apache umbrella project", staged_root_index)
             self.assertNotIn("redirect_url:", staged_root_index)
             self.assertNotIn("## Incubation status", staged_root_index)
             root_front_matter = yaml.safe_load(staged_root_index.split("---", 2)[1])
+            self.assertEqual("Apache Buildish (Incubating)", root_front_matter["title"])
+            self.assertEqual("Apache Buildish develops build automation, CI integrations, and supporting tooling.", root_front_matter["description"])
             self.assertEqual(3, len(root_front_matter["incubator_disclaimer_paragraphs"]))
             self.assertIn("Apache Buildish (Incubating) is an effort undergoing incubation", root_front_matter["incubator_disclaimer_paragraphs"][0])
             self.assertIn("While incubation status is not necessarily a reflection", root_front_matter["incubator_disclaimer_paragraphs"][2])
@@ -161,10 +163,28 @@ class SiteMvpTest(unittest.TestCase):
             self.assertIn("title: Security Report", security_report_page)
             self.assertIn("do not disclose them in public issues", security_report_page)
 
+            about_page = (repo_root / "site" / ".stage" / "content" / "about.md").read_text(encoding="utf-8")
+            self.assertIn("title: About Apache Buildish", about_page)
+            self.assertIn("build automation, CI integrations, and supporting developer tooling", about_page)
+
+            community_index = (repo_root / "site" / ".stage" / "content" / "community" / "_index.md").read_text(encoding="utf-8")
+            self.assertIn("title: Community", community_index)
+            self.assertIn("[Community & Contact](/community/contact/)", community_index)
+
+            contact_page = (repo_root / "site" / ".stage" / "content" / "community" / "contact.md").read_text(encoding="utf-8")
+            self.assertIn("title: Community & Contact", contact_page)
+            self.assertIn("https://github.com/apache/buildish", contact_page)
+            self.assertIn("dev@buildish.apache.org", contact_page)
+
+            get_involved_page = (repo_root / "site" / ".stage" / "content" / "community" / "get-involved.md").read_text(encoding="utf-8")
+            self.assertIn("title: Get Involved", get_involved_page)
+            self.assertIn("Ways to contribute", get_involved_page)
+
             staged_doc = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "wrapper-provisioning.md").read_text(encoding="utf-8")
             self.assertNotIn("\n# Wrapper provisioning\n", staged_doc)
 
             preview_index = (repo_root / "site" / ".preview" / "index.html").read_text(encoding="utf-8")
+            self.assertIn("Apache Buildish (Incubating)", preview_index)
             self.assertIn("Apache Buildish Mammoth Cache for Gradle", preview_index)
 
             version_metadata = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "version.yaml").read_text(encoding="utf-8")

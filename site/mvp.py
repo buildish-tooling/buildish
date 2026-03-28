@@ -32,6 +32,10 @@ import yaml
 
 DEFAULT_TAG_PATTERN = r"^v[0-9]+\.[0-9]+\.[0-9]+$"
 VALID_RELEASE_LINE_STATUSES = {"maintained", "eol"}
+SITE_TITLE = "Apache Buildish (Incubating)"
+PROJECT_HEADLINE = "Apache Buildish develops build automation, CI integrations, and supporting tooling."
+PROJECT_REPOSITORY_URL = "https://github.com/apache/buildish"
+PROJECT_DEV_MAILING_LIST = "dev@buildish.apache.org"
 
 
 @dataclass(frozen=True)
@@ -244,6 +248,11 @@ def with_yaml_front_matter(markdown: str, **fields: Any) -> str:
     return f"---\n{front_matter}\n---\n\n{body}"
 
 
+def write_markdown_page(path: Path, markdown: str, **fields: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(with_yaml_front_matter(markdown, **fields), encoding="utf-8")
+
+
 def public_project_path(slug: str) -> str:
     return f"/projects/{slug}/"
 
@@ -412,9 +421,9 @@ def build_root_index_markdown(results: list[ProjectBuildResult]) -> str:
     available = sum(1 for result in results if result.available)
     total = len(results)
     lines = [
-        "Apache Buildish (Incubating) brings staged project documentation and related site resources together in one place.",
+        "Apache Buildish is an incubating Apache umbrella project for build engineering, CI provider integrations, and the tooling that supports reliable developer workflows.",
         "",
-        "Use the navigation bar to explore projects, community information, ASF links, and local search.",
+        "Use this site to explore staged subprojects, learn what the umbrella project is building toward, and find the best way to join the community.",
         "",
         f"Currently staged local projects: {available}/{total} available.",
     ]
@@ -444,6 +453,67 @@ def build_security_report_markdown() -> str:
         "Follow the [Apache Software Foundation security guidance](https://www.apache.org/security/) when reporting a vulnerability affecting Apache Buildish.",
         "",
         "Include the affected component, versions, reproduction details, impact, and any suggested mitigations to help the report be triaged quickly.",
+    ]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def build_about_markdown() -> str:
+    lines = [
+        "Apache Buildish is an incubating Apache project focused on build automation, CI integrations, and supporting developer tooling.",
+        "",
+        "The umbrella project is intended to host practical tools, reusable build components, and provider-facing integrations that help development teams build, test, and ship software more consistently.",
+        "",
+        "This MVP site brings together umbrella-project information and staged documentation from local Buildish subprojects so contributors can review structure, content, and navigation before the site grows further.",
+    ]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def build_community_index_markdown() -> str:
+    lines = [
+        "Apache Buildish is built in the open. Use this section to find project communication channels, contribution entry points, and security reporting guidance.",
+        "",
+        "- [Community & Contact](/community/contact/)",
+        f"- [Source Code]({PROJECT_REPOSITORY_URL})",
+        "- [Get Involved](/community/get-involved/)",
+        "- [Security Report](/community/security-report/)",
+    ]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def build_contact_markdown() -> str:
+    lines = [
+        "Apache Buildish coordinates development in public and welcomes early feedback while the project is incubating.",
+        "",
+        "## Project channels",
+        "",
+        f"- Source repository: [{PROJECT_REPOSITORY_URL}]({PROJECT_REPOSITORY_URL})",
+        f"- Development mailing list: [{PROJECT_DEV_MAILING_LIST}](mailto:{PROJECT_DEV_MAILING_LIST})",
+        "",
+        "## How to reach the project",
+        "",
+        "Use the development mailing list for design discussion, contributor onboarding questions, release planning, and general project feedback.",
+        "",
+        "Use the source repository for code, issue tracking, pull requests, and implementation-oriented discussion tied to specific changes.",
+        "",
+        "For private vulnerability reports, follow the [Security Report](/community/security-report/) guidance instead of opening a public issue.",
+    ]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def build_get_involved_markdown() -> str:
+    lines = [
+        "Apache Buildish is looking for feedback on project structure, docs, workflows, and tooling ideas while the site and subprojects take shape.",
+        "",
+        "## Ways to contribute",
+        "",
+        "- Try the staged subprojects and share what works or what feels rough.",
+        f"- Join the [development mailing list](mailto:{PROJECT_DEV_MAILING_LIST}) to discuss ideas and priorities.",
+        f"- Browse the [source repository]({PROJECT_REPOSITORY_URL}) for issues, pull requests, and project structure.",
+        "- Improve docs, examples, naming, onboarding notes, and contributor guidance.",
+        "",
+        "## Early focus areas",
+        "",
+        "Early contributors can help validate the umbrella-project site, shape CI integration patterns, improve build automation ergonomics, and tighten the handoff between project docs and implementation repositories.",
     ]
     return "\n".join(lines).rstrip() + "\n"
 
@@ -478,12 +548,12 @@ def build_preview_index(results: list[ProjectBuildResult]) -> str:
             f" — <span class='muted'>{html.escape(status)}</span></li>"
         )
     body = (
-        "<h1>Apache Buildish site MVP</h1>"
+        f"<h1>{SITE_TITLE}</h1>"
         "<p>This is a lightweight local preview for the staged site contract.</p>"
         "<p><a href='/site/.stage/content/_index.md'>Open staged root markdown</a></p>"
         f"<ul>{''.join(items)}</ul>"
     )
-    return html_page("Apache Buildish site MVP", body)
+    return html_page(SITE_TITLE, body)
 
 
 def build_project_preview(result: ProjectBuildResult) -> str:
@@ -836,39 +906,71 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
     incubator_disclaimer_paragraphs = split_paragraphs(incubator_disclaimer)
 
     root_index = stage_root / "content" / "_index.md"
-    root_index.parent.mkdir(parents=True, exist_ok=True)
-    root_index.write_text(
-        with_yaml_front_matter(
-            build_root_index_markdown(results),
-            title="Apache Buildish site MVP",
-            description="Documentation and staged project resources for Apache Buildish.",
-            incubator_disclaimer_paragraphs=incubator_disclaimer_paragraphs,
-        ),
-        encoding="utf-8",
+    write_markdown_page(
+        root_index,
+        build_root_index_markdown(results),
+        title=SITE_TITLE,
+        description=PROJECT_HEADLINE,
+        incubator_disclaimer_paragraphs=incubator_disclaimer_paragraphs,
     )
 
     projects_index = stage_root / "content" / "projects" / "_index.md"
-    projects_index.parent.mkdir(parents=True, exist_ok=True)
-    projects_index.write_text(
-        with_yaml_front_matter(
-            build_projects_index_markdown(results),
-            title="Projects",
-            description="Browsable project sections staged from the local catalog.",
-            type="docs",
-        ),
-        encoding="utf-8",
+    write_markdown_page(
+        projects_index,
+        build_projects_index_markdown(results),
+        title="Projects",
+        description="Browsable project sections staged from the local catalog.",
+        type="docs",
+    )
+
+    about_page = stage_root / "content" / "about.md"
+    write_markdown_page(
+        about_page,
+        build_about_markdown(),
+        title="About Apache Buildish",
+        description=PROJECT_HEADLINE,
+        type="docs",
+        weight=5,
+    )
+
+    community_index_page = stage_root / "content" / "community" / "_index.md"
+    write_markdown_page(
+        community_index_page,
+        build_community_index_markdown(),
+        title="Community",
+        description="Community links, contributor entry points, and contact information for Apache Buildish.",
+        type="docs",
+        weight=20,
+    )
+
+    contact_page = stage_root / "content" / "community" / "contact.md"
+    write_markdown_page(
+        contact_page,
+        build_contact_markdown(),
+        title="Community & Contact",
+        description="How to reach the Apache Buildish project and where to find its public development channels.",
+        type="docs",
+        weight=10,
+    )
+
+    get_involved_page = stage_root / "content" / "community" / "get-involved.md"
+    write_markdown_page(
+        get_involved_page,
+        build_get_involved_markdown(),
+        title="Get Involved",
+        description="Ways contributors can participate in Apache Buildish while the project is taking shape.",
+        type="docs",
+        weight=20,
     )
 
     security_report_page = stage_root / "content" / "community" / "security-report.md"
-    security_report_page.parent.mkdir(parents=True, exist_ok=True)
-    security_report_page.write_text(
-        with_yaml_front_matter(
-            build_security_report_markdown(),
-            title="Security Report",
-            description="How to report suspected Apache Buildish security vulnerabilities.",
-            type="docs",
-        ),
-        encoding="utf-8",
+    write_markdown_page(
+        security_report_page,
+        build_security_report_markdown(),
+        title="Security Report",
+        description="How to report suspected Apache Buildish security vulnerabilities.",
+        type="docs",
+        weight=30,
     )
 
     write_yaml_like(
@@ -973,7 +1075,7 @@ def serve(repo_root: Path | None = None, port: int = 8000) -> None:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Buildish site MVP helper")
+    parser = argparse.ArgumentParser(description="Buildish site helper")
     parser.add_argument("command", choices=["build", "clean", "serve"], nargs="?", default="build")
     parser.add_argument("--port", type=int, default=8000, help="Port for the local preview server")
     return parser.parse_args(argv)

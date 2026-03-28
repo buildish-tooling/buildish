@@ -14,7 +14,7 @@
 # limitations under the License.
 
 baseURL: https://buildish.apache.org/
-title: Apache Buildish site MVP
+title: Apache Buildish (Incubating)
 languageCode: en-us
 enableRobotsTXT: true
 contentDir: .stage/content
@@ -114,17 +114,36 @@ privacy:
 
 menu:
   main:
+    - identifier: about
+      name: About
+      pageRef: /about
+      weight: 5
     - identifier: projects
       name: Projects
       weight: 10
     - identifier: community
       name: Community
       weight: 20
+    - identifier: get-involved
+      name: Get Involved
+      pageRef: /community/get-involved
+      parent: community
+      weight: 10
+    - identifier: community-contact
+      name: Community & Contact
+      pageRef: /community/contact
+      parent: community
+      weight: 20
+    - identifier: source-code
+      name: Source Code
+      url: https://github.com/apache/buildish
+      parent: community
+      weight: 30
     - identifier: security-report
       name: Security Report
       pageRef: /community/security-report
       parent: community
-      weight: 10
+      weight: 40
     - identifier: asf
       name: The ASF
       weight: 30

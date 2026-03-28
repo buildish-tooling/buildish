@@ -18,13 +18,20 @@ limitations under the License.
 {{ $projectSections := slice }}
 {{ with $projectsPage }}{{ $projectSections = (where .Pages "Kind" "section").ByWeight }}{{ end }}
 <div class="td-content">
-  <h1>{{ .Title }}</h1>
-  {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
-  {{ .Content }}
-  <p class="mb-4">
-    <a class="btn btn-primary me-2 mb-2" href="{{ "/projects/" | relURL }}">Browse projects</a>
-    <a class="btn btn-outline-secondary mb-2" href="{{ "/community/security-report/" | relURL }}">Security report</a>
-  </p>
+  <div class="buildish-home-hero">
+    <div class="buildish-home-hero__logo" aria-hidden="true">{{ partial "apache-buildish-pipeline-icon.html" (dict "gradientId" "buildish-home-panel") }}</div>
+    <div class="buildish-home-hero__content">
+      <h1>{{ .Title }}</h1>
+      {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
+      {{ .Content }}
+      <p class="buildish-home-actions mb-4">
+        <a class="btn btn-primary me-2 mb-2" href="{{ "/community/contact/" | relURL }}">Community &amp; contact</a>
+        <a class="btn btn-outline-primary me-2 mb-2" href="{{ "/projects/" | relURL }}">Browse projects</a>
+        <a class="btn btn-outline-secondary me-2 mb-2" href="{{ "/about/" | relURL }}">About Buildish</a>
+        <a class="btn btn-link mb-2" href="{{ "/community/security-report/" | relURL }}">Security report</a>
+      </p>
+    </div>
+  </div>
   {{ with $projectsPage }}
   <h2>Projects</h2>
   <div class="section-index">

@@ -71,7 +71,7 @@ clean: sanity-check ## Remove generated local preview outputs.
 	$(UV_RUN) $(PYTHON) mvp.py clean
 	rm -rf .public .hugo_build.lock resources
 
-test: sanity-check ## Run the site MVP unit tests.
+test: sanity-check ## Run the site unit tests.
 	$(UV_RUN) $(PYTHON) -m unittest discover -s tests -p 'test_*.py' -v
 
 check: ## Run the site verification flow: clean, test, build.

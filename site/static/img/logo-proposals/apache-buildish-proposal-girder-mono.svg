@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" role="img" aria-labelledby="title desc">
+  <title id="title">Apache Buildish logo proposal 2 monochrome: Girder Stack</title>
+  <desc id="desc">A monochrome version of the structural girder stack proposal for Apache Buildish.</desc>
+  <g transform="translate(28 44)">
+    <rect x="10" y="132" width="196" height="34" rx="17" fill="#111827"/>
+    <path d="M24 130 76 34h38l-52 96z" fill="#111827" opacity="0.95"/>
+    <path d="M78 130 130 34h38l-52 96z" fill="#111827" opacity="0.7"/>
+    <path d="M132 130 184 34h38l-52 96z" fill="#111827" opacity="0.45"/>
+    <path d="M37 133 89 37M91 133 143 37M145 133 197 37" stroke="#f8fafc" stroke-opacity="0.5" stroke-width="6"/>
+    <circle cx="95" cy="151" r="10" fill="#f8fafc"/>
+    <circle cx="133" cy="151" r="10" fill="#f8fafc" opacity="0.78"/>
+    <circle cx="171" cy="151" r="10" fill="#f8fafc" opacity="0.58"/>
+  </g>
+  <text x="252" y="110" fill="#111827" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="56" font-weight="700">Apache Buildish</text>
+  <text x="252" y="156" fill="#111827" opacity="0.72" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="22">Apache Buildish develops build automation, CI integrations, and supporting tooling.</text>
+</svg>
