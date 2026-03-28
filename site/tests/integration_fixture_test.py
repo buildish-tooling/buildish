@@ -14,9 +14,9 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -28,6 +28,8 @@ import mvp
 
 
 SOURCE_REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_FIXTURE_BUILD_ROOT = SOURCE_REPO_ROOT / "site" / "build" / "tests" / f"integration-fixture-workspace-{os.getpid()}"
+FIXTURE_BUILD_ROOT = Path(os.environ.get("BUILDISH_SITE_FIXTURE_WORKSPACE", str(DEFAULT_FIXTURE_BUILD_ROOT)))
 
 
 class SiteFixtureIntegrationTest(unittest.TestCase):
@@ -89,8 +91,10 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
             )
 
     def test_build_from_fixture_workspace(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            workspace = Path(temp_dir)
+        shutil.rmtree(FIXTURE_BUILD_ROOT, ignore_errors=True)
+        try:
+            workspace = FIXTURE_BUILD_ROOT
+            workspace.mkdir(parents=True, exist_ok=True)
             repo_root = workspace / "buildish"
             repo_root.mkdir()
             self.seed_main_repo(repo_root)
@@ -120,6 +124,8 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
             preview_index = (repo_root / "site" / ".preview" / "index.html").read_text(encoding="utf-8")
             self.assertIn("Fixture Mammoth Cache for Gradle", preview_index)
             self.assertIn("Fixture no-gradle-wrapper-jar", preview_index)
+        finally:
+            shutil.rmtree(FIXTURE_BUILD_ROOT, ignore_errors=True)
 
 
 if __name__ == "__main__":

@@ -23,25 +23,128 @@ UV ?= uv
 PYTHON ?= python
 PORT ?= 8000
 CONTAINER_ENGINE ?= podman
-CONTAINER_IMAGE ?= buildish-site-build:local
+CONTAINER_IMAGE ?= localhost/buildish-site-build:local
 CONTAINER_HOME ?= /workspace/site/.container-home
 LOCAL_REGISTRY_TEST_PLATFORMS ?= linux/amd64,linux/arm64
 LOCAL_REGISTRY_TEST_TAG ?= integration-test
 LOCAL_REGISTRY_TEST_ARGS ?=
 UV_RUN := $(UV) run --project . --frozen
 HELP_TARGETS := $(MAKEFILE_LIST)
-DOCSY_ENV = export NVM_DIR="$(NVM_DIR)"; if [ -s "$$NVM_DIR/nvm.sh" ]; then . "$$NVM_DIR/nvm.sh"; if [ -f .nvmrc ]; then nvm use --silent >/dev/null; fi; fi; export PATH="$(CURDIR)/node_modules/.bin:$$PATH"
+DOCSY_ENV = \
+	export NVM_DIR="$(NVM_DIR)"; \
+	if [ -s "$$NVM_DIR/nvm.sh" ]; then \
+		. "$$NVM_DIR/nvm.sh"; \
+		if [ -f .nvmrc ]; then \
+			nvm use --silent >/dev/null; \
+		fi; \
+	fi; \
+	export PATH="$(NODE_MODULES_DIR)/.bin:$$PATH"
 REPO_ROOT := $(abspath $(CURDIR)/..)
 CONTAINER_BUILD_DIR ?= $(REPO_ROOT)/tools/site-build-image
+NODE_MODULES_DIR ?= $(CURDIR)/node_modules
+HOST_CONTAINER_SCRATCH_ROOT ?= $(CURDIR)/build/container
+CONTAINER_SCRATCH_ROOT ?= /workspace/site/build/container
+HOST_ARCH ?= $(shell uname -m)
+ifneq ($(filter x86_64 amd64,$(HOST_ARCH)),)
+CONTAINER_PLATFORM ?= linux/amd64
+else ifneq ($(filter aarch64 arm64,$(HOST_ARCH)),)
+CONTAINER_PLATFORM ?= linux/arm64
+endif
+CONTAINER_PLATFORM_FLAG :=
+ifneq ($(strip $(CONTAINER_PLATFORM)),)
+CONTAINER_PLATFORM_FLAG := --platform $(CONTAINER_PLATFORM)
+endif
 CONTAINER_MOUNT_LABEL :=
 CONTAINER_USERNS_FLAGS :=
 ifeq ($(notdir $(CONTAINER_ENGINE)),podman)
 CONTAINER_MOUNT_LABEL := :Z
 CONTAINER_USERNS_FLAGS := --userns=keep-id
 endif
-CONTAINER_RUN = $(CONTAINER_ENGINE) run --rm $(CONTAINER_USERNS_FLAGS) --user $$(id -u):$$(id -g) -e HOME=$(CONTAINER_HOME) -e XDG_CACHE_HOME=$(CONTAINER_HOME)/.cache -e npm_config_cache=$(CONTAINER_HOME)/.cache/npm -e UV_CACHE_DIR=$(CONTAINER_HOME)/.cache/uv -v $(REPO_ROOT):/workspace$(CONTAINER_MOUNT_LABEL) -w /workspace/site $(CONTAINER_IMAGE)
 
-.PHONY: build check clean container-build container-image container-image-local-registry-test container-integration-test container-test docsy-check help hugo-check integration-test render sanity-check serve stage stage-watch test vendor-assets
+CONTAINER_CACHE_ENV = \
+	-e HOME=$(CONTAINER_HOME) \
+	-e XDG_CACHE_HOME=$(CONTAINER_HOME)/.cache \
+	-e npm_config_cache=$(CONTAINER_HOME)/.cache/npm \
+	-e UV_CACHE_DIR=$(CONTAINER_HOME)/.cache/uv
+
+CONTAINER_WORKSPACE_FLAGS = \
+	-v $(REPO_ROOT):/workspace$(CONTAINER_MOUNT_LABEL) \
+	-w /workspace/site
+
+CONTAINER_RUN = \
+	$(CONTAINER_ENGINE) run --rm \
+	$(CONTAINER_PLATFORM_FLAG) \
+	$(CONTAINER_USERNS_FLAGS) \
+	--user $$(id -u):$$(id -g) \
+	$(CONTAINER_CACHE_ENV) \
+	$(CONTAINER_WORKSPACE_FLAGS) \
+	$(CONTAINER_IMAGE)
+
+PREPARE_CONTAINER_SCRATCH = \
+	mkdir -p '$(HOST_CONTAINER_SCRATCH_ROOT)'; \
+	chmod 0777 '$(HOST_CONTAINER_SCRATCH_ROOT)'
+
+CONTAINER_TEST_SCRIPT = \
+	umask 000; \
+	scratch="$$(mktemp -d "$(CONTAINER_SCRATCH_ROOT)/test.XXXXXX")"; \
+	chmod 0777 "$$scratch"; \
+	mkdir -p "$$scratch/uv-cache"; \
+	trap "rm -rf \"$$scratch\"" EXIT; \
+	export UV_CACHE_DIR="$$scratch/uv-cache"; \
+	export UV_PROJECT_ENVIRONMENT="$$scratch/uv-venv"; \
+	make test
+
+CONTAINER_INTEGRATION_TEST_SCRIPT = \
+	umask 000; \
+	scratch="$$(mktemp -d "$(CONTAINER_SCRATCH_ROOT)/integration.XXXXXX")"; \
+	chmod 0777 "$$scratch"; \
+	mkdir -p "$$scratch/uv-cache"; \
+	trap "rm -rf \"$$scratch\"" EXIT; \
+	export UV_CACHE_DIR="$$scratch/uv-cache"; \
+	export UV_PROJECT_ENVIRONMENT="$$scratch/uv-venv"; \
+	export BUILDISH_SITE_FIXTURE_WORKSPACE="$$scratch/workspace"; \
+	make integration-test
+
+CONTAINER_BUILD_SCRIPT = \
+	umask 000; \
+	scratch="$$(mktemp -d "$(CONTAINER_SCRATCH_ROOT)/build.XXXXXX")"; \
+	chmod 0777 "$$scratch"; \
+	node_root="$$scratch/node-work"; \
+	printf "==> [container-build] using scratch directory %s\\n" "$$scratch"; \
+	mkdir -p "$$scratch/uv-cache" "$$scratch/npm-cache" "$$node_root"; \
+	trap "printf \"==> [container-build] cleaning scratch directory %s\\n\" \"$$scratch\"; rm -rf \"$$scratch\"" EXIT; \
+	export UV_CACHE_DIR="$$scratch/uv-cache"; \
+	export UV_PROJECT_ENVIRONMENT="$$scratch/uv-venv"; \
+	export npm_config_cache="$$scratch/npm-cache"; \
+	printf "==> [container-build] installing Node dependencies into %s\\n" "$$node_root"; \
+	cp package.json package-lock.json "$$node_root"/; \
+	npm ci --ignore-scripts --prefix "$$node_root"; \
+	export NODE_MODULES_DIR="$$node_root/node_modules"; \
+	printf "==> [container-build] running make build\\n"; \
+	make build; \
+	printf "==> [container-build] site render completed\\n"
+
+.PHONY: \
+	build \
+	check \
+	clean \
+	container-build \
+	container-check-fast \
+	container-image \
+	container-image-local-registry-test \
+	container-integration-test \
+	container-test \
+	docsy-check \
+	help \
+	hugo-check \
+	integration-test \
+	render \
+	sanity-check \
+	serve \
+	stage \
+	stage-watch \
+	test \
+	vendor-assets
 
 help: ## Show available Make targets.
 	@awk 'BEGIN {FS = ":.*## "; printf "Available targets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(HELP_TARGETS)
@@ -61,15 +164,15 @@ hugo-check: ## Verify Hugo is available on PATH.
 docsy-check: ## Verify Node/PostCSS tooling for Docsy is available.
 	@$(DOCSY_ENV); command -v node >/dev/null 2>&1 || { echo "Error: node is not available (expected via nvm)."; exit 1; }; \
 	command -v postcss >/dev/null 2>&1 || { echo "Error: postcss is not available. Run npm install in site/."; exit 1; }; \
-	test -f node_modules/jquery/dist/jquery.min.js || { echo "Error: jquery is not available. Run npm install in site/."; exit 1; }; \
-	test -f node_modules/mermaid/dist/mermaid.esm.min.mjs || { echo "Error: mermaid is not available. Run npm install in site/."; exit 1; }; \
-	test -f node_modules/lunr/lunr.min.js || { echo "Error: lunr is not available. Run npm install in site/."; exit 1; }
+	test -f $(NODE_MODULES_DIR)/jquery/dist/jquery.min.js || { echo "Error: jquery is not available. Run npm install in site/."; exit 1; }; \
+	test -f $(NODE_MODULES_DIR)/mermaid/dist/mermaid.esm.min.mjs || { echo "Error: mermaid is not available. Run npm install in site/."; exit 1; }; \
+	test -f $(NODE_MODULES_DIR)/lunr/lunr.min.js || { echo "Error: lunr is not available. Run npm install in site/."; exit 1; }
 
 vendor-assets: docsy-check ## Stage local vendor assets required by the renderer.
 	@mkdir -p .stage/static/js/vendor
-	@cp node_modules/jquery/dist/jquery.min.js .stage/static/js/vendor/jquery.min.js
-	@cp node_modules/mermaid/dist/mermaid.esm.min.mjs .stage/static/js/vendor/mermaid.esm.min.mjs
-	@cp node_modules/lunr/lunr.min.js .stage/static/js/vendor/lunr.min.js
+	@cp $(NODE_MODULES_DIR)/jquery/dist/jquery.min.js .stage/static/js/vendor/jquery.min.js
+	@cp $(NODE_MODULES_DIR)/mermaid/dist/mermaid.esm.min.mjs .stage/static/js/vendor/mermaid.esm.min.mjs
+	@cp $(NODE_MODULES_DIR)/lunr/lunr.min.js .stage/static/js/vendor/lunr.min.js
 
 stage: sanity-check ## Build the staged site contract and lightweight Python preview.
 	$(UV_RUN) $(PYTHON) mvp.py build
@@ -83,16 +186,27 @@ render: hugo-check docsy-check vendor-assets ## Render the staged site through l
 build: stage render ## Build staged content and render the local Hugo site.
 
 container-image: ## Build the container image used for reproducible site builds.
-	$(CONTAINER_ENGINE) build -t $(CONTAINER_IMAGE) -f $(CONTAINER_BUILD_DIR)/Containerfile $(CONTAINER_BUILD_DIR)
+	$(CONTAINER_ENGINE) build \
+		$(CONTAINER_PLATFORM_FLAG) \
+		-t $(CONTAINER_IMAGE) \
+		-f $(CONTAINER_BUILD_DIR)/Containerfile \
+		$(CONTAINER_BUILD_DIR)
 
 container-test: container-image ## Run the site unit tests inside the build container.
-	$(CONTAINER_RUN) bash -lc 'export UV_CACHE_DIR=/tmp/buildish-site-test-uv-cache; export UV_PROJECT_ENVIRONMENT=/tmp/buildish-site-test-venv; mkdir -p "$$HOME/.cache/npm" "$$UV_CACHE_DIR" && npm ci --ignore-scripts && make test'
+	@$(PREPARE_CONTAINER_SCRATCH)
+	@$(CONTAINER_RUN) bash -lc '$(CONTAINER_TEST_SCRIPT)'
 
 container-integration-test: container-image ## Run the fixture integration test inside the build container.
-	$(CONTAINER_RUN) bash -lc 'export UV_CACHE_DIR=/tmp/buildish-site-integration-uv-cache; export UV_PROJECT_ENVIRONMENT=/tmp/buildish-site-integration-venv; mkdir -p "$$UV_CACHE_DIR" && make integration-test'
+	@$(PREPARE_CONTAINER_SCRATCH)
+	@$(CONTAINER_RUN) bash -lc '$(CONTAINER_INTEGRATION_TEST_SCRIPT)'
+
+container-check-fast: container-test container-integration-test ## Run the fast containerized verification path for interactive use.
 
 container-build: container-image ## Build the staged site and Hugo output inside the build container.
-	$(CONTAINER_RUN) bash -lc 'export UV_CACHE_DIR=/tmp/buildish-site-build-uv-cache; export UV_PROJECT_ENVIRONMENT=/tmp/buildish-site-build-venv; mkdir -p "$$HOME/.cache/npm" "$$UV_CACHE_DIR" && npm ci --ignore-scripts && make build'
+	@printf '==> [container-build] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
+	@$(PREPARE_CONTAINER_SCRATCH)
+	@printf '==> [container-build] starting containerized site render\n'
+	@$(CONTAINER_RUN) bash -lc '$(CONTAINER_BUILD_SCRIPT)'
 
 container-image-local-registry-test: ## Run the localhost-registry integration test for the builder image.
 	$(CONTAINER_BUILD_DIR)/test-local-registry.sh --platforms '$(LOCAL_REGISTRY_TEST_PLATFORMS)' --tag '$(LOCAL_REGISTRY_TEST_TAG)' $(LOCAL_REGISTRY_TEST_ARGS)

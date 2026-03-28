@@ -59,6 +59,7 @@ The reusable builder-image definition lives in `../tools/site-build-image/`, whi
 From `site/`:
 
 - `make container-image`
+- `make container-check-fast`
 - `make container-test`
 - `make container-integration-test`
 - `make container-build`
@@ -66,7 +67,8 @@ From `site/`:
 Defaults:
 
 - `CONTAINER_ENGINE=podman`
-- `CONTAINER_IMAGE=buildish-site-build:local`
+- `CONTAINER_IMAGE=localhost/buildish-site-build:local`
+- `CONTAINER_PLATFORM=<derived from the local host architecture>`
 
 You can override the engine if needed, for example:
 
@@ -78,6 +80,11 @@ The containerized flow:
 - writes generated outputs back into the working tree
 - keeps tool caches under `site/.container-home/`
 - installs Node dependencies with `npm ci --ignore-scripts`
+
+The builder `Containerfile` pins multi-architecture index digests. The
+`site/Makefile` then passes an explicit `--platform` value derived from the host
+architecture so Podman/Docker select the intended child manifest instead of
+guessing from local cache state.
 
 This split also makes it straightforward for future CI to rebuild or publish the builder image only when the builder-image inputs change.
 
