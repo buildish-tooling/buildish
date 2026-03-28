@@ -225,7 +225,7 @@ serve: sanity-check hugo-check docsy-check ## Serve the staged site with local H
 		fi; \
 		sleep 0.1; \
 	done; \
-	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --port $(PORT)
+	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --port $(PORT) --poll 700ms --disableFastRender
 
 clean: sanity-check ## Remove generated local preview outputs.
 	$(UV_RUN) $(PYTHON) mvp.py clean
