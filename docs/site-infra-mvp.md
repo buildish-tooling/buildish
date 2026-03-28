@@ -45,6 +45,17 @@ then renders it with local Hugo using Docsy as a Hugo module. The renderer
 consumes staged `content/`, `data/`, and `static/` directly, while local Node /
 PostCSS tooling is provided from `site/` for Docsy asset compilation.
 
+As of this MVP closeout, the local proof of concept is considered complete for the
+unreleased-first workflow. The implemented scope now includes:
+
+- catalog-driven staging from sibling sub-project repositories,
+- per-project metadata loading from `site/project.yaml`,
+- generated project/version/lifecycle metadata in `site/.stage/`,
+- local Hugo rendering through `make -C site build`,
+- watch-based restaging through `make -C site stage-watch` and `make -C site serve`,
+- containerized reproducible site verification, and
+- license-header checking via Apache RAT.
+
 ## MVP goals
 
 - Prove the aggregator + renderer split works in practice.
@@ -150,15 +161,11 @@ Even the MVP should keep the core guardrails from the proposal:
 
 If the MVP works well, the next step should be to harden it by adding:
 
-- better lifecycle metadata generation,
 - stricter content validation,
+- release snapshot staging from real exact-version tags,
 - AsciiDoc support validation,
-- a true live-edit `hugo serve` workflow that watches real source inputs,
-  re-stages content automatically, and serializes rebuilds to avoid overlapping
-  stage/render races,
-- a cleaner effective landing-page experience, including a proper `/projects/`
-  landing page and, where hosting supports it, an HTTP-level redirect from `/`,
-- containerized pinned tooling,
-- CI builds,
-- later, a discussion about publication automation.
+- stricter lifecycle/content schema validation,
+- a cleaner effective landing-page experience and broader navigation polish,
+- search, sitemap, redirect, and indexing policy hardening,
+- later, publication automation and cross-repository trigger design.
 

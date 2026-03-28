@@ -41,7 +41,7 @@ CONTAINER_USERNS_FLAGS := --userns=keep-id
 endif
 CONTAINER_RUN = $(CONTAINER_ENGINE) run --rm $(CONTAINER_USERNS_FLAGS) --user $$(id -u):$$(id -g) -e HOME=$(CONTAINER_HOME) -e XDG_CACHE_HOME=$(CONTAINER_HOME)/.cache -e npm_config_cache=$(CONTAINER_HOME)/.cache/npm -e UV_CACHE_DIR=$(CONTAINER_HOME)/.cache/uv -v $(REPO_ROOT):/workspace$(CONTAINER_MOUNT_LABEL) -w /workspace/site $(CONTAINER_IMAGE)
 
-.PHONY: build check clean container-build container-image container-image-local-registry-test container-test docsy-check help hugo-check render sanity-check serve stage stage-watch test vendor-assets
+.PHONY: build check clean container-build container-image container-image-local-registry-test container-integration-test container-test docsy-check help hugo-check integration-test render sanity-check serve stage stage-watch test vendor-assets
 
 help: ## Show available Make targets.
 	@awk 'BEGIN {FS = ":.*## "; printf "Available targets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(HELP_TARGETS)
@@ -86,10 +86,13 @@ container-image: ## Build the container image used for reproducible site builds.
 	$(CONTAINER_ENGINE) build -t $(CONTAINER_IMAGE) -f $(CONTAINER_BUILD_DIR)/Containerfile $(CONTAINER_BUILD_DIR)
 
 container-test: container-image ## Run the site unit tests inside the build container.
-	$(CONTAINER_RUN) bash -lc 'mkdir -p "$$HOME/.cache/npm" "$$HOME/.cache/uv" && npm ci --ignore-scripts && make test'
+	$(CONTAINER_RUN) bash -lc 'export UV_CACHE_DIR=/tmp/buildish-site-test-uv-cache; export UV_PROJECT_ENVIRONMENT=/tmp/buildish-site-test-venv; mkdir -p "$$HOME/.cache/npm" "$$UV_CACHE_DIR" && npm ci --ignore-scripts && make test'
+
+container-integration-test: container-image ## Run the fixture integration test inside the build container.
+	$(CONTAINER_RUN) bash -lc 'export UV_CACHE_DIR=/tmp/buildish-site-integration-uv-cache; export UV_PROJECT_ENVIRONMENT=/tmp/buildish-site-integration-venv; mkdir -p "$$UV_CACHE_DIR" && make integration-test'
 
 container-build: container-image ## Build the staged site and Hugo output inside the build container.
-	$(CONTAINER_RUN) bash -lc 'mkdir -p "$$HOME/.cache/npm" "$$HOME/.cache/uv" && npm ci --ignore-scripts && make build'
+	$(CONTAINER_RUN) bash -lc 'export UV_CACHE_DIR=/tmp/buildish-site-build-uv-cache; export UV_PROJECT_ENVIRONMENT=/tmp/buildish-site-build-venv; mkdir -p "$$HOME/.cache/npm" "$$UV_CACHE_DIR" && npm ci --ignore-scripts && make build'
 
 container-image-local-registry-test: ## Run the localhost-registry integration test for the builder image.
 	$(CONTAINER_BUILD_DIR)/test-local-registry.sh --platforms '$(LOCAL_REGISTRY_TEST_PLATFORMS)' --tag '$(LOCAL_REGISTRY_TEST_TAG)' $(LOCAL_REGISTRY_TEST_ARGS)
@@ -117,7 +120,11 @@ clean: sanity-check ## Remove generated local preview outputs.
 test: sanity-check ## Run the site unit tests.
 	$(UV_RUN) $(PYTHON) -m unittest discover -s tests -p 'test_*.py' -v
 
+integration-test: sanity-check ## Run the fixture-based site integration test.
+	$(UV_RUN) $(PYTHON) -m unittest discover -s tests -p 'integration_*_test.py' -v
+
 check: ## Run the site verification flow: clean, test, build.
 	$(MAKE) clean
 	$(MAKE) test
+	$(MAKE) integration-test
 	$(MAKE) build

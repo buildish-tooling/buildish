@@ -23,6 +23,7 @@ The site uses Hugo + Docsy for rendering and `mvp.py` for staging generated proj
 From `site/`:
 
 - `make test`
+- `make integration-test`
 - `make build`
 - `make serve`
 - `make stage-watch`
@@ -37,6 +38,18 @@ The native workflow expects:
 project READMEs/docs/assets that live outside `site/`. Use `make stage-watch` if you want
 to run only the staging watcher without starting Hugo.
 
+## Current sub-project contract
+
+The currently implemented catalog and sub-project metadata contract is documented in
+[`../docs/site-subproject-contract.md`](../docs/site-subproject-contract.md).
+
+That document describes:
+
+- `site/projects.yaml` defaults and per-project overrides
+- the preferred `site/project.yaml` structure
+- precedence rules between catalog values and sub-project metadata
+- current staging outputs and safety constraints
+
 ## Containerized workflow
 
 The repository includes a pinned build container so developers can build the site without installing the full local toolchain.
@@ -47,6 +60,7 @@ From `site/`:
 
 - `make container-image`
 - `make container-test`
+- `make container-integration-test`
 - `make container-build`
 
 Defaults:
@@ -66,6 +80,9 @@ The containerized flow:
 - installs Node dependencies with `npm ci --ignore-scripts`
 
 This split also makes it straightforward for future CI to rebuild or publish the builder image only when the builder-image inputs change.
+
+The current site verification workflow also uses this containerized path so CI exercises
+the same staged-site and Hugo build flow with pinned tooling.
 
 ## Produced outputs
 
