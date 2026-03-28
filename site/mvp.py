@@ -23,16 +23,27 @@ import os
 import re
 import shutil
 import socketserver
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from watchfiles import watch
 import yaml
 
 
 DEFAULT_TAG_PATTERN = r"^v[0-9]+\.[0-9]+\.[0-9]+$"
 VALID_RELEASE_LINE_STATUSES = {"maintained", "eol"}
 SITE_TITLE = "Apache Buildish (Incubating)"
+WATCH_DEBOUNCE_MS = 300
+WATCH_STEP_MS = 50
+WATCH_IGNORE_PATH_PARTS = {".container-home", ".git", ".preview", ".public", ".stage", "__pycache__"}
+WATCH_IGNORE_SUFFIXES = (".swp", ".swx", "~", ".tmp")
+STAGED_VENDOR_ASSETS = (
+    (Path("node_modules/jquery/dist/jquery.min.js"), Path("static/js/vendor/jquery.min.js")),
+    (Path("node_modules/mermaid/dist/mermaid.esm.min.mjs"), Path("static/js/vendor/mermaid.esm.min.mjs")),
+    (Path("node_modules/lunr/lunr.min.js"), Path("static/js/vendor/lunr.min.js")),
+)
 
 
 @dataclass(frozen=True)
@@ -164,6 +175,129 @@ def copy_tree_without_symlinks(source: Path, destination: Path) -> list[Path]:
             shutil.copy2(source_file, target)
             copied.append(relative)
     return copied
+
+
+def stage_vendor_assets(site_root: Path, stage_root: Path) -> None:
+    for source_relative, destination_relative in STAGED_VENDOR_ASSETS:
+        source = site_root / source_relative
+        if not source.is_file():
+            continue
+        destination = stage_root / destination_relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+
+
+def watchable_existing_path(candidate: Path, fallback: Path) -> Path:
+    current = candidate.resolve(strict=False)
+    fallback_resolved = fallback.resolve(strict=False)
+
+    while True:
+        if current.exists():
+            return current
+        if current == fallback_resolved:
+            return fallback_resolved
+        current = current.parent
+
+
+def project_watch_roots(repo_root: Path, project: dict[str, Any], defaults: dict[str, Any]) -> set[Path]:
+    slug = str(project["slug"])
+    local_dir = str(project["localDir"])
+    repo_path = safe_repo_path(repo_root, local_dir)
+    parent_fallback = repo_path.parent if repo_path.parent.exists() else repo_root.parent.resolve()
+
+    if not repo_path.exists():
+        return {watchable_existing_path(repo_path, parent_fallback)}
+
+    metadata_relative = str(project.get("metadataFile") or defaults.get("metadataFile") or "site/project.yaml")
+    metadata_fields, _ = load_project_metadata(repo_path, metadata_relative, slug)
+    project_fields = mapping_or_empty(metadata_fields, "project", f"project metadata for {slug}")
+    content_fields = mapping_or_empty(metadata_fields, "content", f"content metadata for {slug}")
+
+    watch_roots: set[Path] = set()
+
+    metadata_path = safe_relative_path(repo_path, metadata_relative, f"metadataFile for {slug}")
+    if metadata_path is not None:
+        watch_roots.add(watchable_existing_path(metadata_path, repo_path))
+
+    readme_setting = first_non_none(
+        project.get("readmePath"),
+        content_fields.get("readmePath"),
+        project_fields.get("readmePath"),
+        metadata_fields.get("readmePath"),
+        defaults.get("readmePath"),
+        "README.md",
+    )
+    readme_path = safe_relative_path(repo_path, str(readme_setting), f"README for {slug}")
+    if readme_path is not None:
+        watch_roots.add(watchable_existing_path(readme_path, repo_path))
+
+    docs_setting = (
+        project["docsRoot"]
+        if "docsRoot" in project
+        else first_non_none(content_fields.get("docsRoot"), project_fields.get("docsRoot"), metadata_fields.get("docsRoot"), defaults.get("docsRoot"))
+    )
+    if docs_setting is not None:
+        docs_path = safe_relative_path(repo_path, str(docs_setting), f"docsRoot for {slug}")
+        if docs_path is not None:
+            watch_roots.add(watchable_existing_path(docs_path, repo_path))
+
+    assets_setting = (
+        project["assetsRoot"]
+        if "assetsRoot" in project
+        else first_non_none(
+            content_fields.get("assetsRoot"),
+            project_fields.get("assetsRoot"),
+            metadata_fields.get("assetsRoot"),
+            defaults.get("assetsRoot"),
+        )
+    )
+    if assets_setting is not None:
+        assets_path = safe_relative_path(repo_path, str(assets_setting), f"assetsRoot for {slug}")
+        if assets_path is not None:
+            watch_roots.add(watchable_existing_path(assets_path, repo_path))
+
+    return watch_roots
+
+
+def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
+    resolved_repo_root = repo_root_from(repo_root)
+    site_root = resolved_repo_root / "site"
+    catalog = load_yaml_like(site_root / "projects.yaml")
+    defaults = dict(catalog.get("defaults") or {})
+    projects = list(catalog.get("projects") or [])
+
+    watch_roots: set[Path] = {
+        watchable_existing_path(site_root / "projects.yaml", site_root),
+        watchable_existing_path(site_root / "content", site_root),
+    }
+
+    for source_relative, _ in STAGED_VENDOR_ASSETS:
+        source = site_root / source_relative
+        if source.exists():
+            watch_roots.add(source.resolve())
+
+    for project in projects:
+        watch_roots.update(project_watch_roots(resolved_repo_root, project, defaults))
+
+    return sorted(watch_roots, key=str)
+
+
+def is_relevant_watch_path(path: Path) -> bool:
+    name = path.name
+    if name.startswith(".#") or name == "4913":
+        return False
+    if name.endswith(WATCH_IGNORE_SUFFIXES):
+        return False
+    return not any(part in WATCH_IGNORE_PATH_PARTS for part in path.parts)
+
+
+def format_watch_path(path: Path, repo_root: Path) -> str:
+    resolved_path = path.resolve(strict=False)
+    workspace_parent = repo_root.parent.resolve()
+    try:
+        return resolved_path.relative_to(workspace_parent).as_posix()
+    except ValueError:
+        return str(resolved_path)
 
 
 def strip_leading_html_comment(text: str) -> str:
@@ -838,6 +972,7 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
     incubator_disclaimer = read_text_if_exists(resolved_repo_root / "DISCLAIMER").strip()
     incubator_disclaimer_paragraphs = split_paragraphs(incubator_disclaimer)
     stage_authored_site_content(site_root, stage_root, incubator_disclaimer_paragraphs)
+    stage_vendor_assets(site_root, stage_root)
 
     write_yaml_like(
         stage_root / "manifest.yaml",
@@ -940,10 +1075,69 @@ def serve(repo_root: Path | None = None, port: int = 8000) -> None:
         httpd.serve_forever()
 
 
+def watch_and_build(repo_root: Path | None = None, debounce_ms: int = WATCH_DEBOUNCE_MS) -> None:
+    resolved_repo_root = repo_root_from(repo_root)
+    results = build(resolved_repo_root)
+    print(f"Built {len(results)} project(s) into site/.stage and site/.preview")
+
+    while True:
+        watch_roots = collect_watch_roots(resolved_repo_root)
+        print("Watching staged-source inputs:")
+        for root in watch_roots:
+            print(f"  - {format_watch_path(root, resolved_repo_root)}")
+
+        def watch_filter(_change: object, changed_path: str) -> bool:
+            return is_relevant_watch_path(Path(changed_path))
+
+        restart_watch = False
+        for changes in watch(
+            *(str(path) for path in watch_roots),
+            watch_filter=watch_filter,
+            debounce=debounce_ms,
+            step=WATCH_STEP_MS,
+            yield_on_timeout=False,
+        ):
+            changed_paths = sorted(
+                {
+                    Path(path).resolve(strict=False)
+                    for _change, path in changes
+                    if is_relevant_watch_path(Path(path))
+                },
+                key=str,
+            )
+            if not changed_paths:
+                continue
+
+            print("Detected source changes:")
+            for changed_path in changed_paths:
+                print(f"  - {format_watch_path(changed_path, resolved_repo_root)}")
+
+            try:
+                results = build(resolved_repo_root)
+                print(f"Built {len(results)} project(s) into site/.stage and site/.preview")
+            except Exception as exc:
+                print(f"Rebuild failed: {exc}", file=sys.stderr)
+
+            try:
+                updated_watch_roots = collect_watch_roots(resolved_repo_root)
+            except Exception as exc:
+                print(f"Re-evaluating watch roots failed: {exc}", file=sys.stderr)
+                updated_watch_roots = watch_roots
+
+            if updated_watch_roots != watch_roots:
+                print("Watch roots changed; restarting watcher.")
+                restart_watch = True
+                break
+
+        if not restart_watch:
+            continue
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Buildish site helper")
-    parser.add_argument("command", choices=["build", "clean", "serve"], nargs="?", default="build")
+    parser.add_argument("command", choices=["build", "clean", "serve", "watch"], nargs="?", default="build")
     parser.add_argument("--port", type=int, default=8000, help="Port for the local preview server")
+    parser.add_argument("--debounce-ms", type=int, default=WATCH_DEBOUNCE_MS, help="Debounce window for watch mode")
     return parser.parse_args(argv)
 
 
@@ -956,6 +1150,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "clean":
         clean()
         print("Removed site/.stage and site/.preview")
+        return 0
+    if args.command == "watch":
+        watch_and_build(debounce_ms=args.debounce_ms)
         return 0
     serve(port=args.port)
     return 0

@@ -43,17 +43,39 @@
     // reference for the kinds of managers used in Polaris.
     {
       matchManagers: [
-        "gradle", "gradle-wrapper",
-        "nvm", "npm",
-        "dockerfile", "devcontainer", "docker-compose",
-        "github-actions"],
+        "gradle",
+        "gradle-wrapper",
+        "nvm",
+        "npm",
+        "dockerfile",
+        "devcontainer",
+        "docker-compose",
+        "pip_requirements",
+        "pip_setup",
+        "poetry",
+        "setup-cfg",
+        "github-actions",
+      ],
       automerge: false, // just be explicit (false is the default)
     },
     // NPM dependencies
     {
-      "matchDatasources": ["npm"],
+      "matchDatasources": [
+        "npm",
+      ],
       // 3 days should be the minimum, because a release can be unpublished within the first 72 hours.
       "minimumReleaseAge": "7 days"
+    },
+    // Python dependencies
+    {
+      "matchDatasources": [
+        "pip_requirements",
+        "pip_setup",
+        "poetry",
+        "setup-cfg",
+      ],
+      // 3 days should be the minimum
+      "minimumReleaseAge": "3 days"
     },
   ],
 

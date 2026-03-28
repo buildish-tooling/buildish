@@ -33,6 +33,18 @@ class SiteMvpTest(unittest.TestCase):
         source_content = Path(__file__).resolve().parents[1] / "content"
         shutil.copytree(source_content, repo_root / "site" / "content", dirs_exist_ok=True)
 
+    @staticmethod
+    def seed_docsy_vendor_assets(repo_root: Path) -> None:
+        vendor_sources = {
+            "node_modules/jquery/dist/jquery.min.js": "window.jQuery = {};\n",
+            "node_modules/mermaid/dist/mermaid.esm.min.mjs": "export const mermaid = {};\n",
+            "node_modules/lunr/lunr.min.js": "window.lunr = {};\n",
+        }
+        for relative_path, contents in vendor_sources.items():
+            target = repo_root / "site" / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(contents, encoding="utf-8")
+
     def test_build_stages_docs_and_lifecycle_from_project_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -311,6 +323,65 @@ class SiteMvpTest(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "escapes allowed root"):
                 mvp.build(repo_root)
+
+    def test_build_stages_vendor_assets_when_available(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            repo_root = workspace / "buildish"
+            repo_root.mkdir()
+            (repo_root / "site").mkdir()
+            with (repo_root / "site" / "projects.yaml").open("w", encoding="utf-8") as handle:
+                yaml.safe_dump({"schemaVersion": 1, "projects": []}, handle, sort_keys=False, default_flow_style=False)
+            self.seed_docsy_vendor_assets(repo_root)
+
+            mvp.build(repo_root)
+
+            self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "jquery.min.js").exists())
+            self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "mermaid.esm.min.mjs").exists())
+            self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "lunr.min.js").exists())
+
+    def test_collect_watch_roots_includes_catalog_project_inputs_and_missing_repo_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            repo_root = workspace / "buildish"
+            repo_root.mkdir()
+            (repo_root / "site" / "content").mkdir(parents=True)
+            catalog = {
+                "schemaVersion": 1,
+                "defaults": {
+                    "metadataFile": "site/project.yaml",
+                    "readmePath": "README.md",
+                    "docsRoot": "site/docs",
+                    "assetsRoot": "site/assets",
+                },
+                "projects": [
+                    {"slug": "mammoth-cache-gradle", "localDir": "buildish-mammoth-cache-gradle"},
+                    {"slug": "missing-project", "localDir": "buildish-missing-project"},
+                ],
+            }
+            with (repo_root / "site" / "projects.yaml").open("w", encoding="utf-8") as handle:
+                yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
+
+            mammoth = workspace / "buildish-mammoth-cache-gradle"
+            (mammoth / "site" / "docs").mkdir(parents=True)
+            (mammoth / "site" / "assets").mkdir(parents=True)
+            (mammoth / "README.md").write_text("# Mammoth\n", encoding="utf-8")
+            with (mammoth / "site" / "project.yaml").open("w", encoding="utf-8") as handle:
+                yaml.safe_dump({"schemaVersion": 1, "project": {"displayName": "Mammoth"}}, handle, sort_keys=False, default_flow_style=False)
+
+            watch_roots = set(mvp.collect_watch_roots(repo_root))
+
+            self.assertIn((repo_root / "site" / "projects.yaml").resolve(), watch_roots)
+            self.assertIn((repo_root / "site" / "content").resolve(), watch_roots)
+            self.assertIn((mammoth / "site" / "project.yaml").resolve(), watch_roots)
+            self.assertIn((mammoth / "README.md").resolve(), watch_roots)
+            self.assertIn((mammoth / "site" / "docs").resolve(), watch_roots)
+            self.assertIn((mammoth / "site" / "assets").resolve(), watch_roots)
+            self.assertIn(workspace.resolve(), watch_roots)
+
+    def test_is_relevant_watch_path_allows_explicit_vendor_asset_paths(self) -> None:
+        self.assertTrue(mvp.is_relevant_watch_path(Path("site/node_modules/jquery/dist/jquery.min.js")))
+        self.assertFalse(mvp.is_relevant_watch_path(Path("site/.stage/content/_index.md")))
 
 
 if __name__ == "__main__":

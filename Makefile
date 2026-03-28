@@ -13,6 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.idea/
-**/.swp
-/build/
+.DEFAULT_GOAL := help
+
+HELP_TARGETS := $(MAKEFILE_LIST)
+
+.PHONY: help rat-check
+
+help: ## Show available Make targets.
+	@awk 'BEGIN {FS = ":.*## "; printf "Available targets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(HELP_TARGETS)
+
+rat-check: ## Run Apache RAT against tracked files in this repository (requires Java 21+).
+	sh tools/rat/rat-check.sh

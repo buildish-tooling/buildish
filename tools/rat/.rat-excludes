@@ -13,6 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.idea/
-**/.swp
-/build/
+.git/**
+.idea/**
+build/**
+site/.idea/**
+site/.venv/**
+site/.stage/**
+site/.preview/**
+site/.public/**
+site/.container-home/**
+site/resources/**
+site/node_modules/**
+**/__pycache__/**
+**/*.swp
+site/.hugo_build.lock
+site/.nvmrc
+site/go.sum
+site/uv.lock

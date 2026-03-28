@@ -25,12 +25,17 @@ From `site/`:
 - `make test`
 - `make build`
 - `make serve`
+- `make stage-watch`
 
 The native workflow expects:
 
 - `uv`
 - Hugo extended
 - Node available via `nvm` using `.nvmrc`
+
+`make serve` now keeps `site/.stage/` up to date while Hugo runs, including changes in
+project READMEs/docs/assets that live outside `site/`. Use `make stage-watch` if you want
+to run only the staging watcher without starting Hugo.
 
 ## Containerized workflow
 

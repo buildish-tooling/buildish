@@ -41,7 +41,7 @@ CONTAINER_USERNS_FLAGS := --userns=keep-id
 endif
 CONTAINER_RUN = $(CONTAINER_ENGINE) run --rm $(CONTAINER_USERNS_FLAGS) --user $$(id -u):$$(id -g) -e HOME=$(CONTAINER_HOME) -e XDG_CACHE_HOME=$(CONTAINER_HOME)/.cache -e npm_config_cache=$(CONTAINER_HOME)/.cache/npm -e UV_CACHE_DIR=$(CONTAINER_HOME)/.cache/uv -v $(REPO_ROOT):/workspace$(CONTAINER_MOUNT_LABEL) -w /workspace/site $(CONTAINER_IMAGE)
 
-.PHONY: build check clean container-build container-image container-image-local-registry-test container-test docsy-check help hugo-check render sanity-check serve stage test vendor-assets
+.PHONY: build check clean container-build container-image container-image-local-registry-test container-test docsy-check help hugo-check render sanity-check serve stage stage-watch test vendor-assets
 
 help: ## Show available Make targets.
 	@awk 'BEGIN {FS = ":.*## "; printf "Available targets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(HELP_TARGETS)
@@ -74,6 +74,9 @@ vendor-assets: docsy-check ## Stage local vendor assets required by the renderer
 stage: sanity-check ## Build the staged site contract and lightweight Python preview.
 	$(UV_RUN) $(PYTHON) mvp.py build
 
+stage-watch: sanity-check ## Watch site inputs and rebuild the staged site contract on changes.
+	$(UV_RUN) $(PYTHON) mvp.py watch
+
 render: hugo-check docsy-check vendor-assets ## Render the staged site through local Hugo.
 	@$(DOCSY_ENV); $(HUGO) --source . --config hugo.yaml --cleanDestinationDir
 
@@ -91,8 +94,21 @@ container-build: container-image ## Build the staged site and Hugo output inside
 container-image-local-registry-test: ## Run the localhost-registry integration test for the builder image.
 	$(CONTAINER_BUILD_DIR)/test-local-registry.sh --platforms '$(LOCAL_REGISTRY_TEST_PLATFORMS)' --tag '$(LOCAL_REGISTRY_TEST_TAG)' $(LOCAL_REGISTRY_TEST_ARGS)
 
-serve: stage hugo-check docsy-check vendor-assets ## Serve the staged site with local Hugo; override PORT=<port> if needed.
-	@$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --port $(PORT)
+serve: sanity-check hugo-check docsy-check ## Serve the staged site with local Hugo and automatic restaging; override PORT=<port> if needed.
+	@rm -rf .stage .preview; \
+	watch_pid=''; \
+	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
+	trap cleanup EXIT INT TERM; \
+	$(UV_RUN) $(PYTHON) mvp.py watch & \
+	watch_pid=$$!; \
+	while [ ! -f .stage/manifest.yaml ]; do \
+		if ! kill -0 "$$watch_pid" 2>/dev/null; then \
+			wait "$$watch_pid"; \
+			exit $$?; \
+		fi; \
+		sleep 0.1; \
+	done; \
+	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --port $(PORT)
 
 clean: sanity-check ## Remove generated local preview outputs.
 	$(UV_RUN) $(PYTHON) mvp.py clean
