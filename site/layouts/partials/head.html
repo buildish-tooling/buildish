@@ -29,13 +29,14 @@ limitations under the License.
 {{ partialCached "favicons.html" . }}
 <title>{{- if .IsHome -}}{{ .Site.Title }}{{ else -}}{{ with .Title }}{{ . }} | {{ end -}}{{ .Site.Title }}{{ end -}}</title>
 <meta name="description" content="{{ partial "page-description.html" . }}">
+<link rel="canonical" href="{{ .Permalink | safeURL }}">
 {{ template "_internal/opengraph.html" . -}}
 {{ template "_internal/schema.html" . -}}
 {{ template "_internal/twitter_cards.html" . -}}
 {{ partialCached "head-css.html" . "asdf" -}}
 <script src="{{ "js/vendor/jquery.min.js" | relURL }}"></script>
 {{ if .Site.Params.offlineSearch -}}
-<script defer src="https://unpkg.com/lunr@2.3.9/lunr.min.js" integrity="sha384-203J0SNzyqHby3iU6hzvzltrWi/M41wOP5Gu+BiJMz5nwKykbkUx8Kp7iti0Lpli" crossorigin="anonymous"></script>
+<script defer src="{{ "js/vendor/lunr.min.js" | relURL }}"></script>
 {{ end -}}
 
 {{ if .Site.Params.prism_syntax_highlighting -}}

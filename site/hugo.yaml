@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-baseURL: http://127.0.0.1:1313/
+baseURL: https://buildish.apache.org/
 title: Apache Buildish site MVP
 languageCode: en-us
 enableRobotsTXT: true
@@ -26,7 +26,6 @@ disableKinds:
   - taxonomy
   - term
   - RSS
-  - sitemap
 
 markup:
   highlight:

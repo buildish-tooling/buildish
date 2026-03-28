@@ -46,7 +46,7 @@ class SiteMvpTest(unittest.TestCase):
                 },
                 "projects": [
                     {"slug": "mammoth-cache-gradle", "localDir": "buildish-mammoth-cache-gradle"},
-                    {"slug": "no-gradle-wrapper-jar", "localDir": "buildish-no-gradle-wrapper-jar"},
+                    {"slug": "no-gradle-wrapper-jar", "localDir": "buildish-no-gradle-wrapper-jar", "weight": 5},
                 ],
             }
             with (repo_root / "site" / "projects.yaml").open("w", encoding="utf-8") as handle:
@@ -123,16 +123,21 @@ class SiteMvpTest(unittest.TestCase):
 
             project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("title: Apache Buildish Mammoth Cache for Gradle", project_index)
+            self.assertIn("weight: 10", project_index)
+            self.assertNotIn("linkTitle:", project_index)
             self.assertIn("Secure Gradle wrapper provisioning.", project_index)
-            self.assertIn("Open Preview docs", project_index)
+            self.assertNotIn("\n# Apache Buildish Mammoth Cache for Gradle\n", project_index)
             self.assertIn("Staged assets: 1 file(s)", project_index)
-            self.assertIn("/projects/mammoth-cache-gradle/unreleased/", project_index)
             self.assertIn("Latest stable: `v1.3.5`", project_index)
             self.assertIn("`v1` — maintained; latest `v1.3.5`", project_index)
 
             projects_index = (repo_root / "site" / ".stage" / "content" / "projects" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("title: Projects", projects_index)
-            self.assertIn("Open Preview docs", projects_index)
+            self.assertIn("Local sub-projects staged from the catalog", projects_index)
+            self.assertNotIn("\n# Projects\n", projects_index)
+
+            staged_doc = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "wrapper-provisioning.md").read_text(encoding="utf-8")
+            self.assertNotIn("\n# Wrapper provisioning\n", staged_doc)
 
             preview_index = (repo_root / "site" / ".preview" / "index.html").read_text(encoding="utf-8")
             self.assertIn("Apache Buildish Mammoth Cache for Gradle", preview_index)
@@ -162,6 +167,8 @@ class SiteMvpTest(unittest.TestCase):
             self.assertIn("target: v1.3.5", aliases)
 
             no_wrapper_project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "no-gradle-wrapper-jar" / "_index.md").read_text(encoding="utf-8")
+            self.assertIn("weight: 5", no_wrapper_project_index)
+            self.assertNotIn("linkTitle:", no_wrapper_project_index)
             self.assertNotIn("Latest stable:", no_wrapper_project_index)
             self.assertNotIn("## Release lines", no_wrapper_project_index)
             self.assertNotIn("Staged assets:", no_wrapper_project_index)

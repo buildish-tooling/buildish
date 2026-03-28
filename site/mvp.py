@@ -38,6 +38,7 @@ VALID_RELEASE_LINE_STATUSES = {"maintained", "eol"}
 class ProjectBuildResult:
     slug: str
     display_name: str
+    navigation_weight: int
     available: bool
     repository: str | None
     local_dir: str
@@ -88,6 +89,17 @@ def first_non_none(*values: Any) -> Any:
         if value is not None:
             return value
     return None
+
+
+def parse_int_like(value: Any, label: str) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"Expected integer for {label}")
+    if isinstance(value, int):
+        return value
+    try:
+        return int(str(value))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Expected integer for {label}") from exc
 
 
 def load_project_metadata(repo_path: Path, metadata_relative: str | None, slug: str) -> tuple[dict[str, Any], Path | None]:
@@ -155,6 +167,34 @@ def copy_tree_without_symlinks(source: Path, destination: Path) -> list[Path]:
 
 def strip_leading_html_comment(text: str) -> str:
     return re.sub(r"^<!--.*?-->\s*", "", text, count=1, flags=re.DOTALL)
+
+
+def strip_leading_markdown_h1(markdown_text: str) -> str:
+    lines = markdown_text.splitlines(keepends=True)
+    prefix: list[str] = []
+    index = 0
+
+    while index < len(lines) and not lines[index].strip():
+        index += 1
+
+    while index < len(lines) and lines[index].lstrip().startswith("<!--"):
+        while index < len(lines):
+            current = lines[index]
+            prefix.append(current)
+            index += 1
+            if "-->" in current:
+                break
+        while index < len(lines) and not lines[index].strip():
+            prefix.append(lines[index])
+            index += 1
+
+    if index < len(lines) and lines[index].startswith("# "):
+        index += 1
+        while index < len(lines) and not lines[index].strip():
+            index += 1
+        return "".join(prefix + lines[index:])
+
+    return markdown_text
 
 
 def read_text_if_exists(path: Path | None) -> str:
@@ -322,7 +362,7 @@ def normalize_lifecycle(
 
 
 def build_project_markdown(result: ProjectBuildResult) -> str:
-    lines = [f"# {result.display_name}", ""]
+    lines: list[str] = []
     if result.summary:
         lines.extend([result.summary, ""])
     if result.repository:
@@ -332,9 +372,6 @@ def build_project_markdown(result: ProjectBuildResult) -> str:
     lines.append(f"- Local workspace directory: `{result.local_dir}`")
     if result.navigation_section:
         lines.append(f"- Navigation section: `{result.navigation_section}`")
-    lines.append(
-        f"- Public docs entry point: [{result.raw_unreleased_index_path}]({result.raw_unreleased_index_path})"
-    )
     if result.asset_count and result.raw_assets_root_path:
         lines.append(
             f"- Staged assets: {result.asset_count} file(s) under "
@@ -345,14 +382,6 @@ def build_project_markdown(result: ProjectBuildResult) -> str:
         if result.latest_stable_path:
             latest_stable = f"[{result.latest_stable_version}]({result.latest_stable_path})"
         lines.append(f"- Latest stable: {latest_stable}")
-    lines.append("")
-    if result.raw_unreleased_index_path:
-        lines.append(f"- [Open {result.unreleased_label} docs]({result.raw_unreleased_index_path})")
-    if result.raw_readme_path:
-        lines.append(f"- [Open source README]({result.raw_readme_path})")
-    if result.doc_links:
-        lines.extend(["", f"## {result.unreleased_label} docs", ""])
-        lines.extend(f"- [{entry['label']}]({entry['href']})" for entry in result.doc_links)
     if result.release_lines:
         lines.extend(["", "## Release lines", ""])
         for release_line in result.release_lines:
@@ -367,26 +396,20 @@ def build_project_markdown(result: ProjectBuildResult) -> str:
 
 
 def build_unreleased_index_markdown(result: ProjectBuildResult) -> str:
-    lines = [f"# {result.display_name} {result.unreleased_label}", ""]
+    lines: list[str] = []
     if result.default_branch:
         lines.extend([f"Built from the local `{result.default_branch}` branch snapshot.", ""])
     if result.summary:
         lines.extend([result.summary, ""])
     if result.asset_count and result.raw_assets_root_path:
         lines.extend([f"- [Open staged assets]({result.raw_assets_root_path})", ""])
-    if result.doc_links:
-        lines.extend(["## Available docs", ""])
-        lines.extend(f"- [{entry['label']}]({entry['href']})" for entry in result.doc_links)
-        lines.append("")
-    else:
+    if not result.doc_links:
         lines.extend([f"This project currently uses its README as the {result.unreleased_label} docs entry point.", ""])
-    if result.raw_readme_path:
-        lines.append(f"- [Open source README]({result.raw_readme_path})")
     return "\n".join(lines).rstrip() + "\n"
 
 
 def build_root_index_markdown(results: list[ProjectBuildResult]) -> str:
-    lines = ["# Apache Buildish site MVP", "", "## Local projects", ""]
+    lines = ["Local projects staged from the catalog.", "", "## Local projects", ""]
     for result in results:
         status = "available" if result.available else "missing"
         lines.append(f"- [{result.display_name}]({public_project_path(result.slug)}) — {status}")
@@ -394,13 +417,9 @@ def build_root_index_markdown(results: list[ProjectBuildResult]) -> str:
 
 
 def build_projects_index_markdown(results: list[ProjectBuildResult]) -> str:
-    lines = ["# Projects", "", "## Local sub-projects", ""]
-    for result in results:
-        status = "available" if result.available else "missing"
-        lines.append(f"- [{result.display_name}]({public_project_path(result.slug)}) — {status}")
-        if result.summary:
-            lines.append(f"  - {result.summary}")
-        lines.append(f"  - [Open {result.unreleased_label} docs]({public_unreleased_path(result.slug)})")
+    available = sum(1 for result in results if result.available)
+    total = len(results)
+    lines = [f"Local sub-projects staged from the catalog: {available}/{total} available."]
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -491,12 +510,13 @@ def build_project_preview(result: ProjectBuildResult) -> str:
     return html_page(result.display_name, "".join(body))
 
 
-def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], defaults: dict[str, Any]) -> ProjectBuildResult:
+def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], defaults: dict[str, Any], catalog_index: int) -> ProjectBuildResult:
     slug = str(project["slug"])
     local_dir = str(project["localDir"])
     repo_path = safe_repo_path(repo_root, local_dir)
     warnings: list[str] = []
     available = repo_path.is_dir()
+    navigation_weight = parse_int_like(project.get("weight"), f"weight for {slug}") if "weight" in project else catalog_index * 10
 
     metadata_relative = str(project.get("metadataFile") or defaults.get("metadataFile") or "site/project.yaml")
     metadata_fields: dict[str, Any] = {}
@@ -581,12 +601,15 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
     raw_readme_path = None
     if readme_text:
         staged_readme_path.parent.mkdir(parents=True, exist_ok=True)
+        _, readme_summary = extract_title_and_summary(readme_text, f"{display_name} source README")
+        readme_body = strip_leading_markdown_h1(readme_text)
         staged_readme_path.write_text(
             with_yaml_front_matter(
-                readme_text,
+                readme_body,
                 title=f"{display_name} source README",
-                linkTitle="Source README",
+                weight=20,
                 type="docs",
+                **({"description": readme_summary} if readme_summary else {}),
             ),
             encoding="utf-8",
         )
@@ -616,10 +639,11 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         docs_root.mkdir(parents=True, exist_ok=True)
         (docs_root / "_index.md").write_text(
             with_yaml_front_matter(
-                f"# {display_name} {unreleased_label} docs\n",
+                f"Browsable {unreleased_label.lower()} docs staged for {display_name}.\n",
                 title=f"{display_name} {unreleased_label} docs",
-                linkTitle="Docs",
+                weight=10,
                 type="docs",
+                description=f"Browsable {unreleased_label.lower()} docs staged for {display_name}.",
             ),
             encoding="utf-8",
         )
@@ -629,9 +653,15 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         staged_doc_path = docs_root / copied
         if copied.suffix.lower() in {".md", ".markdown"} and staged_doc_path.is_file():
             doc_text = staged_doc_path.read_text(encoding="utf-8")
-            doc_title, _ = extract_title_and_summary(doc_text, humanized_stem(copied))
+            doc_title, doc_summary = extract_title_and_summary(doc_text, humanized_stem(copied))
+            doc_body = strip_leading_markdown_h1(doc_text)
             staged_doc_path.write_text(
-                with_yaml_front_matter(doc_text, title=doc_title, linkTitle=doc_title, type="docs"),
+                with_yaml_front_matter(
+                    doc_body,
+                    title=doc_title,
+                    type="docs",
+                    **({"description": doc_summary} if doc_summary else {}),
+                ),
                 encoding="utf-8",
             )
         if copied.suffix.lower() not in {".md", ".markdown", ".adoc", ".asciidoc"}:
@@ -660,6 +690,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
     project_result = ProjectBuildResult(
         slug=slug,
         display_name=display_name,
+        navigation_weight=navigation_weight,
         available=available,
         repository=str(repository) if repository else None,
         local_dir=local_dir,
@@ -683,15 +714,22 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
 
     project_index_path.parent.mkdir(parents=True, exist_ok=True)
     project_index_path.write_text(
-        with_yaml_front_matter(build_project_markdown(project_result), title=display_name, linkTitle="Overview", type="docs"),
+        with_yaml_front_matter(
+            build_project_markdown(project_result),
+            title=display_name,
+            weight=navigation_weight,
+            type="docs",
+            **({"description": summary} if summary else {}),
+        ),
         encoding="utf-8",
     )
     unreleased_index_path.write_text(
         with_yaml_front_matter(
             build_unreleased_index_markdown(project_result),
             title=f"{display_name} {unreleased_label}",
-            linkTitle=unreleased_label,
+            weight=10,
             type="docs",
+            **({"description": summary} if summary else {}),
         ),
         encoding="utf-8",
     )
@@ -768,15 +806,29 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
     stage_root.mkdir(parents=True, exist_ok=True)
     preview_root.mkdir(parents=True, exist_ok=True)
 
-    results = [stage_project(resolved_repo_root, stage_root, project, defaults) for project in projects]
+    results = [stage_project(resolved_repo_root, stage_root, project, defaults, index) for index, project in enumerate(projects, start=1)]
 
     root_index = stage_root / "content" / "_index.md"
     root_index.parent.mkdir(parents=True, exist_ok=True)
-    root_index.write_text(with_yaml_front_matter(build_root_index_markdown(results), title="Apache Buildish site MVP"), encoding="utf-8")
+    root_index.write_text(
+        with_yaml_front_matter(
+            build_root_index_markdown(results),
+            title="Apache Buildish site MVP",
+            description="Local staging preview for the Apache Buildish site.",
+        ),
+        encoding="utf-8",
+    )
 
     projects_index = stage_root / "content" / "projects" / "_index.md"
     projects_index.parent.mkdir(parents=True, exist_ok=True)
-    projects_index.write_text(with_yaml_front_matter(build_projects_index_markdown(results), title="Projects"), encoding="utf-8")
+    projects_index.write_text(
+        with_yaml_front_matter(
+            build_projects_index_markdown(results),
+            title="Projects",
+            description="Browsable project sections staged from the local catalog.",
+        ),
+        encoding="utf-8",
+    )
 
     write_yaml_like(
         stage_root / "manifest.yaml",
@@ -788,6 +840,7 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
                 {
                     "slug": result.slug,
                     "displayName": result.display_name,
+                    "weight": result.navigation_weight,
                     "available": result.available,
                     "localDir": result.local_dir,
                     "repository": result.repository,
@@ -804,6 +857,7 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
             "projects": {
                 result.slug: {
                     "displayName": result.display_name,
+                    "weight": result.navigation_weight,
                     "available": result.available,
                     "localDir": result.local_dir,
                     "repository": result.repository,

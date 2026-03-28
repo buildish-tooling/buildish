@@ -47,12 +47,14 @@ docsy-check: ## Verify Node/PostCSS tooling for Docsy is available.
 	@$(DOCSY_ENV); command -v node >/dev/null 2>&1 || { echo "Error: node is not available (expected via nvm)."; exit 1; }; \
 	command -v postcss >/dev/null 2>&1 || { echo "Error: postcss is not available. Run npm install in site/."; exit 1; }; \
 	test -f node_modules/jquery/dist/jquery.min.js || { echo "Error: jquery is not available. Run npm install in site/."; exit 1; }; \
-	test -f node_modules/mermaid/dist/mermaid.esm.min.mjs || { echo "Error: mermaid is not available. Run npm install in site/."; exit 1; }
+	test -f node_modules/mermaid/dist/mermaid.esm.min.mjs || { echo "Error: mermaid is not available. Run npm install in site/."; exit 1; }; \
+	test -f node_modules/lunr/lunr.min.js || { echo "Error: lunr is not available. Run npm install in site/."; exit 1; }
 
 vendor-assets: docsy-check ## Stage local vendor assets required by the renderer.
 	@mkdir -p .stage/static/js/vendor
 	@cp node_modules/jquery/dist/jquery.min.js .stage/static/js/vendor/jquery.min.js
 	@cp node_modules/mermaid/dist/mermaid.esm.min.mjs .stage/static/js/vendor/mermaid.esm.min.mjs
+	@cp node_modules/lunr/lunr.min.js .stage/static/js/vendor/lunr.min.js
 
 stage: sanity-check ## Build the staged site contract and lightweight Python preview.
 	$(UV_RUN) $(PYTHON) mvp.py build
@@ -63,7 +65,7 @@ render: hugo-check docsy-check vendor-assets ## Render the staged site through l
 build: stage render ## Build staged content and render the local Hugo site.
 
 serve: stage hugo-check docsy-check vendor-assets ## Serve the staged site with local Hugo; override PORT=<port> if needed.
-	@$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --port $(PORT)
+	@$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --port $(PORT)
 
 clean: sanity-check ## Remove generated local preview outputs.
 	$(UV_RUN) $(PYTHON) mvp.py clean
