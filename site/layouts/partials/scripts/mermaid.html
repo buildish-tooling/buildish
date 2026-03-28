@@ -13,11 +13,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
-<script type="module" async>
-  import mermaid from "{{ "js/vendor/mermaid.esm.min.mjs" | relURL }}";
+<script src="{{ "js/vendor/mermaid.min.js" | relURL }}"></script>
+<script>
+  const mermaid = window.mermaid;
 
-  (function ($) {
-    if ($('.mermaid').length == 0) {
+  (async function () {
+    if (document.querySelectorAll('.mermaid').length === 0) {
       mermaid.initialize({ startOnLoad: false });
       return;
     }
@@ -40,11 +41,12 @@ limitations under the License.
     };
 
     var settings = norm(mermaid.mermaidAPI.defaultConfig, params);
-    settings.startOnLoad = true;
-    if ($('html[data-bs-theme="dark"]').length) {
+    settings.startOnLoad = false;
+    if (document.documentElement.getAttribute('data-bs-theme') === 'dark') {
       settings.theme = 'dark';
     }
     mermaid.initialize(settings);
+    await mermaid.run({ querySelector: '.mermaid' });
 
     const lightDarkModeThemeChangeHandler = function (mutationsList, observer) {
       for (const mutation of mutationsList) {
@@ -59,5 +61,5 @@ limitations under the License.
       attributes: true,
       attributeFilter: ['data-bs-theme']
     });
-  })(jQuery);
+  })();
 </script>

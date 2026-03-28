@@ -163,15 +163,15 @@ hugo-check: ## Verify Hugo is available on PATH.
 
 docsy-check: ## Verify Node/PostCSS tooling for Docsy is available.
 	@$(DOCSY_ENV); command -v node >/dev/null 2>&1 || { echo "Error: node is not available (expected via nvm)."; exit 1; }; \
-	command -v postcss >/dev/null 2>&1 || { echo "Error: postcss is not available. Run npm install in site/."; exit 1; }; \
-	test -f $(NODE_MODULES_DIR)/jquery/dist/jquery.min.js || { echo "Error: jquery is not available. Run npm install in site/."; exit 1; }; \
-	test -f $(NODE_MODULES_DIR)/mermaid/dist/mermaid.esm.min.mjs || { echo "Error: mermaid is not available. Run npm install in site/."; exit 1; }; \
+		command -v postcss >/dev/null 2>&1 || { echo "Error: postcss is not available. Run npm install in site/."; exit 1; }; \
+		test -f $(NODE_MODULES_DIR)/jquery/dist/jquery.min.js || { echo "Error: jquery is not available. Run npm install in site/."; exit 1; }; \
+		test -f $(NODE_MODULES_DIR)/mermaid/dist/mermaid.min.js || { echo "Error: mermaid is not available. Run npm install in site/."; exit 1; }; \
 	test -f $(NODE_MODULES_DIR)/lunr/lunr.min.js || { echo "Error: lunr is not available. Run npm install in site/."; exit 1; }
 
 vendor-assets: docsy-check ## Stage local vendor assets required by the renderer.
 	@mkdir -p .stage/static/js/vendor
 	@cp $(NODE_MODULES_DIR)/jquery/dist/jquery.min.js .stage/static/js/vendor/jquery.min.js
-	@cp $(NODE_MODULES_DIR)/mermaid/dist/mermaid.esm.min.mjs .stage/static/js/vendor/mermaid.esm.min.mjs
+	@cp $(NODE_MODULES_DIR)/mermaid/dist/mermaid.min.js .stage/static/js/vendor/mermaid.min.js
 	@cp $(NODE_MODULES_DIR)/lunr/lunr.min.js .stage/static/js/vendor/lunr.min.js
 
 stage: sanity-check ## Build the staged site contract and lightweight Python preview.

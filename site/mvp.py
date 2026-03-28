@@ -41,7 +41,7 @@ WATCH_IGNORE_PATH_PARTS = {".container-home", ".git", ".preview", ".public", ".s
 WATCH_IGNORE_SUFFIXES = (".swp", ".swx", "~", ".tmp")
 STAGED_VENDOR_ASSETS = (
     (Path("node_modules/jquery/dist/jquery.min.js"), Path("static/js/vendor/jquery.min.js")),
-    (Path("node_modules/mermaid/dist/mermaid.esm.min.mjs"), Path("static/js/vendor/mermaid.esm.min.mjs")),
+    (Path("node_modules/mermaid/dist/mermaid.min.js"), Path("static/js/vendor/mermaid.min.js")),
     (Path("node_modules/lunr/lunr.min.js"), Path("static/js/vendor/lunr.min.js")),
 )
 
@@ -371,6 +371,49 @@ def extract_title_and_summary(markdown_text: str, fallback_title: str) -> tuple[
     return title, " ".join(summary_lines).strip()
 
 
+def strip_leading_summary_paragraph(markdown_text: str) -> str:
+    lines = markdown_text.splitlines(keepends=True)
+    prefix: list[str] = []
+    index = 0
+
+    while index < len(lines) and not lines[index].strip():
+        prefix.append(lines[index])
+        index += 1
+
+    while index < len(lines) and lines[index].lstrip().startswith("<!--"):
+        while index < len(lines):
+            current = lines[index]
+            prefix.append(current)
+            index += 1
+            if "-->" in current:
+                break
+        while index < len(lines) and not lines[index].strip():
+            prefix.append(lines[index])
+            index += 1
+
+    paragraph_start = index
+    paragraph_lines: list[str] = []
+    while index < len(lines):
+        stripped = lines[index].strip()
+        if not stripped:
+            index += 1
+            while index < len(lines) and not lines[index].strip():
+                index += 1
+            return "".join(prefix + lines[index:])
+        if not paragraph_lines and stripped.startswith(("#", "```", "~~~", "- ", "* ", ">", "|")):
+            return markdown_text
+        if not paragraph_lines and re.match(r"^[0-9]+\.\s", stripped):
+            return markdown_text
+        if paragraph_lines and stripped.startswith("## "):
+            return "".join(prefix + lines[index:])
+        paragraph_lines.append(lines[index])
+        index += 1
+
+    if paragraph_lines:
+        return "".join(prefix + lines[index:])
+    return markdown_text if paragraph_start == index else "".join(prefix + lines[index:])
+
+
 def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: Any) -> tuple[str, str, str]:
     existing_fields, body = split_markdown_front_matter(markdown_text)
 
@@ -381,8 +424,13 @@ def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: An
 
     title, summary = extract_title_and_summary(body, effective_fallback_title)
     existing_description = existing_fields.get("description")
+    has_explicit_description = isinstance(existing_description, str) and bool(existing_description.strip())
     if not summary and isinstance(existing_description, str):
         summary = existing_description.strip()
+
+    normalized_body = strip_leading_markdown_h1(body)
+    if summary and not has_explicit_description:
+        normalized_body = strip_leading_summary_paragraph(normalized_body)
 
     updated_fields = dict(existing_fields)
     updated_fields.update(fields)
@@ -392,7 +440,7 @@ def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: An
     else:
         updated_fields.pop("description", None)
 
-    return with_yaml_front_matter(strip_leading_markdown_h1(body), **updated_fields), title, summary
+    return with_yaml_front_matter(normalized_body, **updated_fields), title, summary
 
 
 def humanized_stem(path: Path) -> str:
@@ -540,8 +588,6 @@ def normalize_lifecycle(
 
 def build_project_markdown(result: ProjectBuildResult) -> str:
     lines: list[str] = []
-    if result.summary:
-        lines.extend([result.summary, ""])
     if result.repository:
         lines.append(f"- Repository: <{result.repository}>")
     if result.default_branch:
@@ -576,8 +622,6 @@ def build_unreleased_index_markdown(result: ProjectBuildResult) -> str:
     lines: list[str] = []
     if result.default_branch:
         lines.extend([f"Built from the local `{result.default_branch}` branch snapshot.", ""])
-    if result.summary:
-        lines.extend([result.summary, ""])
     if result.doc_links:
         lines.extend(["## Docs", ""])
         for doc_link in result.doc_links:
@@ -793,7 +837,14 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         doc_title = humanized_stem(copied)
         if copied.suffix.lower() in {".md", ".markdown"} and staged_doc_path.is_file():
             doc_text = staged_doc_path.read_text(encoding="utf-8")
-            normalized_doc, doc_title, doc_summary = normalize_markdown_doc(doc_text, humanized_stem(copied), type="docs")
+            normalize_fields: dict[str, Any] = {"type": "docs"}
+            if copied == Path("_index.md"):
+                normalize_fields["linkTitle"] = "Docs"
+            normalized_doc, doc_title, doc_summary = normalize_markdown_doc(
+                doc_text,
+                humanized_stem(copied),
+                **normalize_fields,
+            )
             staged_doc_path.write_text(
                 normalized_doc,
                 encoding="utf-8",
@@ -866,6 +917,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         with_yaml_front_matter(
             build_unreleased_index_markdown(project_result),
             title=f"{display_name} {unreleased_label}",
+            linkTitle=unreleased_label,
             weight=10,
             type="docs",
             **({"description": summary} if summary else {}),

@@ -37,7 +37,7 @@ class SiteMvpTest(unittest.TestCase):
     def seed_docsy_vendor_assets(repo_root: Path) -> None:
         vendor_sources = {
             "node_modules/jquery/dist/jquery.min.js": "window.jQuery = {};\n",
-            "node_modules/mermaid/dist/mermaid.esm.min.mjs": "export const mermaid = {};\n",
+            "node_modules/mermaid/dist/mermaid.min.js": "globalThis.mermaid = { mermaidAPI: { defaultConfig: {} }, initialize() {}, run: async () => {} };\n",
             "node_modules/lunr/lunr.min.js": "window.lunr = {};\n",
         }
         for relative_path, contents in vendor_sources.items():
@@ -193,11 +193,20 @@ class SiteMvpTest(unittest.TestCase):
             self.assertIn("title: Apache Buildish Mammoth Cache for Gradle", project_index)
             self.assertIn("weight: 10", project_index)
             self.assertNotIn("linkTitle:", project_index)
-            self.assertIn("Secure Gradle wrapper provisioning.", project_index)
+            self.assertIn("description: Secure Gradle wrapper provisioning.", project_index)
+            self.assertNotIn("\nSecure Gradle wrapper provisioning.\n", project_index)
             self.assertNotIn("\n# Apache Buildish Mammoth Cache for Gradle\n", project_index)
             self.assertIn("Staged assets: 1 file(s)", project_index)
             self.assertIn("Latest stable: `v1.3.5`", project_index)
             self.assertIn("`v1` — maintained; latest `v1.3.5`", project_index)
+
+            mammoth_unreleased_index = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "_index.md").read_text(encoding="utf-8")
+            self.assertIn("title: Apache Buildish Mammoth Cache for Gradle Preview", mammoth_unreleased_index)
+            self.assertIn("linkTitle: Preview", mammoth_unreleased_index)
+            self.assertNotIn("\nSecure Gradle wrapper provisioning.\n", mammoth_unreleased_index)
+
+            mammoth_docs_index = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "_index.md").read_text(encoding="utf-8")
+            self.assertIn("linkTitle: Docs", mammoth_docs_index)
 
             projects_index = (repo_root / "site" / ".stage" / "content" / "projects" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("title: Projects", projects_index)
@@ -376,7 +385,7 @@ class SiteMvpTest(unittest.TestCase):
             mvp.build(repo_root)
 
             self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "jquery.min.js").exists())
-            self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "mermaid.esm.min.mjs").exists())
+            self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "mermaid.min.js").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "lunr.min.js").exists())
 
     def test_extract_title_and_summary_ignores_headings_inside_fenced_code_blocks(self) -> None:
@@ -390,6 +399,21 @@ class SiteMvpTest(unittest.TestCase):
             "Usage examples",
             type="docs",
         )[2])
+
+    def test_normalize_markdown_doc_strips_auto_promoted_summary_from_body(self) -> None:
+        markdown = """<!--\ncomment\n-->\n\n# Bootstrap Process\n\nThis document describes the full execution sequence for both the `prepare` and `finalize` phases.\n\n```mermaid\nflowchart TD\n    A --> B\n```\n"""
+
+        normalized, title, summary = mvp.normalize_markdown_doc(markdown, "Bootstrap Process", type="docs")
+
+        self.assertEqual("Bootstrap Process", title)
+        self.assertEqual(
+            "This document describes the full execution sequence for both the `prepare` and `finalize` phases.",
+            summary,
+        )
+        self.assertIn("description: This document describes the full execution sequence", normalized)
+        self.assertNotIn("# Bootstrap Process", normalized)
+        self.assertNotIn("This document describes the full execution sequence for both the `prepare` and `finalize` phases.\n\n```mermaid", normalized)
+        self.assertIn("```mermaid", normalized)
 
     def test_collect_watch_roots_includes_catalog_project_inputs_and_missing_repo_parent(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
