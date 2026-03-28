@@ -13,12 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__pycache__/
-/.idea/
-/.venv/
-/.stage/
-/.preview/
-/.public/
-/.hugo_build.lock
-/resources/
-
+baseURL: http://127.0.0.1:1313/
+title: Apache Buildish site MVP
+languageCode: en-us
+contentDir: .stage/content
+dataDir: .stage/data
+staticDir:
+  - .stage/static
+layoutDir: layouts
+publishDir: .public
+disableKinds:
+  - taxonomy
+  - term
+  - RSS
+  - sitemap
+markup:
+  goldmark:
+    renderer:
+      unsafe: false

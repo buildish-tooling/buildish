@@ -40,6 +40,10 @@ The current implementation should be treated as **unreleased-first and
 unreleased-only in practice**. Release snapshot staging is intentionally
 deferred until the project has real tagged releases to publish.
 
+The local `make -C site build` flow now stages content into `site/.stage/` and
+then renders it with a small local Hugo site shell that consumes staged
+`content/`, `data/`, and `static/` directly.
+
 ## MVP goals
 
 - Prove the aggregator + renderer split works in practice.

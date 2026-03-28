@@ -194,11 +194,41 @@ def relative_web_path(path: Path) -> str:
     return "/" + path.as_posix().lstrip("/")
 
 
-def release_index_web_path(repo_root: Path, project_root: Path, version: str) -> str | None:
-    release_index_path = project_root / "releases" / version / "index.md"
+def public_project_path(slug: str) -> str:
+    return f"/projects/{slug}/"
+
+
+def public_unreleased_path(slug: str) -> str:
+    return f"/projects/{slug}/unreleased/"
+
+
+def public_source_readme_path(slug: str) -> str:
+    return f"/projects/{slug}/source-readme/"
+
+
+def public_assets_root_path(slug: str) -> str:
+    return f"/projects/{slug}/unreleased/assets/"
+
+
+def public_release_path(slug: str, version: str) -> str:
+    return f"/projects/{slug}/releases/{version}/"
+
+
+def public_content_page_path(root_segments: list[str], relative_path: Path) -> str:
+    file_path = Path(relative_path)
+    segments = [segment for segment in file_path.parts[:-1] if segment not in {"."}]
+    stem = file_path.stem
+    if stem not in {"index", "_index"}:
+        segments.append(stem)
+    suffix = "/".join(root_segments + segments)
+    return "/" + suffix.strip("/") + "/"
+
+
+def release_index_web_path(project_root: Path, slug: str, version: str) -> str | None:
+    release_index_path = project_root / "releases" / version / "_index.md"
     if not release_index_path.is_file():
         return None
-    return relative_web_path(release_index_path.relative_to(repo_root))
+    return public_release_path(slug, version)
 
 
 def compile_tag_pattern(pattern_text: str, slug: str, warnings: list[str]) -> re.Pattern[str]:
@@ -229,7 +259,6 @@ def normalize_lifecycle(
     lifecycle_fields: dict[str, Any],
     tag_pattern: re.Pattern[str],
     slug: str,
-    repo_root: Path,
     project_root: Path,
     warnings: list[str],
 ) -> tuple[str | None, str | None, list[dict[str, Any]], list[dict[str, str]]]:
@@ -267,7 +296,7 @@ def normalize_lifecycle(
             continue
 
         aliases = normalize_aliases(raw_line.get("aliases"), slug, line, warnings)
-        path = release_index_web_path(repo_root, project_root, latest)
+        path = release_index_web_path(project_root, slug, latest)
         release_line = {"line": line, "latest": latest, "status": status, "aliases": aliases}
         if path is not None:
             release_line["path"] = path
@@ -277,7 +306,7 @@ def normalize_lifecycle(
 
     latest_stable_path = None
     if latest_stable_version is not None:
-        latest_stable_path = release_index_web_path(repo_root, project_root, latest_stable_version)
+        latest_stable_path = release_index_web_path(project_root, slug, latest_stable_version)
 
     return latest_stable_version, latest_stable_path, release_lines, alias_mappings
 
@@ -294,8 +323,7 @@ def build_project_markdown(result: ProjectBuildResult) -> str:
     if result.navigation_section:
         lines.append(f"- Navigation section: `{result.navigation_section}`")
     lines.append(
-        f"- Local preview: {result.unreleased_label} docs are staged under "
-        f"`content/projects/{result.slug}/unreleased/`."
+        f"- Public docs entry point: [{result.raw_unreleased_index_path}]({result.raw_unreleased_index_path})"
     )
     if result.asset_count and result.raw_assets_root_path:
         lines.append(
@@ -351,7 +379,7 @@ def build_root_index_markdown(results: list[ProjectBuildResult]) -> str:
     lines = ["# Apache Buildish site MVP", "", "## Local projects", ""]
     for result in results:
         status = "available" if result.available else "missing"
-        lines.append(f"- [{result.display_name}](/site/.stage/content/projects/{result.slug}/index.md) — {status}")
+        lines.append(f"- [{result.display_name}]({public_project_path(result.slug)}) — {status}")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -533,7 +561,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
     if readme_text:
         staged_readme_path.parent.mkdir(parents=True, exist_ok=True)
         staged_readme_path.write_text(readme_text, encoding="utf-8")
-        raw_readme_path = relative_web_path(staged_readme_path.relative_to(repo_root))
+        raw_readme_path = public_source_readme_path(slug)
 
     copied_docs: list[Path] = []
     copied_assets: list[Path] = []
@@ -559,24 +587,23 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
     for copied in copied_docs:
         if copied.suffix.lower() not in {".md", ".markdown", ".adoc", ".asciidoc"}:
             continue
-        raw_path = relative_web_path((docs_root / copied).relative_to(repo_root))
+        raw_path = public_content_page_path(["projects", slug, "unreleased", "docs"], copied)
         doc_links.append({"label": copied.with_suffix("").as_posix().replace("-", " "), "href": raw_path})
 
-    unreleased_index_path = unreleased_root / "index.md"
-    project_index_path = project_root / "index.md"
+    unreleased_index_path = unreleased_root / "_index.md"
+    project_index_path = project_root / "_index.md"
     version_metadata_path = unreleased_root / "version.yaml"
     lifecycle_metadata_path = project_root / "lifecycle.yaml"
 
-    raw_unreleased_index_path = relative_web_path(unreleased_index_path.relative_to(repo_root))
-    raw_project_index_path = relative_web_path(project_index_path.relative_to(repo_root))
-    raw_assets_root_path = relative_web_path(staged_assets_root.relative_to(repo_root)) if copied_assets else None
+    raw_unreleased_index_path = public_unreleased_path(slug)
+    raw_project_index_path = public_project_path(slug)
+    raw_assets_root_path = public_assets_root_path(slug) if copied_assets else None
 
     tag_pattern = compile_tag_pattern(tag_pattern_text, slug, warnings)
     latest_stable_version, latest_stable_path, release_lines, alias_mappings = normalize_lifecycle(
         lifecycle_fields,
         tag_pattern,
         slug,
-        repo_root,
         project_root,
         warnings,
     )

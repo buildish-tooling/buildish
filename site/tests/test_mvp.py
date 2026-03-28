@@ -117,13 +117,14 @@ class SiteMvpTest(unittest.TestCase):
             self.assertEqual(2, len(results))
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "wrapper-provisioning.md").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "static" / "projects" / "mammoth-cache-gradle" / "unreleased" / "assets" / "images" / "logo.svg").exists())
-            self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "no-gradle-wrapper-jar" / "unreleased" / "index.md").exists())
+            self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "no-gradle-wrapper-jar" / "unreleased" / "_index.md").exists())
             self.assertTrue((repo_root / "site" / ".preview" / "index.html").exists())
 
-            project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "index.md").read_text(encoding="utf-8")
+            project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("Secure Gradle wrapper provisioning.", project_index)
             self.assertIn("Open Preview docs", project_index)
             self.assertIn("Staged assets: 1 file(s)", project_index)
+            self.assertIn("/projects/mammoth-cache-gradle/unreleased/", project_index)
             self.assertIn("Latest stable: `v1.3.5`", project_index)
             self.assertIn("`v1` — maintained; latest `v1.3.5`", project_index)
 
@@ -134,10 +135,11 @@ class SiteMvpTest(unittest.TestCase):
             self.assertIn("metadataLoaded: true", version_metadata)
             self.assertIn("metadataFile: site/project.yaml", version_metadata)
             self.assertIn("label: Preview", version_metadata)
+            self.assertIn("path: /projects/mammoth-cache-gradle/unreleased/", version_metadata)
             self.assertIn("defaultBranch: trunk", version_metadata)
             self.assertIn("assetsRoot: site/assets", version_metadata)
             self.assertIn("count: 1", version_metadata)
-            self.assertIn("path: /site/.stage/static/projects/mammoth-cache-gradle/unreleased/assets", version_metadata)
+            self.assertIn("path: /projects/mammoth-cache-gradle/unreleased/assets/", version_metadata)
 
             lifecycle_metadata = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "lifecycle.yaml").read_text(encoding="utf-8")
             self.assertIn("version: v1.3.5", lifecycle_metadata)
@@ -153,7 +155,7 @@ class SiteMvpTest(unittest.TestCase):
             self.assertIn("alias: v1", aliases)
             self.assertIn("target: v1.3.5", aliases)
 
-            no_wrapper_project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "no-gradle-wrapper-jar" / "index.md").read_text(encoding="utf-8")
+            no_wrapper_project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "no-gradle-wrapper-jar" / "_index.md").read_text(encoding="utf-8")
             self.assertNotIn("Latest stable:", no_wrapper_project_index)
             self.assertNotIn("## Release lines", no_wrapper_project_index)
             self.assertNotIn("Staged assets:", no_wrapper_project_index)

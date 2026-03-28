@@ -15,13 +15,14 @@
 
 .DEFAULT_GOAL := help
 
+HUGO ?= hugo
 UV ?= uv
 PYTHON ?= python
 PORT ?= 8000
 UV_RUN := $(UV) run --project . --frozen
 HELP_TARGETS := $(MAKEFILE_LIST)
 
-.PHONY: build check clean help sanity-check serve test
+.PHONY: build check clean help hugo-check render sanity-check serve stage test
 
 help: ## Show available Make targets.
 	@awk 'BEGIN {FS = ":.*## "; printf "Available targets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(HELP_TARGETS)
@@ -32,14 +33,26 @@ sanity-check: ## Verify uv is available on PATH.
 		exit 1; \
 	}
 
-build: sanity-check ## Build the staged site and lightweight local preview.
+hugo-check: ## Verify Hugo is available on PATH.
+	@command -v $(HUGO) >/dev/null 2>&1 || { \
+		echo "Error: $(HUGO) is not available on PATH."; \
+		exit 1; \
+	}
+
+stage: sanity-check ## Build the staged site contract and lightweight Python preview.
 	$(UV_RUN) $(PYTHON) mvp.py build
 
-serve: sanity-check ## Serve the local preview; override PORT=<port> if needed.
-	$(UV_RUN) $(PYTHON) mvp.py serve --port $(PORT)
+render: hugo-check ## Render the staged site through local Hugo.
+	$(HUGO) --source . --config hugo.yaml --cleanDestinationDir
+
+build: stage render ## Build staged content and render the local Hugo site.
+
+serve: stage hugo-check ## Serve the staged site with local Hugo; override PORT=<port> if needed.
+	$(HUGO) server --source . --config hugo.yaml --port $(PORT)
 
 clean: sanity-check ## Remove generated local preview outputs.
 	$(UV_RUN) $(PYTHON) mvp.py clean
+	rm -rf .public .hugo_build.lock resources
 
 test: sanity-check ## Run the site MVP unit tests.
 	$(UV_RUN) $(PYTHON) -m unittest discover -s tests -p 'test_*.py' -v
