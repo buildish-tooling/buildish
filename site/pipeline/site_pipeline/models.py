@@ -39,6 +39,7 @@ class ProjectBuildResult:
     summary: str
     raw_unreleased_index_path: str | None
     raw_project_index_path: str | None
+    raw_docs_root_path: str | None
     raw_assets_root_path: str | None
     unreleased_label: str
     default_branch: str | None

@@ -57,6 +57,25 @@ from .rendering import (
 )
 
 
+def _without_none(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return a shallow copy that excludes keys whose value is ``None``."""
+
+    return {key: value for key, value in payload.items() if value is not None}
+
+
+def _serialized_release_lines(release_lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove null and empty alias values from release-line payloads."""
+
+    return [
+        {
+            key: value
+            for key, value in release_line.items()
+            if value is not None and (key != "aliases" or value)
+        }
+        for release_line in release_lines
+    ]
+
+
 def _content_setting(
     project: dict[str, Any],
     metadata_fields: dict[str, Any],
@@ -164,6 +183,135 @@ def _write_project_indexes(result: ProjectBuildResult, project_root: Path, unrel
     )
 
 
+def _buildish_project_payload(result: ProjectBuildResult) -> dict[str, Any]:
+    """Build the project-context payload injected into staged Markdown pages."""
+
+    payload = {
+        "slug": result.slug,
+        "displayName": result.display_name,
+        "summary": result.summary or None,
+        "available": result.available,
+        "localDir": result.local_dir,
+        "repository": result.repository,
+        "defaultBranch": result.default_branch,
+        "navigationSection": result.navigation_section,
+        "paths": _without_none(
+            {
+                "project": result.raw_project_index_path,
+                "unreleased": result.raw_unreleased_index_path,
+                "docs": result.raw_docs_root_path,
+                "assets": result.raw_assets_root_path,
+            }
+        ),
+        "unreleasedLabel": result.unreleased_label,
+        "unreleased": _without_none(
+            {
+                "label": result.unreleased_label,
+                "path": result.raw_unreleased_index_path,
+                "docsPath": result.raw_docs_root_path,
+                "assetsPath": result.raw_assets_root_path,
+            }
+        ),
+        "latestStable": None,
+        "releaseLines": _serialized_release_lines(result.release_lines),
+    }
+    if result.latest_stable_version is not None:
+        payload["latestStable"] = _without_none(
+            {
+                "version": result.latest_stable_version,
+                "path": result.latest_stable_path,
+            }
+        )
+    return _without_none(payload)
+
+
+def _buildish_project_page_payload(
+    result: ProjectBuildResult,
+    *,
+    kind: str,
+    section: str,
+    page_path: str | None,
+) -> dict[str, Any]:
+    """Build per-page context for staged project pages."""
+
+    payload: dict[str, Any] = {
+        "kind": kind,
+        "section": section,
+        "path": page_path,
+        "projectPath": result.raw_project_index_path,
+    }
+    if section in {"unreleased", "docs"}:
+        payload["version"] = _without_none(
+            {
+                "kind": "unreleased",
+                "label": result.unreleased_label,
+                "path": result.raw_unreleased_index_path,
+                "docsPath": result.raw_docs_root_path,
+            }
+        )
+    return _without_none(payload)
+
+
+def _annotate_staged_project_pages(
+    result: ProjectBuildResult,
+    project_root: Path,
+    unreleased_root: Path,
+    docs_root: Path,
+    copied_docs: list[Path],
+) -> None:
+    """Inject pipeline-owned project context into all staged Markdown pages."""
+
+    project_payload = _buildish_project_payload(result)
+    project_index_path = project_root / "_index.md"
+    project_index_path.write_text(
+        update_markdown_front_matter(
+            project_index_path.read_text(encoding="utf-8"),
+            buildishProject=project_payload,
+            buildishProjectPage=_buildish_project_page_payload(
+                result,
+                kind="project-home",
+                section="project",
+                page_path=result.raw_project_index_path,
+            ),
+        ),
+        encoding="utf-8",
+    )
+
+    unreleased_index_path = unreleased_root / "_index.md"
+    unreleased_index_path.write_text(
+        update_markdown_front_matter(
+            unreleased_index_path.read_text(encoding="utf-8"),
+            buildishProject=project_payload,
+            buildishProjectPage=_buildish_project_page_payload(
+                result,
+                kind="unreleased-home",
+                section="unreleased",
+                page_path=result.raw_unreleased_index_path,
+            ),
+        ),
+        encoding="utf-8",
+    )
+
+    for copied in copied_docs:
+        staged_doc_path = docs_root / copied
+        if copied.suffix.lower() not in {".md", ".markdown"} or not staged_doc_path.is_file():
+            continue
+        page_path = public_content_page_path(["projects", result.slug, "unreleased", "docs"], copied)
+        staged_doc_path.write_text(
+            update_markdown_front_matter(
+                staged_doc_path.read_text(encoding="utf-8"),
+                buildishProject=project_payload,
+                buildishProjectPage=_buildish_project_page_payload(
+                    result,
+                    kind="docs-home" if copied == Path("_index.md") else "docs-page",
+                    section="docs",
+                    page_path=page_path,
+                ),
+            ),
+            encoding="utf-8",
+        )
+
+
 def _write_project_metadata_files(
     result: ProjectBuildResult,
     project_root: Path,
@@ -184,7 +332,14 @@ def _write_project_metadata_files(
         {
             "schemaVersion": 1,
             "project": {"slug": result.slug, "displayName": result.display_name},
-            "version": {"kind": "unreleased", "label": result.unreleased_label, "path": raw_unreleased_index_path},
+            "version": _without_none(
+                {
+                    "kind": "unreleased",
+                    "label": result.unreleased_label,
+                    "path": raw_unreleased_index_path,
+                    "docsPath": result.raw_docs_root_path,
+                }
+            ),
             "source": {
                 "repository": result.repository,
                 "localDir": result.local_dir,
@@ -205,25 +360,18 @@ def _write_project_metadata_files(
         "unreleased": {
             "label": result.unreleased_label,
             "path": raw_unreleased_index_path,
+            "docsPath": result.raw_docs_root_path,
             "robots": "index,follow",
         },
         "latestStable": None,
         "releaseLines": [],
     }
     if result.latest_stable_version is not None:
-        latest_stable_entry: dict[str, Any] = {"version": result.latest_stable_version}
-        if result.latest_stable_path is not None:
-            latest_stable_entry["path"] = result.latest_stable_path
-        lifecycle_payload["latestStable"] = latest_stable_entry
+        lifecycle_payload["latestStable"] = _without_none(
+            {"version": result.latest_stable_version, "path": result.latest_stable_path}
+        )
     if result.release_lines:
-        lifecycle_payload["releaseLines"] = [
-            {
-                key: value
-                for key, value in release_line.items()
-                if value is not None and (key != "aliases" or value)
-            }
-            for release_line in result.release_lines
-        ]
+        lifecycle_payload["releaseLines"] = _serialized_release_lines(result.release_lines)
 
     write_yaml_like(
         lifecycle_metadata_path,
@@ -329,6 +477,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
 
     raw_unreleased_index_path = public_unreleased_path(slug)
     raw_project_index_path = public_project_path(slug)
+    raw_docs_root_path = public_content_page_path(["projects", slug, "unreleased", "docs"], Path("_index.md")) if (docs_root / "_index.md").is_file() else None
     raw_assets_root_path = public_assets_root_path(slug) if copied_assets else None
     tag_pattern = compile_tag_pattern(tag_pattern_text, slug, warnings)
     latest_stable_version, latest_stable_path, release_lines, alias_mappings = normalize_lifecycle(
@@ -350,6 +499,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         summary=summary,
         raw_unreleased_index_path=raw_unreleased_index_path,
         raw_project_index_path=raw_project_index_path,
+        raw_docs_root_path=raw_docs_root_path,
         raw_assets_root_path=raw_assets_root_path,
         unreleased_label=unreleased_label,
         default_branch=str(default_branch) if default_branch else None,
@@ -373,6 +523,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         docs_relative=docs_relative,
         assets_relative=assets_relative,
     )
+    _annotate_staged_project_pages(result, project_root, unreleased_root, docs_root, copied_docs)
     return result
 
 
@@ -411,6 +562,9 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
                     "localDir": result.local_dir,
                     "repository": result.repository,
                     "defaultBranch": result.default_branch,
+                    "projectPath": result.raw_project_index_path,
+                    "unreleasedPath": result.raw_unreleased_index_path,
+                    "docsPath": result.raw_docs_root_path,
                 }
                 for result in results
             ],
@@ -431,9 +585,14 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
                     "defaultBranch": result.default_branch,
                     "navigationSection": result.navigation_section,
                     "unreleasedLabel": result.unreleased_label,
+                    "projectPath": result.raw_project_index_path,
+                    "unreleasedPath": result.raw_unreleased_index_path,
+                    "docsPath": result.raw_docs_root_path,
                     "assetCount": result.asset_count,
                     "assetsPath": result.raw_assets_root_path,
                     "latestStable": result.latest_stable_version,
+                    "latestStablePath": result.latest_stable_path,
+                    "releaseLines": _serialized_release_lines(result.release_lines),
                 }
                 for result in results
             },
@@ -446,15 +605,14 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
             "projects": {
                 result.slug: {
                     "latestStable": result.latest_stable_version,
-                    "releaseLines": [
+                    "releaseLines": _serialized_release_lines(result.release_lines),
+                    "unreleased": _without_none(
                         {
-                            key: value
-                            for key, value in release_line.items()
-                            if key in {"line", "latest", "status", "aliases"} and (key != "aliases" or value)
+                            "label": result.unreleased_label,
+                            "path": result.raw_unreleased_index_path,
+                            "docsPath": result.raw_docs_root_path,
                         }
-                        for release_line in result.release_lines
-                    ],
-                    "unreleased": {"label": result.unreleased_label, "path": result.raw_unreleased_index_path},
+                    ),
                 }
                 for result in results
             },

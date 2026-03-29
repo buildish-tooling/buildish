@@ -138,6 +138,11 @@ The current MVP generates, at minimum:
 - `site/.stage/data/aliases.yaml`
 - `site/.stage/static/projects/<slug>/unreleased/assets/...` when assets exist
 
+Each staged project Markdown page also receives pipeline-owned front matter under:
+
+- `buildishProject` for the current project identity, navigation paths, and lifecycle summary
+- `buildishProjectPage` for the current staged page kind and active unreleased-version context
+
 ## Local commands
 
 From `site/`:

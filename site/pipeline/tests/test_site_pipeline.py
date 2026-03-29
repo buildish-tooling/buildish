@@ -75,8 +75,17 @@ class SitePipelineTest(unittest.TestCase):
                     "navigationSection": "sub-projects",
                 },
                 "projects": [
-                    {"slug": "mammoth-cache-gradle", "localDir": "buildish-mammoth-cache-gradle"},
-                    {"slug": "no-gradle-wrapper-jar", "localDir": "buildish-no-gradle-wrapper-jar", "weight": 5},
+                    {
+                        "slug": "mammoth-cache-gradle",
+                        "displayName": "Mammoth Cache for Gradle",
+                        "localDir": "buildish-mammoth-cache-gradle",
+                    },
+                    {
+                        "slug": "no-gradle-wrapper-jar",
+                        "displayName": "No Gradle Wrapper JAR",
+                        "localDir": "buildish-no-gradle-wrapper-jar",
+                        "weight": 5,
+                    },
                     {"slug": "site", "localDir": "buildish", "weight": 100},
                 ],
             }
@@ -94,7 +103,7 @@ class SitePipelineTest(unittest.TestCase):
                         "schemaVersion": 1,
                         "project": {
                             "slug": "site",
-                            "displayName": "Apache Buildish Site",
+                            "displayName": "Site",
                             "repository": "https://github.com/apache/buildish",
                         },
                         "content": {"docsRoot": "docs", "assetsRoot": None},
@@ -192,23 +201,33 @@ class SitePipelineTest(unittest.TestCase):
             self.assertIn("While incubation status is not necessarily a reflection", root_front_matter["incubator_disclaimer_paragraphs"][2])
 
             project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "_index.md").read_text(encoding="utf-8")
-            self.assertIn("title: Apache Buildish Mammoth Cache for Gradle", project_index)
+            self.assertIn("title: Mammoth Cache for Gradle", project_index)
             self.assertIn("weight: 10", project_index)
             self.assertNotIn("linkTitle:", project_index)
             self.assertIn("description: Secure Gradle wrapper provisioning.", project_index)
             self.assertNotIn("\nSecure Gradle wrapper provisioning.\n", project_index)
-            self.assertNotIn("\n# Apache Buildish Mammoth Cache for Gradle\n", project_index)
+            self.assertNotIn("\n# Mammoth Cache for Gradle\n", project_index)
             self.assertIn("Staged assets: 1 file(s)", project_index)
             self.assertIn("Latest stable: `v1.3.5`", project_index)
             self.assertIn("`v1` — maintained; latest `v1.3.5`", project_index)
+            project_front_matter = yaml.safe_load(project_index.split("---", 2)[1])
+            self.assertEqual("mammoth-cache-gradle", project_front_matter["buildishProject"]["slug"])
+            self.assertEqual("Mammoth Cache for Gradle", project_front_matter["buildishProject"]["displayName"])
+            self.assertEqual("/projects/mammoth-cache-gradle/unreleased/docs/", project_front_matter["buildishProject"]["paths"]["docs"])
+            self.assertEqual("project-home", project_front_matter["buildishProjectPage"]["kind"])
 
             mammoth_unreleased_index = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "_index.md").read_text(encoding="utf-8")
-            self.assertIn("title: Apache Buildish Mammoth Cache for Gradle Preview", mammoth_unreleased_index)
+            self.assertIn("title: Mammoth Cache for Gradle Preview", mammoth_unreleased_index)
             self.assertIn("linkTitle: Preview", mammoth_unreleased_index)
             self.assertNotIn("\nSecure Gradle wrapper provisioning.\n", mammoth_unreleased_index)
+            mammoth_unreleased_front_matter = yaml.safe_load(mammoth_unreleased_index.split("---", 2)[1])
+            self.assertEqual("unreleased-home", mammoth_unreleased_front_matter["buildishProjectPage"]["kind"])
 
             mammoth_docs_index = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("linkTitle: Docs", mammoth_docs_index)
+            mammoth_docs_front_matter = yaml.safe_load(mammoth_docs_index.split("---", 2)[1])
+            self.assertEqual("docs-home", mammoth_docs_front_matter["buildishProjectPage"]["kind"])
+            self.assertEqual("/projects/mammoth-cache-gradle/unreleased/docs/", mammoth_docs_front_matter["buildishProjectPage"]["path"])
 
             projects_index = (repo_root / "site" / ".stage" / "content" / "projects" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("title: Projects", projects_index)
@@ -242,14 +261,15 @@ class SitePipelineTest(unittest.TestCase):
 
             preview_index = (repo_root / "site" / ".preview" / "index.html").read_text(encoding="utf-8")
             self.assertIn("Apache Buildish (Incubating)", preview_index)
-            self.assertIn("Apache Buildish Mammoth Cache for Gradle", preview_index)
-            self.assertIn("Apache Buildish Site", preview_index)
+            self.assertIn("Mammoth Cache for Gradle", preview_index)
+            self.assertIn("Site", preview_index)
 
             version_metadata = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "version.yaml").read_text(encoding="utf-8")
             self.assertIn("metadataLoaded: true", version_metadata)
             self.assertIn("metadataFile: site/project.yaml", version_metadata)
             self.assertIn("label: Preview", version_metadata)
             self.assertIn("path: /projects/mammoth-cache-gradle/unreleased/", version_metadata)
+            self.assertIn("docsPath: /projects/mammoth-cache-gradle/unreleased/docs/", version_metadata)
             self.assertIn("defaultBranch: trunk", version_metadata)
             self.assertIn("assetsRoot: site/assets", version_metadata)
             self.assertIn("count: 1", version_metadata)
@@ -260,10 +280,17 @@ class SitePipelineTest(unittest.TestCase):
             self.assertIn("line: v1", lifecycle_metadata)
             self.assertIn("status: maintained", lifecycle_metadata)
             self.assertIn("- v1", lifecycle_metadata)
+            self.assertIn("docsPath: /projects/mammoth-cache-gradle/unreleased/docs/", lifecycle_metadata)
 
             aggregated_lifecycle = (repo_root / "site" / ".stage" / "data" / "lifecycle.yaml").read_text(encoding="utf-8")
             self.assertIn("latestStable: v1.3.5", aggregated_lifecycle)
             self.assertIn("line: v1.2", aggregated_lifecycle)
+            self.assertIn("docsPath: /projects/mammoth-cache-gradle/unreleased/docs/", aggregated_lifecycle)
+
+            projects_data = yaml.safe_load((repo_root / "site" / ".stage" / "data" / "projects.yaml").read_text(encoding="utf-8"))
+            self.assertEqual("/projects/mammoth-cache-gradle/", projects_data["projects"]["mammoth-cache-gradle"]["projectPath"])
+            self.assertEqual("/projects/mammoth-cache-gradle/unreleased/docs/", projects_data["projects"]["mammoth-cache-gradle"]["docsPath"])
+            self.assertEqual("/projects/site/", projects_data["projects"]["site"]["projectPath"])
 
             aliases = (repo_root / "site" / ".stage" / "data" / "aliases.yaml").read_text(encoding="utf-8")
             self.assertIn("alias: v1", aliases)
@@ -278,7 +305,7 @@ class SitePipelineTest(unittest.TestCase):
             self.assertNotIn("Staged assets:", no_wrapper_project_index)
 
             site_project_index = (repo_root / "site" / ".stage" / "content" / "projects" / "site" / "_index.md").read_text(encoding="utf-8")
-            self.assertIn("title: Apache Buildish Site", site_project_index)
+            self.assertIn("title: Site", site_project_index)
             self.assertIn("weight: 100", site_project_index)
             self.assertIn("Site implementation and infrastructure docs.", site_project_index)
             self.assertNotIn("Staged assets:", site_project_index)
@@ -289,6 +316,7 @@ class SitePipelineTest(unittest.TestCase):
             self.assertNotIn("Open staged assets", site_unreleased_index)
 
             site_version_metadata = (repo_root / "site" / ".stage" / "content" / "projects" / "site" / "unreleased" / "version.yaml").read_text(encoding="utf-8")
+            self.assertIn("docsPath: /projects/site/unreleased/docs/", site_version_metadata)
             self.assertIn("assetsRoot: null", site_version_metadata)
             self.assertIn("count: 0", site_version_metadata)
 

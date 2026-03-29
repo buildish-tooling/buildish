@@ -291,6 +291,7 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         projects_payload = yaml.safe_load((repo_root / "site" / ".stage" / "data" / "projects.yaml").read_text(encoding="utf-8"))
         self.assertTrue(projects_payload["projects"]["mammoth-cache-gradle"]["available"])
         self.assertIn("Mammoth Cache for Gradle", projects_payload["projects"]["mammoth-cache-gradle"]["displayName"])
+        self.assertEqual("/projects/mammoth-cache-gradle/unreleased/docs/", projects_payload["projects"]["mammoth-cache-gradle"]["docsPath"])
         container_log = (repo_root / "site" / "build" / "fake-container.log").read_text(encoding="utf-8")
         self.assertIn("run", container_log)
         self.assertIn("--init", container_log)

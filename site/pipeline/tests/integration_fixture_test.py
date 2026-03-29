@@ -122,7 +122,9 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
             projects_data = yaml.safe_load((repo_root / "site" / ".stage" / "data" / "projects.yaml").read_text(encoding="utf-8"))
             self.assertEqual("Fixture Mammoth Cache for Gradle", projects_data["projects"]["mammoth-cache-gradle"]["displayName"])
             self.assertEqual("buildish-no-gradle-wrapper-jar", projects_data["projects"]["no-gradle-wrapper-jar"]["localDir"])
-            self.assertEqual("Apache Buildish Site", projects_data["projects"]["site"]["displayName"])
+            self.assertEqual("Site", projects_data["projects"]["site"]["displayName"])
+            self.assertEqual("/projects/site/", projects_data["projects"]["site"]["projectPath"])
+            self.assertEqual("/projects/site/unreleased/docs/", projects_data["projects"]["site"]["docsPath"])
             self.assertEqual(0, projects_data["projects"]["site"]["assetCount"])
 
             lifecycle_data = yaml.safe_load((repo_root / "site" / ".stage" / "data" / "lifecycle.yaml").read_text(encoding="utf-8"))
@@ -132,11 +134,14 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
             site_unreleased_index = (repo_root / "site" / ".stage" / "content" / "projects" / "site" / "unreleased" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("## Docs", site_unreleased_index)
             self.assertNotIn("Open staged assets", site_unreleased_index)
+            site_unreleased_front_matter = yaml.safe_load(site_unreleased_index.split("---", 2)[1])
+            self.assertEqual("Site", site_unreleased_front_matter["buildishProject"]["displayName"])
+            self.assertEqual("unreleased-home", site_unreleased_front_matter["buildishProjectPage"]["kind"])
 
             preview_index = (repo_root / "site" / ".preview" / "index.html").read_text(encoding="utf-8")
             self.assertIn("Fixture Mammoth Cache for Gradle", preview_index)
             self.assertIn("Fixture no-gradle-wrapper-jar", preview_index)
-            self.assertIn("Apache Buildish Site", preview_index)
+            self.assertIn("Site", preview_index)
         finally:
             shutil.rmtree(FIXTURE_BUILD_ROOT, ignore_errors=True)
 

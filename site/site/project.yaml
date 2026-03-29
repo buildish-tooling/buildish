@@ -16,7 +16,7 @@
 schemaVersion: 1
 project:
   slug: site
-  displayName: Apache Buildish Site
+  displayName: Site
   repository: https://github.com/apache/buildish
 content:
   assetsRoot: null
