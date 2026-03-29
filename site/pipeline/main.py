@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Python support for the Buildish site.
+"""Tiny command-line entry point for the site pipeline package."""
 
-The ``site/pipeline`` directory contains the local ``uv`` project, a tiny CLI
-entrypoint, the ``site_pipeline`` implementation package, and its tests.
-"""
+from __future__ import annotations
+
+from site_pipeline import main
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

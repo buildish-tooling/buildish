@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Unit tests for the Buildish site pipeline package."""
+
 from __future__ import annotations
 
 import shutil
@@ -422,7 +424,8 @@ class SitePipelineTest(unittest.TestCase):
             repo_root.mkdir()
             (repo_root / "site" / "content").mkdir(parents=True)
             (repo_root / "site" / "pipeline").mkdir(parents=True)
-            (repo_root / "site" / "pipeline" / "site_pipeline.py").write_text("# watcher stub\n", encoding="utf-8")
+            (repo_root / "site" / "pipeline" / "site_pipeline").mkdir(parents=True)
+            (repo_root / "site" / "pipeline" / "site_pipeline" / "__init__.py").write_text("# watcher stub\n", encoding="utf-8")
             catalog = {
                 "schemaVersion": 1,
                 "defaults": {

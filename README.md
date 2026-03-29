@@ -18,31 +18,9 @@ limitations under the License.
 
 Apache Buildish develops build automation, CI integrations, and supporting tooling.
 
-## Available actions
+## Available projects
 
-- [Apache Buildish Mammoth Cache for Gradle](actions/mammoth-cache/gradle/README.md) — secure Gradle wrapper
-  provisioning plus local and distributed cache management.
-
-Use it in GitHub workflows as:
-
-- `uses: apache/buildish/actions/mammoth-cache/gradle@<ref>`
-
-## Repository layout
-
-- `actions/mammoth-cache/gradle/` — Mammoth Cache for Gradle, the first action in the Mammoth Cache family
-- `site/` — Hugo/Docsy site sources and staged-site tooling
-- `tools/site-build-image/` — reusable container image definition for site build/test workflows
-- `tools/buildish-no-gradle-wrapper-jar/` — Buildish no-gradle-wrapper-jar helper tool
-
-> [!ALERT] This repository is a work-in-progress and is not yet ready for use.
-> 
-> We should use multiple GitHub repositories for the different actions and likely (most) plugins.
-> Especially GitHub/Codeberg/GitLab CI "actions" heavily rely on Git tags. Having different release
-> cadences for "all the actions" and "all the plugins" seems natural, but "telling" users of plugin "A"
-> that a new version exists just because GitHub action "B" did a release seems wrong. The only way to
-> avoid that seems to be to have separate repositories for each action/plugin.
-> 
-> This has a big impact on how we design/build the infrastructure for the web site, documentation, etc.
+See [buildish.apache.org](https://buildish.apache.org/) for the latest list of available projects.
 
 ## License
 

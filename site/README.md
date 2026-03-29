@@ -16,7 +16,8 @@ limitations under the License.
 
 # Apache Buildish site development
 
-The site uses Hugo + Docsy for rendering, with the Python staging pipeline living under `site/pipeline/site_pipeline.py`.
+The site uses Hugo + Docsy for rendering, with the Python staging pipeline implemented under
+`site/pipeline/site_pipeline/` and a small CLI entrypoint in `site/pipeline/main.py`.
 
 ## Local native workflow
 
@@ -35,7 +36,8 @@ The native workflow expects:
 - Hugo extended
 - Node available via `nvm` using `.nvmrc`
 
-The Node.js files in `site/` support the Hugo + Docsy render path, while the Python staging logic, Python tests, and `uv` project files now live under `site/pipeline/`.
+The Node.js files in `site/` support the Hugo + Docsy render path, while the Python staging package, Python tests, and
+`uv` project files now live under `site/pipeline/`.
 
 `make stage-local` runs the staging pipeline directly on the host. `make serve-local` keeps
 `site/.stage/` up to date while Hugo runs, including changes in project READMEs/docs/assets
@@ -46,27 +48,31 @@ Known local-dev behavior:
 
 - changes to `site/projects.yaml` can take a short while to appear in the running Hugo server
 - newly added projects usually show up correctly after the watcher restages content
-- removed project routes can linger briefly in an already-running `make serve` session even after they disappear from the staged catalog
+- removed project routes can linger briefly in an already-running `make serve` session even after they disappear from
+  the staged catalog
 
-Treat that last case as an accepted development-only inconvenience. A fresh `make build` or a restarted `make serve-local` reflects the current catalog cleanly.
+Treat that last case as an accepted development-only inconvenience. A fresh `make build` or a restarted
+`make serve-local` reflects the current catalog cleanly.
 
-## Current sub-project contract
+## Current subproject contract
 
-The currently implemented catalog and sub-project metadata contract is documented in
-[`../docs/site-subproject-contract.md`](../docs/site-subproject-contract.md).
+The currently implemented catalog and subproject metadata contract is documented in
+[`../docs/site-subproject-contract.md`](site/docs/site-subproject-contract.md).
 
 That document describes:
 
 - `site/projects.yaml` defaults and per-project overrides
 - the preferred `site/project.yaml` structure
-- precedence rules between catalog values and sub-project metadata
+- precedence rules between catalog values and subproject metadata
 - current staging outputs and safety constraints
 
 ## Containerized workflow
 
-The repository includes a pinned build container so developers can build the site without installing the full local toolchain.
+The repository includes a pinned build container, so developers can build the site without installing the full local
+toolchain.
 
-The reusable builder-image definition lives in `../tools/site-build-image/`, while `site/Makefile` remains the main entrypoint for local site workflows.
+The reusable builder-image definition lives in `../tools/site-build-image/`, while `site/Makefile` remains the main
+entrypoint for local site workflows.
 
 From `site/`:
 
@@ -99,9 +105,12 @@ previous host-native entrypoints remain available as `make stage-local`,
 The containerized flow:
 
 - bind-mounts the parent workspace into `/workspace`, with this repository available at `/workspace/<repo-name>/`
-- uses that mount in read/write mode, not read-only, because the container writes generated outputs and caches back into this repository
-- can only stage/serve sub-projects whose `localDir` resolves within that parent workspace; in practice that means sibling repositories next to the main repo (for example `../buildish-mammoth-cache-gradle`)
-- if your sub-project repositories live somewhere else, prefer the native `make stage-local`, `make stage-watch-local`, or `make serve-local` workflow instead
+- uses that mount in read/write mode, not read-only, because the container writes generated outputs and caches back into
+  this repository
+- can only stage/serve subprojects whose `localDir` resolves within that parent workspace; in practice that means
+  sibling repositories next to the main repo (for example `../buildish-mammoth-cache-gradle`)
+- if your subproject repositories live somewhere else, prefer the native `make stage-local`, `make stage-watch-local`,
+  or `make serve-local` workflow instead
 - writes generated outputs back into the working tree
 - keeps tool caches under `site/.container-home/`
 - installs Node dependencies with `npm ci --ignore-scripts`
@@ -111,9 +120,10 @@ The builder `Containerfile` pins multi-architecture index digests. The
 architecture so Podman/Docker select the intended child manifest instead of
 guessing from local cache state.
 
-This split also makes it straightforward for future CI to rebuild or publish the builder image only when the builder-image inputs change.
+This split also makes it straightforward for future CI to rebuild or publish the builder image only when the
+builder-image inputs change.
 
-The current site verification workflow also uses this containerized path so CI exercises
+The current site verification workflow also uses this containerized path, so CI exercises
 the same staged-site and Hugo build flow with pinned tooling.
 
 ## Produced outputs
@@ -124,4 +134,4 @@ Builds write to:
 - `site/.preview/`
 - `site/.public/`
 
-These outputs are ignored by Git.
+Git ignores these outputs.
