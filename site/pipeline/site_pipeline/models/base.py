@@ -23,7 +23,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 import yaml
 
 
-def snake_to_camel(value: str) -> str:
+def _snake_to_camel(value: str) -> str:
     """Convert ``snake_case`` names into the YAML contract's ``camelCase`` form."""
 
     first, *rest = value.split("_")
@@ -34,7 +34,7 @@ class YamlModel(BaseModel):
     """Base model for plain YAML contracts validated with Pydantic."""
 
     model_config = ConfigDict(
-        alias_generator=snake_to_camel,
+        alias_generator=_snake_to_camel,
         populate_by_name=True,
         extra="forbid",
         frozen=True,

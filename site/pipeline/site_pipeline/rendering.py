@@ -24,7 +24,7 @@ from .constants import SITE_TITLE
 from .models import ProjectBuildResult, ProjectLifecycleSettings, StagedAliasMapping, StagedReleaseLine
 
 
-def relative_web_path(path: Path) -> str:
+def _relative_web_path(path: Path) -> str:
     """Convert a filesystem-relative path into a site-relative URL path."""
 
     return "/" + path.as_posix().lstrip("/")
@@ -48,7 +48,7 @@ def public_assets_root_path(slug: str) -> str:
     return f"/projects/{slug}/unreleased/assets/"
 
 
-def public_release_path(slug: str, version: str) -> str:
+def _public_release_path(slug: str, version: str) -> str:
     """Return the public URL of a staged release landing page."""
 
     return f"/projects/{slug}/releases/{version}/"
@@ -66,13 +66,13 @@ def public_content_page_path(root_segments: list[str], relative_path: Path) -> s
     return "/" + suffix.strip("/") + "/"
 
 
-def release_index_web_path(project_root: Path, slug: str, version: str) -> str | None:
+def _release_index_web_path(project_root: Path, slug: str, version: str) -> str | None:
     """Return the staged URL of a release landing page if that page exists."""
 
     release_index_path = project_root / "releases" / version / "_index.md"
     if not release_index_path.is_file():
         return None
-    return public_release_path(slug, version)
+    return _public_release_path(slug, version)
 
 
 def normalize_lifecycle(
@@ -99,14 +99,14 @@ def normalize_lifecycle(
             )
 
         aliases = tuple(release_line_model.aliases)
-        path = release_index_web_path(project_root, slug, latest)
+        path = _release_index_web_path(project_root, slug, latest)
         release_lines.append(StagedReleaseLine(line=line, latest=latest, status=status, aliases=aliases, path=path))
         for alias in aliases:
             alias_mappings.append(StagedAliasMapping(alias=alias, target=latest, line=line, status=status))
 
     latest_stable_path = None
     if latest_stable_version is not None:
-        latest_stable_path = release_index_web_path(project_root, slug, latest_stable_version)
+        latest_stable_path = _release_index_web_path(project_root, slug, latest_stable_version)
 
     return latest_stable_version, latest_stable_path, tuple(release_lines), tuple(alias_mappings)
 
@@ -163,7 +163,7 @@ def build_unreleased_index_markdown(result: ProjectBuildResult) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def html_page(title: str, body: str) -> str:
+def _html_page(title: str, body: str) -> str:
     """Wrap a preview-page body in a tiny standalone HTML document."""
 
     return """<!doctype html>
@@ -202,7 +202,7 @@ def build_preview_index(results: list[ProjectBuildResult]) -> str:
         "<p><a href='/site/.stage/content/_index.md'>Open staged root markdown</a></p>"
         f"<ul>{''.join(items)}</ul>"
     )
-    return html_page(SITE_TITLE, body)
+    return _html_page(SITE_TITLE, body)
 
 
 def build_project_preview(result: ProjectBuildResult) -> str:
@@ -253,4 +253,4 @@ def build_project_preview(result: ProjectBuildResult) -> str:
         body.append(f"<h2>Release lines</h2><ul>{''.join(release_items)}</ul>")
     if warning_items:
         body.append(f"<h2 class='warn'>Warnings</h2><ul>{warning_items}</ul>")
-    return html_page(result.display_name, "".join(body))
+    return _html_page(result.display_name, "".join(body))

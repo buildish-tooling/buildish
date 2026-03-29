@@ -373,7 +373,7 @@ def _write_project_metadata_files(
     )
 
 
-def stage_authored_site_content(site_root: Path, stage_root: Path, incubator_disclaimer_paragraphs: list[str]) -> None:
+def _stage_authored_site_content(site_root: Path, stage_root: Path, incubator_disclaimer_paragraphs: list[str]) -> None:
     """Copy the site's hand-authored content into the staged Hugo tree."""
 
     source_content_root = site_root / "content"
@@ -529,7 +529,7 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
     ]
     incubator_disclaimer = read_text_if_exists(resolved_repo_root / "DISCLAIMER").strip()
     incubator_disclaimer_paragraphs = split_paragraphs(incubator_disclaimer)
-    stage_authored_site_content(site_root, stage_root, incubator_disclaimer_paragraphs)
+    _stage_authored_site_content(site_root, stage_root, incubator_disclaimer_paragraphs)
     stage_vendor_assets(site_root, stage_root)
 
     write_yaml_like(

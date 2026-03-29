@@ -28,7 +28,7 @@ from .authored import (
     ProjectsCatalog,
     ProjectVersioningSettings,
 )
-from .base import YamlModel, snake_to_camel
+from .base import YamlModel
 from .front_matter import (
     BuildishProjectPagePayload,
     BuildishProjectPaths,

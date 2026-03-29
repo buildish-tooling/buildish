@@ -52,7 +52,7 @@ def _configured_content_root(
     )
 
 
-def project_watch_roots(repo_root: Path, project: CatalogProject, defaults: ProjectCatalogDefaults) -> set[Path]:
+def _project_watch_roots(repo_root: Path, project: CatalogProject, defaults: ProjectCatalogDefaults) -> set[Path]:
     """Return the filesystem paths that can affect one project's staged output."""
 
     slug = project.slug
@@ -106,7 +106,7 @@ def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
             watch_roots.add(source.resolve())
 
     for project in catalog.projects:
-        watch_roots.update(project_watch_roots(resolved_repo_root, project, catalog.defaults))
+        watch_roots.update(_project_watch_roots(resolved_repo_root, project, catalog.defaults))
 
     return sorted(watch_roots, key=str)
 
@@ -122,7 +122,7 @@ def is_relevant_watch_path(path: Path) -> bool:
     return not any(part in WATCH_IGNORE_PATH_PARTS for part in path.parts)
 
 
-def format_watch_path(path: Path, repo_root: Path) -> str:
+def _format_watch_path(path: Path, repo_root: Path) -> str:
     """Format a watched path so logs are easy to read in a multi-repo workspace."""
 
     resolved_path = path.resolve(strict=False)
@@ -146,7 +146,7 @@ def watch_and_build(repo_root: Path | None = None, debounce_ms: int = WATCH_DEBO
         watch_roots = collect_watch_roots(resolved_repo_root)
         print("Watching staged-source inputs:")
         for root in watch_roots:
-            print(f"  - {format_watch_path(root, resolved_repo_root)}")
+            print(f"  - {_format_watch_path(root, resolved_repo_root)}")
 
         def watch_filter(_change: object, changed_path: str) -> bool:
             return is_relevant_watch_path(Path(changed_path))
@@ -173,7 +173,7 @@ def watch_and_build(repo_root: Path | None = None, debounce_ms: int = WATCH_DEBO
 
             print("Detected source changes:")
             for changed_path in changed_paths:
-                print(f"  - {format_watch_path(changed_path, resolved_repo_root)}")
+                print(f"  - {_format_watch_path(changed_path, resolved_repo_root)}")
 
             try:
                 results = build(resolved_repo_root)

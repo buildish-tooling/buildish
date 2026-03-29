@@ -78,7 +78,7 @@ def write_yaml_like(path: Path, payload: Any) -> None:
         yaml.safe_dump(yaml_safe_value(payload), handle, sort_keys=False, allow_unicode=True, default_flow_style=False)
 
 
-def ensure_within(parent: Path, candidate: Path, label: str) -> Path:
+def _ensure_within(parent: Path, candidate: Path, label: str) -> Path:
     """Resolve ``candidate`` and reject paths that escape ``parent``."""
 
     parent_resolved = parent.resolve()
@@ -93,7 +93,7 @@ def safe_repo_path(repo_root: Path, local_dir: str) -> Path:
     """Resolve a configured sibling-repository path within the workspace parent."""
 
     workspace_parent = repo_root.parent.resolve()
-    return ensure_within(workspace_parent, workspace_parent / local_dir, "Project localDir")
+    return _ensure_within(workspace_parent, workspace_parent / local_dir, "Project localDir")
 
 
 def safe_relative_path(base: Path, relative_path: str | None, label: str) -> Path | None:
@@ -101,7 +101,7 @@ def safe_relative_path(base: Path, relative_path: str | None, label: str) -> Pat
 
     if not relative_path:
         return None
-    return ensure_within(base, base / relative_path, label)
+    return _ensure_within(base, base / relative_path, label)
 
 
 def copy_tree_without_symlinks(source: Path, destination: Path) -> list[Path]:

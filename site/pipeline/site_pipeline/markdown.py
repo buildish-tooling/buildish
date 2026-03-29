@@ -30,13 +30,13 @@ import yaml
 from .yaml_support import yaml_safe_value
 
 
-def strip_leading_html_comment(text: str) -> str:
+def _strip_leading_html_comment(text: str) -> str:
     """Remove a leading HTML comment block from a Markdown document."""
 
     return re.sub(r"^<!--.*?-->\s*", "", text, count=1, flags=re.DOTALL)
 
 
-def strip_leading_markdown_h1(markdown_text: str) -> str:
+def _strip_leading_markdown_h1(markdown_text: str) -> str:
     """Drop the first Markdown H1 heading while preserving leading comments."""
 
     lines = markdown_text.splitlines(keepends=True)
@@ -69,7 +69,7 @@ def strip_leading_markdown_h1(markdown_text: str) -> str:
 def extract_title_and_summary(markdown_text: str, fallback_title: str) -> tuple[str, str]:
     """Extract a page title and short summary from Markdown content."""
 
-    cleaned = strip_leading_html_comment(markdown_text).strip()
+    cleaned = _strip_leading_html_comment(markdown_text).strip()
     if not cleaned:
         return fallback_title, ""
 
@@ -111,7 +111,7 @@ def extract_title_and_summary(markdown_text: str, fallback_title: str) -> tuple[
     return title, " ".join(summary_lines).strip()
 
 
-def strip_leading_summary_paragraph(markdown_text: str) -> str:
+def _strip_leading_summary_paragraph(markdown_text: str) -> str:
     """Remove an auto-promoted summary paragraph from the document body."""
 
     lines = markdown_text.splitlines(keepends=True)
@@ -164,7 +164,7 @@ def with_yaml_front_matter(markdown: str, **fields: Any) -> str:
     return f"---\n{front_matter}\n---\n\n{body}"
 
 
-def split_markdown_front_matter(markdown: str) -> tuple[dict[str, Any], str]:
+def _split_markdown_front_matter(markdown: str) -> tuple[dict[str, Any], str]:
     """Split a Markdown document into front matter and body content."""
 
     match = re.match(r"^---\n(.*?)\n---\n?", markdown, flags=re.DOTALL)
@@ -179,7 +179,7 @@ def split_markdown_front_matter(markdown: str) -> tuple[dict[str, Any], str]:
 def update_markdown_front_matter(markdown: str, **fields: Any) -> str:
     """Merge new fields into a document's existing front matter."""
 
-    existing_fields, body = split_markdown_front_matter(markdown)
+    existing_fields, body = _split_markdown_front_matter(markdown)
     existing_fields.update(fields)
     return with_yaml_front_matter(body, **existing_fields)
 
@@ -187,7 +187,7 @@ def update_markdown_front_matter(markdown: str, **fields: Any) -> str:
 def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: Any) -> tuple[str, str, str]:
     """Normalize staged Markdown so Hugo pages have predictable metadata."""
 
-    existing_fields, body = split_markdown_front_matter(markdown_text)
+    existing_fields, body = _split_markdown_front_matter(markdown_text)
 
     existing_title = existing_fields.get("title")
     effective_fallback_title = fallback_title
@@ -200,9 +200,9 @@ def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: An
     if not summary and isinstance(existing_description, str):
         summary = existing_description.strip()
 
-    normalized_body = strip_leading_markdown_h1(body)
+    normalized_body = _strip_leading_markdown_h1(body)
     if summary and not has_explicit_description:
-        normalized_body = strip_leading_summary_paragraph(normalized_body)
+        normalized_body = _strip_leading_summary_paragraph(normalized_body)
 
     updated_fields = dict(existing_fields)
     updated_fields.update(fields)
