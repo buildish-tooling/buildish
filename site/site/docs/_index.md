@@ -27,4 +27,5 @@ This section documents the Apache Buildish website itself: the current MVP imple
 
 - [MVP status](./site-infra-mvp/)
 - [Current project contract](./site-subproject-contract/)
+- [CI build inputs and local workspace overrides](./site-ci-and-local-overrides/)
 - [Infrastructure proposal](./site-infra/)
