@@ -30,6 +30,7 @@ import yaml
 
 SOURCE_REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_FIXTURE_ROOT = SOURCE_REPO_ROOT / "site" / "build" / "tests" / f"integration-make-targets-{os.getpid()}"
+CONTAINERIZED_SERVE_READY_TIMEOUT = 60.0
 
 
 class MakeTargetIntegrationTest(unittest.TestCase):
@@ -434,7 +435,12 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         source_doc = self.workspace / "buildish-mammoth-cache-gradle" / "site" / "docs" / "getting-started.md"
         staged_doc = repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "serve", env)
-        self.wait_for("fake containerized Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(), process=process)
+        self.wait_for(
+            "fake containerized Hugo server readiness",
+            lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(),
+            timeout=CONTAINERIZED_SERVE_READY_TIMEOUT,
+            process=process,
+        )
         source_doc.write_text("# Getting started\n\nUpdated by containerized serve.\n", encoding="utf-8")
         self.wait_for(
             "restaged docs after containerized serve change",
@@ -460,7 +466,12 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
         process = self.start_make(repo_root / "site", "serve", env)
-        self.wait_for("fake containerized Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(), process=process)
+        self.wait_for(
+            "fake containerized Hugo server readiness",
+            lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(),
+            timeout=CONTAINERIZED_SERVE_READY_TIMEOUT,
+            process=process,
+        )
         os.killpg(process.pid, signal.SIGINT)
         process.wait(timeout=10)
         output = self.stop_process(process)
