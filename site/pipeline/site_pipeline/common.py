@@ -11,13 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-[project]
-name = "buildish-site"
-version = "0.1.0"
-description = "Local site pipeline tooling for the Apache Buildish site infrastructure"
-requires-python = ">=3.13"
-dependencies = [
-    "pydantic>=2.11,<3",
-    "pyyaml>=6.0.3",
-    "watchfiles>=1.1.1",
-]
+
+"""Small cross-cutting helpers shared across site pipeline modules."""
+
+from __future__ import annotations
+
+from typing import TypeVar
+
+
+ValueT = TypeVar("ValueT")
+
+
+def first_non_none(*values: ValueT | None) -> ValueT | None:
+    """Return the first value that is not ``None``."""
+
+    for value in values:
+        if value is not None:
+            return value
+    return None

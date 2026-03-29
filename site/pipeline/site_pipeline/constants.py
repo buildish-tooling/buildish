@@ -23,7 +23,6 @@ from __future__ import annotations
 from pathlib import Path
 
 DEFAULT_TAG_PATTERN = r"^v[0-9]+\.[0-9]+\.[0-9]+$"
-VALID_RELEASE_LINE_STATUSES = {"maintained", "eol"}
 SITE_TITLE = "Apache Buildish (Incubating)"
 WATCH_DEBOUNCE_MS = 300
 WATCH_STEP_MS = 50

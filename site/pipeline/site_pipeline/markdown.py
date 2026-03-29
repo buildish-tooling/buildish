@@ -27,6 +27,8 @@ from typing import Any
 
 import yaml
 
+from .yaml_support import yaml_safe_value
+
 
 def strip_leading_html_comment(text: str) -> str:
     """Remove a leading HTML comment block from a Markdown document."""
@@ -157,7 +159,7 @@ def strip_leading_summary_paragraph(markdown_text: str) -> str:
 def with_yaml_front_matter(markdown: str, **fields: Any) -> str:
     """Wrap a Markdown body with YAML front matter fields."""
 
-    front_matter = yaml.safe_dump(fields, sort_keys=False, default_flow_style=False).rstrip()
+    front_matter = yaml.safe_dump(yaml_safe_value(fields), sort_keys=False, default_flow_style=False).rstrip()
     body = markdown.lstrip()
     return f"---\n{front_matter}\n---\n\n{body}"
 

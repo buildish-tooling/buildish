@@ -20,7 +20,7 @@ import html
 import re
 from pathlib import Path
 
-from .constants import DEFAULT_TAG_PATTERN, SITE_TITLE, VALID_RELEASE_LINE_STATUSES
+from .constants import SITE_TITLE
 from .models import ProjectBuildResult, ProjectLifecycleSettings, StagedAliasMapping, StagedReleaseLine
 
 
@@ -75,58 +75,32 @@ def release_index_web_path(project_root: Path, slug: str, version: str) -> str |
     return public_release_path(slug, version)
 
 
-def compile_tag_pattern(pattern_text: str, slug: str, warnings: list[str]) -> re.Pattern[str]:
-    """Compile a project's release-tag pattern with a safe fallback."""
-
-    try:
-        return re.compile(pattern_text)
-    except re.error:
-        warnings.append(f"Invalid tagPattern for {slug}; falling back to the default exact-version pattern.")
-        return re.compile(DEFAULT_TAG_PATTERN)
-
-
 def normalize_lifecycle(
     lifecycle_fields: ProjectLifecycleSettings,
     tag_pattern: re.Pattern[str],
     slug: str,
     project_root: Path,
-    warnings: list[str],
 ) -> tuple[str | None, str | None, tuple[StagedReleaseLine, ...], tuple[StagedAliasMapping, ...]]:
     """Validate lifecycle metadata and turn it into staged output structures."""
 
     latest_stable_version = lifecycle_fields.latest_stable
     if latest_stable_version and tag_pattern.fullmatch(latest_stable_version) is None:
-        warnings.append(f"Ignoring invalid latestStable value for {slug}; expected an exact version tag.")
-        latest_stable_version = None
-
-    if not lifecycle_fields.release_lines_were_list:
-        warnings.append(f"Ignoring invalid releaseLines metadata for {slug}; expected a list.")
+        raise ValueError(f"Invalid latestStable for {slug}: expected an exact version tag matching {tag_pattern.pattern!r}")
 
     release_lines: list[StagedReleaseLine] = []
     alias_mappings: list[StagedAliasMapping] = []
     for release_line_model in lifecycle_fields.release_lines:
-        if not release_line_model.is_mapping:
-            warnings.append(f"Ignoring invalid release line entry for {slug}; expected a mapping.")
-            continue
-
-        line = release_line_model.line or ""
-        latest = release_line_model.latest or ""
-        status = release_line_model.status or ""
-        if not line or not latest or not status:
-            warnings.append(f"Ignoring incomplete release line entry for {slug}; line/latest/status are required.")
-            continue
+        line = release_line_model.line
+        latest = release_line_model.latest
+        status = release_line_model.status
         if tag_pattern.fullmatch(latest) is None:
-            warnings.append(f"Ignoring release line {line} for {slug}; latest must be an exact version tag.")
-            continue
-        if status not in VALID_RELEASE_LINE_STATUSES:
-            warnings.append(f"Ignoring release line {line} for {slug}; unsupported status {status!r}.")
-            continue
+            raise ValueError(
+                f"Invalid release line {line!r} for {slug}: latest must match the exact version tag pattern {tag_pattern.pattern!r}"
+            )
 
-        aliases = list(release_line_model.aliases)
-        if not release_line_model.aliases_were_list:
-            warnings.append(f"Ignoring invalid aliases for release line {line} in {slug}; expected a list.")
+        aliases = tuple(release_line_model.aliases)
         path = release_index_web_path(project_root, slug, latest)
-        release_lines.append(StagedReleaseLine(line=line, latest=latest, status=status, aliases=tuple(aliases), path=path))
+        release_lines.append(StagedReleaseLine(line=line, latest=latest, status=status, aliases=aliases, path=path))
         for alias in aliases:
             alias_mappings.append(StagedAliasMapping(alias=alias, target=latest, line=line, status=status))
 
