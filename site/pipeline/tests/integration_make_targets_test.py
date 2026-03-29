@@ -54,11 +54,14 @@ class MakeTargetIntegrationTest(unittest.TestCase):
     def seed_main_repo(self, repo_root: Path) -> None:
         site_root = repo_root / "site"
         site_root.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(SOURCE_REPO_ROOT / "site" / "assets", site_root / "assets", dirs_exist_ok=True)
         shutil.copytree(SOURCE_REPO_ROOT / "site" / "content", site_root / "content", dirs_exist_ok=True)
+        shutil.copytree(SOURCE_REPO_ROOT / "site" / "layouts", site_root / "layouts", dirs_exist_ok=True)
         shutil.copytree(SOURCE_REPO_ROOT / "site" / "pipeline", site_root / "pipeline", dirs_exist_ok=True)
         shutil.copytree(SOURCE_REPO_ROOT / "site" / "site", site_root / "site", dirs_exist_ok=True)
+        shutil.copytree(SOURCE_REPO_ROOT / "site" / "static", site_root / "static", dirs_exist_ok=True)
         shutil.copy2(SOURCE_REPO_ROOT / "DISCLAIMER", repo_root / "DISCLAIMER")
-        for relative in ["Makefile", "package.json", "package-lock.json", "hugo.yaml"]:
+        for relative in ["Makefile", "go.mod", "go.sum", "hugo.yaml", "package.json", "package-lock.json", "postcss.config.js"]:
             shutil.copy2(SOURCE_REPO_ROOT / "site" / relative, site_root / relative)
 
         catalog = yaml.safe_load((SOURCE_REPO_ROOT / "site" / "projects.yaml").read_text(encoding="utf-8"))
@@ -275,6 +278,31 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertTrue((repo_root / "site" / ".stage" / "manifest.yaml").exists())
         self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "getting-started.md").exists())
+
+    def test_make_build_renders_project_navigation_without_cross_project_sidebar(self) -> None:
+        if shutil.which("hugo") is None:
+            self.skipTest("hugo is required for render integration coverage")
+        if not (SOURCE_REPO_ROOT / "site" / "node_modules" / ".bin" / "postcss").exists():
+            self.skipTest("site/node_modules is required for render integration coverage")
+
+        repo_root = self.prepare_fixture_workspace()
+        env = os.environ.copy()
+        env["NODE_MODULES_DIR"] = str(SOURCE_REPO_ROOT / "site" / "node_modules")
+        result = self.run_make(repo_root / "site", "build", env)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+        home_index = (repo_root / "site" / ".public" / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn("Browse projects", home_index)
+
+        docs_index = (repo_root / "site" / ".public" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('class="navbar-brand" href="/"', docs_index)
+        self.assertIn('<span class="navbar-brand__context">Fixture Mammoth Cache for Gradle</span>', docs_index)
+        self.assertNotIn('<a href="/projects/">Projects</a>', docs_index)
+
+        sidebar = docs_index.split('<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">', 1)[1].split('<aside class="d-none d-xl-block col-xl-2 td-sidebar-toc d-print-none">', 1)[0]
+        self.assertNotIn('id="m-projectsmammoth-cache-gradle"', sidebar)
+        self.assertNotIn('id="m-projectsno-gradle-wrapper-jar"', sidebar)
+        self.assertIn("Unreleased", sidebar)
 
     def test_make_stage_uses_containerized_path_and_stages_vendor_assets(self) -> None:
         repo_root = self.prepare_fixture_workspace()

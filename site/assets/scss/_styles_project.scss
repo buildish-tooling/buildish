@@ -181,6 +181,13 @@ html[data-bs-theme='dark'] .td-sidebar .td-sidebar-nav-active-item {
   }
 }
 
+.td-navbar .navbar-brand__titles {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .buildish-incubator-disclaimer {
   background: #2c3136;
   border-radius: 0.5rem;
@@ -206,11 +213,10 @@ html[data-bs-theme='dark'] .td-sidebar .td-sidebar-nav-active-item {
 }
 
 .td-navbar .navbar-brand__context {
-  border-inline-start: 1px solid rgba(255, 255, 255, 0.24);
-  color: rgba(255, 255, 255, 0.84);
-  font-size: 0.95rem;
-  margin-left: 0.65rem;
-  padding-left: 0.65rem;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
 }
 
 .buildish-project-landing {
@@ -242,11 +248,6 @@ html[data-bs-theme='dark'] .td-sidebar .td-sidebar-nav-active-item {
     gap: 0.4rem;
     margin-top: 1.25rem;
   }
-}
-
-html[data-bs-theme='dark'] .td-navbar .navbar-brand__context {
-  border-inline-start-color: rgba(148, 163, 184, 0.28);
-  color: #cbd5e1;
 }
 
 html[data-bs-theme='dark'] .buildish-project-landing__hero,
