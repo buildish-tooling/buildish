@@ -19,7 +19,6 @@ project:
   displayName: Apache Buildish Site
   repository: https://github.com/apache/buildish
 content:
-  docsRoot: docs
   assetsRoot: null
 navigation:
   section: sub-projects

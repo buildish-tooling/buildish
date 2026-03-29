@@ -27,5 +27,5 @@ projects:
   - slug: no-gradle-wrapper-jar
     localDir: buildish-no-gradle-wrapper-jar
   - slug: site
-    localDir: buildish
+    localDir: buildish/site
     weight: 100
