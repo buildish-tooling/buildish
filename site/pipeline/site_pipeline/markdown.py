@@ -25,135 +25,144 @@ import re
 from pathlib import Path
 from typing import Any
 
+from mistletoe import Document, block_token, span_token
 import yaml
 
 from .yaml_support import yaml_safe_value
 
 
-def _strip_leading_html_comment(text: str) -> str:
-    """Remove a leading HTML comment block from a Markdown document."""
-
-    return re.sub(r"^<!--.*?-->\s*", "", text, count=1, flags=re.DOTALL)
+_HTML_COMMENT_PATTERN = re.compile(r"^<!--.*?-->\s*$", flags=re.DOTALL)
 
 
-def _strip_leading_markdown_h1(markdown_text: str) -> str:
-    """Drop the first Markdown H1 heading while preserving leading comments."""
+def _token_plain_text(token: Any) -> str:
+    """Return the plain-text content of a mistletoe token tree."""
+
+    if isinstance(token, span_token.LineBreak):
+        return "\n"
+
+    children = getattr(token, "children", None)
+    children_text = "".join(_token_plain_text(child) for child in children) if children is not None else ""
+    if isinstance(token, span_token.InlineCode):
+        return f"`{children_text}`"
+    if isinstance(token, span_token.Emphasis):
+        return f"*{children_text}*"
+    if isinstance(token, span_token.Strong):
+        return f"**{children_text}**"
+    if isinstance(token, span_token.Strikethrough):
+        return f"~~{children_text}~~"
+    if isinstance(token, span_token.Link):
+        return f"[{children_text}]({token.target})"
+    if isinstance(token, span_token.AutoLink):
+        return f"<{token.target}>"
+    if isinstance(token, span_token.Image):
+        return f"![{children_text}]({token.src})"
+    if children is not None:
+        return children_text
+    content = getattr(token, "content", None)
+    return content if isinstance(content, str) else ""
+
+
+def _block_plain_text(block: Any) -> str:
+    """Return normalized plain text for a parsed Markdown block."""
+
+    return _token_plain_text(block).strip()
+
+
+def _paragraph_plain_text(block: Any) -> str:
+    """Return a paragraph block collapsed into a single summary line."""
+
+    return " ".join(line.strip() for line in _block_plain_text(block).splitlines() if line.strip())
+
+
+def _is_html_comment_block(block: Any) -> bool:
+    """Return whether a parsed block is only an HTML comment."""
+
+    if not isinstance(block, (block_token.Paragraph, block_token.HtmlBlock)):
+        return False
+    return _HTML_COMMENT_PATTERN.fullmatch(_block_plain_text(block)) is not None
+
+
+def _is_heading_level(block: Any, level: int) -> bool:
+    """Return whether a parsed block is a heading of the requested level."""
+
+    return isinstance(block, (block_token.Heading, block_token.SetextHeading)) and getattr(block, "level", None) == level
+
+
+def _is_heading_level_at_least(block: Any, level: int) -> bool:
+    """Return whether a parsed block is a heading at or above the requested level."""
+
+    return isinstance(block, (block_token.Heading, block_token.SetextHeading)) and getattr(block, "level", 0) >= level
+
+
+def _leading_h1_index(blocks: list[Any]) -> int | None:
+    """Return the leading H1 index after skipping leading HTML comment blocks."""
+
+    for index, block in enumerate(blocks):
+        if _is_html_comment_block(block):
+            continue
+        return index if _is_heading_level(block, 1) else None
+    return None
+
+
+def _summary_paragraph_index_and_text(blocks: list[Any], title_index: int) -> tuple[int | None, str]:
+    """Find the first summary paragraph after a leading H1 and before the next section heading."""
+
+    for index in range(title_index + 1, len(blocks)):
+        block = blocks[index]
+        if _is_html_comment_block(block):
+            continue
+        if _is_heading_level_at_least(block, 2):
+            break
+        if isinstance(block, block_token.Paragraph):
+            return index, _paragraph_plain_text(block)
+    return None, ""
+
+
+def _first_non_comment_block_index(blocks: list[Any], start_index: int) -> int | None:
+    """Return the first block index at or after start_index that is not an HTML comment block."""
+
+    for index in range(start_index, len(blocks)):
+        if not _is_html_comment_block(blocks[index]):
+            return index
+    return None
+
+
+def _remove_blocks(markdown_text: str, blocks: list[Any], block_indexes: list[int]) -> str:
+    """Remove parsed blocks from Markdown text using mistletoe line metadata."""
+
+    if not block_indexes:
+        return markdown_text
 
     lines = markdown_text.splitlines(keepends=True)
-    prefix: list[str] = []
-    index = 0
+    skip = [False] * len(lines)
 
-    while index < len(lines) and not lines[index].strip():
-        index += 1
-
-    while index < len(lines) and lines[index].lstrip().startswith("<!--"):
-        while index < len(lines):
-            current = lines[index]
-            prefix.append(current)
-            index += 1
-            if "-->" in current:
+    for index in sorted(set(block_indexes)):
+        line_number = getattr(blocks[index], "line_number", None)
+        if not isinstance(line_number, int):
+            continue
+        next_line_number = len(lines) + 1
+        for next_index in range(index + 1, len(blocks)):
+            candidate = getattr(blocks[next_index], "line_number", None)
+            if isinstance(candidate, int):
+                next_line_number = candidate
                 break
-        while index < len(lines) and not lines[index].strip():
-            prefix.append(lines[index])
-            index += 1
+        for line_index in range(line_number - 1, min(next_line_number - 1, len(lines))):
+            skip[line_index] = True
 
-    if index < len(lines) and lines[index].startswith("# "):
-        index += 1
-        while index < len(lines) and not lines[index].strip():
-            index += 1
-        return "".join(prefix + lines[index:])
-
-    return markdown_text
+    return "".join(line for line_index, line in enumerate(lines) if not skip[line_index])
 
 
 def extract_title_and_summary(markdown_text: str, fallback_title: str) -> tuple[str, str]:
     """Extract a page title and short summary from Markdown content."""
 
-    cleaned = _strip_leading_html_comment(markdown_text).strip()
-    if not cleaned:
+    blocks = list(Document(markdown_text).children)
+    title_index = _leading_h1_index(blocks)
+    if title_index is None:
         return fallback_title, ""
 
-    title = fallback_title
-    summary_lines: list[str] = []
-    saw_title = False
-    in_fenced_block = False
-    fence_marker = ""
-
-    for raw_line in cleaned.splitlines():
-        stripped = raw_line.lstrip()
-        if stripped.startswith(("```", "~~~")):
-            marker = stripped[:3]
-            if not in_fenced_block:
-                in_fenced_block = True
-                fence_marker = marker
-            elif marker == fence_marker:
-                in_fenced_block = False
-                fence_marker = ""
-            continue
-
-        if in_fenced_block:
-            continue
-
-        line = raw_line.strip()
-        if not saw_title and line.startswith("# "):
-            title = line[2:].strip()
-            saw_title = True
-            continue
-        if not saw_title:
-            continue
-        if line.startswith("## "):
-            break
-        if line:
-            summary_lines.append(line)
-        elif summary_lines:
-            break
-
-    return title, " ".join(summary_lines).strip()
-
-
-def _strip_leading_summary_paragraph(markdown_text: str) -> str:
-    """Remove an auto-promoted summary paragraph from the document body."""
-
-    lines = markdown_text.splitlines(keepends=True)
-    prefix: list[str] = []
-    index = 0
-
-    while index < len(lines) and not lines[index].strip():
-        prefix.append(lines[index])
-        index += 1
-
-    while index < len(lines) and lines[index].lstrip().startswith("<!--"):
-        while index < len(lines):
-            current = lines[index]
-            prefix.append(current)
-            index += 1
-            if "-->" in current:
-                break
-        while index < len(lines) and not lines[index].strip():
-            prefix.append(lines[index])
-            index += 1
-
-    paragraph_start = index
-    paragraph_lines: list[str] = []
-    while index < len(lines):
-        stripped = lines[index].strip()
-        if not stripped:
-            index += 1
-            while index < len(lines) and not lines[index].strip():
-                index += 1
-            return "".join(prefix + lines[index:])
-        if not paragraph_lines and stripped.startswith(("#", "```", "~~~", "- ", "* ", ">", "|")):
-            return markdown_text
-        if not paragraph_lines and re.match(r"^[0-9]+\.\s", stripped):
-            return markdown_text
-        if paragraph_lines and stripped.startswith("## "):
-            return "".join(prefix + lines[index:])
-        paragraph_lines.append(lines[index])
-        index += 1
-
-    if paragraph_lines:
-        return "".join(prefix + lines[index:])
-    return markdown_text if paragraph_start == index else "".join(prefix + lines[index:])
+    title = _paragraph_plain_text(blocks[title_index])
+    _, summary = _summary_paragraph_index_and_text(blocks, title_index)
+    return title or fallback_title, summary
 
 
 def with_yaml_front_matter(markdown: str, **fields: Any) -> str:
@@ -194,15 +203,27 @@ def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: An
     if isinstance(existing_title, str) and existing_title.strip():
         effective_fallback_title = existing_title.strip()
 
-    title, summary = extract_title_and_summary(body, effective_fallback_title)
+    blocks = list(Document(body).children)
+    title_index = _leading_h1_index(blocks)
+    title = effective_fallback_title
+    summary = ""
+    summary_index: int | None = None
+    if title_index is not None:
+        title = _paragraph_plain_text(blocks[title_index]) or effective_fallback_title
+        summary_index, summary = _summary_paragraph_index_and_text(blocks, title_index)
     existing_description = existing_fields.get("description")
     has_explicit_description = isinstance(existing_description, str) and bool(existing_description.strip())
     if not summary and isinstance(existing_description, str):
         summary = existing_description.strip()
 
-    normalized_body = _strip_leading_markdown_h1(body)
-    if summary and not has_explicit_description:
-        normalized_body = _strip_leading_summary_paragraph(normalized_body)
+    removed_blocks: list[int] = []
+    if title_index is not None:
+        removed_blocks.append(title_index)
+    if summary and not has_explicit_description and summary_index is not None:
+        first_content_after_title = _first_non_comment_block_index(blocks, title_index + 1)
+        if first_content_after_title == summary_index:
+            removed_blocks.append(summary_index)
+    normalized_body = _remove_blocks(body, blocks, removed_blocks)
 
     updated_fields = dict(existing_fields)
     updated_fields.update(fields)

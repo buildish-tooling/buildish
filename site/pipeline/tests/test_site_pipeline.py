@@ -743,6 +743,25 @@ class SitePipelineTest(unittest.TestCase):
         self.assertNotIn("This document describes the full execution sequence for both the `prepare` and `finalize` phases.\n\n```mermaid", normalized)
         self.assertIn("```mermaid", normalized)
 
+    def test_normalize_markdown_doc_supports_setext_h1_titles(self) -> None:
+        markdown = """Bootstrap Process
+=================
+
+This document describes the full execution sequence for the bootstrap path.
+
+## Next section
+
+Additional details.
+"""
+
+        normalized, title, summary = site_pipeline.normalize_markdown_doc(markdown, "Fallback Title", type="docs")
+
+        self.assertEqual("Bootstrap Process", title)
+        self.assertEqual("This document describes the full execution sequence for the bootstrap path.", summary)
+        self.assertNotIn("=================", normalized)
+        self.assertNotIn("This document describes the full execution sequence for the bootstrap path.\n\n## Next section", normalized)
+        self.assertIn("## Next section", normalized)
+
     def test_collect_watch_roots_includes_catalog_project_inputs_and_missing_repo_parent(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
