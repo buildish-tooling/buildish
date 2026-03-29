@@ -246,6 +246,8 @@ class SitePipelineTest(unittest.TestCase):
             community_index = (repo_root / "site" / ".stage" / "content" / "community" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("title: Community", community_index)
             self.assertIn("[Community & Contact](/community/contact/)", community_index)
+            self.assertIn("[Contributing Guidelines](/community/contributing-guidelines/)", community_index)
+            self.assertIn("[Community Guidelines](/community/community-guidelines/)", community_index)
 
             contact_page = (repo_root / "site" / ".stage" / "content" / "community" / "contact.md").read_text(encoding="utf-8")
             self.assertIn("title: Community & Contact", contact_page)
@@ -255,6 +257,16 @@ class SitePipelineTest(unittest.TestCase):
             get_involved_page = (repo_root / "site" / ".stage" / "content" / "community" / "get-involved.md").read_text(encoding="utf-8")
             self.assertIn("title: Get Involved", get_involved_page)
             self.assertIn("Ways to contribute", get_involved_page)
+
+            contributing_guidelines_page = (repo_root / "site" / ".stage" / "content" / "community" / "contributing-guidelines.md").read_text(encoding="utf-8")
+            self.assertIn("title: Contributing Guidelines", contributing_guidelines_page)
+            self.assertIn("apache/buildish", contributing_guidelines_page)
+            self.assertIn("For the Buildish site repository, a good baseline is:", contributing_guidelines_page)
+
+            community_guidelines_page = (repo_root / "site" / ".stage" / "content" / "community" / "community-guidelines.md").read_text(encoding="utf-8")
+            self.assertIn("title: Community Guidelines", community_guidelines_page)
+            self.assertIn("ASF Code of Conduct", community_guidelines_page)
+            self.assertIn("Apache Way", community_guidelines_page)
 
             staged_doc = (repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "wrapper-provisioning.md").read_text(encoding="utf-8")
             self.assertNotIn("\n# Wrapper provisioning\n", staged_doc)

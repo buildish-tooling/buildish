@@ -293,16 +293,28 @@ class MakeTargetIntegrationTest(unittest.TestCase):
 
         home_index = (repo_root / "site" / ".public" / "index.html").read_text(encoding="utf-8")
         self.assertNotIn("Browse projects", home_index)
+        self.assertIn('/community/contributing-guidelines/', home_index)
+        self.assertIn('/community/community-guidelines/', home_index)
 
         docs_index = (repo_root / "site" / ".public" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "index.html").read_text(encoding="utf-8")
         self.assertIn('class="navbar-brand" href="/"', docs_index)
         self.assertIn('<span class="navbar-brand__context">Fixture Mammoth Cache for Gradle</span>', docs_index)
         self.assertNotIn('<a href="/projects/">Projects</a>', docs_index)
+        self.assertIn('/community/contributing-guidelines/', docs_index)
+        self.assertIn('/community/community-guidelines/', docs_index)
 
         sidebar = docs_index.split('<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">', 1)[1].split('<aside class="d-none d-xl-block col-xl-2 td-sidebar-toc d-print-none">', 1)[0]
         self.assertNotIn('id="m-projectsmammoth-cache-gradle"', sidebar)
         self.assertNotIn('id="m-projectsno-gradle-wrapper-jar"', sidebar)
         self.assertIn("Unreleased", sidebar)
+
+        contributing_guidelines = (repo_root / "site" / ".public" / "community" / "contributing-guidelines" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("Contributing Guidelines", contributing_guidelines)
+        self.assertIn("apache/buildish", contributing_guidelines)
+
+        community_guidelines = (repo_root / "site" / ".public" / "community" / "community-guidelines" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("Community Guidelines", community_guidelines)
+        self.assertIn("Apache Way", community_guidelines)
 
     def test_make_stage_uses_containerized_path_and_stages_vendor_assets(self) -> None:
         repo_root = self.prepare_fixture_workspace()

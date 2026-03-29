@@ -134,16 +134,26 @@ menu:
       pageRef: /community/contact
       parent: community
       weight: 20
+    - identifier: contributing-guidelines
+      name: Contributing Guidelines
+      pageRef: /community/contributing-guidelines
+      parent: community
+      weight: 30
+    - identifier: community-guidelines
+      name: Community Guidelines
+      pageRef: /community/community-guidelines
+      parent: community
+      weight: 40
     - identifier: source-code
       name: Source Code
       url: https://github.com/apache/buildish
       parent: community
-      weight: 30
+      weight: 50
     - identifier: security-report
       name: Security Report
       pageRef: /community/security-report
       parent: community
-      weight: 40
+      weight: 60
     - identifier: asf
       name: The ASF
       weight: 30
