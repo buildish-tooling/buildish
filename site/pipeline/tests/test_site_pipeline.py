@@ -262,6 +262,7 @@ class SitePipelineTest(unittest.TestCase):
             self.assertIn("title: Contributing Guidelines", contributing_guidelines_page)
             self.assertIn("apache/buildish", contributing_guidelines_page)
             self.assertIn("For the Buildish site repository, a good baseline is:", contributing_guidelines_page)
+            self.assertIn("https://www.apache.org/legal/generative-tooling.html", contributing_guidelines_page)
 
             community_guidelines_page = (repo_root / "site" / ".stage" / "content" / "community" / "community-guidelines.md").read_text(encoding="utf-8")
             self.assertIn("title: Community Guidelines", community_guidelines_page)

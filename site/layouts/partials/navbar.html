@@ -36,7 +36,7 @@ limitations under the License.
 
 <nav class="td-navbar js-navbar-scroll" data-bs-theme="dark">
 <div class="td-navbar-container container-fluid flex-column flex-md-row">
-  <a class="navbar-brand" href="{{ .Site.Home.RelPermalink }}"><span class="navbar-brand__logo navbar-logo" aria-hidden="true">{{ partial "apache-buildish-pipeline-icon.html" (dict "gradientId" "buildish-navbar-panel") }}</span><span class="navbar-brand__titles"><span class="navbar-brand__name">{{ .Site.Title }}</span>{{ if and $projectMode $projectDisplayName }}<span class="navbar-brand__context">{{ $projectDisplayName }}</span>{{ end }}</span></a>
+  <div class="navbar-brand"><a class="navbar-brand__home" href="{{ .Site.Home.RelPermalink }}"><span class="navbar-brand__logo navbar-logo" aria-hidden="true">{{ partial "apache-buildish-pipeline-icon.html" (dict "gradientId" "buildish-navbar-panel") }}</span><span class="navbar-brand__name">{{ .Site.Title }}</span></a>{{ if and $projectMode $projectDisplayName $projectPath }}<span class="navbar-brand__divider" aria-hidden="true"></span><a class="navbar-brand__project" href="{{ $projectPath }}"><span class="navbar-brand__context">{{ $projectDisplayName }}</span></a>{{ end }}</div>
   <div class="td-navbar__main td-navbar-nav-scroll td-navbar-nav-scroll--indicator" id="main_navbar">
     <div class="scroll-indicator scroll-left"></div>
     <ul class="navbar-nav">

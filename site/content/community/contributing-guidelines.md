@@ -76,6 +76,7 @@ Contributors may use AI tools while preparing changes, but the person opening th
 - Understand the change end to end.
 - Be ready to explain and justify the implementation during review.
 - Ensure contributed material is compatible with ASF licensing and policy.
+- Review the [ASF Generative Tooling Guidance](https://www.apache.org/legal/generative-tooling.html) when using AI-assisted tooling for contributions.
 - Consider disclosing significant AI assistance in the pull request description for transparency.
 
 ## Code contribution guidelines

@@ -297,7 +297,9 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         self.assertIn('/community/community-guidelines/', home_index)
 
         docs_index = (repo_root / "site" / ".public" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "index.html").read_text(encoding="utf-8")
-        self.assertIn('class="navbar-brand" href="/"', docs_index)
+        self.assertIn('class="navbar-brand__home" href="/"', docs_index)
+        self.assertIn('class="navbar-brand__project" href="/projects/mammoth-cache-gradle/"', docs_index)
+        self.assertIn('class="navbar-brand__divider"', docs_index)
         self.assertIn('<span class="navbar-brand__context">Fixture Mammoth Cache for Gradle</span>', docs_index)
         self.assertNotIn('<a href="/projects/">Projects</a>', docs_index)
         self.assertIn('/community/contributing-guidelines/', docs_index)
@@ -311,6 +313,7 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         contributing_guidelines = (repo_root / "site" / ".public" / "community" / "contributing-guidelines" / "index.html").read_text(encoding="utf-8")
         self.assertIn("Contributing Guidelines", contributing_guidelines)
         self.assertIn("apache/buildish", contributing_guidelines)
+        self.assertIn("https://www.apache.org/legal/generative-tooling.html", contributing_guidelines)
 
         community_guidelines = (repo_root / "site" / ".public" / "community" / "community-guidelines" / "index.html").read_text(encoding="utf-8")
         self.assertIn("Community Guidelines", community_guidelines)
