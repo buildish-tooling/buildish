@@ -22,12 +22,12 @@ from pathlib import Path
 
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-import mvp
+from pipeline import site_pipeline
 
 
-SOURCE_REPO_ROOT = Path(__file__).resolve().parents[2]
+SOURCE_REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_FIXTURE_BUILD_ROOT = SOURCE_REPO_ROOT / "site" / "build" / "tests" / f"integration-fixture-workspace-{os.getpid()}"
 FIXTURE_BUILD_ROOT = Path(os.environ.get("BUILDISH_SITE_FIXTURE_WORKSPACE", str(DEFAULT_FIXTURE_BUILD_ROOT)))
 
@@ -36,15 +36,14 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
     def seed_main_repo(self, repo_root: Path) -> None:
         (repo_root / "site").mkdir(parents=True, exist_ok=True)
         shutil.copytree(SOURCE_REPO_ROOT / "site" / "content", repo_root / "site" / "content", dirs_exist_ok=True)
-        shutil.copytree(SOURCE_REPO_ROOT / "docs", repo_root / "docs", dirs_exist_ok=True)
+        shutil.copytree(SOURCE_REPO_ROOT / "site" / "site", repo_root / "site" / "site", dirs_exist_ok=True)
         shutil.copy2(SOURCE_REPO_ROOT / "DISCLAIMER", repo_root / "DISCLAIMER")
-        shutil.copy2(SOURCE_REPO_ROOT / "site" / "project.yaml", repo_root / "site" / "project.yaml")
 
         catalog = yaml.safe_load((SOURCE_REPO_ROOT / "site" / "projects.yaml").read_text(encoding="utf-8"))
         catalog["projects"] = [
             {"slug": "mammoth-cache-gradle", "localDir": "buildish-mammoth-cache-gradle"},
             {"slug": "no-gradle-wrapper-jar", "localDir": "buildish-no-gradle-wrapper-jar", "weight": 5},
-            {"slug": "site", "localDir": "buildish", "weight": 100},
+            {"slug": "site", "localDir": "buildish/site", "weight": 100},
         ]
         with (repo_root / "site" / "projects.yaml").open("w", encoding="utf-8") as handle:
             yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
@@ -106,8 +105,8 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
             self.seed_mammoth_fixture(workspace / "buildish-mammoth-cache-gradle")
             self.seed_no_wrapper_fixture(workspace / "buildish-no-gradle-wrapper-jar")
 
-            first_results = mvp.build(repo_root)
-            second_results = mvp.build(repo_root)
+            first_results = site_pipeline.build(repo_root)
+            second_results = site_pipeline.build(repo_root)
 
             self.assertEqual(3, len(first_results))
             self.assertEqual(3, len(second_results))

@@ -22,15 +22,15 @@ from pathlib import Path
 
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-import mvp
+from pipeline import site_pipeline
 
 
-class SiteMvpTest(unittest.TestCase):
+class SitePipelineTest(unittest.TestCase):
     @staticmethod
     def seed_authored_site_content(repo_root: Path) -> None:
-        source_content = Path(__file__).resolve().parents[1] / "content"
+        source_content = Path(__file__).resolve().parents[2] / "content"
         shutil.copytree(source_content, repo_root / "site" / "content", dirs_exist_ok=True)
 
     @staticmethod
@@ -168,7 +168,7 @@ class SiteMvpTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            results = mvp.build(repo_root)
+            results = site_pipeline.build(repo_root)
 
             self.assertEqual(3, len(results))
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "projects" / "_index.md").exists())
@@ -319,7 +319,7 @@ class SiteMvpTest(unittest.TestCase):
                 )
 
             with self.assertRaisesRegex(ValueError, "escapes allowed root"):
-                mvp.build(repo_root)
+                site_pipeline.build(repo_root)
 
     def test_rejects_project_escape_outside_workspace_parent(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -335,7 +335,7 @@ class SiteMvpTest(unittest.TestCase):
                 yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
 
             with self.assertRaisesRegex(ValueError, "escapes allowed root"):
-                mvp.build(repo_root)
+                site_pipeline.build(repo_root)
 
     def test_rejects_assets_path_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -370,7 +370,7 @@ class SiteMvpTest(unittest.TestCase):
                 )
 
             with self.assertRaisesRegex(ValueError, "escapes allowed root"):
-                mvp.build(repo_root)
+                site_pipeline.build(repo_root)
 
     def test_build_stages_vendor_assets_when_available(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -382,7 +382,7 @@ class SiteMvpTest(unittest.TestCase):
                 yaml.safe_dump({"schemaVersion": 1, "projects": []}, handle, sort_keys=False, default_flow_style=False)
             self.seed_docsy_vendor_assets(repo_root)
 
-            mvp.build(repo_root)
+            site_pipeline.build(repo_root)
 
             self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "jquery.min.js").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "mermaid.min.js").exists())
@@ -391,10 +391,10 @@ class SiteMvpTest(unittest.TestCase):
     def test_extract_title_and_summary_ignores_headings_inside_fenced_code_blocks(self) -> None:
         markdown = """<!--\ncomment\n-->\n\nThis page currently carries content moved from the project README.\n\n```yaml\n# .github/buildish-mammoth-gradle.yml\njob-mode: distributed-worker\n```\n\n## Next section\n"""
 
-        title, summary = mvp.extract_title_and_summary(markdown, "[FROM README] Usage examples")
+        title, summary = site_pipeline.extract_title_and_summary(markdown, "[FROM README] Usage examples")
 
         self.assertEqual("[FROM README] Usage examples", title)
-        self.assertEqual("Temporary home for usage examples.", mvp.normalize_markdown_doc(
+        self.assertEqual("Temporary home for usage examples.", site_pipeline.normalize_markdown_doc(
             "---\ntitle: \"[FROM README] Usage examples\"\ndescription: Temporary home for usage examples.\n---\n\n" + markdown,
             "Usage examples",
             type="docs",
@@ -403,7 +403,7 @@ class SiteMvpTest(unittest.TestCase):
     def test_normalize_markdown_doc_strips_auto_promoted_summary_from_body(self) -> None:
         markdown = """<!--\ncomment\n-->\n\n# Bootstrap Process\n\nThis document describes the full execution sequence for both the `prepare` and `finalize` phases.\n\n```mermaid\nflowchart TD\n    A --> B\n```\n"""
 
-        normalized, title, summary = mvp.normalize_markdown_doc(markdown, "Bootstrap Process", type="docs")
+        normalized, title, summary = site_pipeline.normalize_markdown_doc(markdown, "Bootstrap Process", type="docs")
 
         self.assertEqual("Bootstrap Process", title)
         self.assertEqual(
@@ -421,7 +421,8 @@ class SiteMvpTest(unittest.TestCase):
             repo_root = workspace / "buildish"
             repo_root.mkdir()
             (repo_root / "site" / "content").mkdir(parents=True)
-            (repo_root / "site" / "mvp.py").write_text("# watcher stub\n", encoding="utf-8")
+            (repo_root / "site" / "pipeline").mkdir(parents=True)
+            (repo_root / "site" / "pipeline" / "site_pipeline.py").write_text("# watcher stub\n", encoding="utf-8")
             catalog = {
                 "schemaVersion": 1,
                 "defaults": {
@@ -443,19 +444,19 @@ class SiteMvpTest(unittest.TestCase):
             with (mammoth / "site" / "project.yaml").open("w", encoding="utf-8") as handle:
                 yaml.safe_dump({"schemaVersion": 1, "project": {"displayName": "Mammoth"}}, handle, sort_keys=False, default_flow_style=False)
 
-            watch_roots = set(mvp.collect_watch_roots(repo_root))
+            watch_roots = set(site_pipeline.collect_watch_roots(repo_root))
 
             self.assertIn((repo_root / "site" / "projects.yaml").resolve(), watch_roots)
             self.assertIn((repo_root / "site" / "content").resolve(), watch_roots)
-            self.assertIn((repo_root / "site" / "mvp.py").resolve(), watch_roots)
+            self.assertIn((repo_root / "site" / "pipeline").resolve(), watch_roots)
             self.assertIn((mammoth / "site" / "project.yaml").resolve(), watch_roots)
             self.assertIn((mammoth / "site" / "docs").resolve(), watch_roots)
             self.assertIn((mammoth / "site" / "assets").resolve(), watch_roots)
             self.assertIn(workspace.resolve(), watch_roots)
 
     def test_is_relevant_watch_path_allows_explicit_vendor_asset_paths(self) -> None:
-        self.assertTrue(mvp.is_relevant_watch_path(Path("site/node_modules/jquery/dist/jquery.min.js")))
-        self.assertFalse(mvp.is_relevant_watch_path(Path("site/.stage/content/_index.md")))
+        self.assertTrue(site_pipeline.is_relevant_watch_path(Path("site/node_modules/jquery/dist/jquery.min.js")))
+        self.assertFalse(site_pipeline.is_relevant_watch_path(Path("site/.stage/content/_index.md")))
 
 
 if __name__ == "__main__":

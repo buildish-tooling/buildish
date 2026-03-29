@@ -46,6 +46,16 @@ STAGED_VENDOR_ASSETS = (
 )
 
 
+def resolve_vendor_asset_source(site_root: Path, source_relative: Path) -> Path:
+    node_modules_dir = os.environ.get("NODE_MODULES_DIR")
+    if node_modules_dir:
+        try:
+            return Path(node_modules_dir) / source_relative.relative_to("node_modules")
+        except ValueError:
+            pass
+    return site_root / source_relative
+
+
 @dataclass(frozen=True)
 class ProjectBuildResult:
     slug: str
@@ -74,7 +84,7 @@ class ProjectBuildResult:
 def repo_root_from(start: Path | None = None) -> Path:
     if start is not None:
         return start.resolve()
-    return Path(__file__).resolve().parent.parent.resolve()
+    return Path(__file__).resolve().parents[2]
 
 
 def load_yaml_like(path: Path) -> dict[str, Any]:
@@ -185,12 +195,23 @@ def copy_tree_without_symlinks(source: Path, destination: Path) -> list[Path]:
 
 def stage_vendor_assets(site_root: Path, stage_root: Path) -> None:
     for source_relative, destination_relative in STAGED_VENDOR_ASSETS:
-        source = site_root / source_relative
+        source = resolve_vendor_asset_source(site_root, source_relative)
         if not source.is_file():
             continue
         destination = stage_root / destination_relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
+
+
+def reset_output_directory(path: Path) -> None:
+    if path.exists() and (not path.is_dir() or path.is_symlink()):
+        path.unlink()
+    path.mkdir(parents=True, exist_ok=True)
+    for child in path.iterdir():
+        if child.is_dir() and not child.is_symlink():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
 
 
 def watchable_existing_path(candidate: Path, fallback: Path) -> Path:
@@ -258,11 +279,11 @@ def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
     watch_roots: set[Path] = {
         watchable_existing_path(site_root / "projects.yaml", site_root),
         watchable_existing_path(site_root / "content", site_root),
-        watchable_existing_path(site_root / "mvp.py", site_root),
+        watchable_existing_path(site_root / "pipeline", site_root),
     }
 
     for source_relative, _ in STAGED_VENDOR_ASSETS:
-        source = site_root / source_relative
+        source = resolve_vendor_asset_source(site_root, source_relative)
         if source.exists():
             watch_roots.add(source.resolve())
 
@@ -991,10 +1012,8 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
 
     stage_root = site_root / ".stage"
     preview_root = site_root / ".preview"
-    shutil.rmtree(stage_root, ignore_errors=True)
-    shutil.rmtree(preview_root, ignore_errors=True)
-    stage_root.mkdir(parents=True, exist_ok=True)
-    preview_root.mkdir(parents=True, exist_ok=True)
+    reset_output_directory(stage_root)
+    reset_output_directory(preview_root)
 
     results = [stage_project(resolved_repo_root, stage_root, project, defaults, index) for index, project in enumerate(projects, start=1)]
     incubator_disclaimer = read_text_if_exists(resolved_repo_root / "DISCLAIMER").strip()
@@ -1123,6 +1142,7 @@ def watch_and_build(repo_root: Path | None = None, debounce_ms: int = WATCH_DEBO
             watch_filter=watch_filter,
             debounce=debounce_ms,
             step=WATCH_STEP_MS,
+            ignore_permission_denied=True,
             yield_on_timeout=False,
         ):
             changed_paths = sorted(
@@ -1162,7 +1182,7 @@ def watch_and_build(repo_root: Path | None = None, debounce_ms: int = WATCH_DEBO
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Buildish site helper")
+    parser = argparse.ArgumentParser(description="Site pipeline helper")
     parser.add_argument("command", choices=["build", "clean", "serve", "watch"], nargs="?", default="build")
     parser.add_argument("--port", type=int, default=8000, help="Port for the local preview server")
     parser.add_argument("--debounce-ms", type=int, default=WATCH_DEBOUNCE_MS, help="Debounce window for watch mode")

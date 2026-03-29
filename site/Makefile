@@ -21,14 +21,16 @@ HUGO ?= hugo
 NVM_DIR ?= $(HOME)/.nvm
 UV ?= uv
 PYTHON ?= python
+SITE_PIPELINE ?= pipeline/site_pipeline.py
 PORT ?= 8000
-CONTAINER_ENGINE ?= podman
+HUGO_SERVER_BIND ?= 127.0.0.1
+CONTAINER_ENGINE ?= $(shell if command -v podman >/dev/null 2>&1; then printf 'podman'; elif command -v docker >/dev/null 2>&1; then printf 'docker'; fi)
 CONTAINER_IMAGE ?= localhost/buildish-site-build:local
-CONTAINER_HOME ?= /workspace/site/.container-home
+CONTAINER_HOME ?= $(CONTAINER_SITE_ROOT)/.container-home
 LOCAL_REGISTRY_TEST_PLATFORMS ?= linux/amd64,linux/arm64
 LOCAL_REGISTRY_TEST_TAG ?= integration-test
 LOCAL_REGISTRY_TEST_ARGS ?=
-UV_RUN := $(UV) run --project . --frozen
+UV_RUN := $(UV) run --project ./pipeline --frozen
 HELP_TARGETS := $(MAKEFILE_LIST)
 DOCSY_ENV = \
 	export NVM_DIR="$(NVM_DIR)"; \
@@ -40,10 +42,13 @@ DOCSY_ENV = \
 	fi; \
 	export PATH="$(NODE_MODULES_DIR)/.bin:$$PATH"
 REPO_ROOT := $(abspath $(CURDIR)/..)
+WORKSPACE_ROOT := $(abspath $(REPO_ROOT)/..)
+REPO_NAME := $(notdir $(REPO_ROOT))
+CONTAINER_SITE_ROOT ?= /workspace/$(REPO_NAME)/site
 CONTAINER_BUILD_DIR ?= $(REPO_ROOT)/tools/site-build-image
 NODE_MODULES_DIR ?= $(CURDIR)/node_modules
 HOST_CONTAINER_SCRATCH_ROOT ?= $(CURDIR)/build/container
-CONTAINER_SCRATCH_ROOT ?= /workspace/site/build/container
+CONTAINER_SCRATCH_ROOT ?= $(CONTAINER_SITE_ROOT)/build/container
 HOST_ARCH ?= $(shell uname -m)
 ifneq ($(filter x86_64 amd64,$(HOST_ARCH)),)
 CONTAINER_PLATFORM ?= linux/amd64
@@ -54,9 +59,10 @@ CONTAINER_PLATFORM_FLAG :=
 ifneq ($(strip $(CONTAINER_PLATFORM)),)
 CONTAINER_PLATFORM_FLAG := --platform $(CONTAINER_PLATFORM)
 endif
+CONTAINER_ENGINE_BASENAME := $(notdir $(CONTAINER_ENGINE))
 CONTAINER_MOUNT_LABEL :=
 CONTAINER_USERNS_FLAGS :=
-ifeq ($(notdir $(CONTAINER_ENGINE)),podman)
+ifeq ($(CONTAINER_ENGINE_BASENAME),podman)
 CONTAINER_MOUNT_LABEL := :Z
 CONTAINER_USERNS_FLAGS := --userns=keep-id
 endif
@@ -68,11 +74,26 @@ CONTAINER_CACHE_ENV = \
 	-e UV_CACHE_DIR=$(CONTAINER_HOME)/.cache/uv
 
 CONTAINER_WORKSPACE_FLAGS = \
-	-v $(REPO_ROOT):/workspace$(CONTAINER_MOUNT_LABEL) \
-	-w /workspace/site
+	-v $(WORKSPACE_ROOT):/workspace$(CONTAINER_MOUNT_LABEL) \
+	-w $(CONTAINER_SITE_ROOT)
+
+CONTAINER_RUN_BASE = \
+	$(CONTAINER_ENGINE) run --rm \
+	--init \
+	$(CONTAINER_PLATFORM_FLAG) \
+	$(CONTAINER_USERNS_FLAGS) \
+	--user $$(id -u):$$(id -g) \
+	$(CONTAINER_CACHE_ENV) \
+	$(CONTAINER_WORKSPACE_FLAGS)
 
 CONTAINER_RUN = \
+	$(CONTAINER_RUN_BASE) \
+	$(CONTAINER_IMAGE)
+
+CONTAINER_MANAGED_RUN = \
 	$(CONTAINER_ENGINE) run --rm \
+	--name "$$container_name" \
+	--init \
 	$(CONTAINER_PLATFORM_FLAG) \
 	$(CONTAINER_USERNS_FLAGS) \
 	--user $$(id -u):$$(id -g) \
@@ -80,9 +101,36 @@ CONTAINER_RUN = \
 	$(CONTAINER_WORKSPACE_FLAGS) \
 	$(CONTAINER_IMAGE)
 
+CONTAINER_SERVE_RUN = \
+	$(CONTAINER_RUN_BASE) \
+	-p 127.0.0.1:$(PORT):$(PORT) \
+	$(CONTAINER_IMAGE)
+
+CONTAINER_MANAGED_SERVE_RUN = \
+	$(CONTAINER_ENGINE) run --rm \
+	--name "$$container_name" \
+	--init \
+	$(CONTAINER_PLATFORM_FLAG) \
+	$(CONTAINER_USERNS_FLAGS) \
+	--user $$(id -u):$$(id -g) \
+	$(CONTAINER_CACHE_ENV) \
+	$(CONTAINER_WORKSPACE_FLAGS) \
+	-p 127.0.0.1:$(PORT):$(PORT) \
+	$(CONTAINER_IMAGE)
+
 PREPARE_CONTAINER_SCRATCH = \
 	mkdir -p '$(HOST_CONTAINER_SCRATCH_ROOT)'; \
 	chmod 0777 '$(HOST_CONTAINER_SCRATCH_ROOT)'
+
+PREPARE_CONTAINER_STAGE_OUTPUTS = \
+	rm -rf .stage .preview; \
+	mkdir -p .stage .preview; \
+	chmod 0777 .stage .preview
+
+PREPARE_CONTAINER_SERVE_OUTPUTS = \
+	rm -rf .stage .preview .public resources/_gen; \
+	mkdir -p .stage .preview .public resources/_gen; \
+	chmod 0777 .stage .preview .public resources/_gen
 
 CONTAINER_TEST_SCRIPT = \
 	umask 000; \
@@ -105,34 +153,79 @@ CONTAINER_INTEGRATION_TEST_SCRIPT = \
 	export BUILDISH_SITE_FIXTURE_WORKSPACE="$$scratch/workspace"; \
 	make integration-test
 
-CONTAINER_BUILD_SCRIPT = \
+CONTAINER_PREPARE_SITE_ENV = \
 	umask 000; \
-	scratch="$$(mktemp -d "$(CONTAINER_SCRATCH_ROOT)/build.XXXXXX")"; \
+	scratch="$$(mktemp -d "$(CONTAINER_SCRATCH_ROOT)/run.XXXXXX")"; \
 	chmod 0777 "$$scratch"; \
 	node_root="$$scratch/node-work"; \
-	printf "==> [container-build] using scratch directory %s\\n" "$$scratch"; \
+	printf "==> [container] using scratch directory %s\\n" "$$scratch"; \
 	mkdir -p "$$scratch/uv-cache" "$$scratch/npm-cache" "$$node_root"; \
-	trap "printf \"==> [container-build] cleaning scratch directory %s\\n\" \"$$scratch\"; rm -rf \"$$scratch\"" EXIT; \
+	trap "printf \"==> [container] cleaning scratch directory %s\\n\" \"$$scratch\"; rm -rf \"$$scratch\"" EXIT; \
 	export UV_CACHE_DIR="$$scratch/uv-cache"; \
 	export UV_PROJECT_ENVIRONMENT="$$scratch/uv-venv"; \
 	export npm_config_cache="$$scratch/npm-cache"; \
-	printf "==> [container-build] installing Node dependencies into %s\\n" "$$node_root"; \
+	printf "==> [container] installing Node dependencies into %s\\n" "$$node_root"; \
 	cp package.json package-lock.json "$$node_root"/; \
 	npm ci --ignore-scripts --prefix "$$node_root"; \
-	export NODE_MODULES_DIR="$$node_root/node_modules"; \
+	export NODE_MODULES_DIR="$$node_root/node_modules"
+
+CONTAINER_STAGE_SCRIPT = \
+	$(CONTAINER_PREPARE_SITE_ENV); \
+	printf "==> [container-stage] running make stage-local\\n"; \
+	make stage-local; \
+	printf "==> [container-stage] staged site contract completed\\n"
+
+CONTAINER_STAGE_WATCH_SCRIPT = \
+	$(CONTAINER_PREPARE_SITE_ENV); \
+	printf "==> [container-stage-watch] running make stage-watch-local\\n"; \
+	make stage-watch-local; \
+	printf "==> [container-stage-watch] stage watch exited\\n"
+
+CONTAINER_SERVE_SCRIPT = \
+	$(CONTAINER_PREPARE_SITE_ENV); \
+	printf "==> [container-serve] running make serve-local on %s:%s\\n" "0.0.0.0" "$(PORT)"; \
+	make serve-local HUGO_SERVER_BIND=0.0.0.0 PORT=$(PORT); \
+	printf "==> [container-serve] serve exited\\n"
+
+CONTAINER_BUILD_SCRIPT = \
+	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-build] running make build\\n"; \
 	make build; \
 	printf "==> [container-build] site render completed\\n"
+
+define RUN_MANAGED_CONTAINER
+container_name="buildish-site-$(1)-$$PPID-$$BASHPID-$$RANDOM"; \
+run_pid=''; \
+cleanup() { \
+	status=$$?; \
+	trap - EXIT INT TERM; \
+	if [ -n "$$run_pid" ] && kill -0 "$$run_pid" 2>/dev/null; then \
+		$(CONTAINER_ENGINE) stop -t 0 "$$container_name" >/dev/null 2>&1 || true; \
+		wait "$$run_pid" 2>/dev/null || true; \
+	fi; \
+	$(CONTAINER_ENGINE) rm -f "$$container_name" >/dev/null 2>&1 || true; \
+	exit $$status; \
+}; \
+trap cleanup EXIT INT TERM; \
+$(2) bash -lc '$(3)' & \
+run_pid=$$!; \
+wait "$$run_pid"
+endef
 
 .PHONY: \
 	build \
 	check \
 	clean \
+	container-engine-check \
 	container-build \
 	container-check-fast \
 	container-image \
+	container-image-ensure \
 	container-image-local-registry-test \
 	container-integration-test \
+	container-serve \
+	container-stage \
+	container-stage-watch \
 	container-test \
 	docsy-check \
 	help \
@@ -141,8 +234,11 @@ CONTAINER_BUILD_SCRIPT = \
 	render \
 	sanity-check \
 	serve \
+	serve-local \
 	stage \
+	stage-local \
 	stage-watch \
+	stage-watch-local \
 	test \
 	vendor-assets
 
@@ -174,18 +270,37 @@ vendor-assets: docsy-check ## Stage local vendor assets required by the renderer
 	@cp $(NODE_MODULES_DIR)/mermaid/dist/mermaid.min.js .stage/static/js/vendor/mermaid.min.js
 	@cp $(NODE_MODULES_DIR)/lunr/lunr.min.js .stage/static/js/vendor/lunr.min.js
 
-stage: sanity-check ## Build the staged site contract and lightweight Python preview.
-	$(UV_RUN) $(PYTHON) mvp.py build
+stage: container-stage ## Build the staged site contract and lightweight Python preview inside the build container.
 
-stage-watch: sanity-check ## Watch site inputs and rebuild the staged site contract on changes.
-	$(UV_RUN) $(PYTHON) mvp.py watch
+stage-local: sanity-check ## Build the staged site contract and lightweight Python preview natively.
+	$(UV_RUN) $(PYTHON) $(SITE_PIPELINE) build
+
+stage-watch: container-stage-watch ## Watch site inputs and rebuild the staged site contract inside the build container.
+
+stage-watch-local: sanity-check ## Watch site inputs and rebuild the staged site contract natively on changes.
+	$(UV_RUN) $(PYTHON) $(SITE_PIPELINE) watch
 
 render: hugo-check docsy-check vendor-assets ## Render the staged site through local Hugo.
 	@$(DOCSY_ENV); $(HUGO) --source . --config hugo.yaml --cleanDestinationDir
 
-build: stage render ## Build staged content and render the local Hugo site.
+build: stage-local render ## Build staged content and render the local Hugo site natively.
 
-container-image: ## Build the container image used for reproducible site builds.
+container-engine-check: ## Verify Podman or Docker is available for containerized site targets.
+	@engine='$(strip $(CONTAINER_ENGINE))'; \
+	if [ -z "$$engine" ]; then \
+		echo "Error: no supported container engine detected. Install podman or docker, or set CONTAINER_ENGINE=<engine>."; \
+		exit 1; \
+	fi; \
+	command -v "$$engine" >/dev/null 2>&1 || { echo "Error: $$engine is not available on PATH."; exit 1; }
+
+container-image-ensure: container-engine-check ## Build the site builder image if it is missing locally.
+	@if $(CONTAINER_ENGINE) image inspect $(CONTAINER_IMAGE) >/dev/null 2>&1; then \
+		printf '==> [container-image] using existing image %s via %s\n' '$(CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
+	else \
+		$(MAKE) container-image; \
+	fi
+
+container-image: container-engine-check ## Build the container image used for reproducible site builds.
 	$(CONTAINER_ENGINE) build \
 		$(CONTAINER_PLATFORM_FLAG) \
 		-t $(CONTAINER_IMAGE) \
@@ -202,6 +317,20 @@ container-integration-test: container-image ## Run the fixture integration test 
 
 container-check-fast: container-test container-integration-test ## Run the fast containerized verification path for interactive use.
 
+container-stage: container-image-ensure ## Build the staged site contract and lightweight Python preview inside the build container.
+	@printf '==> [container-stage] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
+	@$(PREPARE_CONTAINER_SCRATCH)
+	@$(PREPARE_CONTAINER_STAGE_OUTPUTS)
+	@printf '==> [container-stage] starting containerized site staging\n'
+	@$(CONTAINER_RUN) bash -lc '$(CONTAINER_STAGE_SCRIPT)'
+
+container-stage-watch: container-image-ensure ## Watch site inputs and rebuild the staged site contract inside the build container.
+	@printf '==> [container-stage-watch] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
+	@$(PREPARE_CONTAINER_SCRATCH)
+	@$(PREPARE_CONTAINER_STAGE_OUTPUTS)
+	@printf '==> [container-stage-watch] starting containerized site watch\n'
+	@$(call RUN_MANAGED_CONTAINER,stage-watch,$(CONTAINER_MANAGED_RUN),$(CONTAINER_STAGE_WATCH_SCRIPT))
+
 container-build: container-image ## Build the staged site and Hugo output inside the build container.
 	@printf '==> [container-build] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
 	@$(PREPARE_CONTAINER_SCRATCH)
@@ -211,12 +340,13 @@ container-build: container-image ## Build the staged site and Hugo output inside
 container-image-local-registry-test: ## Run the localhost-registry integration test for the builder image.
 	$(CONTAINER_BUILD_DIR)/test-local-registry.sh --platforms '$(LOCAL_REGISTRY_TEST_PLATFORMS)' --tag '$(LOCAL_REGISTRY_TEST_TAG)' $(LOCAL_REGISTRY_TEST_ARGS)
 
-serve: sanity-check hugo-check docsy-check ## Serve the staged site with local Hugo and automatic restaging; override PORT=<port> if needed.
-	@rm -rf .stage .preview; \
-	watch_pid=''; \
+serve: container-serve ## Serve the staged site with Hugo and automatic restaging inside the build container; override PORT=<port> if needed.
+
+serve-local: sanity-check hugo-check docsy-check ## Serve the staged site with local Hugo and automatic restaging; override PORT=<port> if needed.
+	@watch_pid=''; \
 	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
-	$(UV_RUN) $(PYTHON) mvp.py watch & \
+	$(UV_RUN) $(PYTHON) $(SITE_PIPELINE) watch & \
 	watch_pid=$$!; \
 	while [ ! -f .stage/manifest.yaml ]; do \
 		if ! kill -0 "$$watch_pid" 2>/dev/null; then \
@@ -225,17 +355,25 @@ serve: sanity-check hugo-check docsy-check ## Serve the staged site with local H
 		fi; \
 		sleep 0.1; \
 	done; \
-	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --port $(PORT) --poll 700ms --disableFastRender
+	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --bind $(HUGO_SERVER_BIND) --port $(PORT) --poll 700ms --disableFastRender --noBuildLock --renderToMemory
+
+container-serve: container-image-ensure ## Serve the staged site with Hugo and automatic restaging inside the build container.
+	@printf '==> [container-serve] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
+	@$(PREPARE_CONTAINER_SCRATCH)
+	@$(PREPARE_CONTAINER_SERVE_OUTPUTS)
+	@rm -f .hugo_build.lock
+	@printf '==> [container-serve] starting containerized site server on http://127.0.0.1:%s/\n' '$(PORT)'
+	@$(call RUN_MANAGED_CONTAINER,serve,$(CONTAINER_MANAGED_SERVE_RUN),$(CONTAINER_SERVE_SCRIPT))
 
 clean: sanity-check ## Remove generated local preview outputs.
-	$(UV_RUN) $(PYTHON) mvp.py clean
+	$(UV_RUN) $(PYTHON) $(SITE_PIPELINE) clean
 	rm -rf .public .hugo_build.lock resources
 
 test: sanity-check ## Run the site unit tests.
-	$(UV_RUN) $(PYTHON) -m unittest discover -s tests -p 'test_*.py' -v
+	$(UV_RUN) $(PYTHON) -m unittest discover -s pipeline/tests -p 'test_*.py' -v
 
 integration-test: sanity-check ## Run the fixture-based site integration test.
-	$(UV_RUN) $(PYTHON) -m unittest discover -s tests -p 'integration_*_test.py' -v
+	$(UV_RUN) $(PYTHON) -m unittest discover -s pipeline/tests -p 'integration_*_test.py' -v
 
 check: ## Run the site verification flow: clean, test, build.
 	$(MAKE) clean

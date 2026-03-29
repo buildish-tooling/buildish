@@ -16,7 +16,7 @@ limitations under the License.
 
 # Apache Buildish site development
 
-The site uses Hugo + Docsy for rendering and `mvp.py` for staging generated project content.
+The site uses Hugo + Docsy for rendering, with the Python staging pipeline living under `site/pipeline/site_pipeline.py`.
 
 ## Local native workflow
 
@@ -24,9 +24,10 @@ From `site/`:
 
 - `make test`
 - `make integration-test`
+- `make stage-local`
+- `make stage-watch-local`
 - `make build`
-- `make serve`
-- `make stage-watch`
+- `make serve-local`
 
 The native workflow expects:
 
@@ -34,9 +35,12 @@ The native workflow expects:
 - Hugo extended
 - Node available via `nvm` using `.nvmrc`
 
-`make serve` now keeps `site/.stage/` up to date while Hugo runs, including changes in
-project READMEs/docs/assets that live outside `site/`. Use `make stage-watch` if you want
-to run only the staging watcher without starting Hugo.
+The Node.js files in `site/` support the Hugo + Docsy render path, while the Python staging logic, Python tests, and `uv` project files now live under `site/pipeline/`.
+
+`make stage-local` runs the staging pipeline directly on the host. `make serve-local` keeps
+`site/.stage/` up to date while Hugo runs, including changes in project READMEs/docs/assets
+that live outside `site/`. Use `make stage-watch-local` if you want to run only the native
+staging watcher without starting Hugo.
 
 Known local-dev behavior:
 
@@ -44,7 +48,7 @@ Known local-dev behavior:
 - newly added projects usually show up correctly after the watcher restages content
 - removed project routes can linger briefly in an already-running `make serve` session even after they disappear from the staged catalog
 
-Treat that last case as an accepted development-only inconvenience. A fresh `make build` or a restarted `make serve` reflects the current catalog cleanly.
+Treat that last case as an accepted development-only inconvenience. A fresh `make build` or a restarted `make serve-local` reflects the current catalog cleanly.
 
 ## Current sub-project contract
 
@@ -66,6 +70,9 @@ The reusable builder-image definition lives in `../tools/site-build-image/`, whi
 
 From `site/`:
 
+- `make stage`
+- `make stage-watch`
+- `make serve`
 - `make container-image`
 - `make container-check-fast`
 - `make container-test`
@@ -74,17 +81,27 @@ From `site/`:
 
 Defaults:
 
-- `CONTAINER_ENGINE=podman`
+- `CONTAINER_ENGINE=<auto-detected: podman, then docker>`
 - `CONTAINER_IMAGE=localhost/buildish-site-build:local`
 - `CONTAINER_PLATFORM=<derived from the local host architecture>`
 
 You can override the engine if needed, for example:
 
+- `make CONTAINER_ENGINE=podman stage`
+- `make CONTAINER_ENGINE=docker serve`
 - `make CONTAINER_ENGINE=docker container-build`
+
+`make stage`, `make stage-watch`, and `make serve` are now the default containerized entrypoints.
+They reuse the local builder image when available and build it on demand when missing. The
+previous host-native entrypoints remain available as `make stage-local`,
+`make stage-watch-local`, and `make serve-local`.
 
 The containerized flow:
 
-- bind-mounts the repository into `/workspace`
+- bind-mounts the parent workspace into `/workspace`, with this repository available at `/workspace/<repo-name>/`
+- uses that mount in read/write mode, not read-only, because the container writes generated outputs and caches back into this repository
+- can only stage/serve sub-projects whose `localDir` resolves within that parent workspace; in practice that means sibling repositories next to the main repo (for example `../buildish-mammoth-cache-gradle`)
+- if your sub-project repositories live somewhere else, prefer the native `make stage-local`, `make stage-watch-local`, or `make serve-local` workflow instead
 - writes generated outputs back into the working tree
 - keeps tool caches under `site/.container-home/`
 - installs Node dependencies with `npm ci --ignore-scripts`

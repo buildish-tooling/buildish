@@ -11,12 +11,5 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-[project]
-name = "buildish-site"
-version = "0.1.0"
-description = "Local MVP tooling for the Apache Buildish site infrastructure"
-requires-python = ">=3.13"
-dependencies = [
-    "pyyaml>=6.0.3",
-    "watchfiles>=1.1.1",
-]
+
+"""Tests for the site pipeline."""
