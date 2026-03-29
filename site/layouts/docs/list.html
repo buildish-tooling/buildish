@@ -1,0 +1,65 @@
+{{/*
+Copyright 2026 The Apache Software Foundation
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{ define "main" }}
+{{ $projectContext := partial "buildish-project-context.html" . }}
+{{ if index $projectContext "isProjectLanding" }}
+{{ $project := index $projectContext "project" }}
+<div class="td-content buildish-project-landing">
+  <div class="buildish-project-landing__hero">
+    <p class="buildish-project-landing__eyebrow">Project</p>
+    <h1>{{ .Title }}</h1>
+    {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
+    <div class="buildish-project-landing__actions">
+      {{ with index $projectContext "docsPath" }}
+      <a class="btn btn-primary me-2 mb-2" href="{{ . }}">Open docs</a>
+      {{ end }}
+      {{ if index $projectContext "hasReleaseContent" }}
+      <a class="btn btn-outline-primary me-2 mb-2" href="{{ index $projectContext "releaseAnchor" }}">Release lines</a>
+      {{ end }}
+      {{ with index $project "repository" }}
+      <a class="btn btn-outline-secondary me-2 mb-2" href="{{ . }}" target="_blank" rel="noopener">Source repository</a>
+      {{ end }}
+      <a class="btn btn-link mb-2" href="{{ "/projects/" | relURL }}">All projects</a>
+    </div>
+  </div>
+  <div class="buildish-project-landing__body">
+    {{ .Content }}
+  </div>
+  {{ partial "section-index.html" . -}}
+  {{ partial "feedback.html" . -}}
+  {{ partial "page-meta-lastmod.html" . -}}
+</div>
+{{ else }}
+<div class="td-content">
+	<h1>{{ .Title }}</h1>
+  {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
+	<header class="article-meta">
+		{{ partial "taxonomy_terms_article_wrapper.html" . -}}
+		{{ if (and (not .Params.hide_readingtime) (.Site.Params.ui.readingtime.enable)) -}}
+			{{ partial "reading-time.html" . -}}
+		{{ end -}}
+	</header>
+	{{ .Content }}
+  {{ partial "section-index.html" . -}}
+	{{ partial "feedback.html" . -}}
+	{{ if (.Site.Config.Services.Disqus.Shortname) -}}
+		<br />
+		{{- partial "disqus-comment.html" . -}}
+	{{ end -}}
+	{{ partial "page-meta-lastmod.html" . -}}
+</div>
+{{ end }}
+{{ end -}}

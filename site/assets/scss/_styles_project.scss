@@ -204,3 +204,53 @@ html[data-bs-theme='dark'] .td-sidebar .td-sidebar-nav-active-item {
     width: 100%;
   }
 }
+
+.td-navbar .navbar-brand__context {
+  border-inline-start: 1px solid rgba(255, 255, 255, 0.24);
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.95rem;
+  margin-left: 0.65rem;
+  padding-left: 0.65rem;
+}
+
+.buildish-project-landing {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+
+  &__hero,
+  &__body {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 0.95rem;
+    padding: 1.4rem 1.5rem;
+  }
+
+  &__eyebrow {
+    color: var(--bs-secondary-color);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.6rem;
+    text-transform: uppercase;
+  }
+
+  &__actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 1.25rem;
+  }
+}
+
+html[data-bs-theme='dark'] .td-navbar .navbar-brand__context {
+  border-inline-start-color: rgba(148, 163, 184, 0.28);
+  color: #cbd5e1;
+}
+
+html[data-bs-theme='dark'] .buildish-project-landing__hero,
+html[data-bs-theme='dark'] .buildish-project-landing__body {
+  background: rgba(15, 23, 42, 0.88);
+  border-color: rgba(148, 163, 184, 0.16);
+}
