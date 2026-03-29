@@ -207,7 +207,7 @@ cleanup() { \
 	exit $$status; \
 }; \
 trap cleanup EXIT INT TERM; \
-$(2) bash -lc '$(3)' & \
+$(2) bash -c '$(3)' & \
 run_pid=$$!; \
 wait "$$run_pid"
 endef
@@ -309,11 +309,11 @@ container-image: container-engine-check ## Build the container image used for re
 
 container-test: container-image ## Run the site unit tests inside the build container.
 	@$(PREPARE_CONTAINER_SCRATCH)
-	@$(CONTAINER_RUN) bash -lc '$(CONTAINER_TEST_SCRIPT)'
+	@$(CONTAINER_RUN) bash -c '$(CONTAINER_TEST_SCRIPT)'
 
 container-integration-test: container-image ## Run the fixture integration test inside the build container.
 	@$(PREPARE_CONTAINER_SCRATCH)
-	@$(CONTAINER_RUN) bash -lc '$(CONTAINER_INTEGRATION_TEST_SCRIPT)'
+	@$(CONTAINER_RUN) bash -c '$(CONTAINER_INTEGRATION_TEST_SCRIPT)'
 
 container-check-fast: container-test container-integration-test ## Run the fast containerized verification path for interactive use.
 
@@ -322,7 +322,7 @@ container-stage: container-image-ensure ## Build the staged site contract and li
 	@$(PREPARE_CONTAINER_SCRATCH)
 	@$(PREPARE_CONTAINER_STAGE_OUTPUTS)
 	@printf '==> [container-stage] starting containerized site staging\n'
-	@$(CONTAINER_RUN) bash -lc '$(CONTAINER_STAGE_SCRIPT)'
+	@$(CONTAINER_RUN) bash -c '$(CONTAINER_STAGE_SCRIPT)'
 
 container-stage-watch: container-image-ensure ## Watch site inputs and rebuild the staged site contract inside the build container.
 	@printf '==> [container-stage-watch] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
@@ -335,7 +335,7 @@ container-build: container-image ## Build the staged site and Hugo output inside
 	@printf '==> [container-build] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
 	@$(PREPARE_CONTAINER_SCRATCH)
 	@printf '==> [container-build] starting containerized site render\n'
-	@$(CONTAINER_RUN) bash -lc '$(CONTAINER_BUILD_SCRIPT)'
+	@$(CONTAINER_RUN) bash -c '$(CONTAINER_BUILD_SCRIPT)'
 
 container-image-local-registry-test: ## Run the localhost-registry integration test for the builder image.
 	$(CONTAINER_BUILD_DIR)/test-local-registry.sh --platforms '$(LOCAL_REGISTRY_TEST_PLATFORMS)' --tag '$(LOCAL_REGISTRY_TEST_TAG)' $(LOCAL_REGISTRY_TEST_ARGS)
