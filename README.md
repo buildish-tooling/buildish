@@ -23,6 +23,7 @@ Apache Buildish develops build automation, CI integrations, and supporting tooli
 1. Prevent the term sub**PROJECT**!!
 2. Make the site publishing its own tool that Buildish uses itself.
 3. Need a workflow template so that subproject site changes can be verified.
+4. `site serve[-local]` watcher seems to interfere with IntelliJ IDEs watching the file system as well (complains: too slow).
 
 ## Available projects
 
