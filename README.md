@@ -18,6 +18,11 @@ limitations under the License.
 
 Apache Buildish develops build automation, CI integrations, and supporting tooling.
 
+# TODOs
+
+1. Prevent the term sub**PROJECT**!!
+2. Make the site publishing its own tool that Buildish uses itself.
+
 ## Available projects
 
 See [buildish.apache.org](https://buildish.apache.org/) for the latest list of available projects.
