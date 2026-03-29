@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from pipeline import site_pipeline
 from pipeline.site_pipeline.filesystem import load_project_metadata
-from pipeline.site_pipeline.markdown import with_yaml_front_matter
+from pipeline.site_pipeline.markdown import update_markdown_front_matter, with_yaml_front_matter
 from pipeline.site_pipeline.models import (
     AliasesDataDocument,
     BuildishProjectPagePayload,
@@ -114,6 +114,12 @@ class SitePipelineTest(unittest.TestCase):
         self.assertEqual("Preview", front_matter["buildishProject"]["unreleased"]["label"])
         self.assertNotIn("latestStable", front_matter["buildishProject"])
         self.assertEqual("docs-home", front_matter["buildishProjectPage"]["kind"])
+
+    def test_update_markdown_front_matter_rejects_non_mapping_front_matter(self) -> None:
+        markdown = "---\n[]\n---\n\nBody\n"
+
+        with self.assertRaisesRegex(ValueError, "Expected markdown front matter to be a mapping"):
+            update_markdown_front_matter(markdown, title="Body")
 
     def test_docs_front_matter_to_yaml_data_omits_null_optionals(self) -> None:
         payload = DocsFrontMatter(title="Docs", weight=10).to_yaml_data()

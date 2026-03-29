@@ -21,17 +21,31 @@ without requiring every source repository to follow identical conventions.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import re
 from pathlib import Path
 from typing import Any
 
+from frontmatter.default_handlers import YAMLHandler
 from mistletoe import Document, block_token, span_token
-import yaml
 
 from .yaml_support import yaml_safe_value
 
 
 _HTML_COMMENT_PATTERN = re.compile(r"^<!--.*?-->\s*$", flags=re.DOTALL)
+_FRONT_MATTER_HANDLER = YAMLHandler()
+
+
+@dataclass(frozen=True, slots=True)
+class _MarkdownAnalysis:
+    """Structured view of the leading Markdown blocks relevant to normalization."""
+
+    leading_comment_indexes: tuple[int, ...]
+    title_index: int | None
+    summary_index: int | None
+    summary_is_first_body_block: bool
+    title: str
+    summary: str
 
 
 def _token_plain_text(token: Any) -> str:
@@ -82,49 +96,60 @@ def _is_html_comment_block(block: Any) -> bool:
     return _HTML_COMMENT_PATTERN.fullmatch(_block_plain_text(block)) is not None
 
 
-def _is_heading_level(block: Any, level: int) -> bool:
-    """Return whether a parsed block is a heading of the requested level."""
+def _heading_level(block: Any) -> int | None:
+    """Return the Markdown heading level for heading blocks, otherwise None."""
 
-    return isinstance(block, (block_token.Heading, block_token.SetextHeading)) and getattr(block, "level", None) == level
-
-
-def _is_heading_level_at_least(block: Any, level: int) -> bool:
-    """Return whether a parsed block is a heading at or above the requested level."""
-
-    return isinstance(block, (block_token.Heading, block_token.SetextHeading)) and getattr(block, "level", 0) >= level
+    if not isinstance(block, (block_token.Heading, block_token.SetextHeading)):
+        return None
+    level = getattr(block, "level", None)
+    return level if isinstance(level, int) else None
 
 
-def _leading_h1_index(blocks: list[Any]) -> int | None:
-    """Return the leading H1 index after skipping leading HTML comment blocks."""
+def _analyze_markdown(blocks: list[Any], fallback_title: str) -> _MarkdownAnalysis:
+    """Analyze the leading title/summary structure of a Markdown document."""
 
+    leading_comment_indexes: list[int] = []
+    significant_indexes: list[int] = []
     for index, block in enumerate(blocks):
-        if _is_html_comment_block(block):
+        if not significant_indexes and _is_html_comment_block(block):
+            leading_comment_indexes.append(index)
             continue
-        return index if _is_heading_level(block, 1) else None
-    return None
+        significant_indexes.append(index)
 
+    leading_comments = tuple(leading_comment_indexes)
+    if not significant_indexes:
+        return _MarkdownAnalysis(leading_comments, None, None, False, fallback_title, "")
 
-def _summary_paragraph_index_and_text(blocks: list[Any], title_index: int) -> tuple[int | None, str]:
-    """Find the first summary paragraph after a leading H1 and before the next section heading."""
+    title_index = significant_indexes[0]
+    if _heading_level(blocks[title_index]) != 1:
+        return _MarkdownAnalysis(leading_comments, None, None, False, fallback_title, "")
 
-    for index in range(title_index + 1, len(blocks)):
+    title = _paragraph_plain_text(blocks[title_index]) or fallback_title
+    remaining_indexes = significant_indexes[1:]
+    first_significant_after_title_index = remaining_indexes[0] if remaining_indexes else None
+    for index in remaining_indexes:
         block = blocks[index]
-        if _is_html_comment_block(block):
-            continue
-        if _is_heading_level_at_least(block, 2):
+        heading_level = _heading_level(block)
+        if heading_level is not None and heading_level >= 2:
             break
         if isinstance(block, block_token.Paragraph):
-            return index, _paragraph_plain_text(block)
-    return None, ""
+            return _MarkdownAnalysis(
+                leading_comments,
+                title_index,
+                index,
+                first_significant_after_title_index == index,
+                title,
+                _paragraph_plain_text(block),
+            )
 
-
-def _first_non_comment_block_index(blocks: list[Any], start_index: int) -> int | None:
-    """Return the first block index at or after start_index that is not an HTML comment block."""
-
-    for index in range(start_index, len(blocks)):
-        if not _is_html_comment_block(blocks[index]):
-            return index
-    return None
+    return _MarkdownAnalysis(
+        leading_comments,
+        title_index,
+        None,
+        False,
+        title,
+        "",
+    )
 
 
 def _remove_blocks(markdown_text: str, blocks: list[Any], block_indexes: list[int]) -> str:
@@ -155,20 +180,14 @@ def _remove_blocks(markdown_text: str, blocks: list[Any], block_indexes: list[in
 def extract_title_and_summary(markdown_text: str, fallback_title: str) -> tuple[str, str]:
     """Extract a page title and short summary from Markdown content."""
 
-    blocks = list(Document(markdown_text).children)
-    title_index = _leading_h1_index(blocks)
-    if title_index is None:
-        return fallback_title, ""
-
-    title = _paragraph_plain_text(blocks[title_index])
-    _, summary = _summary_paragraph_index_and_text(blocks, title_index)
-    return title or fallback_title, summary
+    analysis = _analyze_markdown(list(Document(markdown_text).children), fallback_title)
+    return analysis.title, analysis.summary
 
 
 def with_yaml_front_matter(markdown: str, **fields: Any) -> str:
     """Wrap a Markdown body with YAML front matter fields."""
 
-    front_matter = yaml.safe_dump(yaml_safe_value(fields), sort_keys=False, default_flow_style=False).rstrip()
+    front_matter = _FRONT_MATTER_HANDLER.export(yaml_safe_value(fields), sort_keys=False).rstrip()
     body = markdown.lstrip()
     return f"---\n{front_matter}\n---\n\n{body}"
 
@@ -176,13 +195,16 @@ def with_yaml_front_matter(markdown: str, **fields: Any) -> str:
 def _split_markdown_front_matter(markdown: str) -> tuple[dict[str, Any], str]:
     """Split a Markdown document into front matter and body content."""
 
-    match = re.match(r"^---\n(.*?)\n---\n?", markdown, flags=re.DOTALL)
-    if match is None:
+    if not _FRONT_MATTER_HANDLER.detect(markdown):
         return {}, markdown
-    front_matter = yaml.safe_load(match.group(1)) or {}
+
+    raw_front_matter, body = _FRONT_MATTER_HANDLER.split(markdown)
+    front_matter = _FRONT_MATTER_HANDLER.load(raw_front_matter)
+    if front_matter is None:
+        front_matter = {}
     if not isinstance(front_matter, dict):
         raise ValueError("Expected markdown front matter to be a mapping")
-    return front_matter, markdown[match.end() :]
+    return front_matter, body
 
 
 def update_markdown_front_matter(markdown: str, **fields: Any) -> str:
@@ -204,25 +226,25 @@ def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: An
         effective_fallback_title = existing_title.strip()
 
     blocks = list(Document(body).children)
-    title_index = _leading_h1_index(blocks)
-    title = effective_fallback_title
-    summary = ""
-    summary_index: int | None = None
-    if title_index is not None:
-        title = _paragraph_plain_text(blocks[title_index]) or effective_fallback_title
-        summary_index, summary = _summary_paragraph_index_and_text(blocks, title_index)
+    analysis = _analyze_markdown(blocks, effective_fallback_title)
+    title = analysis.title
+    summary = analysis.summary
     existing_description = existing_fields.get("description")
     has_explicit_description = isinstance(existing_description, str) and bool(existing_description.strip())
     if not summary and isinstance(existing_description, str):
         summary = existing_description.strip()
 
     removed_blocks: list[int] = []
-    if title_index is not None:
-        removed_blocks.append(title_index)
-    if summary and not has_explicit_description and summary_index is not None:
-        first_content_after_title = _first_non_comment_block_index(blocks, title_index + 1)
-        if first_content_after_title == summary_index:
-            removed_blocks.append(summary_index)
+    if analysis.title_index is not None:
+        removed_blocks.extend(analysis.leading_comment_indexes)
+        removed_blocks.append(analysis.title_index)
+    if (
+        summary
+        and not has_explicit_description
+        and analysis.summary_index is not None
+        and analysis.summary_is_first_body_block
+    ):
+        removed_blocks.append(analysis.summary_index)
     normalized_body = _remove_blocks(body, blocks, removed_blocks)
 
     updated_fields = dict(existing_fields)
@@ -245,9 +267,8 @@ def humanized_stem(path: Path) -> str:
 def split_paragraphs(text: str) -> list[str]:
     """Split plain text into normalized paragraphs for YAML front matter."""
 
-    paragraphs: list[str] = []
-    for chunk in text.strip().split("\n\n"):
-        lines = [line.strip() for line in chunk.splitlines() if line.strip()]
-        if lines:
-            paragraphs.append(" ".join(lines))
-    return paragraphs
+    return [
+        " ".join(lines)
+        for chunk in text.strip().split("\n\n")
+        if (lines := [line.strip() for line in chunk.splitlines() if line.strip()])
+    ]
