@@ -16,8 +16,8 @@
 .git/**
 .idea/**
 build/**
-site/.idea/**
-site/.venv/**
+**/.idea/**
+**/.venv/**
 site/.stage/**
 site/.preview/**
 site/.public/**
@@ -29,4 +29,5 @@ site/node_modules/**
 site/.hugo_build.lock
 site/.nvmrc
 site/go.sum
+**/uv.lock
 site/uv.lock
