@@ -24,6 +24,7 @@ import sys
 import time
 import unittest
 from pathlib import Path
+from typing import TextIO
 
 import yaml
 
@@ -37,6 +38,7 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         shutil.rmtree(self.workspace, ignore_errors=True)
         self.workspace.mkdir(parents=True, exist_ok=True)
         self.processes: list[subprocess.Popen[str]] = []
+        self.process_logs: dict[int, tuple[Path, TextIO]] = {}
 
     def tearDown(self) -> None:
         for process in self.processes:
@@ -236,17 +238,30 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         return subprocess.run(["make", target], cwd=site_root, env=env, capture_output=True, text=True, check=False)
 
     def start_make(self, site_root: Path, target: str, env: dict[str, str]) -> subprocess.Popen[str]:
+        log_dir = self.workspace / "process-logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / f"{target}-{len(self.processes)}.log"
+        log_handle = log_path.open("w+", encoding="utf-8")
         process = subprocess.Popen(
             ["make", target],
             cwd=site_root,
             env=env,
-            stdout=subprocess.PIPE,
+            stdout=log_handle,
             stderr=subprocess.STDOUT,
             text=True,
             start_new_session=True,
         )
         self.processes.append(process)
+        self.process_logs[process.pid] = (log_path, log_handle)
         return process
+
+    def read_process_output(self, process: subprocess.Popen[str]) -> str:
+        log_info = self.process_logs.get(process.pid)
+        if log_info is None:
+            return ""
+        log_path, log_handle = log_info
+        log_handle.flush()
+        return log_path.read_text(encoding="utf-8")
 
     def stop_process(self, process: subprocess.Popen[str]) -> str:
         if process in self.processes:
@@ -258,19 +273,28 @@ class MakeTargetIntegrationTest(unittest.TestCase):
             except subprocess.TimeoutExpired:
                 os.killpg(process.pid, signal.SIGKILL)
                 process.wait(timeout=10)
-        output = ""
-        if process.stdout and not process.stdout.closed:
-            output = process.stdout.read()
-            process.stdout.close()
+        output = self.read_process_output(process)
+        log_info = self.process_logs.pop(process.pid, None)
+        if log_info is not None:
+            _, log_handle = log_info
+            log_handle.close()
         return output
 
-    def wait_for(self, description: str, predicate, timeout: float = 20.0) -> None:
+    def wait_for(self, description: str, predicate, timeout: float = 20.0, process: subprocess.Popen[str] | None = None) -> None:
         deadline = time.time() + timeout
         while time.time() < deadline:
             if predicate():
                 return
+            if process is not None and process.poll() is not None:
+                self.fail(
+                    f"Process exited while waiting for {description} (returncode={process.returncode})\n"
+                    f"{self.read_process_output(process)}"
+                )
             time.sleep(0.1)
-        self.fail(f"Timed out waiting for {description}")
+        details = ""
+        if process is not None:
+            details = f"\n{self.read_process_output(process)}"
+        self.fail(f"Timed out waiting for {description}{details}")
 
     def test_make_stage_local_builds_fixture_workspace(self) -> None:
         repo_root = self.prepare_fixture_workspace()
@@ -345,10 +369,14 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         source_doc = self.workspace / "buildish-mammoth-cache-gradle" / "site" / "docs" / "getting-started.md"
         staged_doc = repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "stage-watch-local", os.environ.copy())
-        self.wait_for("initial stage-watch build", lambda: staged_doc.exists())
+        self.wait_for("initial stage-watch build", lambda: staged_doc.exists(), process=process)
         time.sleep(1.0)
         source_doc.write_text("# Getting started\n\nUpdated by stage-watch-local.\n", encoding="utf-8")
-        self.wait_for("restaged docs after stage-watch-local change", lambda: staged_doc.exists() and "Updated by stage-watch-local." in staged_doc.read_text(encoding="utf-8"))
+        self.wait_for(
+            "restaged docs after stage-watch-local change",
+            lambda: staged_doc.exists() and "Updated by stage-watch-local." in staged_doc.read_text(encoding="utf-8"),
+            process=process,
+        )
         self.stop_process(process)
 
     def test_make_stage_watch_rebuilds_after_doc_change_in_containerized_mode(self) -> None:
@@ -362,10 +390,14 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         source_doc = self.workspace / "buildish-mammoth-cache-gradle" / "site" / "docs" / "getting-started.md"
         staged_doc = repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "stage-watch", env)
-        self.wait_for("initial containerized stage-watch build", lambda: staged_doc.exists())
+        self.wait_for("initial containerized stage-watch build", lambda: staged_doc.exists(), process=process)
         time.sleep(1.0)
         source_doc.write_text("# Getting started\n\nUpdated by containerized stage-watch.\n", encoding="utf-8")
-        self.wait_for("restaged docs after containerized stage-watch change", lambda: staged_doc.exists() and "Updated by containerized stage-watch." in staged_doc.read_text(encoding="utf-8"))
+        self.wait_for(
+            "restaged docs after containerized stage-watch change",
+            lambda: staged_doc.exists() and "Updated by containerized stage-watch." in staged_doc.read_text(encoding="utf-8"),
+            process=process,
+        )
         self.stop_process(process)
         self.assertIn("run", (repo_root / "site" / "build" / "fake-container.log").read_text(encoding="utf-8"))
 
@@ -377,9 +409,13 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         source_doc = self.workspace / "buildish-mammoth-cache-gradle" / "site" / "docs" / "getting-started.md"
         staged_doc = repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "serve-local", env)
-        self.wait_for("fake local Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists())
+        self.wait_for("fake local Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(), process=process)
         source_doc.write_text("# Getting started\n\nUpdated by serve-local.\n", encoding="utf-8")
-        self.wait_for("restaged docs after serve-local change", lambda: staged_doc.exists() and "Updated by serve-local." in staged_doc.read_text(encoding="utf-8"))
+        self.wait_for(
+            "restaged docs after serve-local change",
+            lambda: staged_doc.exists() and "Updated by serve-local." in staged_doc.read_text(encoding="utf-8"),
+            process=process,
+        )
         hugo_log = Path(env["BUILDISH_FAKE_HUGO_LOG"]).read_text(encoding="utf-8")
         self.assertIn("server", hugo_log)
         self.assertIn("--bind 127.0.0.1", hugo_log)
@@ -398,9 +434,13 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         source_doc = self.workspace / "buildish-mammoth-cache-gradle" / "site" / "docs" / "getting-started.md"
         staged_doc = repo_root / "site" / ".stage" / "content" / "projects" / "mammoth-cache-gradle" / "unreleased" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "serve", env)
-        self.wait_for("fake containerized Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists())
+        self.wait_for("fake containerized Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(), process=process)
         source_doc.write_text("# Getting started\n\nUpdated by containerized serve.\n", encoding="utf-8")
-        self.wait_for("restaged docs after containerized serve change", lambda: staged_doc.exists() and "Updated by containerized serve." in staged_doc.read_text(encoding="utf-8"))
+        self.wait_for(
+            "restaged docs after containerized serve change",
+            lambda: staged_doc.exists() and "Updated by containerized serve." in staged_doc.read_text(encoding="utf-8"),
+            process=process,
+        )
         hugo_log = Path(env["BUILDISH_FAKE_HUGO_LOG"]).read_text(encoding="utf-8")
         self.assertIn("--bind 0.0.0.0", hugo_log)
         self.assertIn("--port 8767", hugo_log)
@@ -420,7 +460,7 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
         process = self.start_make(repo_root / "site", "serve", env)
-        self.wait_for("fake containerized Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists())
+        self.wait_for("fake containerized Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(), process=process)
         os.killpg(process.pid, signal.SIGINT)
         process.wait(timeout=10)
         output = self.stop_process(process)
