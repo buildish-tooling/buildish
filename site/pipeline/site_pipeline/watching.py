@@ -22,38 +22,63 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any
 
 from .builder import build
 from .constants import STAGED_VENDOR_ASSETS, WATCH_DEBOUNCE_MS, WATCH_IGNORE_PATH_PARTS, WATCH_IGNORE_SUFFIXES, WATCH_STEP_MS
 from .filesystem import (
-    first_defined_mapping_value,
+    load_projects_catalog,
     load_project_metadata,
-    load_yaml_like,
-    mapping_or_empty,
     repo_root_from,
     resolve_vendor_asset_source,
     safe_relative_path,
     safe_repo_path,
     watchable_existing_path,
 )
+from .models import CatalogProject, ProjectCatalogDefaults, ProjectMetadata
 
 
-def project_watch_roots(repo_root: Path, project: dict[str, Any], defaults: dict[str, Any]) -> set[Path]:
+def _configured_content_root(
+    project: CatalogProject,
+    metadata: ProjectMetadata,
+    defaults: ProjectCatalogDefaults,
+    key: str,
+) -> str | None:
+    """Resolve typed docs/assets settings for watch-root collection."""
+
+    if key == "docsRoot":
+        if project.docs_root.is_set:
+            return project.docs_root.value
+        if metadata.content.docs_root.is_set:
+            return metadata.content.docs_root.value
+        if metadata.docs_root.is_set:
+            return metadata.docs_root.value
+        if defaults.docs_root.is_set:
+            return defaults.docs_root.value
+        return None
+    if project.assets_root.is_set:
+        return project.assets_root.value
+    if metadata.content.assets_root.is_set:
+        return metadata.content.assets_root.value
+    if metadata.assets_root.is_set:
+        return metadata.assets_root.value
+    if defaults.assets_root.is_set:
+        return defaults.assets_root.value
+    return None
+
+
+def project_watch_roots(repo_root: Path, project: CatalogProject, defaults: ProjectCatalogDefaults) -> set[Path]:
     """Return the filesystem paths that can affect one project's staged output."""
 
-    slug = str(project["slug"])
-    local_dir = str(project["localDir"])
+    slug = project.slug
+    local_dir = project.local_dir
     repo_path = safe_repo_path(repo_root, local_dir)
     parent_fallback = repo_path.parent if repo_path.parent.exists() else repo_root.parent.resolve()
 
     if not repo_path.exists():
         return {watchable_existing_path(repo_path, parent_fallback)}
 
-    metadata_relative = str(project.get("metadataFile") or defaults.get("metadataFile") or "site/project.yaml")
-    metadata_fields, _ = load_project_metadata(repo_path, metadata_relative, slug)
-    project_fields = mapping_or_empty(metadata_fields, "project", f"project metadata for {slug}")
-    content_fields = mapping_or_empty(metadata_fields, "content", f"content metadata for {slug}")
+    metadata_relative = project.metadata_file or defaults.metadata_file or "site/project.yaml"
+    metadata, _ = load_project_metadata(repo_path, metadata_relative, slug)
 
     watch_roots: set[Path] = set()
 
@@ -61,25 +86,13 @@ def project_watch_roots(repo_root: Path, project: dict[str, Any], defaults: dict
     if metadata_path is not None:
         watch_roots.add(watchable_existing_path(metadata_path, repo_path))
 
-    docs_setting = project["docsRoot"] if "docsRoot" in project else first_defined_mapping_value(
-        "docsRoot",
-        content_fields,
-        project_fields,
-        metadata_fields,
-        defaults,
-    )
+    docs_setting = _configured_content_root(project, metadata, defaults, "docsRoot")
     if docs_setting is not None:
         docs_path = safe_relative_path(repo_path, str(docs_setting), f"docsRoot for {slug}")
         if docs_path is not None:
             watch_roots.add(watchable_existing_path(docs_path, repo_path))
 
-    assets_setting = project["assetsRoot"] if "assetsRoot" in project else first_defined_mapping_value(
-        "assetsRoot",
-        content_fields,
-        project_fields,
-        metadata_fields,
-        defaults,
-    )
+    assets_setting = _configured_content_root(project, metadata, defaults, "assetsRoot")
     if assets_setting is not None:
         assets_path = safe_relative_path(repo_path, str(assets_setting), f"assetsRoot for {slug}")
         if assets_path is not None:
@@ -93,9 +106,7 @@ def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
 
     resolved_repo_root = repo_root_from(repo_root)
     site_root = resolved_repo_root / "site"
-    catalog = load_yaml_like(site_root / "projects.yaml")
-    defaults = dict(catalog.get("defaults") or {})
-    projects = list(catalog.get("projects") or [])
+    catalog = load_projects_catalog(site_root / "projects.yaml")
 
     watch_roots: set[Path] = {
         watchable_existing_path(site_root / "projects.yaml", site_root),
@@ -108,8 +119,8 @@ def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
         if source.exists():
             watch_roots.add(source.resolve())
 
-    for project in projects:
-        watch_roots.update(project_watch_roots(resolved_repo_root, project, defaults))
+    for project in catalog.projects:
+        watch_roots.update(project_watch_roots(resolved_repo_root, project, catalog.defaults))
 
     return sorted(watch_roots, key=str)
 

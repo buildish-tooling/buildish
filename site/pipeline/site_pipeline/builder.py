@@ -27,12 +27,9 @@ from typing import Any
 from .constants import DEFAULT_TAG_PATTERN
 from .filesystem import (
     copy_tree_without_symlinks,
-    first_defined_mapping_value,
     first_non_none,
+    load_projects_catalog,
     load_project_metadata,
-    load_yaml_like,
-    mapping_or_empty,
-    parse_int_like,
     read_text_if_exists,
     repo_root_from,
     reset_output_directory,
@@ -42,7 +39,30 @@ from .filesystem import (
     write_yaml_like,
 )
 from .markdown import humanized_stem, normalize_markdown_doc, split_paragraphs, update_markdown_front_matter, with_yaml_front_matter
-from .models import ProjectBuildResult
+from .models import (
+    AliasesDataDocument,
+    CatalogProject,
+    LifecycleDataDocument,
+    LifecycleDataEntry,
+    LifecycleLatestStable,
+    LifecycleUnreleased,
+    ManifestDocument,
+    ManifestProjectEntry,
+    ProjectAliasesEntry,
+    ProjectBuildResult,
+    ProjectCatalogDefaults,
+    ProjectLifecycleDocument,
+    ProjectLifecycleDocumentData,
+    ProjectMetadata,
+    ProjectVersionDocument,
+    ProjectsDataDocument,
+    ProjectsDataEntry,
+    StagedDocLink,
+    StagedProjectRef,
+    VersionAssets,
+    VersionDescriptor,
+    VersionSource,
+)
 from .rendering import (
     build_preview_index,
     build_project_markdown,
@@ -63,32 +83,39 @@ def _without_none(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if value is not None}
 
 
-def _serialized_release_lines(release_lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _serialized_release_lines(release_lines: tuple[Any, ...]) -> list[dict[str, Any]]:
     """Remove null and empty alias values from release-line payloads."""
 
-    return [
-        {
-            key: value
-            for key, value in release_line.items()
-            if value is not None and (key != "aliases" or value)
-        }
-        for release_line in release_lines
-    ]
+    return [release_line.to_yaml_data() for release_line in release_lines]
 
 
 def _content_setting(
-    project: dict[str, Any],
-    metadata_fields: dict[str, Any],
-    project_fields: dict[str, Any],
-    content_fields: dict[str, Any],
-    defaults: dict[str, Any],
+    project: CatalogProject,
+    metadata: ProjectMetadata,
+    defaults: ProjectCatalogDefaults,
     key: str,
-) -> Any:
+) -> str | None:
     """Resolve a content-related setting using the pipeline precedence rules."""
 
-    if key in project:
-        return project[key]
-    return first_defined_mapping_value(key, content_fields, project_fields, metadata_fields, defaults)
+    if key == "docsRoot":
+        if project.docs_root.is_set:
+            return project.docs_root.value
+        if metadata.content.docs_root.is_set:
+            return metadata.content.docs_root.value
+        if metadata.docs_root.is_set:
+            return metadata.docs_root.value
+        if defaults.docs_root.is_set:
+            return defaults.docs_root.value
+        return None
+    if project.assets_root.is_set:
+        return project.assets_root.value
+    if metadata.content.assets_root.is_set:
+        return metadata.content.assets_root.value
+    if metadata.assets_root.is_set:
+        return metadata.assets_root.value
+    if defaults.assets_root.is_set:
+        return defaults.assets_root.value
+    return None
 
 
 def _stage_project_docs(
@@ -125,10 +152,10 @@ def _normalize_staged_docs(
     docs_root: Path,
     slug: str,
     copied_docs: list[Path],
-) -> tuple[list[dict[str, str]], str]:
+) -> tuple[list[StagedDocLink], str]:
     """Normalize staged Markdown docs and build their preview links."""
 
-    doc_links: list[dict[str, str]] = []
+    doc_links: list[StagedDocLink] = []
     summary = ""
     for copied in copied_docs:
         staged_doc_path = docs_root / copied
@@ -149,7 +176,7 @@ def _normalize_staged_docs(
         if copied.suffix.lower() not in {".md", ".markdown", ".adoc", ".asciidoc"}:
             continue
         raw_path = public_content_page_path(["projects", slug, "unreleased", "docs"], copied)
-        doc_links.append({"label": doc_title, "href": raw_path})
+        doc_links.append(StagedDocLink(label=doc_title, href=raw_path))
     return doc_links, summary
 
 
@@ -329,57 +356,51 @@ def _write_project_metadata_files(
 
     write_yaml_like(
         version_metadata_path,
-        {
-            "schemaVersion": 1,
-            "project": {"slug": result.slug, "displayName": result.display_name},
-            "version": _without_none(
-                {
-                    "kind": "unreleased",
-                    "label": result.unreleased_label,
-                    "path": raw_unreleased_index_path,
-                    "docsPath": result.raw_docs_root_path,
-                }
+        ProjectVersionDocument(
+            schema_version=1,
+            project=StagedProjectRef(slug=result.slug, display_name=result.display_name),
+            version=VersionDescriptor(
+                kind="unreleased",
+                label=result.unreleased_label,
+                path=raw_unreleased_index_path,
+                docs_path=result.raw_docs_root_path,
             ),
-            "source": {
-                "repository": result.repository,
-                "localDir": result.local_dir,
-                "metadataFile": metadata_relative,
-                "metadataLoaded": metadata_loaded,
-                "defaultBranch": result.default_branch,
-                "docsRoot": docs_relative or None,
-                "assetsRoot": assets_relative or None,
-            },
-            "assets": {
-                "count": result.asset_count,
-                "path": result.raw_assets_root_path,
-            },
-        },
+            source=VersionSource(
+                repository=result.repository,
+                local_dir=result.local_dir,
+                metadata_file=metadata_relative,
+                metadata_loaded=metadata_loaded,
+                default_branch=result.default_branch,
+                docs_root=docs_relative or None,
+                assets_root=assets_relative or None,
+            ),
+            assets=VersionAssets(count=result.asset_count, path=result.raw_assets_root_path),
+        ),
     )
-
-    lifecycle_payload: dict[str, Any] = {
-        "unreleased": {
-            "label": result.unreleased_label,
-            "path": raw_unreleased_index_path,
-            "docsPath": result.raw_docs_root_path,
-            "robots": "index,follow",
-        },
-        "latestStable": None,
-        "releaseLines": [],
-    }
-    if result.latest_stable_version is not None:
-        lifecycle_payload["latestStable"] = _without_none(
-            {"version": result.latest_stable_version, "path": result.latest_stable_path}
-        )
-    if result.release_lines:
-        lifecycle_payload["releaseLines"] = _serialized_release_lines(result.release_lines)
 
     write_yaml_like(
         lifecycle_metadata_path,
-        {
-            "schemaVersion": 1,
-            "project": {"slug": result.slug, "displayName": result.display_name},
-            "lifecycle": lifecycle_payload,
-        },
+        ProjectLifecycleDocument(
+            schema_version=1,
+            project=StagedProjectRef(slug=result.slug, display_name=result.display_name),
+            lifecycle=ProjectLifecycleDocumentData(
+                unreleased=LifecycleUnreleased(
+                    label=result.unreleased_label,
+                    path=raw_unreleased_index_path,
+                    docs_path=result.raw_docs_root_path,
+                    robots="index,follow",
+                ),
+                latest_stable=(
+                    None
+                    if result.latest_stable_version is None
+                    else LifecycleLatestStable(
+                        version=result.latest_stable_version,
+                        path=result.latest_stable_path,
+                    )
+                ),
+                release_lines=result.release_lines,
+            ),
+        ),
     )
 
 
@@ -401,59 +422,59 @@ def stage_authored_site_content(site_root: Path, stage_root: Path, incubator_dis
         )
 
 
-def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], defaults: dict[str, Any], catalog_index: int) -> ProjectBuildResult:
+def stage_project(
+    repo_root: Path,
+    stage_root: Path,
+    project: CatalogProject,
+    defaults: ProjectCatalogDefaults,
+    catalog_index: int,
+) -> ProjectBuildResult:
     """Stage one project described in ``site/projects.yaml``."""
 
-    slug = str(project["slug"])
-    local_dir = str(project["localDir"])
+    slug = project.slug
+    local_dir = project.local_dir
     repo_path = safe_repo_path(repo_root, local_dir)
     warnings: list[str] = []
     available = repo_path.is_dir()
-    navigation_weight = parse_int_like(project.get("weight"), f"weight for {slug}") if "weight" in project else catalog_index * 10
+    navigation_weight = project.weight.value if project.weight.is_set else catalog_index * 10
 
-    metadata_relative = str(project.get("metadataFile") or defaults.get("metadataFile") or "site/project.yaml")
-    metadata_fields: dict[str, Any] = {}
+    metadata_relative = project.metadata_file or defaults.metadata_file or "site/project.yaml"
+    metadata = ProjectMetadata()
     metadata_path: Path | None = None
     if available:
-        metadata_fields, metadata_path = load_project_metadata(repo_path, metadata_relative, slug)
+        metadata, metadata_path = load_project_metadata(repo_path, metadata_relative, slug)
 
-    project_fields = mapping_or_empty(metadata_fields, "project", f"project metadata for {slug}")
-    content_fields = mapping_or_empty(metadata_fields, "content", f"content metadata for {slug}")
-    versioning_fields = mapping_or_empty(metadata_fields, "versioning", f"versioning metadata for {slug}")
-    lifecycle_fields = mapping_or_empty(metadata_fields, "lifecycle", f"lifecycle metadata for {slug}")
-    navigation_fields = mapping_or_empty(metadata_fields, "navigation", f"navigation metadata for {slug}")
-
-    display_name = str(first_non_none(project.get("displayName"), project_fields.get("displayName"), metadata_fields.get("displayName"), slug))
-    repository = first_non_none(project.get("repository"), project_fields.get("repository"), metadata_fields.get("repository"))
-    default_branch = first_non_none(project.get("defaultBranch"), project_fields.get("defaultBranch"), metadata_fields.get("defaultBranch"))
+    display_name = str(first_non_none(project.display_name, metadata.project.display_name, metadata.display_name, slug))
+    repository = first_non_none(project.repository, metadata.project.repository, metadata.repository)
+    default_branch = first_non_none(project.default_branch, metadata.project.default_branch, metadata.default_branch)
     navigation_section = first_non_none(
-        project.get("navigationSection"),
-        navigation_fields.get("section"),
-        metadata_fields.get("navigationSection"),
-        defaults.get("navigationSection"),
+        project.navigation_section,
+        metadata.navigation.section,
+        metadata.navigation_section,
+        defaults.navigation_section,
     )
 
-    docs_setting = _content_setting(project, metadata_fields, project_fields, content_fields, defaults, "docsRoot")
+    docs_setting = _content_setting(project, metadata, defaults, "docsRoot")
     docs_relative = "" if docs_setting is None else str(docs_setting)
 
-    assets_setting = _content_setting(project, metadata_fields, project_fields, content_fields, defaults, "assetsRoot")
+    assets_setting = _content_setting(project, metadata, defaults, "assetsRoot")
     assets_relative = "" if assets_setting is None else str(assets_setting)
 
     unreleased_label = str(
         first_non_none(
-            project.get("unreleasedLabel"),
-            versioning_fields.get("unreleasedLabel"),
-            metadata_fields.get("unreleasedLabel"),
-            defaults.get("unreleasedLabel"),
+            project.unreleased_label,
+            metadata.versioning.unreleased_label,
+            metadata.unreleased_label,
+            defaults.unreleased_label,
             "Unreleased",
         )
     )
     tag_pattern_text = str(
         first_non_none(
-            project.get("tagPattern"),
-            versioning_fields.get("tagPattern"),
-            metadata_fields.get("tagPattern"),
-            defaults.get("tagPattern"),
+            project.tag_pattern,
+            metadata.versioning.tag_pattern,
+            metadata.tag_pattern,
+            defaults.tag_pattern,
             DEFAULT_TAG_PATTERN,
         )
     )
@@ -481,7 +502,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
     raw_assets_root_path = public_assets_root_path(slug) if copied_assets else None
     tag_pattern = compile_tag_pattern(tag_pattern_text, slug, warnings)
     latest_stable_version, latest_stable_path, release_lines, alias_mappings = normalize_lifecycle(
-        lifecycle_fields,
+        metadata.lifecycle,
         tag_pattern,
         slug,
         project_root,
@@ -509,7 +530,7 @@ def stage_project(repo_root: Path, stage_root: Path, project: dict[str, Any], de
         latest_stable_path=latest_stable_path,
         release_lines=release_lines,
         alias_mappings=alias_mappings,
-        doc_links=doc_links,
+        doc_links=tuple(doc_links),
         warnings=warnings,
     )
 
@@ -532,16 +553,17 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
 
     resolved_repo_root = repo_root_from(repo_root)
     site_root = resolved_repo_root / "site"
-    catalog = load_yaml_like(site_root / "projects.yaml")
-    defaults = dict(catalog.get("defaults") or {})
-    projects = list(catalog.get("projects") or [])
+    catalog = load_projects_catalog(site_root / "projects.yaml")
 
     stage_root = site_root / ".stage"
     preview_root = site_root / ".preview"
     reset_output_directory(stage_root)
     reset_output_directory(preview_root)
 
-    results = [stage_project(resolved_repo_root, stage_root, project, defaults, index) for index, project in enumerate(projects, start=1)]
+    results = [
+        stage_project(resolved_repo_root, stage_root, project, catalog.defaults, index)
+        for index, project in enumerate(catalog.projects, start=1)
+    ]
     incubator_disclaimer = read_text_if_exists(resolved_repo_root / "DISCLAIMER").strip()
     incubator_disclaimer_paragraphs = split_paragraphs(incubator_disclaimer)
     stage_authored_site_content(site_root, stage_root, incubator_disclaimer_paragraphs)
@@ -549,84 +571,79 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
 
     write_yaml_like(
         stage_root / "manifest.yaml",
-        {
-            "schemaVersion": 1,
-            "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(),
-            "repoRoot": str(resolved_repo_root),
-            "projects": [
-                {
-                    "slug": result.slug,
-                    "displayName": result.display_name,
-                    "weight": result.navigation_weight,
-                    "available": result.available,
-                    "localDir": result.local_dir,
-                    "repository": result.repository,
-                    "defaultBranch": result.default_branch,
-                    "projectPath": result.raw_project_index_path,
-                    "unreleasedPath": result.raw_unreleased_index_path,
-                    "docsPath": result.raw_docs_root_path,
-                }
+        ManifestDocument(
+            schema_version=1,
+            generated_at=dt.datetime.now(dt.timezone.utc).isoformat(),
+            repo_root=str(resolved_repo_root),
+            projects=tuple(
+                ManifestProjectEntry(
+                    slug=result.slug,
+                    display_name=result.display_name,
+                    weight=result.navigation_weight,
+                    available=result.available,
+                    local_dir=result.local_dir,
+                    repository=result.repository,
+                    default_branch=result.default_branch,
+                    project_path=result.raw_project_index_path,
+                    unreleased_path=result.raw_unreleased_index_path,
+                    docs_path=result.raw_docs_root_path,
+                )
                 for result in results
-            ],
-        },
+            ),
+        ),
     )
     write_yaml_like(
         stage_root / "data" / "projects.yaml",
-        {
-            "schemaVersion": 1,
-            "projects": {
-                result.slug: {
-                    "displayName": result.display_name,
-                    "weight": result.navigation_weight,
-                    "available": result.available,
-                    "localDir": result.local_dir,
-                    "repository": result.repository,
-                    "summary": result.summary,
-                    "defaultBranch": result.default_branch,
-                    "navigationSection": result.navigation_section,
-                    "unreleasedLabel": result.unreleased_label,
-                    "projectPath": result.raw_project_index_path,
-                    "unreleasedPath": result.raw_unreleased_index_path,
-                    "docsPath": result.raw_docs_root_path,
-                    "assetCount": result.asset_count,
-                    "assetsPath": result.raw_assets_root_path,
-                    "latestStable": result.latest_stable_version,
-                    "latestStablePath": result.latest_stable_path,
-                    "releaseLines": _serialized_release_lines(result.release_lines),
-                }
+        ProjectsDataDocument(
+            schema_version=1,
+            projects={
+                result.slug: ProjectsDataEntry(
+                    display_name=result.display_name,
+                    weight=result.navigation_weight,
+                    available=result.available,
+                    local_dir=result.local_dir,
+                    repository=result.repository,
+                    summary=result.summary,
+                    default_branch=result.default_branch,
+                    navigation_section=result.navigation_section,
+                    unreleased_label=result.unreleased_label,
+                    project_path=result.raw_project_index_path,
+                    unreleased_path=result.raw_unreleased_index_path,
+                    docs_path=result.raw_docs_root_path,
+                    asset_count=result.asset_count,
+                    assets_path=result.raw_assets_root_path,
+                    latest_stable=result.latest_stable_version,
+                    latest_stable_path=result.latest_stable_path,
+                    release_lines=result.release_lines,
+                )
                 for result in results
             },
-        },
+        ),
     )
     write_yaml_like(
         stage_root / "data" / "lifecycle.yaml",
-        {
-            "schemaVersion": 1,
-            "projects": {
-                result.slug: {
-                    "latestStable": result.latest_stable_version,
-                    "releaseLines": _serialized_release_lines(result.release_lines),
-                    "unreleased": _without_none(
-                        {
-                            "label": result.unreleased_label,
-                            "path": result.raw_unreleased_index_path,
-                            "docsPath": result.raw_docs_root_path,
-                        }
+        LifecycleDataDocument(
+            schema_version=1,
+            projects={
+                result.slug: LifecycleDataEntry(
+                    latest_stable=result.latest_stable_version,
+                    release_lines=result.release_lines,
+                    unreleased=LifecycleUnreleased(
+                        label=result.unreleased_label,
+                        path=result.raw_unreleased_index_path,
+                        docs_path=result.raw_docs_root_path,
                     ),
-                }
+                )
                 for result in results
             },
-        },
+        ),
     )
     write_yaml_like(
         stage_root / "data" / "aliases.yaml",
-        {
-            "schemaVersion": 1,
-            "projects": {
-                result.slug: {"aliases": result.alias_mappings}
-                for result in results
-            },
-        },
+        AliasesDataDocument(
+            schema_version=1,
+            projects={result.slug: ProjectAliasesEntry(aliases=result.alias_mappings) for result in results},
+        ),
     )
 
     (preview_root / "index.html").write_text(build_preview_index(results), encoding="utf-8")

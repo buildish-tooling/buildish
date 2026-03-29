@@ -19,10 +19,9 @@ from __future__ import annotations
 import html
 import re
 from pathlib import Path
-from typing import Any
 
 from .constants import DEFAULT_TAG_PATTERN, SITE_TITLE, VALID_RELEASE_LINE_STATUSES
-from .models import ProjectBuildResult
+from .models import ProjectBuildResult, ProjectLifecycleSettings, StagedAliasMapping, StagedReleaseLine
 
 
 def relative_web_path(path: Path) -> str:
@@ -86,56 +85,33 @@ def compile_tag_pattern(pattern_text: str, slug: str, warnings: list[str]) -> re
         return re.compile(DEFAULT_TAG_PATTERN)
 
 
-def normalize_aliases(raw_aliases: Any, slug: str, line: str, warnings: list[str]) -> list[str]:
-    """Validate and normalize alias values declared for a release line."""
-
-    if raw_aliases is None:
-        return []
-    if not isinstance(raw_aliases, list):
-        warnings.append(f"Ignoring invalid aliases for release line {line} in {slug}; expected a list.")
-        return []
-    aliases: list[str] = []
-    for raw_alias in raw_aliases:
-        if raw_alias is None:
-            continue
-        alias = str(raw_alias).strip()
-        if alias:
-            aliases.append(alias)
-    return aliases
-
-
 def normalize_lifecycle(
-    lifecycle_fields: dict[str, Any],
+    lifecycle_fields: ProjectLifecycleSettings,
     tag_pattern: re.Pattern[str],
     slug: str,
     project_root: Path,
     warnings: list[str],
-) -> tuple[str | None, str | None, list[dict[str, Any]], list[dict[str, str]]]:
+) -> tuple[str | None, str | None, tuple[StagedReleaseLine, ...], tuple[StagedAliasMapping, ...]]:
     """Validate lifecycle metadata and turn it into staged output structures."""
 
-    latest_stable_raw = lifecycle_fields.get("latestStable")
-    latest_stable_version = str(latest_stable_raw).strip() if latest_stable_raw is not None else None
+    latest_stable_version = lifecycle_fields.latest_stable
     if latest_stable_version and tag_pattern.fullmatch(latest_stable_version) is None:
         warnings.append(f"Ignoring invalid latestStable value for {slug}; expected an exact version tag.")
         latest_stable_version = None
 
-    release_lines_raw = lifecycle_fields.get("releaseLines")
-    if release_lines_raw is None:
-        release_lines_raw = []
-    if not isinstance(release_lines_raw, list):
+    if not lifecycle_fields.release_lines_were_list:
         warnings.append(f"Ignoring invalid releaseLines metadata for {slug}; expected a list.")
-        release_lines_raw = []
 
-    release_lines: list[dict[str, Any]] = []
-    alias_mappings: list[dict[str, str]] = []
-    for raw_line in release_lines_raw:
-        if not isinstance(raw_line, dict):
+    release_lines: list[StagedReleaseLine] = []
+    alias_mappings: list[StagedAliasMapping] = []
+    for release_line_model in lifecycle_fields.release_lines:
+        if not release_line_model.is_mapping:
             warnings.append(f"Ignoring invalid release line entry for {slug}; expected a mapping.")
             continue
 
-        line = str(raw_line.get("line") or "").strip()
-        latest = str(raw_line.get("latest") or "").strip()
-        status = str(raw_line.get("status") or "").strip()
+        line = release_line_model.line or ""
+        latest = release_line_model.latest or ""
+        status = release_line_model.status or ""
         if not line or not latest or not status:
             warnings.append(f"Ignoring incomplete release line entry for {slug}; line/latest/status are required.")
             continue
@@ -146,20 +122,19 @@ def normalize_lifecycle(
             warnings.append(f"Ignoring release line {line} for {slug}; unsupported status {status!r}.")
             continue
 
-        aliases = normalize_aliases(raw_line.get("aliases"), slug, line, warnings)
+        aliases = list(release_line_model.aliases)
+        if not release_line_model.aliases_were_list:
+            warnings.append(f"Ignoring invalid aliases for release line {line} in {slug}; expected a list.")
         path = release_index_web_path(project_root, slug, latest)
-        release_line = {"line": line, "latest": latest, "status": status, "aliases": aliases}
-        if path is not None:
-            release_line["path"] = path
-        release_lines.append(release_line)
+        release_lines.append(StagedReleaseLine(line=line, latest=latest, status=status, aliases=tuple(aliases), path=path))
         for alias in aliases:
-            alias_mappings.append({"alias": alias, "target": latest, "line": line, "status": status})
+            alias_mappings.append(StagedAliasMapping(alias=alias, target=latest, line=line, status=status))
 
     latest_stable_path = None
     if latest_stable_version is not None:
         latest_stable_path = release_index_web_path(project_root, slug, latest_stable_version)
 
-    return latest_stable_version, latest_stable_path, release_lines, alias_mappings
+    return latest_stable_version, latest_stable_path, tuple(release_lines), tuple(alias_mappings)
 
 
 def build_project_markdown(result: ProjectBuildResult) -> str:
@@ -186,13 +161,13 @@ def build_project_markdown(result: ProjectBuildResult) -> str:
     if result.release_lines:
         lines.extend(["", "## Release lines", ""])
         for release_line in result.release_lines:
-            latest = f"`{release_line['latest']}`"
-            if release_line.get("path"):
-                latest = f"[{release_line['latest']}]({release_line['path']})"
+            latest = f"`{release_line.latest}`"
+            if release_line.path:
+                latest = f"[{release_line.latest}]({release_line.path})"
             alias_suffix = ""
-            if release_line["aliases"]:
-                alias_suffix = " (aliases: " + ", ".join(f"`{alias}`" for alias in release_line["aliases"]) + ")"
-            lines.append(f"- `{release_line['line']}` — {release_line['status']}; latest {latest}{alias_suffix}")
+            if release_line.aliases:
+                alias_suffix = " (aliases: " + ", ".join(f"`{alias}`" for alias in release_line.aliases) + ")"
+            lines.append(f"- `{release_line.line}` — {release_line.status}; latest {latest}{alias_suffix}")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -205,7 +180,7 @@ def build_unreleased_index_markdown(result: ProjectBuildResult) -> str:
     if result.doc_links:
         lines.extend(["## Docs", ""])
         for doc_link in result.doc_links:
-            lines.append(f"- [{doc_link['label']}]({doc_link['href']})")
+            lines.append(f"- [{doc_link.label}]({doc_link.href})")
         lines.append("")
     if result.asset_count and result.raw_assets_root_path:
         lines.extend([f"- [Open staged assets]({result.raw_assets_root_path})", ""])
@@ -260,7 +235,7 @@ def build_project_preview(result: ProjectBuildResult) -> str:
     """Build the lightweight preview page for one staged project."""
 
     doc_items = "".join(
-        f"<li><a href='{html.escape(entry['href'])}'>{html.escape(entry['label'])}</a></li>"
+        f"<li><a href='{html.escape(entry.href)}'>{html.escape(entry.label)}</a></li>"
         for entry in result.doc_links
     )
     warning_items = "".join(f"<li>{html.escape(item)}</li>" for item in result.warnings)
@@ -292,14 +267,14 @@ def build_project_preview(result: ProjectBuildResult) -> str:
     if result.release_lines:
         release_items = []
         for release_line in result.release_lines:
-            latest = f"<code>{html.escape(release_line['latest'])}</code>"
-            if release_line.get("path"):
-                latest = f"<a href='{html.escape(release_line['path'])}'>{html.escape(release_line['latest'])}</a>"
+            latest = f"<code>{html.escape(release_line.latest)}</code>"
+            if release_line.path:
+                latest = f"<a href='{html.escape(release_line.path)}'>{html.escape(release_line.latest)}</a>"
             aliases = ""
-            if release_line["aliases"]:
-                aliases = " (aliases: " + ", ".join(html.escape(alias) for alias in release_line["aliases"]) + ")"
+            if release_line.aliases:
+                aliases = " (aliases: " + ", ".join(html.escape(alias) for alias in release_line.aliases) + ")"
             release_items.append(
-                f"<li><code>{html.escape(release_line['line'])}</code> — {html.escape(release_line['status'])}; latest {latest}{aliases}</li>"
+                f"<li><code>{html.escape(release_line.line)}</code> — {html.escape(release_line.status)}; latest {latest}{aliases}</li>"
             )
         body.append(f"<h2>Release lines</h2><ul>{''.join(release_items)}</ul>")
     if warning_items:
