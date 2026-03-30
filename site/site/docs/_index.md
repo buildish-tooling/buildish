@@ -21,11 +21,11 @@ description: Current documentation for the Apache Buildish site implementation, 
 
 # Apache Buildish Site Documentation
 
-This section documents the Apache Buildish website itself: the current MVP implementation, the current project metadata contract, and the broader long-term site infrastructure proposal.
+This section documents the Apache Buildish website itself: the current implementation, the current project metadata contract, and the broader long-term site infrastructure proposal.
 
 ## Documents
 
-- [MVP status](./site-infra-mvp/)
+- [Current implementation](./site-pipeline/)
 - [Current project contract](./site-subproject-contract/)
 - [CI build inputs and local workspace overrides](./site-ci-and-local-overrides/)
 - [Infrastructure proposal](./site-infra/)

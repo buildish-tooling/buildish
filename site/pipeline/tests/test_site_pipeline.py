@@ -768,6 +768,51 @@ Additional details.
         self.assertNotIn("This document describes the full execution sequence for the bootstrap path.\n\n## Next section", normalized)
         self.assertIn("## Next section", normalized)
 
+    def test_build_can_skip_preview_generation_in_watch_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            repo_root = workspace / "buildish"
+            repo_root.mkdir()
+            (repo_root / "site").mkdir(parents=True)
+            (repo_root / "DISCLAIMER").write_text("Buildish disclaimer.\n", encoding="utf-8")
+            with (repo_root / "site" / "projects.yaml").open("w", encoding="utf-8") as handle:
+                yaml.safe_dump(
+                    {
+                        "schemaVersion": 1,
+                        "defaults": {
+                            "metadataFile": "site/project.yaml",
+                            "docsRoot": "site/docs",
+                        },
+                        "projects": [{"slug": "mammoth-cache-gradle", "localDir": "buildish-mammoth-cache-gradle"}],
+                    },
+                    handle,
+                    sort_keys=False,
+                    default_flow_style=False,
+                )
+
+            mammoth = workspace / "buildish-mammoth-cache-gradle"
+            (mammoth / "site" / "docs").mkdir(parents=True)
+            with (mammoth / "site" / "project.yaml").open("w", encoding="utf-8") as handle:
+                yaml.safe_dump(
+                    {"schemaVersion": 1, "project": {"displayName": "Mammoth Cache for Gradle"}},
+                    handle,
+                    sort_keys=False,
+                    default_flow_style=False,
+                )
+            (mammoth / "site" / "docs" / "_index.md").write_text("# Overview\n\nHello.\n", encoding="utf-8")
+
+            preview_sentinel = repo_root / "site" / ".preview" / "keep.txt"
+            preview_sentinel.parent.mkdir(parents=True, exist_ok=True)
+            preview_sentinel.write_text("preserve me\n", encoding="utf-8")
+
+            results = site_pipeline.build(repo_root, include_preview=False)
+
+            self.assertEqual(1, len(results))
+            self.assertTrue((repo_root / "site" / ".stage" / "manifest.yaml").exists())
+            self.assertTrue(preview_sentinel.exists())
+            self.assertEqual("preserve me\n", preview_sentinel.read_text(encoding="utf-8"))
+            self.assertFalse((repo_root / "site" / ".preview" / "index.html").exists())
+
     def test_collect_watch_roots_includes_catalog_project_inputs_and_missing_repo_parent(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
@@ -775,6 +820,11 @@ Additional details.
             repo_root.mkdir()
             (repo_root / "site" / "content").mkdir(parents=True)
             (repo_root / "site" / "pipeline").mkdir(parents=True)
+            (repo_root / "site" / "pipeline" / "main.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
+            (repo_root / "site" / "pipeline" / "pyproject.toml").write_text("[project]\nname='stub'\n", encoding="utf-8")
+            (repo_root / "site" / "pipeline" / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+            (repo_root / "site" / "pipeline" / ".venv" / "bin").mkdir(parents=True)
+            (repo_root / "site" / "pipeline" / ".idea").mkdir(parents=True)
             (repo_root / "site" / "pipeline" / "site_pipeline").mkdir(parents=True)
             (repo_root / "site" / "pipeline" / "site_pipeline" / "__init__.py").write_text("# watcher stub\n", encoding="utf-8")
             catalog = {
@@ -802,11 +852,17 @@ Additional details.
 
             self.assertIn((repo_root / "site" / "projects.yaml").resolve(), watch_roots)
             self.assertIn((repo_root / "site" / "content").resolve(), watch_roots)
-            self.assertIn((repo_root / "site" / "pipeline").resolve(), watch_roots)
+            self.assertIn((repo_root / "site" / "pipeline" / "main.py").resolve(), watch_roots)
+            self.assertIn((repo_root / "site" / "pipeline" / "pyproject.toml").resolve(), watch_roots)
+            self.assertIn((repo_root / "site" / "pipeline" / "uv.lock").resolve(), watch_roots)
+            self.assertIn((repo_root / "site" / "pipeline" / "site_pipeline").resolve(), watch_roots)
             self.assertIn((mammoth / "site" / "project.yaml").resolve(), watch_roots)
             self.assertIn((mammoth / "site" / "docs").resolve(), watch_roots)
             self.assertIn((mammoth / "site" / "assets").resolve(), watch_roots)
             self.assertIn(workspace.resolve(), watch_roots)
+            self.assertNotIn((repo_root / "site" / "pipeline").resolve(), watch_roots)
+            self.assertNotIn((repo_root / "site" / "pipeline" / ".venv").resolve(), watch_roots)
+            self.assertNotIn((repo_root / "site" / "pipeline" / ".idea").resolve(), watch_roots)
 
     def test_is_relevant_watch_path_allows_explicit_vendor_asset_paths(self) -> None:
         self.assertTrue(site_pipeline.is_relevant_watch_path(Path("site/node_modules/jquery/dist/jquery.min.js")))

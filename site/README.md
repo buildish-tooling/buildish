@@ -44,6 +44,11 @@ The Node.js files in `site/` support the Hugo + Docsy render path, while the Pyt
 that live outside `site/`. Use `make stage-watch-local` if you want to run only the native
 staging watcher without starting Hugo.
 
+The current watch loop intentionally watches only staged-source inputs and rebuilds only
+`site/.stage/`. It does **not** regenerate `site/.preview/` on every change. That keeps the
+live Hugo workflow focused on the staged contract and reduces external file churn seen by IDEs.
+The full implementation is documented in [`site/site/docs/site-pipeline.md`](site/docs/site-pipeline.md).
+
 Known local-dev behavior:
 
 - changes to `site/projects.yaml` can take a short while to appear in the running Hugo server

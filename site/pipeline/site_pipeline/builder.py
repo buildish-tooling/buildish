@@ -511,8 +511,13 @@ def stage_project(
     return result
 
 
-def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
-    """Build the complete staged site contract and preview pages."""
+def build(repo_root: Path | None = None, *, include_preview: bool = True) -> list[ProjectBuildResult]:
+    """Build the staged site contract and, optionally, the lightweight preview pages.
+
+    ``include_preview=False`` is used by watch mode so repeated restaging only
+    rewrites ``site/.stage``. That keeps local Hugo serve sessions focused on the
+    staged contract and reduces unnecessary file-system churn in ``site/.preview``.
+    """
 
     resolved_repo_root = repo_root_from(repo_root)
     site_root = resolved_repo_root / "site"
@@ -521,7 +526,8 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
     stage_root = site_root / ".stage"
     preview_root = site_root / ".preview"
     reset_output_directory(stage_root)
-    reset_output_directory(preview_root)
+    if include_preview:
+        reset_output_directory(preview_root)
 
     results = [
         stage_project(resolved_repo_root, stage_root, project, catalog.defaults, index)
@@ -609,11 +615,12 @@ def build(repo_root: Path | None = None) -> list[ProjectBuildResult]:
         ),
     )
 
-    (preview_root / "index.html").write_text(build_preview_index(results), encoding="utf-8")
-    for result in results:
-        project_preview = preview_root / "projects" / result.slug / "index.html"
-        project_preview.parent.mkdir(parents=True, exist_ok=True)
-        project_preview.write_text(build_project_preview(result), encoding="utf-8")
+    if include_preview:
+        (preview_root / "index.html").write_text(build_preview_index(results), encoding="utf-8")
+        for result in results:
+            project_preview = preview_root / "projects" / result.slug / "index.html"
+            project_preview.parent.mkdir(parents=True, exist_ok=True)
+            project_preview.write_text(build_project_preview(result), encoding="utf-8")
     return results
 
 

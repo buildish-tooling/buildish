@@ -14,8 +14,16 @@
 
 """Watch-mode helpers for the site pipeline.
 
-These functions decide which paths should trigger a rebuild and run the
-long-lived watcher loop used by local development targets.
+The local watch loop deliberately follows a narrower contract than a full
+`build()` run:
+
+- it watches only staged-source inputs, not generated outputs,
+- it watches a curated subset of `site/pipeline/` instead of the whole tree, and
+- it rebuilds `site/.stage/` only, leaving `site/.preview/` untouched to reduce
+  file-system churn while Hugo is serving.
+
+Those constraints keep local `make serve-local` sessions responsive and reduce
+the amount of external file activity observed by IDE file watchers.
 """
 
 from __future__ import annotations
@@ -87,8 +95,25 @@ def _project_watch_roots(repo_root: Path, project: CatalogProject, defaults: Pro
     return watch_roots
 
 
+def _pipeline_watch_roots(site_root: Path) -> set[Path]:
+    """Return the narrow set of pipeline paths that can affect watch-mode rebuilds.
+
+    Watching all of ``site/pipeline/`` recursively would also subscribe to tool
+    directories such as ``.venv`` and ``.idea``. The watch loop only needs the
+    entrypoint, dependency metadata, and the package source tree itself.
+    """
+
+    pipeline_root = site_root / "pipeline"
+    watch_roots: set[Path] = set()
+    for relative_path in (Path("main.py"), Path("pyproject.toml"), Path("uv.lock"), Path("site_pipeline")):
+        candidate = pipeline_root / relative_path
+        if candidate.exists():
+            watch_roots.add(candidate.resolve())
+    return watch_roots
+
+
 def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
-    """Collect every path that should trigger a full staged rebuild."""
+    """Collect every path that should trigger a staged rebuild in watch mode."""
 
     resolved_repo_root = repo_root_from(repo_root)
     site_root = resolved_repo_root / "site"
@@ -97,8 +122,8 @@ def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
     watch_roots: set[Path] = {
         watchable_existing_path(site_root / "projects.yaml", site_root),
         watchable_existing_path(site_root / "content", site_root),
-        watchable_existing_path(site_root / "pipeline", site_root),
     }
+    watch_roots.update(_pipeline_watch_roots(site_root))
 
     for source_relative, _ in STAGED_VENDOR_ASSETS:
         source = resolve_vendor_asset_source(site_root, source_relative)
@@ -134,13 +159,19 @@ def _format_watch_path(path: Path, repo_root: Path) -> str:
 
 
 def watch_and_build(repo_root: Path | None = None, debounce_ms: int = WATCH_DEBOUNCE_MS) -> None:
-    """Continuously rebuild staged output whenever relevant inputs change."""
+    """Continuously rebuild ``site/.stage`` whenever relevant inputs change.
+
+    Watch mode intentionally skips preview generation because local Hugo serve
+    sessions consume ``site/.stage`` directly. Rewriting ``site/.preview`` on
+    every change only adds extra external file churn without affecting the live
+    rendered site.
+    """
 
     from watchfiles import watch
 
     resolved_repo_root = repo_root_from(repo_root)
-    results = build(resolved_repo_root)
-    print(f"Built {len(results)} project(s) into site/.stage and site/.preview")
+    results = build(resolved_repo_root, include_preview=False)
+    print(f"Built {len(results)} project(s) into site/.stage")
 
     while True:
         watch_roots = collect_watch_roots(resolved_repo_root)
@@ -176,8 +207,8 @@ def watch_and_build(repo_root: Path | None = None, debounce_ms: int = WATCH_DEBO
                 print(f"  - {_format_watch_path(changed_path, resolved_repo_root)}")
 
             try:
-                results = build(resolved_repo_root)
-                print(f"Built {len(results)} project(s) into site/.stage and site/.preview")
+                results = build(resolved_repo_root, include_preview=False)
+                print(f"Built {len(results)} project(s) into site/.stage")
             except Exception as exc:
                 print(f"Rebuild failed: {exc}", file=sys.stderr)
 

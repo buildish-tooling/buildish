@@ -16,7 +16,7 @@ limitations under the License.
 
 # Current site sub-project contract
 
-This document describes the **currently implemented** input contract for the site MVP.
+This document describes the implemented input contract for the site pipeline.
 For the broader long-term design, see [`site-infra.md`](site-infra.md).
 
 ## Workspace model
@@ -92,7 +92,7 @@ while the sub-project metadata controls content-local structure.
 
 ## Content inputs
 
-For each available sub-project repository, the current MVP stages:
+For each available sub-project repository, it stages:
 
 - the configured docs tree, defaulting to `site/docs`
 - the configured asset tree, defaulting to `site/assets`
@@ -104,7 +104,7 @@ project.
 
 ## Lifecycle inputs
 
-The current MVP supports lightweight lifecycle metadata in `site/project.yaml`:
+Lightweight lifecycle metadata in `site/project.yaml`:
 
 - `latestStable`: exact version tag such as `v1.3.5`
 - `releaseLines[]`
@@ -127,7 +127,7 @@ The current aggregator enforces these guardrails:
 
 ## Staged outputs
 
-The current MVP generates, at minimum:
+Stage outputs are, at minimum:
 
 - `site/.stage/content/projects/<slug>/_index.md`
 - `site/.stage/content/projects/<slug>/unreleased/docs/...`

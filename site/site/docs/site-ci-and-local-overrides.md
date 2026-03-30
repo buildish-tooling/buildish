@@ -25,7 +25,7 @@ It intentionally does **not** restate the broader renderer, URL, indexing, or pu
 
 ## Problem statement
 
-The current MVP uses `localDir` in `site/projects.yaml` as the path from which a project's docs are staged. That works for the local proof of concept, but it mixes two different concerns:
+The implementation uses `localDir` in `site/projects.yaml` as the path from which a project's docs are staged. That works for the local proof of concept, but it mixes two different concerns:
 
 - **repository identity** — which Git repository provides the content,
 - **workspace binding** — where that repository happens to be checked out on one machine.

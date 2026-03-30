@@ -27,16 +27,16 @@ be read as the proposed **baseline implementation**. Ideas intentionally
 deferred beyond that baseline are collected in the [Follow-ups](#follow-ups)
 section.
 
-For implementation-oriented experiments and a local proof of concept, see
-[`site-infra-mvp.md`](site-infra-mvp.md).
+For the implementation and local development behavior, see
+[`site-pipeline.md`](site-pipeline.md).
 
-The current local MVP is intentionally unreleased-only in practice; release
+The current implementation is intentionally unreleased-only in practice; release
 snapshot staging should wait until real tagged releases exist.
 
 > [!NOTE]
-> The current MVP already implements the local aggregation/rendering split,
+> The current implementation already provides the local aggregation/rendering split,
 > central catalog plus sub-project metadata contract, unreleased staging, local
-> Hugo rendering, and containerized verification. The main gaps between the MVP
+> Hugo rendering, and containerized verification. The main gaps between the implementation
 > and this full proposal are released-docs handling from exact tags,
 > publication automation, redirect/search/indexing policy, and stricter content
 > and schema hardening.
