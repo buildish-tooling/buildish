@@ -113,7 +113,14 @@ class MakeTargetIntegrationTest(unittest.TestCase):
                 sort_keys=False,
                 default_flow_style=False,
             )
-        (repo_root / "site" / "pages" / "_index.md").write_text("# Mammoth Cache for Gradle\n\nFixture component landing page.\n", encoding="utf-8")
+        (repo_root / "site" / "pages" / "_index.md").write_text(
+            "# Mammoth Cache for Gradle\n\n"
+            "Fixture component landing page.\n\n"
+            "{{< buildish-component-link kind=\"docs\" label=\"Read unreleased docs\" appearance=\"primary\" >}}\n\n"
+            "{{< buildish-component-link kind=\"source\" label=\"Browse source\" appearance=\"outline-secondary\" >}}\n\n"
+            "{{< buildish-component-releases heading=\"Current release lines\" >}}\n",
+            encoding="utf-8",
+        )
         (repo_root / "site" / "docs" / "_index.md").write_text("# Overview\n\nInitial overview.\n", encoding="utf-8")
         (repo_root / "site" / "docs" / "getting-started.md").write_text("# Getting started\n\nInitial fixture text.\n", encoding="utf-8")
         (repo_root / "site" / "assets" / "images" / "diagram.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>\n", encoding="utf-8")
@@ -366,9 +373,13 @@ class MakeTargetIntegrationTest(unittest.TestCase):
 
         component_index = (repo_root / "site" / ".public" / "components" / "mammoth-cache-gradle" / "index.html").read_text(encoding="utf-8")
         self.assertIn('Fixture component landing page.', component_index)
-        self.assertNotIn('Open docs', component_index)
-        self.assertNotIn('Release lines', component_index)
-        self.assertNotIn('Source repository', component_index)
+        self.assertIn('Read unreleased docs', component_index)
+        self.assertIn('href="/components/mammoth-cache-gradle/unreleased/docs/"', component_index)
+        self.assertIn('Browse source', component_index)
+        self.assertIn('href="https://github.com/apache/buildish-mammoth-cache-gradle"', component_index)
+        self.assertIn('Current release lines', component_index)
+        self.assertIn('Latest stable (v1.2.3)', component_index)
+        self.assertIn('v1 — maintained (latest v1.2.3); aliases: v1', component_index)
         self.assertNotIn('buildish-component-landing__hero', component_index)
         self.assertNotIn('buildish-component-landing__actions', component_index)
 

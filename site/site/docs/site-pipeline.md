@@ -73,6 +73,10 @@ For component landing pages, the Hugo layer now renders the authored
 `site/pages/_index.md` body directly instead of wrapping it in a fixed Buildish
 hero/actions shell.
 
+The rendering layer also provides a small set of site-owned shortcodes under
+`site/layouts/shortcodes/` so component landing pages can link to pipeline-owned
+component metadata without hard-coding URLs.
+
 ### Rendering layer
 
 Hugo consumes the staged contract via `site/hugo.yaml`:

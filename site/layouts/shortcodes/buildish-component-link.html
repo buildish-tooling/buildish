@@ -1,0 +1,75 @@
+{{/*
+Copyright 2026 The Apache Software Foundation
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{- $component := .Page.Params.buildishComponent -}}
+{{- if not $component -}}
+  {{- errorf "%q shortcode requires buildishComponent context on %s" .Name .Page.RelPermalink -}}
+{{- end -}}
+{{- $paths := dict -}}
+{{- with index $component "paths" }}{{ $paths = . }}{{ end -}}
+{{- $kind := "docs" -}}
+{{- with .Get "kind" }}{{ $kind = lower (printf "%v" .) }}{{ end -}}
+{{- $appearance := "link" -}}
+{{- with .Get "appearance" }}{{ $appearance = lower (printf "%v" .) }}{{ end -}}
+{{- $optional := false -}}
+{{- with .Get "optional" }}{{ $optional = in (slice true "true" "True" "TRUE" 1 "1") . }}{{ end -}}
+{{- $href := "" -}}
+{{- $label := "" -}}
+{{- $external := false -}}
+{{- $unreleasedLabel := "Unreleased" -}}
+{{- with index $component "unreleasedLabel" }}{{ $unreleasedLabel = . }}{{ end -}}
+{{- if or (eq $kind "component") (eq $kind "overview") -}}
+  {{- with index $paths "component" }}{{ $href = . }}{{ end -}}
+  {{- $label = "Overview" -}}
+{{- else if eq $kind "docs" -}}
+  {{- with index $paths "docs" }}{{ $href = . }}{{ end -}}
+  {{- $label = printf "%s docs" $unreleasedLabel -}}
+{{- else if eq $kind "unreleased" -}}
+  {{- with index $component "unreleased" -}}
+    {{- with index . "path" }}{{ $href = . }}{{ end -}}
+    {{- with index . "label" }}{{ $label = . }}{{ end -}}
+  {{- end -}}
+{{- else if eq $kind "source" -}}
+  {{- with index $component "repository" }}{{ $href = . }}{{ end -}}
+  {{- $label = "Source repository" -}}
+  {{- $external = true -}}
+{{- else -}}
+  {{- errorf "%q shortcode on %s does not support kind %q" .Name .Page.RelPermalink $kind -}}
+{{- end -}}
+{{- with .Get "label" }}{{ $label = printf "%v" . }}{{ end -}}
+{{- if and $external $href (not (or (hasPrefix $href "https://") (hasPrefix $href "http://"))) -}}
+  {{- errorf "%q shortcode on %s requires an http(s) repository URL, got %q" .Name .Page.RelPermalink $href -}}
+{{- end -}}
+{{- $class := "" -}}
+{{- if eq $appearance "link" -}}
+  {{- $class = "" -}}
+{{- else if eq $appearance "primary" -}}
+  {{- $class = "btn btn-primary me-2 mb-2" -}}
+{{- else if eq $appearance "secondary" -}}
+  {{- $class = "btn btn-secondary me-2 mb-2" -}}
+{{- else if eq $appearance "outline-primary" -}}
+  {{- $class = "btn btn-outline-primary me-2 mb-2" -}}
+{{- else if eq $appearance "outline-secondary" -}}
+  {{- $class = "btn btn-outline-secondary me-2 mb-2" -}}
+{{- else -}}
+  {{- errorf "%q shortcode on %s does not support appearance %q" .Name .Page.RelPermalink $appearance -}}
+{{- end -}}
+{{- if not $href -}}
+  {{- if not $optional -}}
+    {{- errorf "%q shortcode could not resolve target %q on %s" .Name $kind .Page.RelPermalink -}}
+  {{- end -}}
+{{- else -}}
+  <a{{ with $class }} class="{{ . }}"{{ end }} href="{{ $href }}"{{ if $external }} target="_blank" rel="noopener"{{ end }}>{{ $label }}</a>
+{{- end -}}

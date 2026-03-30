@@ -126,6 +126,31 @@ release-card shell. Component authors own the landing-page body in
 `pagesRoot/_index.md` and can place links to unreleased docs, releases, source,
 or any other component-specific content where they want.
 
+### Landing-page shortcodes
+
+The site provides a small set of site-owned Hugo shortcodes for component pages.
+They read the pipeline-owned `buildishComponent` front matter and avoid
+hard-coding URLs in component-authored Markdown.
+
+- `buildish-component-link`
+  - supported `kind` values: `overview`, `component`, `docs`, `unreleased`, `source`
+  - optional `label`
+  - optional `appearance`: `link`, `primary`, `secondary`, `outline-primary`, `outline-secondary`
+  - optional `optional="true"` to suppress output when a target is unavailable
+- `buildish-component-releases`
+  - renders the current latest-stable and release-line summary from component metadata
+  - emits a `release-lines` anchor for landing-page links
+  - optional `heading`
+  - optional `optional="true"`
+
+Example landing-page usage:
+
+```text
+{{< buildish-component-link kind="docs" label="Read unreleased docs" appearance="primary" >}}
+{{< buildish-component-link kind="source" appearance="outline-secondary" >}}
+{{< buildish-component-releases heading="Current release lines" optional="true" >}}
+```
+
 ## Lifecycle inputs
 
 Lightweight lifecycle metadata in `site/component.yaml`:
