@@ -27,26 +27,40 @@ limitations under the License.
 <div id="td-sidebar-menu" class="td-sidebar__inner{{ if $shouldDelayActive }} d-none{{ end }}">
   {{ if not .Site.Params.ui.sidebar_search_disable -}}
 
-  <form class="td-sidebar__search d-flex align-items-center">
+  <form class="td-sidebar__search td-sidebar__search--desktop d-none d-md-flex align-items-center">
     {{ partial "search-input.html" . }}
+  </form>
+
+  <div class="td-sidebar__controls d-flex d-md-none align-items-center">
+    <button class="btn btn-link td-sidebar__search-toggle" type="button"
+      data-bs-toggle="collapse" data-bs-target="#td-sidebar-search"
+      aria-controls="td-sidebar-search" aria-expanded="false" aria-label="Toggle search">
+    </button>
     <button class="btn btn-link td-sidebar__toggle" type="button"
       data-bs-toggle="collapse" data-bs-target="#td-section-nav"
       aria-controls="td-section-nav" aria-expanded="false" aria-label="Toggle section navigation">
     </button>
+  </div>
+
+  <form class="td-sidebar__search td-sidebar__search--mobile collapse d-md-none" id="td-sidebar-search">
+    {{ partial "search-input.html" . }}
   </form>
 
   {{- else -}}
 
-  <div id="content-mobile">
-  <form class="td-sidebar__search d-flex align-items-center">
-    {{ partial "search-input.html" . }}
+  <div class="td-sidebar__controls d-flex d-md-none align-items-center">
+    <button class="btn btn-link td-sidebar__search-toggle" type="button"
+      data-bs-toggle="collapse" data-bs-target="#td-sidebar-search"
+      aria-controls="td-sidebar-search" aria-expanded="false" aria-label="Toggle search">
+    </button>
     <button class="btn btn-link td-sidebar__toggle" type="button"
       data-bs-toggle="collapse" data-bs-target="#td-section-nav"
       aria-controls="td-section-nav" aria-expanded="false" aria-label="Toggle section navigation">
     </button>
-  </form>
   </div>
-  <div id="content-desktop"></div>
+  <form class="td-sidebar__search td-sidebar__search--mobile collapse d-md-none" id="td-sidebar-search">
+    {{ partial "search-input.html" . }}
+  </form>
 
   {{- end }}
 

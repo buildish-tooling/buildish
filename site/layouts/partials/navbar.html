@@ -39,14 +39,15 @@ limitations under the License.
 
 <nav class="td-navbar js-navbar-scroll" data-bs-theme="dark">
 <div class="td-navbar-container container-fluid flex-column flex-md-row">
-  <div class="navbar-brand"><a class="navbar-brand__home" href="{{ .Site.Home.RelPermalink }}"><span class="navbar-brand__logo navbar-logo" aria-hidden="true">{{ partial "apache-buildish-pipeline-icon.html" (dict "gradientId" "buildish-navbar-panel") }}</span><span class="navbar-brand__name">{{ .Site.Title }}</span></a>{{ if and $componentMode $componentDisplayName $componentPath }}<span class="navbar-brand__divider" aria-hidden="true"></span><a class="navbar-brand__component" href="{{ $componentPath }}"><span class="navbar-brand__context">{{ $componentDisplayName }}</span></a>{{ end }}</div>
-  <div class="td-navbar__main td-navbar-nav-scroll td-navbar-nav-scroll--indicator" id="main_navbar">
+  <div class="td-navbar__top"><div class="navbar-brand"><a class="navbar-brand__home" href="{{ .Site.Home.RelPermalink }}"><span class="navbar-brand__logo navbar-logo" aria-hidden="true">{{ partial "apache-buildish-pipeline-icon.html" (dict "gradientId" "buildish-navbar-panel") }}</span><span class="navbar-brand__name">{{ .Site.Title }}</span></a>{{ if and $componentMode $componentDisplayName $componentPath }}<span class="navbar-brand__divider" aria-hidden="true"></span><a class="navbar-brand__component" href="{{ $componentPath }}"><span class="navbar-brand__context">{{ $componentDisplayName }}</span></a>{{ end }}</div><button class="navbar-toggler td-navbar__toggle collapsed d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#main_navbar" aria-controls="main_navbar" aria-expanded="false" aria-label="Toggle site navigation"><span class="navbar-toggler-icon"></span></button></div>
+  <div class="collapse d-md-flex td-navbar__main td-navbar-nav-scroll td-navbar-nav-scroll--indicator" id="main_navbar">
     <div class="scroll-indicator scroll-left"></div>
     <ul class="navbar-nav">
       {{ if $componentMode }}
       {{ if gt (len $componentDocsItems) 0 }}
       <li class="nav-item dropdown navbar-item--component">
-        <a class="nav-link dropdown-toggle{{ if $componentDocsActive }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>Docs</span></a>
+        <a class="nav-link dropdown-toggle d-none d-md-flex{{ if $componentDocsActive }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>Docs</span></a>
+        <span class="nav-link navbar-mobile-section-title d-md-none{{ if $componentDocsActive }} active{{ end }}"><span>Docs</span></span>
         <ul class="dropdown-menu">
           {{ range $componentDocsItems }}
           {{ $itemActive := eq $p.RelPermalink .href }}
@@ -58,7 +59,8 @@ limitations under the License.
       {{ end }}
       {{ if gt (len $componentReleaseItems) 0 }}
       <li class="nav-item dropdown navbar-item--component">
-        <a class="nav-link dropdown-toggle{{ if $componentReleasesActive }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>Releases</span></a>
+        <a class="nav-link dropdown-toggle d-none d-md-flex{{ if $componentReleasesActive }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>Releases</span></a>
+        <span class="nav-link navbar-mobile-section-title d-md-none{{ if $componentReleasesActive }} active{{ end }}"><span>Releases</span></span>
         <ul class="dropdown-menu">
           {{ range $componentReleaseItems }}
           {{ $itemActive := eq $p.RelPermalink .href }}
@@ -93,7 +95,8 @@ limitations under the License.
       {{ if and $componentMode $isComponents $componentsPage }}{{ $active = eq $p.RelPermalink $componentsPage.RelPermalink }}{{ end -}}
       {{ if $hasChildren }}
       <li class="nav-item dropdown{{ if $componentMode }} navbar-item--global{{ end }}">
-        <a class="nav-link dropdown-toggle{{ if $active }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>{{ $menu.Name }}</span></a>
+        <a class="nav-link dropdown-toggle d-none d-md-flex{{ if $active }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>{{ $menu.Name }}</span></a>
+        <span class="nav-link navbar-mobile-section-title d-md-none{{ if $active }} active{{ end }}"><span>{{ $menu.Name }}</span></span>
         <ul class="dropdown-menu">
           {{ if $isComponents }}
           <li><a class="dropdown-item{{ if and $componentsPage (eq $p.RelPermalink $componentsPage.RelPermalink) }} active{{ end }}" href="{{ with $componentsPage }}{{ .RelPermalink }}{{ else }}{{ "/components/" | relURL }}{{ end }}">All components</a></li>
