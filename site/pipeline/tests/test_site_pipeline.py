@@ -35,6 +35,7 @@ from pipeline.site_pipeline.models import (
     BuildishComponentPaths,
     BuildishComponentPayload,
     BuildishComponentUnreleased,
+    ComponentsLocalOverrides,
     DocsFrontMatter,
     LifecycleDataDocument,
     LifecycleLatestStable,
@@ -68,6 +69,10 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
         if defaults is not None:
             payload["defaults"] = defaults
         return payload
+
+    @staticmethod
+    def local_overrides_payload(*, components: dict[str, dict[str, object]] | None = None) -> dict[str, object]:
+        return {"schemaVersion": 1, "workspace": {"components": {} if components is None else components}}
 
     @staticmethod
     def seed_authored_site_content(repo_root: Path) -> None:
@@ -194,6 +199,20 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "Invalid YAML"):
                 ComponentsCatalog.from_yaml_path(repo_root / "site" / "components.yaml")
+
+    def test_components_local_overrides_from_yaml_path_returns_typed_models(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "buildish"
+            (repo_root / "site").mkdir(parents=True)
+            self.write_yaml(
+                repo_root / "site" / "components.local.yaml",
+                self.local_overrides_payload(components={"mammoth-cache": {"checkoutDir": "../src/mammoth-cache"}}),
+            )
+
+            overrides = ComponentsLocalOverrides.from_yaml_path(repo_root / "site" / "components.local.yaml")
+
+            self.assertEqual(1, overrides.schema_version)
+            self.assertEqual("../src/mammoth-cache", overrides.workspace.components["mammoth-cache"].checkout_dir)
 
     def test_load_component_metadata_returns_typed_models(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -742,6 +761,142 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "escapes allowed root"):
                 site_pipeline.build(repo_root)
+
+    def test_rejects_local_override_escape_outside_workspace_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            repo_root = workspace / "buildish"
+            (repo_root / "site").mkdir(parents=True)
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload({"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"}),
+            )
+            self.write_yaml(
+                repo_root / "site" / "components.local.yaml",
+                self.local_overrides_payload(components={"mammoth-cache": {"checkoutDir": "../../escape"}}),
+            )
+
+            with self.assertRaisesRegex(ValueError, "escapes allowed root"):
+                site_pipeline.build(repo_root)
+
+    def test_build_uses_components_local_yaml_checkout_override(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            repo_root = workspace / "buildish"
+            repo_root.mkdir()
+            (repo_root / "site").mkdir()
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
+                    {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
+                    defaults={"metadataFile": "site/component.yaml", "pagesRoot": "site/pages", "docsRoot": "site/docs"},
+                ),
+            )
+            self.write_yaml(
+                repo_root / "site" / "components.local.yaml",
+                self.local_overrides_payload(components={"mammoth-cache": {"checkoutDir": "../src/mammoth-cache"}}),
+            )
+
+            mammoth = workspace / "src" / "mammoth-cache"
+            write_files(
+                mammoth,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Mammoth
+
+                        Landing page.
+                        """
+                    ),
+                    "site/docs/_index.md": text_block(
+                        """
+                        # Overview
+
+                        Docs landing page.
+                        """
+                    ),
+                },
+            )
+            self.write_yaml(mammoth / "site" / "component.yaml", {"schemaVersion": 1, "component": {"displayName": "Mammoth"}})
+            self.seed_authored_site_content(repo_root)
+
+            results = site_pipeline.build(repo_root)
+
+            self.assertEqual((workspace / "src" / "mammoth-cache").resolve(), results[0].repo_path)
+            self.assertEqual("buildish-mammoth-cache", results[0].local_dir)
+            self.assert_paths_exist(
+                repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "_index.md",
+                repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "_index.md",
+            )
+
+    def test_collect_watch_roots_uses_components_local_yaml_checkout_override(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            repo_root = workspace / "buildish"
+            repo_root.mkdir()
+            write_files(
+                repo_root,
+                {
+                    "site/pipeline/main.py": text_block(
+                        """
+                        raise SystemExit(0)
+                        """
+                    ),
+                    "site/pipeline/pyproject.toml": text_block(
+                        """
+                        [project]
+                        name='stub'
+                        """
+                    ),
+                    "site/pipeline/uv.lock": text_block(
+                        """
+                        version = 1
+                        """
+                    ),
+                    "site/pipeline/site_pipeline/__init__.py": text_block(
+                        """
+                        # watcher stub
+                        """
+                    ),
+                },
+            )
+            (repo_root / "site" / "content").mkdir(parents=True)
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
+                    {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
+                    defaults=self.default_catalog_defaults(),
+                ),
+            )
+            self.write_yaml(
+                repo_root / "site" / "components.local.yaml",
+                self.local_overrides_payload(components={"mammoth-cache": {"checkoutDir": "../src/mammoth-cache"}}),
+            )
+
+            mammoth = workspace / "src" / "mammoth-cache"
+            write_files(
+                mammoth,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Mammoth
+
+                        Landing page.
+                        """
+                    )
+                },
+            )
+            (mammoth / "site" / "docs").mkdir(parents=True)
+            (mammoth / "site" / "assets").mkdir(parents=True)
+            self.write_yaml(mammoth / "site" / "component.yaml", {"schemaVersion": 1, "component": {"displayName": "Mammoth"}})
+
+            watch_roots = set(site_pipeline.collect_watch_roots(repo_root))
+
+            self.assertIn((repo_root / "site" / "components.local.yaml").resolve(), watch_roots)
+            self.assertIn((mammoth / "site" / "component.yaml").resolve(), watch_roots)
+            self.assertIn((mammoth / "site" / "pages").resolve(), watch_roots)
+            self.assertIn((mammoth / "site" / "docs").resolve(), watch_roots)
+            self.assertIn((mammoth / "site" / "assets").resolve(), watch_roots)
 
     def test_rejects_assets_path_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

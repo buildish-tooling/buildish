@@ -28,7 +28,7 @@ from typing import Any
 import yaml
 
 from .constants import STAGED_VENDOR_ASSETS
-from .models import ComponentMetadata
+from .models import CatalogComponent, ComponentMetadata, ComponentsLocalOverrides
 from .yaml_support import yaml_safe_value
 
 
@@ -92,8 +92,55 @@ def _ensure_within(parent: Path, candidate: Path, label: str) -> Path:
 def safe_repo_path(repo_root: Path, local_dir: str) -> Path:
     """Resolve a configured sibling-repository path within the workspace parent."""
 
+    return safe_workspace_checkout_path(repo_root, local_dir, "Component localDir")
+
+
+def safe_workspace_checkout_path(
+    repo_root: Path,
+    checkout_dir: str,
+    label: str,
+    *,
+    relative_to_repo_root: bool = False,
+) -> Path:
+    """Resolve one workspace checkout path while enforcing the workspace-parent boundary."""
+
     workspace_parent = repo_root.parent.resolve()
-    return _ensure_within(workspace_parent, workspace_parent / local_dir, "Component localDir")
+    candidate = Path(checkout_dir)
+    if not candidate.is_absolute():
+        base_root = repo_root if relative_to_repo_root else workspace_parent
+        candidate = base_root / checkout_dir
+    return _ensure_within(workspace_parent, candidate, label)
+
+
+def load_components_local_overrides(site_root: Path) -> ComponentsLocalOverrides:
+    """Load optional local source bindings from ``site/components.local.yaml``."""
+
+    overrides_path = site_root / "components.local.yaml"
+    if not overrides_path.is_file():
+        return ComponentsLocalOverrides()
+    return ComponentsLocalOverrides.from_yaml_path(overrides_path)
+
+
+def resolve_component_repo_path(
+    repo_root: Path,
+    component: CatalogComponent,
+    local_overrides: ComponentsLocalOverrides | None = None,
+) -> Path:
+    """Resolve the effective local checkout path for one component."""
+
+    override = None
+    if local_overrides is not None:
+        binding = local_overrides.workspace.components.get(component.slug)
+        if binding is not None:
+            override = binding.checkout_dir
+    if override is not None:
+        return safe_workspace_checkout_path(
+            repo_root,
+            override,
+            f"Local override checkoutDir for {component.slug}",
+            relative_to_repo_root=True,
+        )
+    return safe_repo_path(repo_root, component.local_dir)
 
 
 def safe_relative_path(base: Path, relative_path: str | None, label: str) -> Path | None:

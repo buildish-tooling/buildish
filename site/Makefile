@@ -158,8 +158,9 @@ CONTAINER_PREPARE_SITE_ENV = \
 	scratch="$$(mktemp -d "$(CONTAINER_SCRATCH_ROOT)/run.XXXXXX")"; \
 	chmod 0777 "$$scratch"; \
 	node_root="$$scratch/node-work"; \
+	tool_bin="$$scratch/tool-bin"; \
 	printf "==> [container] using scratch directory %s\\n" "$$scratch"; \
-	mkdir -p "$$scratch/uv-cache" "$$scratch/npm-cache" "$$node_root"; \
+	mkdir -p "$$scratch/uv-cache" "$$scratch/npm-cache" "$$node_root" "$$tool_bin"; \
 	trap "printf \"==> [container] cleaning scratch directory %s\\n\" \"$$scratch\"; rm -rf \"$$scratch\"" EXIT; \
 	export UV_CACHE_DIR="$$scratch/uv-cache"; \
 	export UV_PROJECT_ENVIRONMENT="$$scratch/uv-venv"; \
@@ -167,6 +168,10 @@ CONTAINER_PREPARE_SITE_ENV = \
 	printf "==> [container] installing Node dependencies into %s\\n" "$$node_root"; \
 	cp package.json package-lock.json "$$node_root"/; \
 	npm ci --ignore-scripts --prefix "$$node_root"; \
+	cp scripts/container-npx "$$tool_bin/npx"; \
+	chmod 755 "$$tool_bin/npx"; \
+	export PATH="$$tool_bin:$$PATH"; \
+	export NODE_PATH="$$node_root/node_modules"; \
 	export NODE_MODULES_DIR="$$node_root/node_modules"
 
 CONTAINER_STAGE_SCRIPT = \

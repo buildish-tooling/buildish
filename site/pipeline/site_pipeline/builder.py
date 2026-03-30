@@ -29,11 +29,12 @@ from .constants import DEFAULT_TAG_PATTERN
 from .filesystem import (
     copy_tree_without_symlinks,
     load_component_metadata,
+    load_components_local_overrides,
     read_text_if_exists,
     repo_root_from,
     reset_output_directory,
+    resolve_component_repo_path,
     safe_relative_path,
-    safe_repo_path,
     stage_vendor_assets,
     write_yaml_like,
 )
@@ -434,12 +435,13 @@ def stage_component(
     component: CatalogComponent,
     defaults: ComponentCatalogDefaults,
     catalog_index: int,
+    local_overrides: ComponentsLocalOverrides | None = None,
 ) -> ComponentBuildResult:
     """Stage one component described in ``site/components.yaml``."""
 
     slug = component.slug
     local_dir = component.local_dir
-    repo_path = safe_repo_path(repo_root, local_dir)
+    repo_path = resolve_component_repo_path(repo_root, component, local_overrides)
     warnings: list[str] = []
     available = repo_path.is_dir()
     navigation_weight = component.weight if component.weight is not None else catalog_index * 10
@@ -568,6 +570,7 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
     resolved_repo_root = repo_root_from(repo_root)
     site_root = resolved_repo_root / "site"
     catalog = ComponentsCatalog.from_yaml_path(site_root / "components.yaml")
+    local_overrides = load_components_local_overrides(site_root)
 
     stage_root = site_root / ".stage"
     preview_root = site_root / ".preview"
@@ -576,7 +579,7 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
         reset_output_directory(preview_root)
 
     results = [
-        stage_component(resolved_repo_root, stage_root, component, catalog.defaults, index)
+        stage_component(resolved_repo_root, stage_root, component, catalog.defaults, index, local_overrides=local_overrides)
         for index, component in enumerate(catalog.components, start=1)
     ]
     incubator_disclaimer = read_text_if_exists(resolved_repo_root / "DISCLAIMER").strip()

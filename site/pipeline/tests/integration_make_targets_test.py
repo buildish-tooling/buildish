@@ -152,8 +152,9 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                   shift
                 done
                 root="$prefix/node_modules"
-                mkdir -p "$root/.bin" "$root/jquery/dist" "$root/mermaid/dist" "$root/lunr"
-                printf '#!/usr/bin/env sh\nexit 0\n' > "$root/.bin/postcss"
+                mkdir -p "$root/.bin" "$root/autoprefixer" "$root/jquery/dist" "$root/mermaid/dist" "$root/lunr"
+                printf 'module.exports = {}\n' > "$root/autoprefixer/index.js"
+                printf '#!/usr/bin/env sh\nset -eu\nif [ -n "${NODE_PATH:-}" ] && [ -f "${NODE_PATH}/autoprefixer/index.js" ]; then\n  exit 0\nfi\nif [ -f "$PWD/node_modules/autoprefixer/index.js" ]; then\n  exit 0\nfi\necho "autoprefixer is not resolvable" >&2\nexit 1\n' > "$root/.bin/postcss"
                 chmod 755 "$root/.bin/postcss"
                 printf '// fake asset\n' > "$root/jquery/dist/jquery.min.js"
                 printf '// fake asset\n' > "$root/mermaid/dist/mermaid.min.js"
@@ -169,7 +170,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                     r"""
                     #!/usr/bin/env python3
                     from pathlib import Path
-                    import os, signal, sys, time
+                    import os, signal, subprocess, sys, time
 
                     log_path = Path(os.environ['BUILDISH_FAKE_HUGO_LOG'])
                     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -182,6 +183,9 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                         signal.signal(signal.SIGINT, lambda *_: sys.exit(0))
                         while True:
                             time.sleep(0.1)
+
+                    if os.environ.get('BUILDISH_FAKE_HUGO_REQUIRE_POSTCSS_NPX') == '1':
+                        subprocess.run(['npx', 'postcss', '--help'], check=True)
                     """
                 ),
             )
@@ -486,6 +490,19 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         self.assertEqual("/components/mammoth-cache/unreleased/docs/", components_payload["components"]["mammoth-cache"]["docsPath"])
         container_log = self.read_text(repo_root / "site" / "build" / "fake-container.log")
         self.assert_contains_all(container_log, "run", "--init", "/workspace/buildish/site")
+
+    def test_make_container_build_exposes_postcss_to_hugo_via_npx(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
+        env = self.base_env(repo_root / "site", bin_dir)
+        env["CONTAINER_ENGINE"] = "fake-container-engine"
+        env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
+        env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
+        env["BUILDISH_FAKE_HUGO_REQUIRE_POSTCSS_NPX"] = "1"
+        result = self.run_make(repo_root / "site", "container-build", env)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assert_contains_all(self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"])), "--source .", "--config hugo.yaml")
 
     def test_make_stage_watch_local_rebuilds_after_doc_change(self) -> None:
         repo_root = self.prepare_fixture_workspace()

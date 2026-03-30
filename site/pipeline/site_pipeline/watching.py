@@ -36,10 +36,11 @@ from .common import first_non_none
 from .constants import STAGED_VENDOR_ASSETS, WATCH_DEBOUNCE_MS, WATCH_IGNORE_PATH_PARTS, WATCH_IGNORE_SUFFIXES, WATCH_STEP_MS
 from .filesystem import (
     load_component_metadata,
+    load_components_local_overrides,
     repo_root_from,
     resolve_vendor_asset_source,
+    resolve_component_repo_path,
     safe_relative_path,
-    safe_repo_path,
     watchable_existing_path,
 )
 from .models import CatalogComponent, ComponentCatalogDefaults, ComponentMetadata, ComponentsCatalog
@@ -60,12 +61,16 @@ def _configured_content_root(
     )
 
 
-def _component_watch_roots(repo_root: Path, component: CatalogComponent, defaults: ComponentCatalogDefaults) -> set[Path]:
+def _component_watch_roots(
+    repo_root: Path,
+    component: CatalogComponent,
+    defaults: ComponentCatalogDefaults,
+    local_overrides: ComponentsLocalOverrides | None = None,
+) -> set[Path]:
     """Return the filesystem paths that can affect one component's staged output."""
 
     slug = component.slug
-    local_dir = component.local_dir
-    repo_path = safe_repo_path(repo_root, local_dir)
+    repo_path = resolve_component_repo_path(repo_root, component, local_overrides)
     parent_fallback = repo_path.parent if repo_path.parent.exists() else repo_root.parent.resolve()
 
     if not repo_path.exists():
@@ -124,11 +129,15 @@ def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
     resolved_repo_root = repo_root_from(repo_root)
     site_root = resolved_repo_root / "site"
     catalog = ComponentsCatalog.from_yaml_path(site_root / "components.yaml")
+    local_overrides = load_components_local_overrides(site_root)
 
     watch_roots: set[Path] = {
         watchable_existing_path(site_root / "components.yaml", site_root),
         watchable_existing_path(site_root / "content", site_root),
     }
+    components_local_path = site_root / "components.local.yaml"
+    if components_local_path.is_file():
+        watch_roots.add(components_local_path.resolve())
     watch_roots.update(_pipeline_watch_roots(site_root))
 
     for source_relative, _ in STAGED_VENDOR_ASSETS:
@@ -137,7 +146,7 @@ def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
             watch_roots.add(source.resolve())
 
     for component in catalog.components:
-        watch_roots.update(_component_watch_roots(resolved_repo_root, component, catalog.defaults))
+        watch_roots.update(_component_watch_roots(resolved_repo_root, component, catalog.defaults, local_overrides))
 
     return sorted(watch_roots, key=str)
 

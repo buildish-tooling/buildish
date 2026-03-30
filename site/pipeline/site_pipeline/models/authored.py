@@ -62,6 +62,25 @@ class ComponentsCatalog(YamlModel):
     components: tuple[CatalogComponent, ...] = Field(default_factory=tuple)
 
 
+class LocalWorkspaceComponentOverride(YamlModel):
+    """One slug-keyed local checkout override from ``site/components.local.yaml``."""
+
+    checkout_dir: str
+
+
+class LocalWorkspaceOverrides(YamlModel):
+    """Workspace-local source bindings from ``site/components.local.yaml``."""
+
+    components: dict[str, LocalWorkspaceComponentOverride] = Field(default_factory=dict)
+
+
+class ComponentsLocalOverrides(YamlModel):
+    """Typed representation of ``site/components.local.yaml`` when present."""
+
+    schema_version: int | None = None
+    workspace: LocalWorkspaceOverrides = Field(default_factory=LocalWorkspaceOverrides)
+
+
 class ComponentIdentity(YamlModel):
     """Component identity and repository fields from ``component.yaml``."""
 

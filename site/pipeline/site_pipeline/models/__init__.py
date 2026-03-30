@@ -18,9 +18,12 @@ from __future__ import annotations
 
 from .authored import (
     CatalogComponent,
+    ComponentsLocalOverrides,
     ComponentCatalogDefaults,
     ComponentContentSettings,
     ComponentIdentity,
+    LocalWorkspaceComponentOverride,
+    LocalWorkspaceOverrides,
     ComponentLifecycleReleaseLine,
     ComponentLifecycleSettings,
     ComponentMetadata,
