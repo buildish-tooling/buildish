@@ -16,29 +16,10 @@ limitations under the License.
 {{ define "main" }}
 {{ $componentContext := partial "buildish-component-context.html" . }}
 {{ if index $componentContext "isComponentLanding" }}
-{{ $component := index $componentContext "component" }}
-<div class="td-content buildish-component-landing">
-  <div class="buildish-component-landing__hero">
-    <p class="buildish-component-landing__eyebrow">Component</p>
-    <h1>{{ .Title }}</h1>
-    {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
-    <div class="buildish-component-landing__actions">
-      {{ with index $componentContext "docsPath" }}
-      <a class="btn btn-primary me-2 mb-2" href="{{ . }}">Open docs</a>
-      {{ end }}
-      {{ if index $componentContext "hasReleaseContent" }}
-      <a class="btn btn-outline-primary me-2 mb-2" href="{{ index $componentContext "releaseAnchor" }}">Release lines</a>
-      {{ end }}
-      {{ with index $component "repository" }}
-      <a class="btn btn-outline-secondary me-2 mb-2" href="{{ . }}" target="_blank" rel="noopener">Source repository</a>
-      {{ end }}
-      <a class="btn btn-link mb-2" href="{{ "/components/" | relURL }}">All components</a>
-    </div>
-  </div>
-  <div class="buildish-component-landing__body">
-    {{ .Content }}
-  </div>
-  {{ partial "section-index.html" . -}}
+<div class="td-content">
+  <h1>{{ .Title }}</h1>
+  {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
+  {{ .Content }}
   {{ partial "feedback.html" . -}}
   {{ partial "page-meta-lastmod.html" . -}}
 </div>

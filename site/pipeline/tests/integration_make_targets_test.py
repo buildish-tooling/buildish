@@ -366,6 +366,11 @@ class MakeTargetIntegrationTest(unittest.TestCase):
 
         component_index = (repo_root / "site" / ".public" / "components" / "mammoth-cache-gradle" / "index.html").read_text(encoding="utf-8")
         self.assertIn('Fixture component landing page.', component_index)
+        self.assertNotIn('Open docs', component_index)
+        self.assertNotIn('Release lines', component_index)
+        self.assertNotIn('Source repository', component_index)
+        self.assertNotIn('buildish-component-landing__hero', component_index)
+        self.assertNotIn('buildish-component-landing__actions', component_index)
 
         sidebar = docs_index.split('<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">', 1)[1].split('<aside class="d-none d-xl-block col-xl-2 td-sidebar-toc d-print-none">', 1)[0]
         self.assertNotIn('id="m-componentsmammoth-cache-gradle"', sidebar)

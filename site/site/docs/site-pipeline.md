@@ -23,7 +23,8 @@ This document describes the current implementation under `site/`.
 The broader target architecture and future publication/release goals remain in
 [`site-infra.md`](site-infra.md). The current implementation is still
 **unreleased-first and unreleased-only** in practice for versioned docs; stable,
-component-level landing pages now come from authored `site/pages/` content.
+non-versioned component landing pages come from authored `site/pages/_index.md`
+content, while version-specific docs come from `site/docs/`.
 
 ## What the current implementation provides
 
@@ -32,6 +33,7 @@ The code under `site/` currently provides:
 - catalog-driven aggregation from `site/components.yaml`,
 - per-component metadata loading from each component's `site/component.yaml`,
 - authored component landing pages and version-independent component pages from each component's `site/pages/`,
+- version-specific docs from each component's `site/docs/`, staged today as unreleased docs,
 - normalized staged content and metadata under `site/.stage/`,
 - local Hugo + Docsy rendering from that staged tree,
 - watch-based restaging for interactive local development,
@@ -62,10 +64,14 @@ flowchart LR
 The Python pipeline under `site/pipeline/site_pipeline/` is responsible for:
 
 - reading the catalog and component metadata,
-- copying approved docs and static assets into a normalized tree,
+- copying approved non-versioned pages, versioned docs, and static assets into a normalized tree,
 - normalizing Markdown titles, summaries, and front matter,
 - generating YAML data consumed by templates,
 - writing a manifest describing the staged contract.
+
+For component landing pages, the Hugo layer now renders the authored
+`site/pages/_index.md` body directly instead of wrapping it in a fixed Buildish
+hero/actions shell.
 
 ### Rendering layer
 
@@ -171,15 +177,17 @@ updates reliably during development.
 
 - `site/components.yaml` in the main repository
 - `site/component.yaml` in each participating component
-- `site/pages/` in each participating component
-- `site/docs/` in each participating component
+- `site/pages/` in each participating component for non-versioned component pages
+- `site/docs/` in each participating component for version-specific docs
 - optional `site/assets/` in each participating component
 - authored site content under `site/content/`
 
 ### Outputs
 
 - `site/.stage/content/components/<slug>/_index.md` and any additional authored component pages
-- `site/.stage/content/components/<slug>/unreleased/...`
+- `site/.stage/content/components/<slug>/unreleased/docs/...`
+- `site/.stage/content/components/<slug>/unreleased/version.yaml`
+- `site/.stage/content/components/<slug>/unreleased/_index.md`
 - `site/.stage/data/components.yaml`
 - `site/.stage/data/lifecycle.yaml`
 - `site/.stage/data/aliases.yaml`

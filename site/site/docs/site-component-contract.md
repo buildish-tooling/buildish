@@ -100,14 +100,31 @@ For each available component repository, it stages:
 - the configured docs tree, defaulting to `site/docs`
 - the configured asset tree, defaulting to `site/assets`
 
-The component pages tree is mandatory for available component repositories and must include `_index.md`.
+`pagesRoot` is the non-versioned component content tree. It stages directly into
+`content/components/<slug>/...`, and `pagesRoot/_index.md` is the authored
+component landing page at `/components/<slug>/`.
 
-The docs tree should include a site-oriented `_index.md` landing page.
+The component pages tree is mandatory for available component repositories and
+must include `_index.md`.
 
-Because `site/pages/` stages directly into `content/components/<slug>/...`, the top-level names `unreleased/`, `releases/`, and `lifecycle.yaml` are reserved for pipeline-owned output.
+`docsRoot` is the version-specific documentation tree. In the current
+implementation, the working-tree copy stages to
+`content/components/<slug>/unreleased/docs/...`.
+
+The docs tree should include a site-oriented `_index.md` landing page for that
+versioned docs section.
+
+Because `pagesRoot` stages directly into `content/components/<slug>/...`, the
+top-level names `unreleased/`, `releases/`, and `lifecycle.yaml` are reserved
+for pipeline-owned output.
 
 If the docs tree is missing, unreleased docs staging is skipped for that
 component.
+
+The renderer does not inject a mandatory component-home hero, CTA button row, or
+release-card shell. Component authors own the landing-page body in
+`pagesRoot/_index.md` and can place links to unreleased docs, releases, source,
+or any other component-specific content where they want.
 
 ## Lifecycle inputs
 
