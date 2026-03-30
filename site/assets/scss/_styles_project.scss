@@ -208,6 +208,51 @@ html[data-bs-theme='dark'] .td-sidebar .td-sidebar-nav-active-item {
   margin-inline: 0.3rem 0.15rem;
 }
 
+.td-navbar .navbar-group-separator {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding-inline: 0.1rem;
+  pointer-events: none;
+}
+
+.td-navbar .navbar-group-separator__line {
+  border-inline-start: 1px solid rgba(255, 255, 255, 0.2);
+  display: block;
+  height: 1rem;
+  margin-inline: 0.15rem 0.3rem;
+}
+
+.td-navbar .navbar-item--global > .nav-link,
+.td-navbar .navbar-item--global > .dropdown-toggle,
+.td-navbar .navbar-item--global > .btn {
+  opacity: 0.86;
+  transition: opacity 0.18s ease;
+}
+
+.td-navbar .navbar-item--global:hover > .nav-link,
+.td-navbar .navbar-item--global:hover > .dropdown-toggle,
+.td-navbar .navbar-item--global:focus-within > .nav-link,
+.td-navbar .navbar-item--global:focus-within > .dropdown-toggle,
+.td-navbar .navbar-item--global > .nav-link.active,
+.td-navbar .navbar-item--global > .dropdown-toggle.active,
+.td-navbar .navbar-item--global > .dropdown-toggle[aria-expanded='true'],
+.td-navbar .navbar-item--global > .btn:hover,
+.td-navbar .navbar-item--global > .btn:focus {
+  opacity: 1;
+}
+
+@media (min-width: 768px) {
+  .td-navbar .navbar-group-separator {
+    padding-inline: 0.25rem;
+  }
+
+  .td-navbar .navbar-group-separator__line {
+    height: 1.15rem;
+    margin-inline: 0.3rem 0.55rem;
+  }
+}
+
 .buildish-incubator-disclaimer {
   background: #2c3136;
   border-radius: 0.5rem;
@@ -241,6 +286,10 @@ html[data-bs-theme='dark'] .td-sidebar .td-sidebar-nav-active-item {
 
 html[data-bs-theme='dark'] .td-navbar .navbar-brand__divider {
   border-inline-start-color: rgba(148, 163, 184, 0.28);
+}
+
+html[data-bs-theme='dark'] .td-navbar .navbar-group-separator__line {
+  border-inline-start-color: rgba(148, 163, 184, 0.24);
 }
 
 .buildish-component-landing {

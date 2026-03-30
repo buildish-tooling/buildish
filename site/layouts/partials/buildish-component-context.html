@@ -23,6 +23,8 @@ limitations under the License.
   {{- with index $paths "component" }}{{ $componentPath = . }}{{ end -}}
   {{- $docsPath := "" -}}
   {{- with index $paths "docs" }}{{ $docsPath = . }}{{ end -}}
+  {{- $repositoryPath := "" -}}
+  {{- with index $component "repository" }}{{ $repositoryPath = . }}{{ end -}}
   {{- $unreleasedLabel := "Unreleased" -}}
   {{- with index $component "unreleasedLabel" }}{{ $unreleasedLabel = . }}{{ end -}}
 
@@ -80,6 +82,7 @@ limitations under the License.
     "page" $page
     "componentPath" $componentPath
     "docsPath" $docsPath
+    "repositoryPath" $repositoryPath
     "docsItems" $docsItems
     "releaseAnchor" $releaseAnchor
     "releaseItems" $releaseItems

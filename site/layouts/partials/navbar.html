@@ -25,10 +25,13 @@ limitations under the License.
 {{ $componentDisplayName := "" -}}
 {{ $componentDocsItems := slice -}}
 {{ $componentReleaseItems := slice -}}
+{{ $componentRepositoryPath := "" -}}
 {{ $componentDocsActive := false -}}
 {{ $componentReleasesActive := false -}}
+{{ $hasGlobalItems := or (gt (len .Site.Menus.main) 0) (or .Site.Params.versions (or (gt (len .Site.Home.Translations) 0) .Site.Params.ui.showLightDarkModeMenu)) -}}
 {{ with index $componentContext "page" }}{{ $componentPage = . }}{{ end -}}
 {{ with index $componentContext "componentPath" }}{{ $componentPath = . }}{{ end -}}
+{{ with index $componentContext "repositoryPath" }}{{ $componentRepositoryPath = . }}{{ end -}}
 {{ with index $componentContext "docsItems" }}{{ $componentDocsItems = . }}{{ end -}}
 {{ with index $componentContext "releaseItems" }}{{ $componentReleaseItems = . }}{{ end -}}
 {{ with index $componentContext "component" }}{{ with index . "displayName" }}{{ $componentDisplayName = . }}{{ end }}{{ end -}}
@@ -42,7 +45,7 @@ limitations under the License.
     <ul class="navbar-nav">
       {{ if $componentMode }}
       {{ if gt (len $componentDocsItems) 0 }}
-      <li class="nav-item dropdown">
+      <li class="nav-item dropdown navbar-item--component">
         <a class="nav-link dropdown-toggle{{ if $componentDocsActive }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>Docs</span></a>
         <ul class="dropdown-menu">
           {{ range $componentDocsItems }}
@@ -54,7 +57,7 @@ limitations under the License.
       </li>
       {{ end }}
       {{ if gt (len $componentReleaseItems) 0 }}
-      <li class="nav-item dropdown">
+      <li class="nav-item dropdown navbar-item--component">
         <a class="nav-link dropdown-toggle{{ if $componentReleasesActive }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>Releases</span></a>
         <ul class="dropdown-menu">
           {{ range $componentReleaseItems }}
@@ -65,8 +68,14 @@ limitations under the License.
       </li>
       {{ else if index $componentContext "hasReleaseContent" }}
       {{ with index $componentContext "releaseAnchor" }}
-      <li class="nav-item"><a class="nav-link{{ if $componentReleasesActive }} active{{ end }}" href="{{ . }}"><span>Releases</span></a></li>
+      <li class="nav-item navbar-item--component"><a class="nav-link{{ if $componentReleasesActive }} active{{ end }}" href="{{ . }}"><span>Releases</span></a></li>
       {{ end }}
+      {{ end }}
+      {{ with $componentRepositoryPath }}
+      <li class="nav-item navbar-item--component"><a class="nav-link" href="{{ . }}" target="_blank" rel="noopener"><span>Source</span></a></li>
+      {{ end }}
+      {{ if $hasGlobalItems }}
+      <li class="nav-item navbar-group-separator" aria-hidden="true"><span class="navbar-group-separator__line"></span></li>
       {{ end }}
       {{ end }}
       {{ range .Site.Menus.main -}}
@@ -83,7 +92,7 @@ limitations under the License.
       {{ if and $isComponents $componentsPage }}{{ $active = or $active (eq $p.RelPermalink $componentsPage.RelPermalink) ($p.IsDescendant $componentsPage) }}{{ end -}}
       {{ if and $componentMode $isComponents $componentsPage }}{{ $active = eq $p.RelPermalink $componentsPage.RelPermalink }}{{ end -}}
       {{ if $hasChildren }}
-      <li class="nav-item dropdown">
+      <li class="nav-item dropdown{{ if $componentMode }} navbar-item--global{{ end }}">
         <a class="nav-link dropdown-toggle{{ if $active }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>{{ $menu.Name }}</span></a>
         <ul class="dropdown-menu">
           {{ if $isComponents }}
@@ -107,12 +116,12 @@ limitations under the License.
       {{ else }}
       {{ $parsedMenuURL := urls.Parse $menu.URL }}
       {{ $isExternal := and $menu.URL $parsedMenuURL.Host (ne $baseURL.Host $parsedMenuURL.Host) }}
-      <li class="nav-item"><a class="nav-link{{ if $active }} active{{ end }}" href="{{ $href }}"{{ if $isExternal }} target="_blank" rel="noopener"{{ end }}><span>{{ $menu.Name }}</span></a></li>
+      <li class="nav-item{{ if $componentMode }} navbar-item--global{{ end }}"><a class="nav-link{{ if $active }} active{{ end }}" href="{{ $href }}"{{ if $isExternal }} target="_blank" rel="noopener"{{ end }}><span>{{ $menu.Name }}</span></a></li>
       {{ end }}
       {{ end -}}
-      {{ if .Site.Params.versions -}}<li class="nav-item dropdown d-none d-lg-block">{{ partial "navbar-version-selector.html" . -}}</li>{{ end -}}
-      {{ if (gt (len .Site.Home.Translations) 0) -}}<li class="nav-item dropdown d-none d-lg-block">{{ partial "navbar-lang-selector.html" . -}}</li>{{ end -}}
-      {{ if .Site.Params.ui.showLightDarkModeMenu -}}<li class="td-light-dark-menu nav-item dropdown">{{ partial "theme-toggler" . }}</li>{{ end -}}
+      {{ if .Site.Params.versions -}}<li class="nav-item dropdown d-none d-lg-block{{ if $componentMode }} navbar-item--global{{ end }}">{{ partial "navbar-version-selector.html" . -}}</li>{{ end -}}
+      {{ if (gt (len .Site.Home.Translations) 0) -}}<li class="nav-item dropdown d-none d-lg-block{{ if $componentMode }} navbar-item--global{{ end }}">{{ partial "navbar-lang-selector.html" . -}}</li>{{ end -}}
+      {{ if .Site.Params.ui.showLightDarkModeMenu -}}<li class="td-light-dark-menu nav-item dropdown{{ if $componentMode }} navbar-item--global{{ end }}">{{ partial "theme-toggler" . }}</li>{{ end -}}
     </ul>
     <div class="scroll-indicator scroll-right"></div>
   </div>

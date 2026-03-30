@@ -63,7 +63,7 @@ class BuildishComponentPayload(YamlModel):
 class BuildishComponentPagePayload(YamlModel):
     """Per-page context payload injected into staged component page front matter."""
 
-    kind: Literal["component-home", "unreleased-home", "docs-home", "docs-page"]
+    kind: Literal["component-home", "component-page", "unreleased-home", "docs-home", "docs-page"]
     section: Literal["component", "unreleased", "docs"]
     path: str | None = Field(default=None, exclude_if=lambda value: value is None)
     component_path: str | None = Field(default=None, exclude_if=lambda value: value is None)

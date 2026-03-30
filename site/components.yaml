@@ -16,6 +16,7 @@
 schemaVersion: 1
 defaults:
   metadataFile: site/component.yaml
+  pagesRoot: site/pages
   docsRoot: site/docs
   assetsRoot: site/assets
   unreleasedLabel: Unreleased

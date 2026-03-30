@@ -52,6 +52,7 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
 
     @staticmethod
     def seed_mammoth_fixture(repo_root: Path) -> None:
+        (repo_root / "site" / "pages").mkdir(parents=True)
         (repo_root / "site" / "docs").mkdir(parents=True)
         (repo_root / "site" / "assets" / "images").mkdir(parents=True)
         (repo_root / "README.md").write_text("# Mammoth Cache for Gradle\n\nFixture component summary.\n", encoding="utf-8")
@@ -74,6 +75,7 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
                 sort_keys=False,
                 default_flow_style=False,
             )
+        (repo_root / "site" / "pages" / "_index.md").write_text("# Mammoth Cache for Gradle\n\nFixture component landing page.\n", encoding="utf-8")
         (repo_root / "site" / "docs" / "_index.md").write_text("# Overview\n", encoding="utf-8")
         (repo_root / "site" / "docs" / "getting-started.md").write_text("# Getting started\n", encoding="utf-8")
         (repo_root / "site" / "assets" / "images" / "diagram.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>\n", encoding="utf-8")
@@ -81,6 +83,7 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
     @staticmethod
     def seed_no_wrapper_fixture(repo_root: Path) -> None:
         (repo_root / "site").mkdir(parents=True)
+        (repo_root / "site" / "pages").mkdir(parents=True)
         (repo_root / "site" / "docs").mkdir(parents=True)
         with (repo_root / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
             yaml.safe_dump(
@@ -93,6 +96,7 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
                 sort_keys=False,
                 default_flow_style=False,
             )
+        (repo_root / "site" / "pages" / "_index.md").write_text("# No Wrapper JAR\n\nFixture component landing page.\n", encoding="utf-8")
         (repo_root / "site" / "docs" / "_index.md").write_text("# No Wrapper JAR\n\nFixture docs overview.\n", encoding="utf-8")
 
     def test_build_from_fixture_workspace(self) -> None:
@@ -114,6 +118,7 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
             self.assertEqual(3, len(second_results))
 
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache-gradle" / "unreleased" / "docs" / "getting-started.md").exists())
+            self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache-gradle" / "_index.md").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache-gradle" / "unreleased" / "assets" / "images" / "diagram.svg").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "no-gradle-wrapper-jar" / "unreleased" / "docs" / "_index.md").exists())
             self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "site" / "unreleased" / "docs" / "_index.md").exists())
@@ -126,6 +131,7 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
             self.assertEqual("/components/site/", components_data["components"]["site"]["componentPath"])
             self.assertEqual("/components/site/unreleased/docs/", components_data["components"]["site"]["docsPath"])
             self.assertEqual(0, components_data["components"]["site"]["assetCount"])
+            self.assertEqual("Fixture component landing page.", components_data["components"]["mammoth-cache-gradle"]["summary"])
 
             lifecycle_data = yaml.safe_load((repo_root / "site" / ".stage" / "data" / "lifecycle.yaml").read_text(encoding="utf-8"))
             self.assertEqual("v1.2.3", lifecycle_data["components"]["mammoth-cache-gradle"]["latestStable"])

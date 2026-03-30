@@ -90,6 +90,7 @@ class MakeTargetIntegrationTest(unittest.TestCase):
 
     @staticmethod
     def seed_mammoth_fixture(repo_root: Path) -> None:
+        (repo_root / "site" / "pages").mkdir(parents=True)
         (repo_root / "site" / "docs").mkdir(parents=True)
         (repo_root / "site" / "assets" / "images").mkdir(parents=True)
         (repo_root / "README.md").write_text("# Mammoth Cache for Gradle\n\nFixture component summary.\n", encoding="utf-8")
@@ -112,12 +113,14 @@ class MakeTargetIntegrationTest(unittest.TestCase):
                 sort_keys=False,
                 default_flow_style=False,
             )
+        (repo_root / "site" / "pages" / "_index.md").write_text("# Mammoth Cache for Gradle\n\nFixture component landing page.\n", encoding="utf-8")
         (repo_root / "site" / "docs" / "_index.md").write_text("# Overview\n\nInitial overview.\n", encoding="utf-8")
         (repo_root / "site" / "docs" / "getting-started.md").write_text("# Getting started\n\nInitial fixture text.\n", encoding="utf-8")
         (repo_root / "site" / "assets" / "images" / "diagram.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>\n", encoding="utf-8")
 
     @staticmethod
     def seed_no_wrapper_fixture(repo_root: Path) -> None:
+        (repo_root / "site" / "pages").mkdir(parents=True)
         (repo_root / "site" / "docs").mkdir(parents=True)
         with (repo_root / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
             yaml.safe_dump(
@@ -130,6 +133,7 @@ class MakeTargetIntegrationTest(unittest.TestCase):
                 sort_keys=False,
                 default_flow_style=False,
             )
+        (repo_root / "site" / "pages" / "_index.md").write_text("# No Wrapper JAR\n\nFixture component landing page.\n", encoding="utf-8")
         (repo_root / "site" / "docs" / "_index.md").write_text("# No Wrapper JAR\n\nFixture docs overview.\n", encoding="utf-8")
 
     def write_executable(self, path: Path, content: str) -> None:
@@ -332,6 +336,8 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         self.assertNotIn("Browse components", home_index)
         self.assertIn('/community/contributing-guidelines/', home_index)
         self.assertIn('/community/community-guidelines/', home_index)
+        self.assertNotIn('class="nav-item navbar-group-separator"', home_index)
+        self.assertNotIn('navbar-item--global', home_index)
 
         docs_index = (repo_root / "site" / ".public" / "components" / "mammoth-cache-gradle" / "unreleased" / "docs" / "index.html").read_text(encoding="utf-8")
         self.assertIn('class="navbar-brand__home" href="/"', docs_index)
@@ -339,8 +345,17 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         self.assertIn('class="navbar-brand__divider"', docs_index)
         self.assertIn('<span class="navbar-brand__context">Fixture Mammoth Cache for Gradle</span>', docs_index)
         self.assertNotIn('<a href="/components/">Components</a>', docs_index)
+        self.assertIn('href="https://github.com/apache/buildish-mammoth-cache-gradle"', docs_index)
+        self.assertIn('>Source</span>', docs_index)
+        self.assertIn('navbar-item--component', docs_index)
+        self.assertIn('class="nav-item navbar-group-separator"', docs_index)
+        self.assertIn('class="navbar-group-separator__line"', docs_index)
+        self.assertIn('navbar-item--global', docs_index)
         self.assertIn('/community/contributing-guidelines/', docs_index)
         self.assertIn('/community/community-guidelines/', docs_index)
+
+        component_index = (repo_root / "site" / ".public" / "components" / "mammoth-cache-gradle" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('Fixture component landing page.', component_index)
 
         sidebar = docs_index.split('<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">', 1)[1].split('<aside class="d-none d-xl-block col-xl-2 td-sidebar-toc d-print-none">', 1)[0]
         self.assertNotIn('id="m-componentsmammoth-cache-gradle"', sidebar)

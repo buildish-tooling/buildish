@@ -38,6 +38,7 @@ Current supported top-level fields:
 Current supported `defaults` fields:
 
 - `metadataFile`
+- `pagesRoot`
 - `docsRoot`
 - `assetsRoot`
 - `unreleasedLabel`
@@ -48,7 +49,7 @@ Each `components[]` entry currently supports:
 
 - required: `slug`, `localDir`
 - optional: `displayName`, `repository`, `defaultBranch`, `weight`
-- optional overrides: `metadataFile`, `docsRoot`, `assetsRoot`
+- optional overrides: `metadataFile`, `pagesRoot`, `docsRoot`, `assetsRoot`
 - optional publication/navigation hints: `unreleasedLabel`, `tagPattern`, `navigationSection`
 
 ## Component metadata file
@@ -64,6 +65,7 @@ Preferred structure:
   - `repository`
   - `defaultBranch`
 - `content`
+  - `pagesRoot`
   - `docsRoot`
   - `assetsRoot`
 - `versioning`
@@ -94,10 +96,15 @@ while the component metadata controls content-local structure.
 
 For each available component repository, it stages:
 
+- the configured component pages tree, defaulting to `site/pages`
 - the configured docs tree, defaulting to `site/docs`
 - the configured asset tree, defaulting to `site/assets`
 
+The component pages tree is mandatory for available component repositories and must include `_index.md`.
+
 The docs tree should include a site-oriented `_index.md` landing page.
+
+Because `site/pages/` stages directly into `content/components/<slug>/...`, the top-level names `unreleased/`, `releases/`, and `lifecycle.yaml` are reserved for pipeline-owned output.
 
 If the docs tree is missing, unreleased docs staging is skipped for that
 component.
@@ -130,6 +137,7 @@ The current aggregator enforces these guardrails:
 Stage outputs are, at minimum:
 
 - `site/.stage/content/components/<slug>/_index.md`
+- `site/.stage/content/components/<slug>/...` for any additional authored component pages
 - `site/.stage/content/components/<slug>/unreleased/docs/...`
 - `site/.stage/content/components/<slug>/unreleased/version.yaml`
 - `site/.stage/content/components/<slug>/lifecycle.yaml`

@@ -28,6 +28,7 @@ class ComponentCatalogDefaults(YamlModel):
     """Typed representation of the ``defaults`` section in ``site/components.yaml``."""
 
     metadata_file: str | None = None
+    pages_root: str | None = None
     docs_root: str | None = None
     assets_root: str | None = None
     unreleased_label: str | None = None
@@ -44,6 +45,7 @@ class CatalogComponent(YamlModel):
     repository: str | None = None
     default_branch: str | None = None
     metadata_file: str | None = None
+    pages_root: str | None = None
     docs_root: str | None = None
     assets_root: str | None = None
     unreleased_label: str | None = None
@@ -72,6 +74,7 @@ class ComponentIdentity(YamlModel):
 class ComponentContentSettings(YamlModel):
     """Typed content-path settings from ``component.yaml``."""
 
+    pages_root: str | None = None
     docs_root: str | None = None
     assets_root: str | None = None
 

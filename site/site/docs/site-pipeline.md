@@ -22,8 +22,8 @@ This document describes the current implementation under `site/`.
 
 The broader target architecture and future publication/release goals remain in
 [`site-infra.md`](site-infra.md). The current implementation is still
-**unreleased-first and unreleased-only** in practice; staging from exact release
-tags is intentionally deferred until real release material exists.
+**unreleased-first and unreleased-only** in practice for versioned docs; stable,
+component-level landing pages now come from authored `site/pages/` content.
 
 ## What the current implementation provides
 
@@ -31,6 +31,7 @@ The code under `site/` currently provides:
 
 - catalog-driven aggregation from `site/components.yaml`,
 - per-component metadata loading from each component's `site/component.yaml`,
+- authored component landing pages and version-independent component pages from each component's `site/pages/`,
 - normalized staged content and metadata under `site/.stage/`,
 - local Hugo + Docsy rendering from that staged tree,
 - watch-based restaging for interactive local development,
@@ -48,7 +49,7 @@ The implementation is split into an aggregation layer and a rendering layer.
 flowchart LR
     A[site/components.yaml] --> P[Python staging pipeline]
     B[component site/component.yaml] --> P
-    C[component site/docs and site/assets] --> P
+    C[component site/pages, site/docs, and site/assets] --> P
     D[site/content and shared assets] --> P
     P --> S[site/.stage]
     P --> V[site/.preview]
@@ -170,12 +171,14 @@ updates reliably during development.
 
 - `site/components.yaml` in the main repository
 - `site/component.yaml` in each participating component
+- `site/pages/` in each participating component
 - `site/docs/` in each participating component
 - optional `site/assets/` in each participating component
 - authored site content under `site/content/`
 
 ### Outputs
 
+- `site/.stage/content/components/<slug>/_index.md` and any additional authored component pages
 - `site/.stage/content/components/<slug>/unreleased/...`
 - `site/.stage/data/components.yaml`
 - `site/.stage/data/lifecycle.yaml`
@@ -193,6 +196,7 @@ proposal:
 - no arbitrary code execution from staged content,
 - no path traversal outside approved repository roots,
 - no symlink-following during staged content copying,
+- reserved pipeline-owned component paths such as `unreleased/`, `releases/`, and `lifecycle.yaml` cannot be shadowed by authored `site/pages/` content,
 - no remote fetching during normal local builds,
 - no custom renderer logic contributed from component repositories.
 

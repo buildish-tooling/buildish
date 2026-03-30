@@ -46,7 +46,7 @@ The shared catalog should describe the **canonical source** of each site compone
 - `slug` — stable public component identifier,
 - `repository` — canonical Git repository URL,
 - `sourceRoot` — path inside that repository that owns the component's site contract,
-- `metadataFile`, `docsRoot`, `assetsRoot` — paths relative to `sourceRoot`.
+- `metadataFile`, `pagesRoot`, `docsRoot`, `assetsRoot` — paths relative to `sourceRoot`.
 
 `sourceRoot` defaults to `.`. This makes it possible for one repository to host multiple site components.
 

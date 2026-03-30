@@ -80,6 +80,12 @@ def _component_watch_roots(repo_root: Path, component: CatalogComponent, default
     if metadata_path is not None:
         watch_roots.add(watchable_existing_path(metadata_path, repo_path))
 
+    pages_setting = _configured_content_root(component, metadata, defaults, "pages_root")
+    if pages_setting is not None:
+        pages_path = safe_relative_path(repo_path, str(pages_setting), f"pagesRoot for {slug}")
+        if pages_path is not None:
+            watch_roots.add(watchable_existing_path(pages_path, repo_path))
+
     docs_setting = _configured_content_root(component, metadata, defaults, "docs_root")
     if docs_setting is not None:
         docs_path = safe_relative_path(repo_path, str(docs_setting), f"docsRoot for {slug}")

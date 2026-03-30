@@ -111,40 +111,6 @@ def normalize_lifecycle(
     return latest_stable_version, latest_stable_path, tuple(release_lines), tuple(alias_mappings)
 
 
-def build_component_markdown(result: ComponentBuildResult) -> str:
-    """Build the staged landing-page body for one component."""
-
-    lines: list[str] = []
-    if result.repository:
-        lines.append(f"- Repository: <{result.repository}>")
-    if result.default_branch:
-        lines.append(f"- Default branch: `{result.default_branch}`")
-    lines.append(f"- Local workspace directory: `{result.local_dir}`")
-    if result.navigation_section:
-        lines.append(f"- Navigation section: `{result.navigation_section}`")
-    if result.asset_count and result.raw_assets_root_path:
-        lines.append(
-            f"- Staged assets: {result.asset_count} file(s) under "
-            f"[{result.raw_assets_root_path}]({result.raw_assets_root_path})."
-        )
-    if result.latest_stable_version:
-        latest_stable = f"`{result.latest_stable_version}`"
-        if result.latest_stable_path:
-            latest_stable = f"[{result.latest_stable_version}]({result.latest_stable_path})"
-        lines.append(f"- Latest stable: {latest_stable}")
-    if result.release_lines:
-        lines.extend(["", "## Release lines", ""])
-        for release_line in result.release_lines:
-            latest = f"`{release_line.latest}`"
-            if release_line.path:
-                latest = f"[{release_line.latest}]({release_line.path})"
-            alias_suffix = ""
-            if release_line.aliases:
-                alias_suffix = " (aliases: " + ", ".join(f"`{alias}`" for alias in release_line.aliases) + ")"
-            lines.append(f"- `{release_line.line}` — {release_line.status}; latest {latest}{alias_suffix}")
-    return "\n".join(lines).rstrip() + "\n"
-
-
 def build_unreleased_index_markdown(result: ComponentBuildResult) -> str:
     """Build the staged unreleased landing-page body for one component."""
 

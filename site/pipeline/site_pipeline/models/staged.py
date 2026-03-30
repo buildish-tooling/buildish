@@ -74,6 +74,7 @@ class VersionSource(YamlModel):
     metadata_file: str
     metadata_loaded: StrictBool
     default_branch: str | None = None
+    pages_root: str | None = None
     docs_root: str | None = None
     assets_root: str | None = None
 

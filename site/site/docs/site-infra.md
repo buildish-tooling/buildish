@@ -175,6 +175,7 @@ Each component should expose a small, stable contract, for example:
 
 - `site/`
 - `site/component.yaml` (or similar metadata file)
+- `site/pages/` for stable component landing pages and other version-independent content
 - `site/docs/` for documentation content
 
 The metadata should be kept intentionally small and may later include fields
@@ -206,6 +207,7 @@ component:
   repository: https://github.com/apache/buildish-mammoth-cache-gradle
   defaultBranch: main
 content:
+  pagesRoot: pages
   docsRoot: docs
   assetsRoot: assets
 versioning:
@@ -226,7 +228,7 @@ Notes:
 - `slug` is the stable identifier used in URLs and staged content paths.
 - `defaultBranch` is source metadata only; the public site should still present
   this content as `unreleased`.
-- `docsRoot` is relative to the repository's `site/` directory.
+- `pagesRoot` and `docsRoot` are relative to the repository's `site/` directory.
 - release line lifecycle state such as maintained vs EOL should likely be
   tracked outside this file, because it changes over time and is not purely a
   property of the docs source tree.
@@ -237,6 +239,7 @@ Unless explicitly overridden, the aggregation layer should assume defaults such
 as:
 
 - metadata file: `site/component.yaml`
+- pages root: `site/pages`
 - docs root: `site/docs`
 - assets root: `site/assets`
 - public unreleased label: `Unreleased`
@@ -799,6 +802,7 @@ One possible staging layout is:
 ### Staging rules
 
 - Each component gets its own namespace under `content/components/<component-slug>/`.
+- Authored version-independent component pages stage at the component root; `unreleased/`, `releases/`, and `lifecycle.yaml` remain pipeline-owned reserved names.
 - Unreleased content is always staged under `unreleased/` regardless of the
   repository's actual default branch name.
 - Released content is staged only under exact version identifiers.
@@ -965,6 +969,7 @@ The catalog should provide:
 schemaVersion: 1
 defaults:
   metadataFile: site/component.yaml
+  pagesRoot: site/pages
   docsRoot: site/docs
   assetsRoot: site/assets
   unreleasedLabel: Unreleased
