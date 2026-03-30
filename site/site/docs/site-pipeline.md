@@ -100,6 +100,10 @@ From `site/`:
 Containerized equivalents remain available as `make stage`, `make stage-watch`,
 and `make serve`.
 
+If you want to inspect the static `site/.public/` output without running Hugo in
+watch mode, run `make build`, then serve it locally, for example with
+`python3 -m http.server --directory .public 8080` from `site/`.
+
 ## How `serve-local` works
 
 `make serve-local` starts two long-lived processes:

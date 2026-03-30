@@ -22,6 +22,7 @@ Apache Buildish develops build automation, CI integrations, and supporting tooli
 
 1. Make the site publishing its own tool that Buildish uses itself.
 2. Need a workflow template so that component's site changes can be verified.
+3. Update RAT check to use what's done for the ASFinfra-actions repo.
 
 ## Available components
 

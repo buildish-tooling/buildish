@@ -32,7 +32,7 @@ from mistletoe import Document, block_token, span_token
 from .yaml_support import yaml_safe_value
 
 
-_HTML_COMMENT_PATTERN = re.compile(r"^<!--.*?-->\s*$", flags=re.DOTALL)
+_LEADING_HTML_COMMENT_PATTERN = re.compile(r"\A(?:[ \t\r\n]*<!--.*?-->[ \t\r\n]*)+", flags=re.DOTALL)
 _FRONT_MATTER_HANDLER = YAMLHandler()
 
 
@@ -40,7 +40,6 @@ _FRONT_MATTER_HANDLER = YAMLHandler()
 class _MarkdownAnalysis:
     """Structured view of the leading Markdown blocks relevant to normalization."""
 
-    leading_comment_indexes: tuple[int, ...]
     title_index: int | None
     summary_index: int | None
     summary_is_first_body_block: bool
@@ -88,12 +87,13 @@ def _paragraph_plain_text(block: Any) -> str:
     return " ".join(line.strip() for line in _block_plain_text(block).splitlines() if line.strip())
 
 
-def _is_html_comment_block(block: Any) -> bool:
-    """Return whether a parsed block is only an HTML comment."""
+def _split_leading_html_comments(markdown_text: str) -> tuple[str, str]:
+    """Split one or more leading HTML comments from ``markdown_text``."""
 
-    if not isinstance(block, (block_token.Paragraph, block_token.HtmlBlock)):
-        return False
-    return _HTML_COMMENT_PATTERN.fullmatch(_block_plain_text(block)) is not None
+    match = _LEADING_HTML_COMMENT_PATTERN.match(markdown_text)
+    if match is None:
+        return "", markdown_text
+    return markdown_text[: match.end()], markdown_text[match.end() :]
 
 
 def _heading_level(block: Any) -> int | None:
@@ -108,21 +108,13 @@ def _heading_level(block: Any) -> int | None:
 def _analyze_markdown(blocks: list[Any], fallback_title: str) -> _MarkdownAnalysis:
     """Analyze the leading title/summary structure of a Markdown document."""
 
-    leading_comment_indexes: list[int] = []
-    significant_indexes: list[int] = []
-    for index, block in enumerate(blocks):
-        if not significant_indexes and _is_html_comment_block(block):
-            leading_comment_indexes.append(index)
-            continue
-        significant_indexes.append(index)
-
-    leading_comments = tuple(leading_comment_indexes)
+    significant_indexes = list(range(len(blocks)))
     if not significant_indexes:
-        return _MarkdownAnalysis(leading_comments, None, None, False, fallback_title, "")
+        return _MarkdownAnalysis(None, None, False, fallback_title, "")
 
     title_index = significant_indexes[0]
     if _heading_level(blocks[title_index]) != 1:
-        return _MarkdownAnalysis(leading_comments, None, None, False, fallback_title, "")
+        return _MarkdownAnalysis(None, None, False, fallback_title, "")
 
     title = _paragraph_plain_text(blocks[title_index]) or fallback_title
     remaining_indexes = significant_indexes[1:]
@@ -134,7 +126,6 @@ def _analyze_markdown(blocks: list[Any], fallback_title: str) -> _MarkdownAnalys
             break
         if isinstance(block, block_token.Paragraph):
             return _MarkdownAnalysis(
-                leading_comments,
                 title_index,
                 index,
                 first_significant_after_title_index == index,
@@ -143,7 +134,6 @@ def _analyze_markdown(blocks: list[Any], fallback_title: str) -> _MarkdownAnalys
             )
 
     return _MarkdownAnalysis(
-        leading_comments,
         title_index,
         None,
         False,
@@ -180,7 +170,8 @@ def _remove_blocks(markdown_text: str, blocks: list[Any], block_indexes: list[in
 def extract_title_and_summary(markdown_text: str, fallback_title: str) -> tuple[str, str]:
     """Extract a page title and short summary from Markdown content."""
 
-    analysis = _analyze_markdown(list(Document(markdown_text).children), fallback_title)
+    _, analyzable_body = _split_leading_html_comments(markdown_text)
+    analysis = _analyze_markdown(list(Document(analyzable_body).children), fallback_title)
     return analysis.title, analysis.summary
 
 
@@ -219,13 +210,14 @@ def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: An
     """Normalize staged Markdown so Hugo pages have predictable metadata."""
 
     existing_fields, body = _split_markdown_front_matter(markdown_text)
+    _, analyzable_body = _split_leading_html_comments(body)
 
     existing_title = existing_fields.get("title")
     effective_fallback_title = fallback_title
     if isinstance(existing_title, str) and existing_title.strip():
         effective_fallback_title = existing_title.strip()
 
-    blocks = list(Document(body).children)
+    blocks = list(Document(analyzable_body).children)
     analysis = _analyze_markdown(blocks, effective_fallback_title)
     title = analysis.title
     summary = analysis.summary
@@ -236,7 +228,6 @@ def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: An
 
     removed_blocks: list[int] = []
     if analysis.title_index is not None:
-        removed_blocks.extend(analysis.leading_comment_indexes)
         removed_blocks.append(analysis.title_index)
     if (
         summary
@@ -245,7 +236,7 @@ def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: An
         and analysis.summary_is_first_body_block
     ):
         removed_blocks.append(analysis.summary_index)
-    normalized_body = _remove_blocks(body, blocks, removed_blocks)
+    normalized_body = _remove_blocks(analyzable_body, blocks, removed_blocks) if analysis.title_index is not None else body
 
     updated_fields = dict(existing_fields)
     updated_fields.update(fields)

@@ -44,6 +44,15 @@ The Node.js files in `site/` support the Hugo + Docsy render path, while the Pyt
 that live outside `site/`. Use `make stage-watch-local` if you want to run only the native
 staging watcher without starting Hugo.
 
+If you want to inspect a static build without running Hugo in watch mode, first run
+`make build`, then serve `site/.public/` over a tiny local HTTP server. From `site/`:
+
+- `python3 -m http.server --directory .public 8080`
+- `docker run --rm --init -p 127.0.0.1:8080:8080 -v "$PWD/.public:/www:ro" docker.io/library/busybox:1.36.1 httpd -f -p 8080 -h /www`
+- open `http://127.0.0.1:8080/`
+
+If you prefer Podman, replace `docker` with `podman` in the same command.
+
 The current watch loop intentionally watches only staged-source inputs and rebuilds only
 `site/.stage/`. It does **not** regenerate `site/.preview/` on every change. That keeps the
 live Hugo workflow focused on the staged contract and reduces external file churn seen by IDEs.

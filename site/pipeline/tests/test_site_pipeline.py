@@ -749,6 +749,46 @@ class SitePipelineTest(unittest.TestCase):
         self.assertNotIn("This document describes the full execution sequence for both the `prepare` and `finalize` phases.\n\n```mermaid", normalized)
         self.assertIn("```mermaid", normalized)
 
+    def test_normalize_markdown_doc_strips_asf_header_comment_h1_and_summary(self) -> None:
+        markdown = """<!--
+Copyright 2026 The Apache Software Foundation
+
+Licensed under the Apache License, Version 2.0 (the \"License\");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an \"AS IS\" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+# Bootstrap Process
+
+This document describes the full execution sequence for both the `prepare` and `finalize` phases,
+covering input resolution, config normalization, cache model creation, wrapper provisioning,
+single-run guarding, and the state that flows between phases.
+
+## Two-phase execution model
+
+Additional details.
+"""
+
+        normalized, title, summary = site_pipeline.normalize_markdown_doc(markdown, "Fallback Title", type="docs")
+
+        self.assertEqual("Bootstrap Process", title)
+        self.assertEqual(
+            "This document describes the full execution sequence for both the `prepare` and `finalize` phases, covering input resolution, config normalization, cache model creation, wrapper provisioning, single-run guarding, and the state that flows between phases.",
+            summary,
+        )
+        self.assertIn("description: This document describes the full execution sequence", normalized)
+        self.assertNotIn("Copyright 2026 The Apache Software Foundation", normalized)
+        self.assertNotIn("# Bootstrap Process", normalized)
+        self.assertIn("## Two-phase execution model", normalized)
+
     def test_normalize_markdown_doc_supports_setext_h1_titles(self) -> None:
         markdown = """Bootstrap Process
 =================
