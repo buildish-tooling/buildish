@@ -1,3 +1,8 @@
+---
+title: Apache Buildish Site Documentation
+description: Current documentation for the Apache Buildish site implementation, component contract, and infrastructure proposal.
+---
+
 <!--
 Copyright 2026 The Apache Software Foundation
 
@@ -13,11 +18,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-
----
-title: Apache Buildish Site Documentation
-description: Current documentation for the Apache Buildish site implementation, component contract, and infrastructure proposal.
----
 
 # Apache Buildish Site Documentation
 
