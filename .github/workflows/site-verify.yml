@@ -48,10 +48,42 @@ jobs:
           rm -f repo.tar.gz
 
       - name: Run site verification in the reproducible build container
+        timeout-minutes: 6
         run: |
-          make -C site \
-            CONTAINER_ENGINE=docker \
-            container-image \
-            container-test \
-            container-integration-test \
-            container-build
+          set -euo pipefail
+
+          dump_diagnostics() {
+            status="$1"
+            if [ "$status" -eq 124 ]; then
+              echo "::error::Site verification timed out after 5 minutes"
+            else
+              echo "::error::Site verification failed with exit code ${status}"
+            fi
+
+            echo "::group::Site verification diagnostics"
+            date -u
+            pwd
+            ls -la site/.hugo_build.lock site/.public site/resources 2>/dev/null || true
+            find site -maxdepth 4 \( -name '.hugo_build.lock' -o -name '*.pid' \) -print -exec ls -l {} \; 2>/dev/null || true
+            ps -ef | grep -E 'hugo|node|postcss|docker|python|make' | grep -v grep || true
+            docker ps -a --no-trunc || true
+            echo "::endgroup::"
+          }
+
+          rm -f site/.hugo_build.lock
+
+          set +e
+          timeout --signal=TERM --kill-after=30s 5m \
+            make -C site \
+              CONTAINER_ENGINE=docker \
+              container-image \
+              container-test \
+              container-integration-test \
+              container-build
+          status=$?
+          set -e
+
+          if [ "$status" -ne 0 ]; then
+            dump_diagnostics "$status"
+            exit "$status"
+          fi
