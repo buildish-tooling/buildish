@@ -27,6 +27,13 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from pipeline import site_pipeline
+from pipeline.tests.test_support import (
+    TestCaseHelpers,
+    seed_api_fixture_main_repo,
+    seed_mammoth_fixture,
+    seed_no_wrapper_fixture,
+    text_block,
+)
 
 
 SOURCE_REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -34,70 +41,52 @@ DEFAULT_FIXTURE_BUILD_ROOT = SOURCE_REPO_ROOT / "site" / "build" / "tests" / f"i
 FIXTURE_BUILD_ROOT = Path(os.environ.get("BUILDISH_SITE_FIXTURE_WORKSPACE", str(DEFAULT_FIXTURE_BUILD_ROOT)))
 
 
-class SiteFixtureIntegrationTest(unittest.TestCase):
+class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
     def seed_main_repo(self, repo_root: Path) -> None:
-        (repo_root / "site").mkdir(parents=True, exist_ok=True)
-        shutil.copytree(SOURCE_REPO_ROOT / "site" / "content", repo_root / "site" / "content", dirs_exist_ok=True)
-        shutil.copytree(SOURCE_REPO_ROOT / "site" / "site", repo_root / "site" / "site", dirs_exist_ok=True)
-        shutil.copy2(SOURCE_REPO_ROOT / "DISCLAIMER", repo_root / "DISCLAIMER")
-
-        catalog = yaml.safe_load((SOURCE_REPO_ROOT / "site" / "components.yaml").read_text(encoding="utf-8"))
-        catalog["components"] = [
-            {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
-            {"slug": "no-gradle-wrapper-jar", "localDir": "buildish-no-gradle-wrapper-jar", "weight": 5},
-            {"slug": "site", "localDir": "buildish/site", "weight": 100},
-        ]
-        with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-            yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
+        seed_api_fixture_main_repo(repo_root)
 
     @staticmethod
     def seed_mammoth_fixture(repo_root: Path) -> None:
-        (repo_root / "site" / "pages").mkdir(parents=True)
-        (repo_root / "site" / "docs").mkdir(parents=True)
-        (repo_root / "site" / "assets" / "images").mkdir(parents=True)
-        (repo_root / "README.md").write_text("# Mammoth Cache for Gradle and Maven\n\nFixture component summary.\n", encoding="utf-8")
-        with (repo_root / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-            yaml.safe_dump(
-                {
-                    "schemaVersion": 1,
-                    "component": {
-                        "slug": "mammoth-cache",
-                        "displayName": "Fixture Mammoth Cache for Gradle and Maven",
-                        "repository": "https://github.com/apache/buildish-mammoth-cache",
-                        "defaultBranch": "main",
-                    },
-                    "lifecycle": {
-                        "latestStable": "v1.2.3",
-                        "releaseLines": [{"line": "v1", "latest": "v1.2.3", "status": "maintained", "aliases": ["v1"]}],
-                    },
-                },
-                handle,
-                sort_keys=False,
-                default_flow_style=False,
-            )
-        (repo_root / "site" / "pages" / "_index.md").write_text("# Mammoth Cache for Gradle and Maven\n\nFixture component landing page.\n", encoding="utf-8")
-        (repo_root / "site" / "docs" / "_index.md").write_text("# Overview\n", encoding="utf-8")
-        (repo_root / "site" / "docs" / "getting-started.md").write_text("# Getting started\n", encoding="utf-8")
-        (repo_root / "site" / "assets" / "images" / "diagram.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>\n", encoding="utf-8")
+        seed_mammoth_fixture(
+            repo_root,
+            landing_page=text_block(
+                """
+                # Mammoth Cache for Gradle and Maven
+
+                Fixture component landing page.
+                """
+            ),
+            docs_index=text_block(
+                """
+                # Overview
+                """
+            ),
+            getting_started=text_block(
+                """
+                # Getting started
+                """
+            ),
+        )
 
     @staticmethod
     def seed_no_wrapper_fixture(repo_root: Path) -> None:
-        (repo_root / "site").mkdir(parents=True)
-        (repo_root / "site" / "pages").mkdir(parents=True)
-        (repo_root / "site" / "docs").mkdir(parents=True)
-        with (repo_root / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-            yaml.safe_dump(
-                {
-                    "schemaVersion": 1,
-                    "component": {"slug": "no-gradle-wrapper-jar", "displayName": "Fixture no-gradle-wrapper-jar"},
-                    "content": {"docsRoot": "site/docs"},
-                },
-                handle,
-                sort_keys=False,
-                default_flow_style=False,
-            )
-        (repo_root / "site" / "pages" / "_index.md").write_text("# No Wrapper JAR\n\nFixture component landing page.\n", encoding="utf-8")
-        (repo_root / "site" / "docs" / "_index.md").write_text("# No Wrapper JAR\n\nFixture docs overview.\n", encoding="utf-8")
+        seed_no_wrapper_fixture(
+            repo_root,
+            landing_page=text_block(
+                """
+                # No Wrapper JAR
+
+                Fixture component landing page.
+                """
+            ),
+            docs_index=text_block(
+                """
+                # No Wrapper JAR
+
+                Fixture docs overview.
+                """
+            ),
+        )
 
     def test_build_from_fixture_workspace(self) -> None:
         shutil.rmtree(FIXTURE_BUILD_ROOT, ignore_errors=True)
@@ -117,14 +106,16 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
             self.assertEqual(3, len(first_results))
             self.assertEqual(3, len(second_results))
 
-            self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md").exists())
-            self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "_index.md").exists())
-            self.assertTrue((repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache" / "unreleased" / "assets" / "images" / "diagram.svg").exists())
-            self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "no-gradle-wrapper-jar" / "unreleased" / "docs" / "_index.md").exists())
-            self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "site" / "unreleased" / "docs" / "_index.md").exists())
-            self.assertTrue((repo_root / "site" / ".preview" / "index.html").exists())
+            self.assert_paths_exist(
+                repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md",
+                repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "_index.md",
+                repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache" / "unreleased" / "assets" / "images" / "diagram.svg",
+                repo_root / "site" / ".stage" / "content" / "components" / "no-gradle-wrapper-jar" / "unreleased" / "docs" / "_index.md",
+                repo_root / "site" / ".stage" / "content" / "components" / "site" / "unreleased" / "docs" / "_index.md",
+                repo_root / "site" / ".preview" / "index.html",
+            )
 
-            components_data = yaml.safe_load((repo_root / "site" / ".stage" / "data" / "components.yaml").read_text(encoding="utf-8"))
+            components_data = self.load_yaml(repo_root / "site" / ".stage" / "data" / "components.yaml")
             self.assertEqual("Fixture Mammoth Cache for Gradle and Maven", components_data["components"]["mammoth-cache"]["displayName"])
             self.assertEqual("buildish-no-gradle-wrapper-jar", components_data["components"]["no-gradle-wrapper-jar"]["localDir"])
             self.assertEqual("Site", components_data["components"]["site"]["displayName"])
@@ -133,21 +124,19 @@ class SiteFixtureIntegrationTest(unittest.TestCase):
             self.assertEqual(0, components_data["components"]["site"]["assetCount"])
             self.assertEqual("Fixture component landing page.", components_data["components"]["mammoth-cache"]["summary"])
 
-            lifecycle_data = yaml.safe_load((repo_root / "site" / ".stage" / "data" / "lifecycle.yaml").read_text(encoding="utf-8"))
+            lifecycle_data = self.load_yaml(repo_root / "site" / ".stage" / "data" / "lifecycle.yaml")
             self.assertEqual("v1.2.3", lifecycle_data["components"]["mammoth-cache"]["latestStable"])
             self.assertEqual("maintained", lifecycle_data["components"]["mammoth-cache"]["releaseLines"][0]["status"])
 
-            site_unreleased_index = (repo_root / "site" / ".stage" / "content" / "components" / "site" / "unreleased" / "_index.md").read_text(encoding="utf-8")
-            self.assertIn("## Docs", site_unreleased_index)
-            self.assertNotIn("Open staged assets", site_unreleased_index)
+            site_unreleased_index = self.read_text(repo_root / "site" / ".stage" / "content" / "components" / "site" / "unreleased" / "_index.md")
+            self.assert_contains_all(site_unreleased_index, "## Docs")
+            self.assert_not_contains_any(site_unreleased_index, "Open staged assets")
             site_unreleased_front_matter = yaml.safe_load(site_unreleased_index.split("---", 2)[1])
             self.assertEqual("Site", site_unreleased_front_matter["buildishComponent"]["displayName"])
             self.assertEqual("unreleased-home", site_unreleased_front_matter["buildishComponentPage"]["kind"])
 
-            preview_index = (repo_root / "site" / ".preview" / "index.html").read_text(encoding="utf-8")
-            self.assertIn("Fixture Mammoth Cache for Gradle and Maven", preview_index)
-            self.assertIn("Fixture no-gradle-wrapper-jar", preview_index)
-            self.assertIn("Site", preview_index)
+            preview_index = self.read_text(repo_root / "site" / ".preview" / "index.html")
+            self.assert_contains_all(preview_index, "Fixture Mammoth Cache for Gradle and Maven", "Fixture no-gradle-wrapper-jar", "Site")
         finally:
             shutil.rmtree(FIXTURE_BUILD_ROOT, ignore_errors=True)
 

@@ -28,19 +28,22 @@ from typing import TextIO
 
 import yaml
 
-SOURCE_REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_FIXTURE_ROOT = SOURCE_REPO_ROOT / "site" / "build" / "tests" / f"integration-make-targets-{os.getpid()}"
-CONTAINERIZED_SERVE_READY_TIMEOUT = 60.0
-PIPELINE_FIXTURE_IGNORE = shutil.ignore_patterns(
-    ".venv",
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from pipeline.tests.test_support import (
+    SOURCE_REPO_ROOT,
+    TestCaseHelpers,
+    seed_make_fixture_main_repo,
+    seed_mammoth_fixture,
+    seed_no_wrapper_fixture,
+    text_block,
 )
 
+DEFAULT_FIXTURE_ROOT = SOURCE_REPO_ROOT / "site" / "build" / "tests" / f"integration-make-targets-{os.getpid()}"
+CONTAINERIZED_SERVE_READY_TIMEOUT = 60.0
 
-class MakeTargetIntegrationTest(unittest.TestCase):
+
+class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
     def setUp(self) -> None:
         self.workspace = DEFAULT_FIXTURE_ROOT / self._testMethodName
         shutil.rmtree(self.workspace, ignore_errors=True)
@@ -62,86 +65,60 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         return repo_root
 
     def seed_main_repo(self, repo_root: Path) -> None:
-        site_root = repo_root / "site"
-        site_root.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(SOURCE_REPO_ROOT / "site" / "assets", site_root / "assets", dirs_exist_ok=True)
-        shutil.copytree(SOURCE_REPO_ROOT / "site" / "content", site_root / "content", dirs_exist_ok=True)
-        shutil.copytree(SOURCE_REPO_ROOT / "site" / "layouts", site_root / "layouts", dirs_exist_ok=True)
-        shutil.copytree(
-            SOURCE_REPO_ROOT / "site" / "pipeline",
-            site_root / "pipeline",
-            dirs_exist_ok=True,
-            ignore=PIPELINE_FIXTURE_IGNORE,
-        )
-        shutil.copytree(SOURCE_REPO_ROOT / "site" / "site", site_root / "site", dirs_exist_ok=True)
-        shutil.copytree(SOURCE_REPO_ROOT / "site" / "static", site_root / "static", dirs_exist_ok=True)
-        shutil.copy2(SOURCE_REPO_ROOT / "DISCLAIMER", repo_root / "DISCLAIMER")
-        for relative in ["Makefile", "go.mod", "go.sum", "hugo.yaml", "package.json", "package-lock.json", "postcss.config.js"]:
-            shutil.copy2(SOURCE_REPO_ROOT / "site" / relative, site_root / relative)
-
-        catalog = yaml.safe_load((SOURCE_REPO_ROOT / "site" / "components.yaml").read_text(encoding="utf-8"))
-        catalog["components"] = [
-            {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
-            {"slug": "no-gradle-wrapper-jar", "localDir": "buildish-no-gradle-wrapper-jar", "weight": 5},
-            {"slug": "site", "localDir": "buildish/site", "weight": 100},
-        ]
-        with (site_root / "components.yaml").open("w", encoding="utf-8") as handle:
-            yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
+        seed_make_fixture_main_repo(repo_root)
 
     @staticmethod
     def seed_mammoth_fixture(repo_root: Path) -> None:
-        (repo_root / "site" / "pages").mkdir(parents=True)
-        (repo_root / "site" / "docs").mkdir(parents=True)
-        (repo_root / "site" / "assets" / "images").mkdir(parents=True)
-        (repo_root / "README.md").write_text("# Mammoth Cache for Gradle and Maven\n\nFixture component summary.\n", encoding="utf-8")
-        with (repo_root / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-            yaml.safe_dump(
-                {
-                    "schemaVersion": 1,
-                    "component": {
-                        "slug": "mammoth-cache",
-                        "displayName": "Fixture Mammoth Cache for Gradle and Maven",
-                        "repository": "https://github.com/apache/buildish-mammoth-cache",
-                        "defaultBranch": "main",
-                    },
-                    "lifecycle": {
-                        "latestStable": "v1.2.3",
-                        "releaseLines": [{"line": "v1", "latest": "v1.2.3", "status": "maintained", "aliases": ["v1"]}],
-                    },
-                },
-                handle,
-                sort_keys=False,
-                default_flow_style=False,
-            )
-        (repo_root / "site" / "pages" / "_index.md").write_text(
-            "# Mammoth Cache for Gradle and Maven\n\n"
-            "Fixture component landing page.\n\n"
-            "{{< buildish-component-link kind=\"docs\" label=\"Read unreleased docs\" appearance=\"primary\" >}}\n\n"
-            "{{< buildish-component-link kind=\"source\" label=\"Browse source\" appearance=\"outline-secondary\" >}}\n\n"
-            "{{< buildish-component-releases heading=\"Current release lines\" >}}\n",
-            encoding="utf-8",
+        seed_mammoth_fixture(
+            repo_root,
+            landing_page=text_block(
+                """
+                # Mammoth Cache for Gradle and Maven
+
+                Fixture component landing page.
+
+                {{< buildish-component-link kind="docs" label="Read unreleased docs" appearance="primary" >}}
+
+                {{< buildish-component-link kind="source" label="Browse source" appearance="outline-secondary" >}}
+
+                {{< buildish-component-releases heading="Current release lines" >}}
+                """
+            ),
+            docs_index=text_block(
+                """
+                # Overview
+
+                Initial overview.
+                """
+            ),
+            getting_started=text_block(
+                """
+                # Getting started
+
+                Initial fixture text.
+                """
+            ),
         )
-        (repo_root / "site" / "docs" / "_index.md").write_text("# Overview\n\nInitial overview.\n", encoding="utf-8")
-        (repo_root / "site" / "docs" / "getting-started.md").write_text("# Getting started\n\nInitial fixture text.\n", encoding="utf-8")
-        (repo_root / "site" / "assets" / "images" / "diagram.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>\n", encoding="utf-8")
 
     @staticmethod
     def seed_no_wrapper_fixture(repo_root: Path) -> None:
-        (repo_root / "site" / "pages").mkdir(parents=True)
-        (repo_root / "site" / "docs").mkdir(parents=True)
-        with (repo_root / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-            yaml.safe_dump(
-                {
-                    "schemaVersion": 1,
-                    "component": {"slug": "no-gradle-wrapper-jar", "displayName": "Fixture no-gradle-wrapper-jar"},
-                    "content": {"docsRoot": "site/docs"},
-                },
-                handle,
-                sort_keys=False,
-                default_flow_style=False,
-            )
-        (repo_root / "site" / "pages" / "_index.md").write_text("# No Wrapper JAR\n\nFixture component landing page.\n", encoding="utf-8")
-        (repo_root / "site" / "docs" / "_index.md").write_text("# No Wrapper JAR\n\nFixture docs overview.\n", encoding="utf-8")
+        seed_no_wrapper_fixture(
+            repo_root,
+            landing_page=text_block(
+                """
+                # No Wrapper JAR
+
+                Fixture component landing page.
+                """
+            ),
+            docs_index=text_block(
+                """
+                # No Wrapper JAR
+
+                Fixture docs overview.
+                """
+            ),
+        )
 
     def write_executable(self, path: Path, content: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -150,97 +127,179 @@ class MakeTargetIntegrationTest(unittest.TestCase):
 
     def seed_fake_tools(self, site_root: Path, include_engine: bool = False, include_hugo: bool = False, include_native_docsy: bool = False) -> Path:
         bin_dir = site_root / "build" / "test-bin"
-        self.write_executable(bin_dir / "node", "#!/usr/bin/env sh\nexit 0\n")
+        self.write_executable(
+            bin_dir / "node",
+            text_block(
+                r"""
+                #!/usr/bin/env sh
+                exit 0
+                """
+            ),
+        )
         self.write_executable(
             bin_dir / "npm",
-            "#!/usr/bin/env sh\n"
-            "set -eu\n"
-            "prefix=.\n"
-            "while [ \"$#\" -gt 0 ]; do\n"
-            "  if [ \"$1\" = \"--prefix\" ]; then\n"
-            "    prefix=\"$2\"\n"
-            "    shift 2\n"
-            "    continue\n"
-            "  fi\n"
-            "  shift\n"
-            "done\n"
-            "root=\"$prefix/node_modules\"\n"
-            "mkdir -p \"$root/.bin\" \"$root/jquery/dist\" \"$root/mermaid/dist\" \"$root/lunr\"\n"
-            "printf '#!/usr/bin/env sh\\nexit 0\\n' > \"$root/.bin/postcss\"\n"
-            "chmod 755 \"$root/.bin/postcss\"\n"
-            "printf '// fake asset\\n' > \"$root/jquery/dist/jquery.min.js\"\n"
-            "printf '// fake asset\\n' > \"$root/mermaid/dist/mermaid.min.js\"\n"
-            "printf '// fake asset\\n' > \"$root/lunr/lunr.min.js\"\n"
-            "echo 'fake npm ci completed'\n",
+            text_block(
+                r"""
+                #!/usr/bin/env sh
+                set -eu
+                prefix=.
+                while [ "$#" -gt 0 ]; do
+                  if [ "$1" = "--prefix" ]; then
+                    prefix="$2"
+                    shift 2
+                    continue
+                  fi
+                  shift
+                done
+                root="$prefix/node_modules"
+                mkdir -p "$root/.bin" "$root/jquery/dist" "$root/mermaid/dist" "$root/lunr"
+                printf '#!/usr/bin/env sh\nexit 0\n' > "$root/.bin/postcss"
+                chmod 755 "$root/.bin/postcss"
+                printf '// fake asset\n' > "$root/jquery/dist/jquery.min.js"
+                printf '// fake asset\n' > "$root/mermaid/dist/mermaid.min.js"
+                printf '// fake asset\n' > "$root/lunr/lunr.min.js"
+                echo 'fake npm ci completed'
+                """
+            ),
         )
         if include_hugo:
             self.write_executable(
                 bin_dir / "hugo",
-                "#!/usr/bin/env python3\nfrom pathlib import Path\nimport os, signal, sys, time\n"
-                "log_path = Path(os.environ['BUILDISH_FAKE_HUGO_LOG'])\nlog_path.parent.mkdir(parents=True, exist_ok=True)\n"
-                "with log_path.open('a', encoding='utf-8') as handle: handle.write(' '.join(sys.argv[1:]) + '\\n')\n"
-                "if 'server' in sys.argv[1:]:\n"
-                "    Path(os.environ['BUILDISH_FAKE_HUGO_READY']).write_text('ready\\n', encoding='utf-8')\n"
-                "    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))\n"
-                "    signal.signal(signal.SIGINT, lambda *_: sys.exit(0))\n"
-                "    while True: time.sleep(0.1)\n",
+                text_block(
+                    r"""
+                    #!/usr/bin/env python3
+                    from pathlib import Path
+                    import os, signal, sys, time
+
+                    log_path = Path(os.environ['BUILDISH_FAKE_HUGO_LOG'])
+                    log_path.parent.mkdir(parents=True, exist_ok=True)
+                    with log_path.open('a', encoding='utf-8') as handle:
+                        handle.write(' '.join(sys.argv[1:]) + '\n')
+
+                    if 'server' in sys.argv[1:]:
+                        Path(os.environ['BUILDISH_FAKE_HUGO_READY']).write_text('ready\n', encoding='utf-8')
+                        signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+                        signal.signal(signal.SIGINT, lambda *_: sys.exit(0))
+                        while True:
+                            time.sleep(0.1)
+                    """
+                ),
             )
         if include_engine:
             self.write_executable(
                 bin_dir / "fake-container-engine",
-                "#!/usr/bin/env python3\nfrom pathlib import Path\nimport os, signal, subprocess, sys\n"
-                "args=sys.argv[1:]\nlog=Path(os.environ['BUILDISH_FAKE_CONTAINER_LOG'])\nlog.parent.mkdir(parents=True, exist_ok=True)\n"
-                "state_dir=Path(os.environ['BUILDISH_FAKE_CONTAINER_STATE_DIR'])\nstate_dir.mkdir(parents=True, exist_ok=True)\n"
-                "with log.open('a', encoding='utf-8') as handle: handle.write(' '.join(args) + '\\n')\n"
-                "if not args: sys.exit(1)\n"
-                "if args[:2] == ['image', 'inspect'] or args[0] == 'build': sys.exit(0)\n"
-                "if args[0] == 'stop':\n"
-                "    name = args[-1]\n"
-                "    pidfile = state_dir / f'{name}.pid'\n"
-                "    if pidfile.exists():\n"
-                "        try: os.killpg(int(pidfile.read_text(encoding='utf-8')), signal.SIGTERM)\n"
-                "        except ProcessLookupError: pass\n"
-                "    sys.exit(0)\n"
-                "if args[0] == 'rm':\n"
-                "    name = args[-1]\n"
-                "    pidfile = state_dir / f'{name}.pid'\n"
-                "    pidfile.unlink(missing_ok=True)\n"
-                "    sys.exit(0)\n"
-                "if args[0] != 'run': sys.exit(0)\n"
-                "env=os.environ.copy(); i=1; command=None; workdir=None; volume_map={}; name=None\n"
-                "while i < len(args):\n"
-                "    arg=args[i]\n"
-                "    if arg == '-e':\n        key, value = args[i+1].split('=', 1); env[key]=value; i += 2; continue\n"
-                "    if arg == '-v':\n        spec=args[i+1]; parts=spec.split(':'); volume_map[parts[1]]=parts[0]; i += 2; continue\n"
-                "    if arg == '-w':\n        workdir=args[i+1]; i += 2; continue\n"
-                "    if arg == '--name':\n        name=args[i+1]; i += 2; continue\n"
-                "    if arg in {'-p', '--platform', '--user'}: i += 2; continue\n"
-                "    if arg == '--rm' or arg == '--init' or arg.startswith('--userns='): i += 1; continue\n"
-                "    command = args[i+1:]; break\n"
-                "if command is None: sys.exit(1)\n"
-                "cwd = os.environ.get('BUILDISH_FAKE_CONTAINER_CWD', os.getcwd())\n"
-                "if workdir is not None:\n"
-                "    for container_root, host_root in volume_map.items():\n"
-                "        if workdir == container_root or workdir.startswith(container_root + '/'):\n"
-                "            suffix = workdir[len(container_root):].lstrip('/')\n"
-                "            cwd = str(Path(host_root) / suffix)\n"
-                "            break\n"
-                "proc = subprocess.Popen(command, cwd=cwd, env=env, start_new_session=True)\n"
-                "if name is not None:\n"
-                "    (state_dir / f'{name}.pid').write_text(str(proc.pid), encoding='utf-8')\n"
-                "def forward(signum, _frame):\n"
-                "    try: os.killpg(proc.pid, signum)\n"
-                "    except ProcessLookupError: pass\n"
-                "signal.signal(signal.SIGINT, forward)\n"
-                "signal.signal(signal.SIGTERM, forward)\n"
-                "returncode = proc.wait()\n"
-                "if name is not None:\n"
-                "    (state_dir / f'{name}.pid').unlink(missing_ok=True)\n"
-                "sys.exit(returncode)\n",
+                text_block(
+                    r"""
+                    #!/usr/bin/env python3
+                    from pathlib import Path
+                    import os, signal, subprocess, sys
+
+                    args = sys.argv[1:]
+                    log = Path(os.environ['BUILDISH_FAKE_CONTAINER_LOG'])
+                    log.parent.mkdir(parents=True, exist_ok=True)
+                    state_dir = Path(os.environ['BUILDISH_FAKE_CONTAINER_STATE_DIR'])
+                    state_dir.mkdir(parents=True, exist_ok=True)
+                    with log.open('a', encoding='utf-8') as handle:
+                        handle.write(' '.join(args) + '\n')
+
+                    if not args:
+                        sys.exit(1)
+                    if args[:2] == ['image', 'inspect'] or args[0] == 'build':
+                        sys.exit(0)
+                    if args[0] == 'stop':
+                        name = args[-1]
+                        pidfile = state_dir / f'{name}.pid'
+                        if pidfile.exists():
+                            try:
+                                os.killpg(int(pidfile.read_text(encoding='utf-8')), signal.SIGTERM)
+                            except ProcessLookupError:
+                                pass
+                        sys.exit(0)
+                    if args[0] == 'rm':
+                        name = args[-1]
+                        pidfile = state_dir / f'{name}.pid'
+                        pidfile.unlink(missing_ok=True)
+                        sys.exit(0)
+                    if args[0] != 'run':
+                        sys.exit(0)
+
+                    env = os.environ.copy()
+                    i = 1
+                    command = None
+                    workdir = None
+                    volume_map = {}
+                    name = None
+                    while i < len(args):
+                        arg = args[i]
+                        if arg == '-e':
+                            key, value = args[i + 1].split('=', 1)
+                            env[key] = value
+                            i += 2
+                            continue
+                        if arg == '-v':
+                            spec = args[i + 1]
+                            parts = spec.split(':')
+                            volume_map[parts[1]] = parts[0]
+                            i += 2
+                            continue
+                        if arg == '-w':
+                            workdir = args[i + 1]
+                            i += 2
+                            continue
+                        if arg == '--name':
+                            name = args[i + 1]
+                            i += 2
+                            continue
+                        if arg in {'-p', '--platform', '--user'}:
+                            i += 2
+                            continue
+                        if arg == '--rm' or arg == '--init' or arg.startswith('--userns='):
+                            i += 1
+                            continue
+                        command = args[i + 1 :]
+                        break
+
+                    if command is None:
+                        sys.exit(1)
+
+                    cwd = os.environ.get('BUILDISH_FAKE_CONTAINER_CWD', os.getcwd())
+                    if workdir is not None:
+                        for container_root, host_root in volume_map.items():
+                            if workdir == container_root or workdir.startswith(container_root + '/'):
+                                suffix = workdir[len(container_root) :].lstrip('/')
+                                cwd = str(Path(host_root) / suffix)
+                                break
+
+                    proc = subprocess.Popen(command, cwd=cwd, env=env, start_new_session=True)
+                    if name is not None:
+                        (state_dir / f'{name}.pid').write_text(str(proc.pid), encoding='utf-8')
+
+                    def forward(signum, _frame):
+                        try:
+                            os.killpg(proc.pid, signum)
+                        except ProcessLookupError:
+                            pass
+
+                    signal.signal(signal.SIGINT, forward)
+                    signal.signal(signal.SIGTERM, forward)
+                    returncode = proc.wait()
+                    if name is not None:
+                        (state_dir / f'{name}.pid').unlink(missing_ok=True)
+                    sys.exit(returncode)
+                    """
+                ),
             )
         if include_native_docsy:
             node_modules = site_root / "node_modules"
-            self.write_executable(node_modules / ".bin" / "postcss", "#!/usr/bin/env sh\nexit 0\n")
+            self.write_executable(
+                node_modules / ".bin" / "postcss",
+                text_block(
+                    r"""
+                    #!/usr/bin/env sh
+                    exit 0
+                    """
+                ),
+            )
             for rel in ["jquery/dist/jquery.min.js", "mermaid/dist/mermaid.min.js", "lunr/lunr.min.js"]:
                 target = node_modules / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -324,8 +383,10 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         repo_root = self.prepare_fixture_workspace()
         result = self.run_make(repo_root / "site", "stage-local", os.environ.copy())
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertTrue((repo_root / "site" / ".stage" / "manifest.yaml").exists())
-        self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md").exists())
+        self.assert_paths_exist(
+            repo_root / "site" / ".stage" / "manifest.yaml",
+            repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md",
+        )
 
     def test_make_build_renders_component_navigation_without_cross_component_sidebar(self) -> None:
         if shutil.which("hugo") is None:
@@ -339,63 +400,71 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         result = self.run_make(repo_root / "site", "build", env)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
-        home_index = (repo_root / "site" / ".public" / "index.html").read_text(encoding="utf-8")
-        self.assertNotIn("Browse components", home_index)
-        self.assertIn('/community/contributing-guidelines/', home_index)
-        self.assertIn('/community/community-guidelines/', home_index)
-        self.assertIn('class="navbar-toggler td-navbar__toggle collapsed d-md-none"', home_index)
-        self.assertIn('data-bs-target="#main_navbar"', home_index)
-        self.assertIn('navbar-mobile-section-title d-md-none', home_index)
-        self.assertNotIn('class="nav-item navbar-group-separator"', home_index)
-        self.assertNotIn('navbar-item--global', home_index)
+        home_index = self.read_text(repo_root / "site" / ".public" / "index.html")
+        self.assert_contains_all(
+            home_index,
+            '/community/contributing-guidelines/',
+            '/community/community-guidelines/',
+            'class="navbar-toggler td-navbar__toggle collapsed d-md-none"',
+            'data-bs-target="#main_navbar"',
+            'navbar-mobile-section-title d-md-none',
+        )
+        self.assert_not_contains_any(home_index, "Browse components", 'class="nav-item navbar-group-separator"', 'navbar-item--global')
 
-        docs_index = (repo_root / "site" / ".public" / "components" / "mammoth-cache" / "unreleased" / "docs" / "index.html").read_text(encoding="utf-8")
-        self.assertIn('class="td-navbar__top"', docs_index)
-        self.assertIn('class="collapse d-md-flex td-navbar__main', docs_index)
-        self.assertIn('navbar-mobile-section-title d-md-none', docs_index)
-        self.assertIn('class="td-sidebar__controls d-flex d-md-none align-items-center"', docs_index)
-        self.assertIn('class="btn btn-link td-sidebar__search-toggle"', docs_index)
-        self.assertIn('data-bs-target="#td-sidebar-search"', docs_index)
-        self.assertIn('class="td-sidebar__search td-sidebar__search--mobile collapse d-md-none" id="td-sidebar-search"', docs_index)
-        self.assertIn('class="navbar-brand__home" href="/"', docs_index)
-        self.assertIn('class="navbar-brand__component" href="/components/mammoth-cache/"', docs_index)
-        self.assertIn('class="navbar-brand__divider"', docs_index)
-        self.assertIn('<span class="navbar-brand__context">Fixture Mammoth Cache for Gradle and Maven</span>', docs_index)
-        self.assertNotIn('<a href="/components/">Components</a>', docs_index)
-        self.assertIn('href="https://github.com/apache/buildish-mammoth-cache"', docs_index)
-        self.assertIn('>Source</span>', docs_index)
-        self.assertIn('navbar-item--component', docs_index)
-        self.assertIn('class="nav-item navbar-group-separator"', docs_index)
-        self.assertIn('class="navbar-group-separator__line"', docs_index)
-        self.assertIn('navbar-item--global', docs_index)
-        self.assertIn('/community/contributing-guidelines/', docs_index)
-        self.assertIn('/community/community-guidelines/', docs_index)
+        docs_index = self.read_text(repo_root / "site" / ".public" / "components" / "mammoth-cache" / "unreleased" / "docs" / "index.html")
+        self.assert_contains_all(
+            docs_index,
+            'class="td-navbar__top"',
+            'class="collapse d-md-flex td-navbar__main',
+            'navbar-mobile-section-title d-md-none',
+            'class="td-sidebar__controls d-flex d-md-none align-items-center"',
+            'class="btn btn-link td-sidebar__search-toggle"',
+            'data-bs-target="#td-sidebar-search"',
+            'class="td-sidebar__search td-sidebar__search--mobile collapse d-md-none" id="td-sidebar-search"',
+            'class="navbar-brand__home" href="/"',
+            'class="navbar-brand__component" href="/components/mammoth-cache/"',
+            'class="navbar-brand__divider"',
+            '<span class="navbar-brand__context">Fixture Mammoth Cache for Gradle and Maven</span>',
+            'href="https://github.com/apache/buildish-mammoth-cache"',
+            '>Source</span>',
+            'navbar-item--component',
+            'class="nav-item navbar-group-separator"',
+            'class="navbar-group-separator__line"',
+            'navbar-item--global',
+            '/community/contributing-guidelines/',
+            '/community/community-guidelines/',
+        )
+        self.assert_not_contains_any(docs_index, '<a href="/components/">Components</a>')
 
-        component_index = (repo_root / "site" / ".public" / "components" / "mammoth-cache" / "index.html").read_text(encoding="utf-8")
-        self.assertIn('Fixture component landing page.', component_index)
-        self.assertIn('Read unreleased docs', component_index)
-        self.assertIn('href="/components/mammoth-cache/unreleased/docs/"', component_index)
-        self.assertIn('Browse source', component_index)
-        self.assertIn('href="https://github.com/apache/buildish-mammoth-cache"', component_index)
-        self.assertIn('Current release lines', component_index)
-        self.assertIn('Latest stable (v1.2.3)', component_index)
-        self.assertIn('v1 — maintained (latest v1.2.3); aliases: v1', component_index)
-        self.assertNotIn('buildish-component-landing__hero', component_index)
-        self.assertNotIn('buildish-component-landing__actions', component_index)
+        component_index = self.read_text(repo_root / "site" / ".public" / "components" / "mammoth-cache" / "index.html")
+        self.assert_contains_all(
+            component_index,
+            'Fixture component landing page.',
+            'Read unreleased docs',
+            'href="/components/mammoth-cache/unreleased/docs/"',
+            'Browse source',
+            'href="https://github.com/apache/buildish-mammoth-cache"',
+            'Current release lines',
+            'Latest stable (v1.2.3)',
+            'v1 — maintained (latest v1.2.3); aliases: v1',
+        )
+        self.assert_not_contains_any(component_index, 'buildish-component-landing__hero', 'buildish-component-landing__actions')
 
         sidebar = docs_index.split('<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">', 1)[1].split('<aside class="d-none d-xl-block col-xl-2 td-sidebar-toc d-print-none">', 1)[0]
         self.assertNotIn('id="m-componentsmammoth-cache"', sidebar)
         self.assertNotIn('id="m-componentsno-gradle-wrapper-jar"', sidebar)
         self.assertIn("Unreleased", sidebar)
 
-        contributing_guidelines = (repo_root / "site" / ".public" / "community" / "contributing-guidelines" / "index.html").read_text(encoding="utf-8")
-        self.assertIn("Contributing Guidelines", contributing_guidelines)
-        self.assertIn("apache/buildish", contributing_guidelines)
-        self.assertIn("https://www.apache.org/legal/generative-tooling.html", contributing_guidelines)
+        contributing_guidelines = self.read_text(repo_root / "site" / ".public" / "community" / "contributing-guidelines" / "index.html")
+        self.assert_contains_all(
+            contributing_guidelines,
+            "Contributing Guidelines",
+            "apache/buildish",
+            "https://www.apache.org/legal/generative-tooling.html",
+        )
 
-        community_guidelines = (repo_root / "site" / ".public" / "community" / "community-guidelines" / "index.html").read_text(encoding="utf-8")
-        self.assertIn("Community Guidelines", community_guidelines)
-        self.assertIn("Apache Way", community_guidelines)
+        community_guidelines = self.read_text(repo_root / "site" / ".public" / "community" / "community-guidelines" / "index.html")
+        self.assert_contains_all(community_guidelines, "Community Guidelines", "Apache Way")
 
     def test_make_stage_uses_containerized_path_and_stages_vendor_assets(self) -> None:
         repo_root = self.prepare_fixture_workspace()
@@ -407,16 +476,16 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
         result = self.run_make(repo_root / "site", "stage", env)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertTrue((repo_root / "site" / ".stage" / "manifest.yaml").exists())
-        self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "jquery.min.js").exists())
+        self.assert_paths_exist(
+            repo_root / "site" / ".stage" / "manifest.yaml",
+            repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "jquery.min.js",
+        )
         components_payload = yaml.safe_load((repo_root / "site" / ".stage" / "data" / "components.yaml").read_text(encoding="utf-8"))
         self.assertTrue(components_payload["components"]["mammoth-cache"]["available"])
         self.assertIn("Mammoth Cache for Gradle and Maven", components_payload["components"]["mammoth-cache"]["displayName"])
         self.assertEqual("/components/mammoth-cache/unreleased/docs/", components_payload["components"]["mammoth-cache"]["docsPath"])
-        container_log = (repo_root / "site" / "build" / "fake-container.log").read_text(encoding="utf-8")
-        self.assertIn("run", container_log)
-        self.assertIn("--init", container_log)
-        self.assertIn("/workspace/buildish/site", container_log)
+        container_log = self.read_text(repo_root / "site" / "build" / "fake-container.log")
+        self.assert_contains_all(container_log, "run", "--init", "/workspace/buildish/site")
 
     def test_make_stage_watch_local_rebuilds_after_doc_change(self) -> None:
         repo_root = self.prepare_fixture_workspace()
@@ -425,7 +494,16 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         process = self.start_make(repo_root / "site", "stage-watch-local", os.environ.copy())
         self.wait_for("initial stage-watch build", lambda: staged_doc.exists(), process=process)
         time.sleep(1.0)
-        source_doc.write_text("# Getting started\n\nUpdated by stage-watch-local.\n", encoding="utf-8")
+        source_doc.write_text(
+            text_block(
+                """
+                # Getting started
+
+                Updated by stage-watch-local.
+                """
+            ),
+            encoding="utf-8",
+        )
         self.wait_for(
             "restaged docs after stage-watch-local change",
             lambda: staged_doc.exists() and "Updated by stage-watch-local." in staged_doc.read_text(encoding="utf-8"),
@@ -446,14 +524,23 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         process = self.start_make(repo_root / "site", "stage-watch", env)
         self.wait_for("initial containerized stage-watch build", lambda: staged_doc.exists(), process=process)
         time.sleep(1.0)
-        source_doc.write_text("# Getting started\n\nUpdated by containerized stage-watch.\n", encoding="utf-8")
+        source_doc.write_text(
+            text_block(
+                """
+                # Getting started
+
+                Updated by containerized stage-watch.
+                """
+            ),
+            encoding="utf-8",
+        )
         self.wait_for(
             "restaged docs after containerized stage-watch change",
             lambda: staged_doc.exists() and "Updated by containerized stage-watch." in staged_doc.read_text(encoding="utf-8"),
             process=process,
         )
         self.stop_process(process)
-        self.assertIn("run", (repo_root / "site" / "build" / "fake-container.log").read_text(encoding="utf-8"))
+        self.assert_contains_all(self.read_text(repo_root / "site" / "build" / "fake-container.log"), "run")
 
     def test_make_serve_local_starts_hugo_with_local_bind_and_restages_changes(self) -> None:
         repo_root = self.prepare_fixture_workspace()
@@ -464,16 +551,23 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "serve-local", env)
         self.wait_for("fake local Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(), process=process)
-        source_doc.write_text("# Getting started\n\nUpdated by serve-local.\n", encoding="utf-8")
+        source_doc.write_text(
+            text_block(
+                """
+                # Getting started
+
+                Updated by serve-local.
+                """
+            ),
+            encoding="utf-8",
+        )
         self.wait_for(
             "restaged docs after serve-local change",
             lambda: staged_doc.exists() and "Updated by serve-local." in staged_doc.read_text(encoding="utf-8"),
             process=process,
         )
-        hugo_log = Path(env["BUILDISH_FAKE_HUGO_LOG"]).read_text(encoding="utf-8")
-        self.assertIn("server", hugo_log)
-        self.assertIn("--bind 127.0.0.1", hugo_log)
-        self.assertIn("--port 8766", hugo_log)
+        hugo_log = self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"]))
+        self.assert_contains_all(hugo_log, "server", "--bind 127.0.0.1", "--port 8766")
         self.stop_process(process)
 
     def test_make_serve_starts_hugo_in_containerized_mode_with_public_bind(self) -> None:
@@ -494,19 +588,25 @@ class MakeTargetIntegrationTest(unittest.TestCase):
             timeout=CONTAINERIZED_SERVE_READY_TIMEOUT,
             process=process,
         )
-        source_doc.write_text("# Getting started\n\nUpdated by containerized serve.\n", encoding="utf-8")
+        source_doc.write_text(
+            text_block(
+                """
+                # Getting started
+
+                Updated by containerized serve.
+                """
+            ),
+            encoding="utf-8",
+        )
         self.wait_for(
             "restaged docs after containerized serve change",
             lambda: staged_doc.exists() and "Updated by containerized serve." in staged_doc.read_text(encoding="utf-8"),
             process=process,
         )
-        hugo_log = Path(env["BUILDISH_FAKE_HUGO_LOG"]).read_text(encoding="utf-8")
-        self.assertIn("--bind 0.0.0.0", hugo_log)
-        self.assertIn("--port 8767", hugo_log)
-        container_log = (repo_root / "site" / "build" / "fake-container.log").read_text(encoding="utf-8")
-        self.assertIn("run", container_log)
-        self.assertIn("--init", container_log)
-        self.assertIn("/workspace/buildish/site", container_log)
+        hugo_log = self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"]))
+        self.assert_contains_all(hugo_log, "--bind 0.0.0.0", "--port 8767")
+        container_log = self.read_text(repo_root / "site" / "build" / "fake-container.log")
+        self.assert_contains_all(container_log, "run", "--init", "/workspace/buildish/site")
         self.stop_process(process)
 
     def test_make_serve_in_containerized_mode_stops_on_sigint(self) -> None:
@@ -529,9 +629,8 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         process.wait(timeout=10)
         output = self.stop_process(process)
         self.assertIn(process.returncode, {130, -signal.SIGINT}, output)
-        container_log = (repo_root / "site" / "build" / "fake-container.log").read_text(encoding="utf-8")
-        self.assertIn("stop -t 0", container_log)
-        self.assertIn("rm -f", container_log)
+        container_log = self.read_text(repo_root / "site" / "build" / "fake-container.log")
+        self.assert_contains_all(container_log, "stop -t 0", "rm -f")
 
 
 if __name__ == "__main__":

@@ -47,9 +47,28 @@ from pipeline.site_pipeline.models import (
     StagedReleaseLine,
     VersionDescriptor,
 )
+from pipeline.tests.test_support import BUILDISH_DISCLAIMER, TestCaseHelpers, text_block, write_files, write_text
 
 
-class SitePipelineTest(unittest.TestCase):
+class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
+    @staticmethod
+    def default_catalog_defaults(**overrides: object) -> dict[str, object]:
+        defaults: dict[str, object] = {
+            "metadataFile": "site/component.yaml",
+            "pagesRoot": "site/pages",
+            "docsRoot": "site/docs",
+            "assetsRoot": "site/assets",
+        }
+        defaults.update(overrides)
+        return defaults
+
+    @staticmethod
+    def catalog_payload(*components: dict[str, object], defaults: dict[str, object] | None = None) -> dict[str, object]:
+        payload: dict[str, object] = {"schemaVersion": 1, "components": list(components)}
+        if defaults is not None:
+            payload["defaults"] = defaults
+        return payload
+
     @staticmethod
     def seed_authored_site_content(repo_root: Path) -> None:
         source_content = Path(__file__).resolve().parents[2] / "content"
@@ -130,29 +149,18 @@ class SitePipelineTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "buildish"
             (repo_root / "site").mkdir(parents=True)
-            with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
                     {
-                        "schemaVersion": 1,
-                        "defaults": {
-                            "metadataFile": "site/component.yaml",
-                            "pagesRoot": "site/pages",
-                            "docsRoot": "site/docs",
-                            "assetsRoot": "site/assets",
-                        },
-                        "components": [
-                            {
-                                "slug": "mammoth-cache",
-                                "localDir": "buildish-mammoth-cache",
-                                "assetsRoot": None,
-                                "weight": "7",
-                            }
-                        ],
+                        "slug": "mammoth-cache",
+                        "localDir": "buildish-mammoth-cache",
+                        "assetsRoot": None,
+                        "weight": "7",
                     },
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
+                    defaults=self.default_catalog_defaults(),
+                ),
+            )
 
             catalog = ComponentsCatalog.from_yaml_path(repo_root / "site" / "components.yaml")
 
@@ -169,13 +177,10 @@ class SitePipelineTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "buildish"
             (repo_root / "site").mkdir(parents=True)
-            with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {"schemaVersion": 1, "components": [{"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache", "weight": None}]},
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload({"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache", "weight": None}),
+            )
 
             catalog = ComponentsCatalog.from_yaml_path(repo_root / "site" / "components.yaml")
 
@@ -185,8 +190,7 @@ class SitePipelineTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "buildish"
             (repo_root / "site").mkdir(parents=True)
-            with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump({"schemaVersion": 1, "defaults": None, "components": None}, handle, sort_keys=False, default_flow_style=False)
+            self.write_yaml(repo_root / "site" / "components.yaml", {"schemaVersion": 1, "defaults": None, "components": None})
 
             with self.assertRaisesRegex(ValueError, "Invalid YAML"):
                 ComponentsCatalog.from_yaml_path(repo_root / "site" / "components.yaml")
@@ -195,30 +199,27 @@ class SitePipelineTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "buildish-mammoth-cache"
             (repo_root / "site").mkdir(parents=True)
-            with (repo_root / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {
-                        "schemaVersion": 1,
-                        "component": {
-                            "slug": "mammoth-cache",
-                            "displayName": "Mammoth Cache for Gradle and Maven",
-                            "repository": "https://github.com/apache/buildish-mammoth-cache",
-                        },
-                        "content": {"pagesRoot": "site/pages", "docsRoot": "site/docs", "assetsRoot": None},
-                        "versioning": {"unreleasedLabel": "Preview", "tagPattern": r"^v[0-9]+\.[0-9]+\.[0-9]+$"},
-                        "lifecycle": {
-                            "latestStable": "v1.2.3",
-                            "releaseLines": [
-                                {"line": "v1", "latest": "v1.2.3", "status": "maintained", "aliases": ["v1"]},
-                                {"line": "v0", "latest": "v0.9.0", "status": "eol", "aliases": ["stable"]},
-                            ],
-                        },
-                        "navigation": {"section": "components"},
+            self.write_yaml(
+                repo_root / "site" / "component.yaml",
+                {
+                    "schemaVersion": 1,
+                    "component": {
+                        "slug": "mammoth-cache",
+                        "displayName": "Mammoth Cache for Gradle and Maven",
+                        "repository": "https://github.com/apache/buildish-mammoth-cache",
                     },
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
+                    "content": {"pagesRoot": "site/pages", "docsRoot": "site/docs", "assetsRoot": None},
+                    "versioning": {"unreleasedLabel": "Preview", "tagPattern": r"^v[0-9]+\.[0-9]+\.[0-9]+$"},
+                    "lifecycle": {
+                        "latestStable": "v1.2.3",
+                        "releaseLines": [
+                            {"line": "v1", "latest": "v1.2.3", "status": "maintained", "aliases": ["v1"]},
+                            {"line": "v0", "latest": "v0.9.0", "status": "eol", "aliases": ["stable"]},
+                        ],
+                    },
+                    "navigation": {"section": "components"},
+                },
+            )
 
             metadata, metadata_path = load_component_metadata(repo_root, "site/component.yaml", "mammoth-cache")
 
@@ -239,13 +240,7 @@ class SitePipelineTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "buildish-mammoth-cache"
             (repo_root / "site").mkdir(parents=True)
-            with (repo_root / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {"schemaVersion": 1, "versioning": {"tagPattern": "["}},
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
+            self.write_yaml(repo_root / "site" / "component.yaml", {"schemaVersion": 1, "versioning": {"tagPattern": "["}})
 
             with self.assertRaisesRegex(ValueError, "Invalid YAML"):
                 load_component_metadata(repo_root, "site/component.yaml", "mammoth-cache")
@@ -254,20 +249,13 @@ class SitePipelineTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "buildish-mammoth-cache"
             (repo_root / "site").mkdir(parents=True)
-            with (repo_root / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {
-                        "schemaVersion": 1,
-                        "lifecycle": {
-                            "releaseLines": [
-                                {"line": "v1", "latest": "v1.2.3", "status": "maintained", "aliases": "stable"}
-                            ]
-                        },
-                    },
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
+            self.write_yaml(
+                repo_root / "site" / "component.yaml",
+                {
+                    "schemaVersion": 1,
+                    "lifecycle": {"releaseLines": [{"line": "v1", "latest": "v1.2.3", "status": "maintained", "aliases": "stable"}]},
+                },
+            )
 
             with self.assertRaisesRegex(ValueError, "Invalid YAML"):
                 load_component_metadata(repo_root, "site/component.yaml", "mammoth-cache")
@@ -276,13 +264,10 @@ class SitePipelineTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "buildish-mammoth-cache"
             (repo_root / "site").mkdir(parents=True)
-            with (repo_root / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {"schemaVersion": 1, "component": None, "content": None, "versioning": None, "lifecycle": None, "navigation": None},
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
+            self.write_yaml(
+                repo_root / "site" / "component.yaml",
+                {"schemaVersion": 1, "component": None, "content": None, "versioning": None, "lifecycle": None, "navigation": None},
+            )
 
             with self.assertRaisesRegex(ValueError, "Invalid YAML"):
                 load_component_metadata(repo_root, "site/component.yaml", "mammoth-cache")
@@ -293,27 +278,40 @@ class SitePipelineTest(unittest.TestCase):
             repo_root = workspace / "buildish"
             repo_root.mkdir()
             (repo_root / "site").mkdir()
-            with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {
-                        "schemaVersion": 1,
-                        "defaults": {"pagesRoot": "site/pages", "docsRoot": "site/docs"},
-                        "components": [{"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache", "docsRoot": None}],
-                    },
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
+                    {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache", "docsRoot": None},
+                    defaults={"pagesRoot": "site/pages", "docsRoot": "site/docs"},
+                ),
+            )
             component_root = workspace / "buildish-mammoth-cache"
-            (component_root / "site" / "pages").mkdir(parents=True)
-            (component_root / "site" / "docs").mkdir(parents=True)
-            (component_root / "site" / "pages" / "_index.md").write_text("# Mammoth Cache for Gradle and Maven\n\nComponent landing page.\n", encoding="utf-8")
-            (component_root / "site" / "docs" / "_index.md").write_text("---\ntitle: Docs\n---\n", encoding="utf-8")
+            write_files(
+                component_root,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Mammoth Cache for Gradle and Maven
+
+                        Component landing page.
+                        """
+                    ),
+                    "site/docs/_index.md": text_block(
+                        """
+                        ---
+                        title: Docs
+                        ---
+                        """
+                    ),
+                },
+            )
 
             site_pipeline.build(repo_root)
 
-            self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "_index.md").is_file())
-            self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "_index.md").is_file())
+            self.assert_paths_exist(
+                repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "_index.md",
+                repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "_index.md",
+            )
 
     def test_build_stages_docs_and_lifecycle_from_component_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -321,17 +319,7 @@ class SitePipelineTest(unittest.TestCase):
             repo_root = workspace / "buildish"
             repo_root.mkdir()
             (repo_root / "site").mkdir()
-            (repo_root / "DISCLAIMER").write_text(
-                "Apache Buildish (Incubating) is an effort undergoing incubation at The Apache\n"
-                "Software Foundation (ASF), sponsored by the Apache Incubator PMC.\n\n"
-                "Incubation is required of all newly accepted projects until a further review\n"
-                "indicates that the infrastructure, communications, and decision making process\n"
-                "have stabilized in a manner consistent with other successful ASF projects.\n\n"
-                "While incubation status is not necessarily a reflection of the completeness\n"
-                "or stability of the code, it does indicate that the project has yet to be\n"
-                "fully endorsed by the ASF.\n",
-                encoding="utf-8",
-            )
+            write_text(repo_root / "DISCLAIMER", BUILDISH_DISCLAIMER)
             catalog = {
                 "schemaVersion": 1,
                 "defaults": {
@@ -358,145 +346,197 @@ class SitePipelineTest(unittest.TestCase):
                     {"slug": "site", "localDir": "buildish", "weight": 100},
                 ],
             }
-            with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
+            self.write_yaml(repo_root / "site" / "components.yaml", catalog)
             self.seed_authored_site_content(repo_root)
-            (repo_root / "site" / "pages").mkdir()
-            (repo_root / "site" / "pages" / "_index.md").write_text(
-                "# Buildish Site\n\nBuildish site publishing and shared documentation tooling.\n\nUse the authored component pages for the stable overview and the unreleased docs for implementation details.\n",
-                encoding="utf-8",
+            write_files(
+                repo_root,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Buildish Site
+
+                        Buildish site publishing and shared documentation tooling.
+
+                        Use the authored component pages for the stable overview and the unreleased docs for implementation details.
+                        """
+                    ),
+                    "docs/_index.md": text_block(
+                        """
+                        # Apache Buildish Site Documentation
+
+                        Site implementation and infrastructure docs.
+                        """
+                    ),
+                },
             )
-            (repo_root / "docs").mkdir()
-            (repo_root / "docs" / "_index.md").write_text(
-                "# Apache Buildish Site Documentation\n\nSite implementation and infrastructure docs.\n",
-                encoding="utf-8",
+            self.write_yaml(
+                repo_root / "site" / "component.yaml",
+                {
+                    "schemaVersion": 1,
+                    "component": {"slug": "site", "displayName": "Site", "repository": "https://github.com/apache/buildish"},
+                    "content": {"docsRoot": "docs", "assetsRoot": None},
+                    "navigation": {"section": "components"},
+                },
             )
-            with (repo_root / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {
-                        "schemaVersion": 1,
-                        "component": {
-                            "slug": "site",
-                            "displayName": "Site",
-                            "repository": "https://github.com/apache/buildish",
-                        },
-                        "content": {"docsRoot": "docs", "assetsRoot": None},
-                        "navigation": {"section": "components"},
-                    },
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
 
             mammoth = workspace / "buildish-mammoth-cache"
-            (mammoth / "site").mkdir(parents=True)
-            (mammoth / "site" / "pages").mkdir(parents=True)
-            (mammoth / "site" / "docs").mkdir(parents=True)
-            (mammoth / "site" / "assets" / "images").mkdir(parents=True)
-            (mammoth / "README.md").write_text(
-                "# Apache Buildish Mammoth Cache for Gradle and Maven\n\nSecure Gradle wrapper provisioning.\n",
-                encoding="utf-8",
+            write_text(
+                mammoth / "README.md",
+                text_block(
+                    """
+                    # Apache Buildish Mammoth Cache for Gradle and Maven
+
+                    Secure Gradle wrapper provisioning.
+                    """
+                ),
             )
-            with (mammoth / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {
-                        "schemaVersion": 1,
-                        "component": {
-                            "slug": "mammoth-cache",
-                            "displayName": "Apache Buildish Mammoth Cache for Gradle and Maven",
-                            "repository": "https://github.com/apache/buildish-mammoth-cache",
-                            "defaultBranch": "trunk",
-                        },
-                        "content": {"docsRoot": "site/docs", "assetsRoot": "site/assets"},
-                        "versioning": {"unreleasedLabel": "Preview"},
-                        "lifecycle": {
-                            "latestStable": "v1.3.5",
-                            "releaseLines": [
-                                {"line": "v1", "latest": "v1.3.5", "status": "maintained", "aliases": ["v1"]},
-                                {"line": "v1.2", "latest": "v1.2.9", "status": "eol", "aliases": ["v1.2"]},
-                            ],
-                        },
-                        "navigation": {"section": "components"},
+            self.write_yaml(
+                mammoth / "site" / "component.yaml",
+                {
+                    "schemaVersion": 1,
+                    "component": {
+                        "slug": "mammoth-cache",
+                        "displayName": "Apache Buildish Mammoth Cache for Gradle and Maven",
+                        "repository": "https://github.com/apache/buildish-mammoth-cache",
+                        "defaultBranch": "trunk",
                     },
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
-            (mammoth / "site" / "pages" / "_index.md").write_text(
-                "# Mammoth Cache for Gradle and Maven\n\nSecure Gradle wrapper provisioning.\n\nUse the unreleased docs to evaluate planned changes before they ship.\n",
-                encoding="utf-8",
+                    "content": {"docsRoot": "site/docs", "assetsRoot": "site/assets"},
+                    "versioning": {"unreleasedLabel": "Preview"},
+                    "lifecycle": {
+                        "latestStable": "v1.3.5",
+                        "releaseLines": [
+                            {"line": "v1", "latest": "v1.3.5", "status": "maintained", "aliases": ["v1"]},
+                            {"line": "v1.2", "latest": "v1.2.9", "status": "eol", "aliases": ["v1.2"]},
+                        ],
+                    },
+                    "navigation": {"section": "components"},
+                },
             )
-            (mammoth / "site" / "pages" / "faq.md").write_text(
-                "# FAQ\n\nAnswers for component-level rollout questions.\n",
-                encoding="utf-8",
+            write_files(
+                mammoth,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Mammoth Cache for Gradle and Maven
+
+                        Secure Gradle wrapper provisioning.
+
+                        Use the unreleased docs to evaluate planned changes before they ship.
+                        """
+                    ),
+                    "site/pages/faq.md": text_block(
+                        """
+                        # FAQ
+
+                        Answers for component-level rollout questions.
+                        """
+                    ),
+                    "site/docs/_index.md": text_block(
+                        """
+                        # Mammoth overview
+
+                        Secure Gradle wrapper provisioning.
+                        """
+                    ),
+                    "site/docs/wrapper-provisioning.md": text_block(
+                        """
+                        # Wrapper provisioning
+                        """
+                    ),
+                    "site/assets/images/logo.svg": text_block(
+                        """
+                        <svg xmlns='http://www.w3.org/2000/svg'></svg>
+                        """
+                    ),
+                },
             )
-            (mammoth / "site" / "docs" / "_index.md").write_text(
-                "# Mammoth overview\n\nSecure Gradle wrapper provisioning.\n",
-                encoding="utf-8",
-            )
-            (mammoth / "site" / "docs" / "wrapper-provisioning.md").write_text("# Wrapper provisioning\n", encoding="utf-8")
-            (mammoth / "site" / "assets" / "images" / "logo.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>\n", encoding="utf-8")
 
             no_wrapper = workspace / "buildish-no-gradle-wrapper-jar"
-            (no_wrapper / "site").mkdir(parents=True)
-            (no_wrapper / "site" / "pages").mkdir()
-            (no_wrapper / "site" / "docs").mkdir()
-            with (no_wrapper / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {
-                        "schemaVersion": 1,
-                        "component": {
-                            "slug": "no-gradle-wrapper-jar",
-                            "displayName": "Buildish no-gradle-wrapper-jar",
-                            "repository": "https://github.com/apache/buildish-no-gradle-wrapper-jar",
-                            "defaultBranch": "main",
-                        },
-                        "content": {"docsRoot": "site/docs"},
-                        "navigation": {"section": "components"},
+            self.write_yaml(
+                no_wrapper / "site" / "component.yaml",
+                {
+                    "schemaVersion": 1,
+                    "component": {
+                        "slug": "no-gradle-wrapper-jar",
+                        "displayName": "Buildish no-gradle-wrapper-jar",
+                        "repository": "https://github.com/apache/buildish-no-gradle-wrapper-jar",
+                        "defaultBranch": "main",
                     },
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
-            (no_wrapper / "site" / "pages" / "_index.md").write_text(
-                "# No Wrapper JAR\n\nHelper scripts for Gradle wrapper usage.\n\nThis component keeps wrapper bootstrapping lean for repositories that do not ship the wrapper JAR.\n",
-                encoding="utf-8",
+                    "content": {"docsRoot": "site/docs"},
+                    "navigation": {"section": "components"},
+                },
             )
-            (no_wrapper / "site" / "docs" / "_index.md").write_text(
-                "# No wrapper JAR\n\nHelper scripts for Gradle wrapper usage.\n",
-                encoding="utf-8",
+            write_files(
+                no_wrapper,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # No Wrapper JAR
+
+                        Helper scripts for Gradle wrapper usage.
+
+                        This component keeps wrapper bootstrapping lean for repositories that do not ship the wrapper JAR.
+                        """
+                    ),
+                    "site/docs/_index.md": text_block(
+                        """
+                        # No wrapper JAR
+
+                        Helper scripts for Gradle wrapper usage.
+                        """
+                    ),
+                },
             )
 
             results = site_pipeline.build(repo_root)
 
             self.assertEqual(3, len(results))
-            self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "_index.md").exists())
-            self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "wrapper-provisioning.md").exists())
-            self.assertTrue((repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache" / "unreleased" / "assets" / "images" / "logo.svg").exists())
-            self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "no-gradle-wrapper-jar" / "unreleased" / "_index.md").exists())
-            self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "site" / "unreleased" / "docs" / "_index.md").exists())
-            self.assertTrue((repo_root / "site" / ".preview" / "index.html").exists())
+            self.assert_paths_exist(
+                repo_root / "site" / ".stage" / "content" / "components" / "_index.md",
+                repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "wrapper-provisioning.md",
+                repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache" / "unreleased" / "assets" / "images" / "logo.svg",
+                repo_root / "site" / ".stage" / "content" / "components" / "no-gradle-wrapper-jar" / "unreleased" / "_index.md",
+                repo_root / "site" / ".stage" / "content" / "components" / "site" / "unreleased" / "docs" / "_index.md",
+                repo_root / "site" / ".preview" / "index.html",
+            )
 
             staged_root_index = (repo_root / "site" / ".stage" / "content" / "_index.md").read_text(encoding="utf-8")
-            self.assertIn("Apache Buildish is an incubating Apache umbrella project focused on practical tooling", staged_root_index)
-            self.assertNotIn("redirect_url:", staged_root_index)
-            self.assertNotIn("## Incubation status", staged_root_index)
+            self.assert_contains_all(
+                staged_root_index,
+                "Apache Buildish is an incubating Apache umbrella project focused on practical tooling",
+            )
+            self.assert_not_contains_any(staged_root_index, "redirect_url:", "## Incubation status")
             root_front_matter = yaml.safe_load(staged_root_index.split("---", 2)[1])
             self.assertEqual("Apache Buildish (Incubating)", root_front_matter["title"])
             self.assertEqual("Apache Buildish develops build automation, CI integrations, and supporting tooling.", root_front_matter["description"])
             self.assertEqual(3, len(root_front_matter["incubator_disclaimer_paragraphs"]))
-            self.assertIn("Apache Buildish (Incubating) is an effort undergoing incubation", root_front_matter["incubator_disclaimer_paragraphs"][0])
-            self.assertIn("While incubation status is not necessarily a reflection", root_front_matter["incubator_disclaimer_paragraphs"][2])
+            self.assert_contains_all(
+                root_front_matter["incubator_disclaimer_paragraphs"][0],
+                "Apache Buildish (Incubating) is an effort undergoing incubation",
+            )
+            self.assert_contains_all(
+                root_front_matter["incubator_disclaimer_paragraphs"][2],
+                "While incubation status is not necessarily a reflection",
+            )
 
             component_index = (repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "_index.md").read_text(encoding="utf-8")
-            self.assertIn("title: Mammoth Cache for Gradle and Maven", component_index)
-            self.assertIn("weight: 10", component_index)
-            self.assertNotIn("linkTitle:", component_index)
-            self.assertIn("description: Secure Gradle wrapper provisioning.", component_index)
-            self.assertNotIn("\nSecure Gradle wrapper provisioning.\n", component_index)
-            self.assertNotIn("\n# Mammoth Cache for Gradle and Maven\n", component_index)
-            self.assertIn("Use the authored component pages for the stable overview", (repo_root / "site" / ".stage" / "content" / "components" / "site" / "_index.md").read_text(encoding="utf-8"))
-            self.assertIn("Use the unreleased docs to evaluate planned changes before they ship.", component_index)
+            self.assert_contains_all(
+                component_index,
+                "title: Mammoth Cache for Gradle and Maven",
+                "weight: 10",
+                "description: Secure Gradle wrapper provisioning.",
+                "Use the unreleased docs to evaluate planned changes before they ship.",
+            )
+            self.assert_not_contains_any(
+                component_index,
+                "linkTitle:",
+                "\nSecure Gradle wrapper provisioning.\n",
+                "\n# Mammoth Cache for Gradle and Maven\n",
+            )
+            self.assert_contains_all(
+                (repo_root / "site" / ".stage" / "content" / "components" / "site" / "_index.md").read_text(encoding="utf-8"),
+                "Use the authored component pages for the stable overview",
+            )
             component_front_matter = yaml.safe_load(component_index.split("---", 2)[1])
             self.assertEqual("mammoth-cache", component_front_matter["buildishComponent"]["slug"])
             self.assertEqual("Mammoth Cache for Gradle and Maven", component_front_matter["buildishComponent"]["displayName"])
@@ -509,23 +549,20 @@ class SitePipelineTest(unittest.TestCase):
             self.assertEqual("/components/mammoth-cache/faq/", mammoth_component_front_matter["buildishComponentPage"]["path"])
 
             mammoth_unreleased_index = (repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "_index.md").read_text(encoding="utf-8")
-            self.assertIn("title: Mammoth Cache for Gradle and Maven Preview", mammoth_unreleased_index)
-            self.assertIn("linkTitle: Preview", mammoth_unreleased_index)
-            self.assertNotIn("\nSecure Gradle wrapper provisioning.\n", mammoth_unreleased_index)
+            self.assert_contains_all(mammoth_unreleased_index, "title: Mammoth Cache for Gradle and Maven Preview", "linkTitle: Preview")
+            self.assert_not_contains_any(mammoth_unreleased_index, "\nSecure Gradle wrapper provisioning.\n")
             mammoth_unreleased_front_matter = yaml.safe_load(mammoth_unreleased_index.split("---", 2)[1])
             self.assertEqual("unreleased-home", mammoth_unreleased_front_matter["buildishComponentPage"]["kind"])
 
             mammoth_docs_index = (repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "_index.md").read_text(encoding="utf-8")
-            self.assertIn("linkTitle: Docs", mammoth_docs_index)
+            self.assert_contains_all(mammoth_docs_index, "linkTitle: Docs")
             mammoth_docs_front_matter = yaml.safe_load(mammoth_docs_index.split("---", 2)[1])
             self.assertEqual("docs-home", mammoth_docs_front_matter["buildishComponentPage"]["kind"])
             self.assertEqual("/components/mammoth-cache/unreleased/docs/", mammoth_docs_front_matter["buildishComponentPage"]["path"])
 
             components_index = (repo_root / "site" / ".stage" / "content" / "components" / "_index.md").read_text(encoding="utf-8")
-            self.assertIn("title: Components", components_index)
-            self.assertIn("type: docs", components_index)
-            self.assertIn("Browse staged components", components_index)
-            self.assertNotIn("\n# Components\n", components_index)
+            self.assert_contains_all(components_index, "title: Components", "type: docs", "Browse staged components")
+            self.assert_not_contains_any(components_index, "\n# Components\n")
 
             security_report_page = (repo_root / "site" / ".stage" / "content" / "community" / "security-report.md").read_text(encoding="utf-8")
             self.assertIn("title: Security Report", security_report_page)
@@ -661,28 +698,31 @@ class SitePipelineTest(unittest.TestCase):
             repo_root = workspace / "buildish"
             repo_root.mkdir()
             (repo_root / "site").mkdir()
-            catalog = {
-                "schemaVersion": 1,
-                "defaults": {"metadataFile": "site/component.yaml", "pagesRoot": "site/pages", "docsRoot": "site/docs"},
-                "components": [{"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"}],
-            }
-            with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
+                    {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
+                    defaults={"metadataFile": "site/component.yaml", "pagesRoot": "site/pages", "docsRoot": "site/docs"},
+                ),
+            )
 
             mammoth = workspace / "buildish-mammoth-cache"
-            (mammoth / "site" / "pages").mkdir(parents=True)
-            (mammoth / "site" / "pages" / "_index.md").write_text("# Bad metadata\n\nLanding page.\n", encoding="utf-8")
-            with (mammoth / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {
-                        "schemaVersion": 1,
-                        "component": {"displayName": "Bad metadata"},
-                        "content": {"docsRoot": "../escape"},
-                    },
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
+            write_files(
+                mammoth,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Bad metadata
+
+                        Landing page.
+                        """
+                    )
+                },
+            )
+            self.write_yaml(
+                mammoth / "site" / "component.yaml",
+                {"schemaVersion": 1, "component": {"displayName": "Bad metadata"}, "content": {"docsRoot": "../escape"}},
+            )
 
             with self.assertRaisesRegex(ValueError, "escapes allowed root"):
                 site_pipeline.build(repo_root)
@@ -692,13 +732,13 @@ class SitePipelineTest(unittest.TestCase):
             workspace = Path(temp_dir)
             repo_root = workspace / "buildish"
             (repo_root / "site").mkdir(parents=True)
-            catalog = {
-                "schemaVersion": 1,
-                "defaults": {"metadataFile": "site/component.yaml", "pagesRoot": "site/pages", "docsRoot": "site/docs"},
-                "components": [{"slug": "bad-component", "displayName": "Bad", "localDir": "../escape"}],
-            }
-            with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
+                    {"slug": "bad-component", "displayName": "Bad", "localDir": "../escape"},
+                    defaults={"metadataFile": "site/component.yaml", "pagesRoot": "site/pages", "docsRoot": "site/docs"},
+                ),
+            )
 
             with self.assertRaisesRegex(ValueError, "escapes allowed root"):
                 site_pipeline.build(repo_root)
@@ -709,33 +749,31 @@ class SitePipelineTest(unittest.TestCase):
             repo_root = workspace / "buildish"
             repo_root.mkdir()
             (repo_root / "site").mkdir(parents=True)
-            catalog = {
-                "schemaVersion": 1,
-                "defaults": {
-                    "metadataFile": "site/component.yaml",
-                    "pagesRoot": "site/pages",
-                    "docsRoot": "site/docs",
-                    "assetsRoot": "site/assets",
-                },
-                "components": [{"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"}],
-            }
-            with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
+                    {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
+                    defaults=self.default_catalog_defaults(),
+                ),
+            )
 
             mammoth = workspace / "buildish-mammoth-cache"
-            (mammoth / "site" / "pages").mkdir(parents=True)
-            (mammoth / "site" / "pages" / "_index.md").write_text("# Bad assets metadata\n\nLanding page.\n", encoding="utf-8")
-            with (mammoth / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {
-                        "schemaVersion": 1,
-                        "component": {"displayName": "Bad assets metadata"},
-                        "content": {"assetsRoot": "../escape"},
-                    },
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
+            write_files(
+                mammoth,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Bad assets metadata
+
+                        Landing page.
+                        """
+                    )
+                },
+            )
+            self.write_yaml(
+                mammoth / "site" / "component.yaml",
+                {"schemaVersion": 1, "component": {"displayName": "Bad assets metadata"}, "content": {"assetsRoot": "../escape"}},
+            )
 
             with self.assertRaisesRegex(ValueError, "escapes allowed root"):
                 site_pipeline.build(repo_root)
@@ -746,15 +784,16 @@ class SitePipelineTest(unittest.TestCase):
             repo_root = workspace / "buildish"
             repo_root.mkdir()
             (repo_root / "site").mkdir()
-            with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump({"schemaVersion": 1, "components": []}, handle, sort_keys=False, default_flow_style=False)
+            self.write_yaml(repo_root / "site" / "components.yaml", self.catalog_payload())
             self.seed_docsy_vendor_assets(repo_root)
 
             site_pipeline.build(repo_root)
 
-            self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "jquery.min.js").exists())
-            self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "mermaid.min.js").exists())
-            self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "lunr.min.js").exists())
+            self.assert_paths_exist(
+                repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "jquery.min.js",
+                repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "mermaid.min.js",
+                repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "lunr.min.js",
+            )
 
     def test_extract_title_and_summary_ignores_headings_inside_fenced_code_blocks(self) -> None:
         markdown = """<!--\ncomment\n-->\n\nThis page currently carries content moved from the component README.\n\n```yaml\n# .github/buildish-mammoth.yml\njob-mode: distributed-worker\n```\n\n## Next section\n"""
@@ -848,35 +887,36 @@ Additional details.
             repo_root = workspace / "buildish"
             repo_root.mkdir()
             (repo_root / "site").mkdir(parents=True)
-            (repo_root / "DISCLAIMER").write_text("Buildish disclaimer.\n", encoding="utf-8")
-            with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {
-                        "schemaVersion": 1,
-                        "defaults": {
-                            "metadataFile": "site/component.yaml",
-                            "pagesRoot": "site/pages",
-                            "docsRoot": "site/docs",
-                        },
-                        "components": [{"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"}],
-                    },
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
+            write_text(repo_root / "DISCLAIMER", "Buildish disclaimer.\n")
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
+                    {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
+                    defaults={"metadataFile": "site/component.yaml", "pagesRoot": "site/pages", "docsRoot": "site/docs"},
+                ),
+            )
 
             mammoth = workspace / "buildish-mammoth-cache"
-            (mammoth / "site" / "pages").mkdir(parents=True)
-            (mammoth / "site" / "docs").mkdir(parents=True)
-            (mammoth / "site" / "pages" / "_index.md").write_text("# Overview\n\nLanding page.\n", encoding="utf-8")
-            with (mammoth / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {"schemaVersion": 1, "component": {"displayName": "Mammoth Cache for Gradle and Maven"}},
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
-            (mammoth / "site" / "docs" / "_index.md").write_text("# Overview\n\nHello.\n", encoding="utf-8")
+            write_files(
+                mammoth,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Overview
+
+                        Landing page.
+                        """
+                    ),
+                    "site/docs/_index.md": text_block(
+                        """
+                        # Overview
+
+                        Hello.
+                        """
+                    ),
+                },
+            )
+            self.write_yaml(mammoth / "site" / "component.yaml", {"schemaVersion": 1, "component": {"displayName": "Mammoth Cache for Gradle and Maven"}})
 
             preview_sentinel = repo_root / "site" / ".preview" / "keep.txt"
             preview_sentinel.parent.mkdir(parents=True, exist_ok=True)
@@ -885,8 +925,8 @@ Additional details.
             results = site_pipeline.build(repo_root, include_preview=False)
 
             self.assertEqual(1, len(results))
-            self.assertTrue((repo_root / "site" / ".stage" / "manifest.yaml").exists())
-            self.assertTrue(preview_sentinel.exists())
+            self.assert_paths_exist(repo_root / "site" / ".stage" / "manifest.yaml")
+            self.assert_paths_exist(preview_sentinel)
             self.assertEqual("preserve me\n", preview_sentinel.read_text(encoding="utf-8"))
             self.assertFalse((repo_root / "site" / ".preview" / "index.html").exists())
 
@@ -895,38 +935,60 @@ Additional details.
             workspace = Path(temp_dir)
             repo_root = workspace / "buildish"
             repo_root.mkdir()
+            write_files(
+                repo_root,
+                {
+                    "site/pipeline/main.py": text_block(
+                        """
+                        raise SystemExit(0)
+                        """
+                    ),
+                    "site/pipeline/pyproject.toml": text_block(
+                        """
+                        [project]
+                        name='stub'
+                        """
+                    ),
+                    "site/pipeline/uv.lock": text_block(
+                        """
+                        version = 1
+                        """
+                    ),
+                    "site/pipeline/site_pipeline/__init__.py": text_block(
+                        """
+                        # watcher stub
+                        """
+                    ),
+                },
+            )
             (repo_root / "site" / "content").mkdir(parents=True)
-            (repo_root / "site" / "pipeline").mkdir(parents=True)
-            (repo_root / "site" / "pipeline" / "main.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
-            (repo_root / "site" / "pipeline" / "pyproject.toml").write_text("[project]\nname='stub'\n", encoding="utf-8")
-            (repo_root / "site" / "pipeline" / "uv.lock").write_text("version = 1\n", encoding="utf-8")
             (repo_root / "site" / "pipeline" / ".venv" / "bin").mkdir(parents=True)
             (repo_root / "site" / "pipeline" / ".idea").mkdir(parents=True)
-            (repo_root / "site" / "pipeline" / "site_pipeline").mkdir(parents=True)
-            (repo_root / "site" / "pipeline" / "site_pipeline" / "__init__.py").write_text("# watcher stub\n", encoding="utf-8")
-            catalog = {
-                "schemaVersion": 1,
-                "defaults": {
-                    "metadataFile": "site/component.yaml",
-                    "pagesRoot": "site/pages",
-                    "docsRoot": "site/docs",
-                    "assetsRoot": "site/assets",
-                },
-                "components": [
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
                     {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
                     {"slug": "missing-component", "localDir": "buildish-missing-component"},
-                ],
-            }
-            with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(catalog, handle, sort_keys=False, default_flow_style=False)
+                    defaults=self.default_catalog_defaults(),
+                ),
+            )
 
             mammoth = workspace / "buildish-mammoth-cache"
-            (mammoth / "site" / "pages").mkdir(parents=True)
+            write_files(
+                mammoth,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Mammoth
+
+                        Landing page.
+                        """
+                    )
+                },
+            )
             (mammoth / "site" / "docs").mkdir(parents=True)
             (mammoth / "site" / "assets").mkdir(parents=True)
-            (mammoth / "site" / "pages" / "_index.md").write_text("# Mammoth\n\nLanding page.\n", encoding="utf-8")
-            with (mammoth / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump({"schemaVersion": 1, "component": {"displayName": "Mammoth"}}, handle, sort_keys=False, default_flow_style=False)
+            self.write_yaml(mammoth / "site" / "component.yaml", {"schemaVersion": 1, "component": {"displayName": "Mammoth"}})
 
             watch_roots = set(site_pipeline.collect_watch_roots(repo_root))
 
@@ -951,22 +1013,32 @@ Additional details.
             repo_root = workspace / "buildish"
             repo_root.mkdir()
             (repo_root / "site").mkdir()
-            with (repo_root / "site" / "components.yaml").open("w", encoding="utf-8") as handle:
-                yaml.safe_dump(
-                    {
-                        "schemaVersion": 1,
-                        "defaults": {"pagesRoot": "site/pages", "docsRoot": "site/docs"},
-                        "components": [{"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"}],
-                    },
-                    handle,
-                    sort_keys=False,
-                    default_flow_style=False,
-                )
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
+                    {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
+                    defaults={"pagesRoot": "site/pages", "docsRoot": "site/docs"},
+                ),
+            )
 
             mammoth = workspace / "buildish-mammoth-cache"
-            (mammoth / "site" / "pages" / "unreleased").mkdir(parents=True)
-            (mammoth / "site" / "pages" / "_index.md").write_text("# Mammoth Cache for Gradle and Maven\n\nLanding page.\n", encoding="utf-8")
-            (mammoth / "site" / "pages" / "unreleased" / "overview.md").write_text("# Bad path\n", encoding="utf-8")
+            write_files(
+                mammoth,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Mammoth Cache for Gradle and Maven
+
+                        Landing page.
+                        """
+                    ),
+                    "site/pages/unreleased/overview.md": text_block(
+                        """
+                        # Bad path
+                        """
+                    ),
+                },
+            )
 
             with self.assertRaisesRegex(ValueError, "reserved staged path"):
                 site_pipeline.build(repo_root)
