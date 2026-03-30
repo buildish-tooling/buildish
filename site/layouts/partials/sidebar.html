@@ -27,7 +27,7 @@ limitations under the License.
 {{/* Determine sidebar root and ID (if enabled) */ -}}
 {{ $sidebarRoot := .FirstSection -}}
 {{ $navRoot := cond (and (ne .Params.toc_root true) (eq .Site.Home.Type "docs")) .Site.Home .FirstSection -}}
-{{ $projectContext := partial "buildish-project-context.html" . -}}
+{{ $componentContext := partial "buildish-component-context.html" . -}}
 {{ $skipRootSection := false -}}
 {{ if .Site.Params.ui.sidebar_root_enabled -}}
   {{ if and .IsSection (eq .Params.sidebar_root_for "self") -}}
@@ -67,9 +67,9 @@ limitations under the License.
   {{ end -}}
 {{ end -}}
 
-{{ if index $projectContext "enabled" -}}
-  {{ with index $projectContext "project" -}}
-    {{ with $.Site.GetPage (printf "/projects/%s" (index . "slug")) -}}
+{{ if index $componentContext "enabled" -}}
+  {{ with index $componentContext "component" -}}
+    {{ with $.Site.GetPage (printf "/components/%s" (index . "slug")) -}}
       {{ $sidebarRoot = . -}}
       {{ $skipRootSection = true -}}
     {{ end -}}

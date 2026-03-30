@@ -28,7 +28,7 @@ from .common import first_non_none
 from .constants import DEFAULT_TAG_PATTERN
 from .filesystem import (
     copy_tree_without_symlinks,
-    load_project_metadata,
+    load_component_metadata,
     read_text_if_exists,
     repo_root_from,
     reset_output_directory,
@@ -40,70 +40,70 @@ from .filesystem import (
 from .markdown import humanized_stem, normalize_markdown_doc, split_paragraphs, update_markdown_front_matter, with_yaml_front_matter
 from .models import (
     AliasesDataDocument,
-    BuildishProjectPagePayload,
-    BuildishProjectPaths,
-    BuildishProjectPayload,
-    CatalogProject,
-    BuildishProjectUnreleased,
+    BuildishComponentPagePayload,
+    BuildishComponentPaths,
+    BuildishComponentPayload,
+    CatalogComponent,
+    BuildishComponentUnreleased,
     DocsFrontMatter,
     LifecycleDataDocument,
     LifecycleDataEntry,
     LifecycleLatestStable,
     LifecycleUnreleased,
     ManifestDocument,
-    ManifestProjectEntry,
-    ProjectAliasesEntry,
-    ProjectBuildResult,
-    ProjectCatalogDefaults,
-    ProjectLifecycleDocument,
-    ProjectLifecycleDocumentData,
-    ProjectMetadata,
-    ProjectVersionDocument,
-    ProjectsCatalog,
-    ProjectsDataDocument,
-    ProjectsDataEntry,
+    ManifestComponentEntry,
+    ComponentAliasesEntry,
+    ComponentBuildResult,
+    ComponentCatalogDefaults,
+    ComponentLifecycleDocument,
+    ComponentLifecycleDocumentData,
+    ComponentMetadata,
+    ComponentVersionDocument,
+    ComponentsCatalog,
+    ComponentsDataDocument,
+    ComponentsDataEntry,
     StagedDocLink,
-    StagedProjectRef,
+    StagedComponentRef,
     VersionAssets,
     VersionDescriptor,
     VersionSource,
 )
 from .rendering import (
     build_preview_index,
-    build_project_markdown,
-    build_project_preview,
+    build_component_markdown,
+    build_component_preview,
     build_unreleased_index_markdown,
     normalize_lifecycle,
     public_assets_root_path,
     public_content_page_path,
-    public_project_path,
+    public_component_path,
     public_unreleased_path,
 )
 
 
 def _content_setting(
-    project: CatalogProject,
-    metadata: ProjectMetadata,
-    defaults: ProjectCatalogDefaults,
+    component: CatalogComponent,
+    metadata: ComponentMetadata,
+    defaults: ComponentCatalogDefaults,
     field_name: str,
 ) -> str | None:
     """Resolve a content-related setting using the pipeline precedence rules."""
 
     return first_non_none(
-        getattr(project, field_name),
+        getattr(component, field_name),
         getattr(metadata.content, field_name),
         getattr(defaults, field_name),
     )
 
 
-def _stage_project_docs(
+def _stage_component_docs(
     repo_path: Path,
     docs_relative: str,
     docs_root: Path,
     slug: str,
     warnings: list[str],
 ) -> list[Path]:
-    """Copy a project's docs tree into the staged Hugo content tree."""
+    """Copy a component's docs tree into the staged Hugo content tree."""
 
     docs_path = safe_relative_path(repo_path, docs_relative, f"docsRoot for {slug}") if docs_relative else None
     if docs_path and docs_path.is_dir():
@@ -112,13 +112,13 @@ def _stage_project_docs(
     return []
 
 
-def _stage_project_assets(
+def _stage_component_assets(
     repo_path: Path,
     assets_relative: str,
     staged_assets_root: Path,
     slug: str,
 ) -> list[Path]:
-    """Copy a project's static assets into the staged site tree."""
+    """Copy a component's static assets into the staged site tree."""
 
     assets_path = safe_relative_path(repo_path, assets_relative, f"assetsRoot for {slug}") if assets_relative else None
     if assets_path and assets_path.is_dir():
@@ -150,21 +150,21 @@ def _normalize_staged_docs(
                 summary = doc_summary
         if copied.suffix.lower() not in {".md", ".markdown", ".adoc", ".asciidoc"}:
             continue
-        raw_path = public_content_page_path(["projects", slug, "unreleased", "docs"], copied)
+        raw_path = public_content_page_path(["components", slug, "unreleased", "docs"], copied)
         doc_links.append(StagedDocLink(label=doc_title, href=raw_path))
     return doc_links, summary
 
 
-def _write_project_indexes(result: ProjectBuildResult, project_root: Path, unreleased_root: Path) -> None:
-    """Write the staged Markdown landing pages for one project."""
+def _write_component_indexes(result: ComponentBuildResult, component_root: Path, unreleased_root: Path) -> None:
+    """Write the staged Markdown landing pages for one component."""
 
-    project_index_path = project_root / "_index.md"
+    component_index_path = component_root / "_index.md"
     unreleased_index_path = unreleased_root / "_index.md"
-    project_index_path.parent.mkdir(parents=True, exist_ok=True)
+    component_index_path.parent.mkdir(parents=True, exist_ok=True)
     unreleased_index_path.parent.mkdir(parents=True, exist_ok=True)
-    project_index_path.write_text(
+    component_index_path.write_text(
         with_yaml_front_matter(
-            build_project_markdown(result),
+            build_component_markdown(result),
             **DocsFrontMatter(
                 title=result.display_name,
                 weight=result.navigation_weight,
@@ -187,10 +187,10 @@ def _write_project_indexes(result: ProjectBuildResult, project_root: Path, unrel
     )
 
 
-def _buildish_project_payload(result: ProjectBuildResult) -> BuildishProjectPayload:
-    """Build the project-context payload injected into staged Markdown pages."""
+def _buildish_component_payload(result: ComponentBuildResult) -> BuildishComponentPayload:
+    """Build the component-context payload injected into staged Markdown pages."""
 
-    return BuildishProjectPayload(
+    return BuildishComponentPayload(
         slug=result.slug,
         display_name=result.display_name,
         summary=result.summary or None,
@@ -199,14 +199,14 @@ def _buildish_project_payload(result: ProjectBuildResult) -> BuildishProjectPayl
         repository=result.repository,
         default_branch=result.default_branch,
         navigation_section=result.navigation_section,
-        paths=BuildishProjectPaths(
-            project=result.raw_project_index_path,
+        paths=BuildishComponentPaths(
+            component=result.raw_component_index_path,
             unreleased=result.raw_unreleased_index_path,
             docs=result.raw_docs_root_path,
             assets=result.raw_assets_root_path,
         ),
         unreleased_label=result.unreleased_label,
-        unreleased=BuildishProjectUnreleased(
+        unreleased=BuildishComponentUnreleased(
             label=result.unreleased_label,
             path=result.raw_unreleased_index_path or public_unreleased_path(result.slug),
             docs_path=result.raw_docs_root_path,
@@ -221,20 +221,20 @@ def _buildish_project_payload(result: ProjectBuildResult) -> BuildishProjectPayl
     )
 
 
-def _buildish_project_page_payload(
-    result: ProjectBuildResult,
+def _buildish_component_page_payload(
+    result: ComponentBuildResult,
     *,
     kind: str,
     section: str,
     page_path: str | None,
-) -> BuildishProjectPagePayload:
-    """Build per-page context for staged project pages."""
+) -> BuildishComponentPagePayload:
+    """Build per-page context for staged component pages."""
 
-    return BuildishProjectPagePayload(
+    return BuildishComponentPagePayload(
         kind=kind,
         section=section,
         path=page_path,
-        project_path=result.raw_project_index_path,
+        component_path=result.raw_component_index_path,
         version=(
             None
             if section not in {"unreleased", "docs"}
@@ -248,26 +248,26 @@ def _buildish_project_page_payload(
     )
 
 
-def _annotate_staged_project_pages(
-    result: ProjectBuildResult,
-    project_root: Path,
+def _annotate_staged_component_pages(
+    result: ComponentBuildResult,
+    component_root: Path,
     unreleased_root: Path,
     docs_root: Path,
     copied_docs: list[Path],
 ) -> None:
-    """Inject pipeline-owned project context into all staged Markdown pages."""
+    """Inject pipeline-owned component context into all staged Markdown pages."""
 
-    project_payload = _buildish_project_payload(result)
-    project_index_path = project_root / "_index.md"
-    project_index_path.write_text(
+    component_payload = _buildish_component_payload(result)
+    component_index_path = component_root / "_index.md"
+    component_index_path.write_text(
         update_markdown_front_matter(
-            project_index_path.read_text(encoding="utf-8"),
-            buildishProject=project_payload,
-            buildishProjectPage=_buildish_project_page_payload(
+            component_index_path.read_text(encoding="utf-8"),
+            buildishComponent=component_payload,
+            buildishComponentPage=_buildish_component_page_payload(
                 result,
-                kind="project-home",
-                section="project",
-                page_path=result.raw_project_index_path,
+                kind="component-home",
+                section="component",
+                page_path=result.raw_component_index_path,
             ),
         ),
         encoding="utf-8",
@@ -277,8 +277,8 @@ def _annotate_staged_project_pages(
     unreleased_index_path.write_text(
         update_markdown_front_matter(
             unreleased_index_path.read_text(encoding="utf-8"),
-            buildishProject=project_payload,
-            buildishProjectPage=_buildish_project_page_payload(
+            buildishComponent=component_payload,
+            buildishComponentPage=_buildish_component_page_payload(
                 result,
                 kind="unreleased-home",
                 section="unreleased",
@@ -292,12 +292,12 @@ def _annotate_staged_project_pages(
         staged_doc_path = docs_root / copied
         if copied.suffix.lower() not in {".md", ".markdown"} or not staged_doc_path.is_file():
             continue
-        page_path = public_content_page_path(["projects", result.slug, "unreleased", "docs"], copied)
+        page_path = public_content_page_path(["components", result.slug, "unreleased", "docs"], copied)
         staged_doc_path.write_text(
             update_markdown_front_matter(
                 staged_doc_path.read_text(encoding="utf-8"),
-                buildishProject=project_payload,
-                buildishProjectPage=_buildish_project_page_payload(
+                buildishComponent=component_payload,
+                buildishComponentPage=_buildish_component_page_payload(
                     result,
                     kind="docs-home" if copied == Path("_index.md") else "docs-page",
                     section="docs",
@@ -308,9 +308,9 @@ def _annotate_staged_project_pages(
         )
 
 
-def _write_project_metadata_files(
-    result: ProjectBuildResult,
-    project_root: Path,
+def _write_component_metadata_files(
+    result: ComponentBuildResult,
+    component_root: Path,
     unreleased_root: Path,
     metadata_relative: str,
     metadata_loaded: bool,
@@ -321,13 +321,13 @@ def _write_project_metadata_files(
 
     raw_unreleased_index_path = public_unreleased_path(result.slug)
     version_metadata_path = unreleased_root / "version.yaml"
-    lifecycle_metadata_path = project_root / "lifecycle.yaml"
+    lifecycle_metadata_path = component_root / "lifecycle.yaml"
 
     write_yaml_like(
         version_metadata_path,
-        ProjectVersionDocument(
+        ComponentVersionDocument(
             schema_version=1,
-            project=StagedProjectRef(slug=result.slug, display_name=result.display_name),
+            component=StagedComponentRef(slug=result.slug, display_name=result.display_name),
             version=VersionDescriptor(
                 kind="unreleased",
                 label=result.unreleased_label,
@@ -349,10 +349,10 @@ def _write_project_metadata_files(
 
     write_yaml_like(
         lifecycle_metadata_path,
-        ProjectLifecycleDocument(
+        ComponentLifecycleDocument(
             schema_version=1,
-            project=StagedProjectRef(slug=result.slug, display_name=result.display_name),
-            lifecycle=ProjectLifecycleDocumentData(
+            component=StagedComponentRef(slug=result.slug, display_name=result.display_name),
+            lifecycle=ComponentLifecycleDocumentData(
                 unreleased=LifecycleUnreleased(
                     label=result.unreleased_label,
                     path=raw_unreleased_index_path,
@@ -391,88 +391,88 @@ def _stage_authored_site_content(site_root: Path, stage_root: Path, incubator_di
         )
 
 
-def stage_project(
+def stage_component(
     repo_root: Path,
     stage_root: Path,
-    project: CatalogProject,
-    defaults: ProjectCatalogDefaults,
+    component: CatalogComponent,
+    defaults: ComponentCatalogDefaults,
     catalog_index: int,
-) -> ProjectBuildResult:
-    """Stage one project described in ``site/projects.yaml``."""
+) -> ComponentBuildResult:
+    """Stage one component described in ``site/components.yaml``."""
 
-    slug = project.slug
-    local_dir = project.local_dir
+    slug = component.slug
+    local_dir = component.local_dir
     repo_path = safe_repo_path(repo_root, local_dir)
     warnings: list[str] = []
     available = repo_path.is_dir()
-    navigation_weight = project.weight if project.weight is not None else catalog_index * 10
+    navigation_weight = component.weight if component.weight is not None else catalog_index * 10
 
-    metadata_relative = project.metadata_file or defaults.metadata_file or "site/project.yaml"
-    metadata = ProjectMetadata()
+    metadata_relative = component.metadata_file or defaults.metadata_file or "site/component.yaml"
+    metadata = ComponentMetadata()
     metadata_path: Path | None = None
     if available:
-        metadata, metadata_path = load_project_metadata(repo_path, metadata_relative, slug)
+        metadata, metadata_path = load_component_metadata(repo_path, metadata_relative, slug)
 
-    display_name = str(first_non_none(project.display_name, metadata.project.display_name, slug))
-    repository = first_non_none(project.repository, metadata.project.repository)
-    default_branch = first_non_none(project.default_branch, metadata.project.default_branch)
+    display_name = str(first_non_none(component.display_name, metadata.component.display_name, slug))
+    repository = first_non_none(component.repository, metadata.component.repository)
+    default_branch = first_non_none(component.default_branch, metadata.component.default_branch)
     navigation_section = first_non_none(
-        project.navigation_section,
+        component.navigation_section,
         metadata.navigation.section,
         defaults.navigation_section,
     )
 
-    docs_setting = _content_setting(project, metadata, defaults, "docs_root")
+    docs_setting = _content_setting(component, metadata, defaults, "docs_root")
     docs_relative = "" if docs_setting is None else str(docs_setting)
 
-    assets_setting = _content_setting(project, metadata, defaults, "assets_root")
+    assets_setting = _content_setting(component, metadata, defaults, "assets_root")
     assets_relative = "" if assets_setting is None else str(assets_setting)
 
     unreleased_label = str(
         first_non_none(
-            project.unreleased_label,
+            component.unreleased_label,
             metadata.versioning.unreleased_label,
             defaults.unreleased_label,
             "Unreleased",
         )
     )
     tag_pattern = first_non_none(
-        project.tag_pattern,
+        component.tag_pattern,
         metadata.versioning.tag_pattern,
         defaults.tag_pattern,
     )
     if tag_pattern is None:
         tag_pattern = re.compile(DEFAULT_TAG_PATTERN)
 
-    project_root = stage_root / "content" / "projects" / slug
-    unreleased_root = project_root / "unreleased"
+    component_root = stage_root / "content" / "components" / slug
+    unreleased_root = component_root / "unreleased"
     docs_root = unreleased_root / "docs"
-    staged_assets_root = stage_root / "static" / "projects" / slug / "unreleased" / "assets"
+    staged_assets_root = stage_root / "static" / "components" / slug / "unreleased" / "assets"
 
     if available:
-        copied_docs = _stage_project_docs(repo_path, docs_relative, docs_root, slug, warnings)
-        copied_assets = _stage_project_assets(repo_path, assets_relative, staged_assets_root, slug)
+        copied_docs = _stage_component_docs(repo_path, docs_relative, docs_root, slug, warnings)
+        copied_assets = _stage_component_assets(repo_path, assets_relative, staged_assets_root, slug)
     else:
         copied_docs = []
         copied_assets = []
-        warnings.append("Local repository directory is missing; project was skipped for raw docs staging.")
+        warnings.append("Local repository directory is missing; component was skipped for raw docs staging.")
 
     doc_links, summary = _normalize_staged_docs(docs_root, slug, copied_docs)
     if copied_docs and not (docs_root / "_index.md").is_file():
         warnings.append("Docs root is missing _index.md; add a site-oriented docs landing page.")
 
     raw_unreleased_index_path = public_unreleased_path(slug)
-    raw_project_index_path = public_project_path(slug)
-    raw_docs_root_path = public_content_page_path(["projects", slug, "unreleased", "docs"], Path("_index.md")) if (docs_root / "_index.md").is_file() else None
+    raw_component_index_path = public_component_path(slug)
+    raw_docs_root_path = public_content_page_path(["components", slug, "unreleased", "docs"], Path("_index.md")) if (docs_root / "_index.md").is_file() else None
     raw_assets_root_path = public_assets_root_path(slug) if copied_assets else None
     latest_stable_version, latest_stable_path, release_lines, alias_mappings = normalize_lifecycle(
         metadata.lifecycle,
         tag_pattern,
         slug,
-        project_root,
+        component_root,
     )
 
-    result = ProjectBuildResult(
+    result = ComponentBuildResult(
         slug=slug,
         display_name=display_name,
         navigation_weight=navigation_weight,
@@ -482,7 +482,7 @@ def stage_project(
         repo_path=repo_path,
         summary=summary,
         raw_unreleased_index_path=raw_unreleased_index_path,
-        raw_project_index_path=raw_project_index_path,
+        raw_component_index_path=raw_component_index_path,
         raw_docs_root_path=raw_docs_root_path,
         raw_assets_root_path=raw_assets_root_path,
         unreleased_label=unreleased_label,
@@ -497,21 +497,21 @@ def stage_project(
         warnings=warnings,
     )
 
-    _write_project_indexes(result, project_root, unreleased_root)
-    _write_project_metadata_files(
+    _write_component_indexes(result, component_root, unreleased_root)
+    _write_component_metadata_files(
         result,
-        project_root,
+        component_root,
         unreleased_root,
         metadata_relative=metadata_relative,
         metadata_loaded=metadata_path is not None,
         docs_relative=docs_relative,
         assets_relative=assets_relative,
     )
-    _annotate_staged_project_pages(result, project_root, unreleased_root, docs_root, copied_docs)
+    _annotate_staged_component_pages(result, component_root, unreleased_root, docs_root, copied_docs)
     return result
 
 
-def build(repo_root: Path | None = None, *, include_preview: bool = True) -> list[ProjectBuildResult]:
+def build(repo_root: Path | None = None, *, include_preview: bool = True) -> list[ComponentBuildResult]:
     """Build the staged site contract and, optionally, the lightweight preview pages.
 
     ``include_preview=False`` is used by watch mode so repeated restaging only
@@ -521,7 +521,7 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
 
     resolved_repo_root = repo_root_from(repo_root)
     site_root = resolved_repo_root / "site"
-    catalog = ProjectsCatalog.from_yaml_path(site_root / "projects.yaml")
+    catalog = ComponentsCatalog.from_yaml_path(site_root / "components.yaml")
 
     stage_root = site_root / ".stage"
     preview_root = site_root / ".preview"
@@ -530,8 +530,8 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
         reset_output_directory(preview_root)
 
     results = [
-        stage_project(resolved_repo_root, stage_root, project, catalog.defaults, index)
-        for index, project in enumerate(catalog.projects, start=1)
+        stage_component(resolved_repo_root, stage_root, component, catalog.defaults, index)
+        for index, component in enumerate(catalog.components, start=1)
     ]
     incubator_disclaimer = read_text_if_exists(resolved_repo_root / "DISCLAIMER").strip()
     incubator_disclaimer_paragraphs = split_paragraphs(incubator_disclaimer)
@@ -544,8 +544,8 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
             schema_version=1,
             generated_at=dt.datetime.now(dt.timezone.utc).isoformat(),
             repo_root=str(resolved_repo_root),
-            projects=tuple(
-                ManifestProjectEntry(
+            components=tuple(
+                ManifestComponentEntry(
                     slug=result.slug,
                     display_name=result.display_name,
                     weight=result.navigation_weight,
@@ -553,7 +553,7 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
                     local_dir=result.local_dir,
                     repository=result.repository,
                     default_branch=result.default_branch,
-                    project_path=result.raw_project_index_path,
+                    component_path=result.raw_component_index_path,
                     unreleased_path=result.raw_unreleased_index_path,
                     docs_path=result.raw_docs_root_path,
                 )
@@ -562,11 +562,11 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
         ),
     )
     write_yaml_like(
-        stage_root / "data" / "projects.yaml",
-        ProjectsDataDocument(
+        stage_root / "data" / "components.yaml",
+        ComponentsDataDocument(
             schema_version=1,
-            projects={
-                result.slug: ProjectsDataEntry(
+            components={
+                result.slug: ComponentsDataEntry(
                     display_name=result.display_name,
                     weight=result.navigation_weight,
                     available=result.available,
@@ -576,7 +576,7 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
                     default_branch=result.default_branch,
                     navigation_section=result.navigation_section,
                     unreleased_label=result.unreleased_label,
-                    project_path=result.raw_project_index_path,
+                    component_path=result.raw_component_index_path,
                     unreleased_path=result.raw_unreleased_index_path,
                     docs_path=result.raw_docs_root_path,
                     asset_count=result.asset_count,
@@ -593,7 +593,7 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
         stage_root / "data" / "lifecycle.yaml",
         LifecycleDataDocument(
             schema_version=1,
-            projects={
+            components={
                 result.slug: LifecycleDataEntry(
                     latest_stable=result.latest_stable_version,
                     release_lines=result.release_lines,
@@ -611,16 +611,16 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
         stage_root / "data" / "aliases.yaml",
         AliasesDataDocument(
             schema_version=1,
-            projects={result.slug: ProjectAliasesEntry(aliases=result.alias_mappings) for result in results},
+            components={result.slug: ComponentAliasesEntry(aliases=result.alias_mappings) for result in results},
         ),
     )
 
     if include_preview:
         (preview_root / "index.html").write_text(build_preview_index(results), encoding="utf-8")
         for result in results:
-            project_preview = preview_root / "projects" / result.slug / "index.html"
-            project_preview.parent.mkdir(parents=True, exist_ok=True)
-            project_preview.write_text(build_project_preview(result), encoding="utf-8")
+            component_preview = preview_root / "components" / result.slug / "index.html"
+            component_preview.parent.mkdir(parents=True, exist_ok=True)
+            component_preview.write_text(build_component_preview(result), encoding="utf-8")
     return results
 
 

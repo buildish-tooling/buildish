@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Current site sub-project contract
+# Current site component contract
 
 This document describes the implemented input contract for the site pipeline.
 For the broader long-term design, see [`site-infra.md`](site-infra.md).
@@ -22,18 +22,18 @@ For the broader long-term design, see [`site-infra.md`](site-infra.md).
 ## Workspace model
 
 - the main repository is expected at `./buildish`
-- participating sub-projects are normally sibling checkouts such as `./buildish-mammoth-cache-gradle`
-- missing sub-project repositories are allowed during local builds and CI; they are skipped cleanly
+- participating components are normally sibling checkouts such as `./buildish-mammoth-cache-gradle`
+- missing component repositories are allowed during local builds and CI; they are skipped cleanly
 
 ## Main repository catalog
 
-The main repository owns `site/projects.yaml`.
+The main repository owns `site/components.yaml`.
 
 Current supported top-level fields:
 
 - `schemaVersion`
 - `defaults`
-- `projects`
+- `components`
 
 Current supported `defaults` fields:
 
@@ -44,21 +44,21 @@ Current supported `defaults` fields:
 - `tagPattern`
 - `navigationSection`
 
-Each `projects[]` entry currently supports:
+Each `components[]` entry currently supports:
 
 - required: `slug`, `localDir`
 - optional: `displayName`, `repository`, `defaultBranch`, `weight`
 - optional overrides: `metadataFile`, `docsRoot`, `assetsRoot`
 - optional publication/navigation hints: `unreleasedLabel`, `tagPattern`, `navigationSection`
 
-## Sub-project metadata file
+## Component metadata file
 
-When present, the aggregator reads `site/project.yaml` from the sub-project.
+When present, the aggregator reads `site/component.yaml` from the component.
 
 Preferred structure:
 
 - `schemaVersion`
-- `project`
+- `component`
   - `slug`
   - `displayName`
   - `repository`
@@ -82,17 +82,17 @@ and navigation fields, but new metadata should prefer the nested structure above
 
 The current implementation resolves values in this order:
 
-1. per-project overrides in `site/projects.yaml`
-2. sub-project metadata in `site/project.yaml`
-3. catalog defaults from `site/projects.yaml`
+1. per-component overrides in `site/components.yaml`
+2. component metadata in `site/component.yaml`
+3. catalog defaults from `site/components.yaml`
 4. built-in defaults in the aggregator
 
 In practice, that means the central catalog controls inventory and local discovery,
-while the sub-project metadata controls content-local structure.
+while the component metadata controls content-local structure.
 
 ## Content inputs
 
-For each available sub-project repository, it stages:
+For each available component repository, it stages:
 
 - the configured docs tree, defaulting to `site/docs`
 - the configured asset tree, defaulting to `site/assets`
@@ -100,11 +100,11 @@ For each available sub-project repository, it stages:
 The docs tree should include a site-oriented `_index.md` landing page.
 
 If the docs tree is missing, unreleased docs staging is skipped for that
-project.
+component.
 
 ## Lifecycle inputs
 
-Lightweight lifecycle metadata in `site/project.yaml`:
+Lightweight lifecycle metadata in `site/component.yaml`:
 
 - `latestStable`: exact version tag such as `v1.3.5`
 - `releaseLines[]`
@@ -129,19 +129,19 @@ The current aggregator enforces these guardrails:
 
 Stage outputs are, at minimum:
 
-- `site/.stage/content/projects/<slug>/_index.md`
-- `site/.stage/content/projects/<slug>/unreleased/docs/...`
-- `site/.stage/content/projects/<slug>/unreleased/version.yaml`
-- `site/.stage/content/projects/<slug>/lifecycle.yaml`
-- `site/.stage/data/projects.yaml`
+- `site/.stage/content/components/<slug>/_index.md`
+- `site/.stage/content/components/<slug>/unreleased/docs/...`
+- `site/.stage/content/components/<slug>/unreleased/version.yaml`
+- `site/.stage/content/components/<slug>/lifecycle.yaml`
+- `site/.stage/data/components.yaml`
 - `site/.stage/data/lifecycle.yaml`
 - `site/.stage/data/aliases.yaml`
-- `site/.stage/static/projects/<slug>/unreleased/assets/...` when assets exist
+- `site/.stage/static/components/<slug>/unreleased/assets/...` when assets exist
 
-Each staged project Markdown page also receives pipeline-owned front matter under:
+Each staged component Markdown page also receives pipeline-owned front matter under:
 
-- `buildishProject` for the current project identity, navigation paths, and lifecycle summary
-- `buildishProjectPage` for the current staged page kind and active unreleased-version context
+- `buildishComponent` for the current component identity, navigation paths, and lifecycle summary
+- `buildishComponentPage` for the current staged page kind and active unreleased-version context
 
 ## Local commands
 

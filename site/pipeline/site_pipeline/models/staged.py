@@ -24,8 +24,8 @@ from pydantic import Field, StrictBool
 from .base import YamlModel
 
 
-class StagedProjectRef(YamlModel):
-    """Project identity written into staged YAML contract files."""
+class StagedComponentRef(YamlModel):
+    """Component identity written into staged YAML contract files."""
 
     slug: str
     display_name: str
@@ -85,11 +85,11 @@ class VersionAssets(YamlModel):
     path: str | None = None
 
 
-class ProjectVersionDocument(YamlModel):
-    """Typed representation of a staged project ``version.yaml`` file."""
+class ComponentVersionDocument(YamlModel):
+    """Typed representation of a staged component ``version.yaml`` file."""
 
     schema_version: int
-    project: StagedProjectRef
+    component: StagedComponentRef
     version: VersionDescriptor
     source: VersionSource
     assets: VersionAssets
@@ -105,30 +105,30 @@ class LifecycleUnreleased(YamlModel):
 
 
 class LifecycleLatestStable(YamlModel):
-    """The structured latest-stable entry used in project ``lifecycle.yaml``."""
+    """The structured latest-stable entry used in component ``lifecycle.yaml``."""
 
     version: str
     path: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
-class ProjectLifecycleDocumentData(YamlModel):
-    """The ``lifecycle`` section of a project ``lifecycle.yaml`` file."""
+class ComponentLifecycleDocumentData(YamlModel):
+    """The ``lifecycle`` section of a component ``lifecycle.yaml`` file."""
 
     unreleased: LifecycleUnreleased
     latest_stable: LifecycleLatestStable | None = None
     release_lines: tuple[StagedReleaseLine, ...] = Field(default_factory=tuple)
 
 
-class ProjectLifecycleDocument(YamlModel):
-    """Typed representation of a staged project ``lifecycle.yaml`` file."""
+class ComponentLifecycleDocument(YamlModel):
+    """Typed representation of a staged component ``lifecycle.yaml`` file."""
 
     schema_version: int
-    project: StagedProjectRef
-    lifecycle: ProjectLifecycleDocumentData
+    component: StagedComponentRef
+    lifecycle: ComponentLifecycleDocumentData
 
 
-class ManifestProjectEntry(YamlModel):
-    """One project entry in the staged root ``manifest.yaml`` file."""
+class ManifestComponentEntry(YamlModel):
+    """One component entry in the staged root ``manifest.yaml`` file."""
 
     slug: str
     display_name: str
@@ -137,7 +137,7 @@ class ManifestProjectEntry(YamlModel):
     local_dir: str
     repository: str | None = None
     default_branch: str | None = None
-    project_path: str | None = None
+    component_path: str | None = None
     unreleased_path: str | None = None
     docs_path: str | None = None
 
@@ -148,11 +148,11 @@ class ManifestDocument(YamlModel):
     schema_version: int
     generated_at: str
     repo_root: str
-    projects: tuple[ManifestProjectEntry, ...] = Field(default_factory=tuple)
+    components: tuple[ManifestComponentEntry, ...] = Field(default_factory=tuple)
 
 
-class ProjectsDataEntry(YamlModel):
-    """One project entry in the aggregated staged ``data/projects.yaml`` file."""
+class ComponentsDataEntry(YamlModel):
+    """One component entry in the aggregated staged ``data/components.yaml`` file."""
 
     display_name: str
     weight: int
@@ -163,7 +163,7 @@ class ProjectsDataEntry(YamlModel):
     default_branch: str | None = None
     navigation_section: str | None = None
     unreleased_label: str
-    project_path: str | None = None
+    component_path: str | None = None
     unreleased_path: str | None = None
     docs_path: str | None = None
     asset_count: int
@@ -173,15 +173,15 @@ class ProjectsDataEntry(YamlModel):
     release_lines: tuple[StagedReleaseLine, ...] = Field(default_factory=tuple)
 
 
-class ProjectsDataDocument(YamlModel):
-    """Typed representation of the staged aggregated ``data/projects.yaml`` file."""
+class ComponentsDataDocument(YamlModel):
+    """Typed representation of the staged aggregated ``data/components.yaml`` file."""
 
     schema_version: int
-    projects: dict[str, ProjectsDataEntry] = Field(default_factory=dict)
+    components: dict[str, ComponentsDataEntry] = Field(default_factory=dict)
 
 
 class LifecycleDataEntry(YamlModel):
-    """One project entry in the aggregated staged ``data/lifecycle.yaml`` file."""
+    """One component entry in the aggregated staged ``data/lifecycle.yaml`` file."""
 
     latest_stable: str | None = None
     release_lines: tuple[StagedReleaseLine, ...] = Field(default_factory=tuple)
@@ -192,11 +192,11 @@ class LifecycleDataDocument(YamlModel):
     """Typed representation of the staged aggregated ``data/lifecycle.yaml`` file."""
 
     schema_version: int
-    projects: dict[str, LifecycleDataEntry] = Field(default_factory=dict)
+    components: dict[str, LifecycleDataEntry] = Field(default_factory=dict)
 
 
-class ProjectAliasesEntry(YamlModel):
-    """One project entry in the staged aggregated ``data/aliases.yaml`` file."""
+class ComponentAliasesEntry(YamlModel):
+    """One component entry in the staged aggregated ``data/aliases.yaml`` file."""
 
     aliases: tuple[StagedAliasMapping, ...] = Field(default_factory=tuple)
 
@@ -205,12 +205,12 @@ class AliasesDataDocument(YamlModel):
     """Typed representation of the staged aggregated ``data/aliases.yaml`` file."""
 
     schema_version: int
-    projects: dict[str, ProjectAliasesEntry] = Field(default_factory=dict)
+    components: dict[str, ComponentAliasesEntry] = Field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
-class ProjectBuildResult:
-    """Describe the staged output produced for one catalog project."""
+class ComponentBuildResult:
+    """Describe the staged output produced for one catalog component."""
 
     slug: str
     display_name: str
@@ -221,7 +221,7 @@ class ProjectBuildResult:
     repo_path: Path
     summary: str
     raw_unreleased_index_path: str | None
-    raw_project_index_path: str | None
+    raw_component_index_path: str | None
     raw_docs_root_path: str | None
     raw_assets_root_path: str | None
     unreleased_label: str

@@ -13,14 +13,14 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
-{{ $projectContext := partial "buildish-project-context.html" . }}
-{{ $hideSidebar := index $projectContext "isProjectLanding" }}
+{{ $componentContext := partial "buildish-component-context.html" . }}
+{{ $hideSidebar := index $componentContext "isComponentLanding" }}
 <!doctype html>
 <html itemscope itemtype="http://schema.org/WebPage" lang="{{ .Site.Language.Lang }}" class="no-js">
   <head>
     {{ partial "head.html" . }}
   </head>
-  <body class="td-{{ .Kind }}{{ with .Page.Params.body_class }} {{ . }}{{ end }}{{ if $hideSidebar }} buildish-project-landing-page{{ end }}">
+  <body class="td-{{ .Kind }}{{ with .Page.Params.body_class }} {{ . }}{{ end }}{{ if $hideSidebar }} buildish-component-landing-page{{ end }}">
     <header>
       {{ partial "navbar.html" . }}
     </header>

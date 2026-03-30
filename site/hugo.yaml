@@ -118,8 +118,8 @@ menu:
       name: About
       pageRef: /about
       weight: 5
-    - identifier: projects
-      name: Projects
+    - identifier: components
+      name: Components
       weight: 10
     - identifier: community
       name: Community

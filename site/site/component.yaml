@@ -14,11 +14,11 @@
 # limitations under the License.
 
 schemaVersion: 1
-project:
+component:
   slug: site
   displayName: Site
   repository: https://github.com/apache/buildish
 content:
   assetsRoot: null
 navigation:
-  section: sub-projects
+  section: components

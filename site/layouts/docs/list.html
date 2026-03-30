@@ -14,28 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 {{ define "main" }}
-{{ $projectContext := partial "buildish-project-context.html" . }}
-{{ if index $projectContext "isProjectLanding" }}
-{{ $project := index $projectContext "project" }}
-<div class="td-content buildish-project-landing">
-  <div class="buildish-project-landing__hero">
-    <p class="buildish-project-landing__eyebrow">Project</p>
+{{ $componentContext := partial "buildish-component-context.html" . }}
+{{ if index $componentContext "isComponentLanding" }}
+{{ $component := index $componentContext "component" }}
+<div class="td-content buildish-component-landing">
+  <div class="buildish-component-landing__hero">
+    <p class="buildish-component-landing__eyebrow">Component</p>
     <h1>{{ .Title }}</h1>
     {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
-    <div class="buildish-project-landing__actions">
-      {{ with index $projectContext "docsPath" }}
+    <div class="buildish-component-landing__actions">
+      {{ with index $componentContext "docsPath" }}
       <a class="btn btn-primary me-2 mb-2" href="{{ . }}">Open docs</a>
       {{ end }}
-      {{ if index $projectContext "hasReleaseContent" }}
-      <a class="btn btn-outline-primary me-2 mb-2" href="{{ index $projectContext "releaseAnchor" }}">Release lines</a>
+      {{ if index $componentContext "hasReleaseContent" }}
+      <a class="btn btn-outline-primary me-2 mb-2" href="{{ index $componentContext "releaseAnchor" }}">Release lines</a>
       {{ end }}
-      {{ with index $project "repository" }}
+      {{ with index $component "repository" }}
       <a class="btn btn-outline-secondary me-2 mb-2" href="{{ . }}" target="_blank" rel="noopener">Source repository</a>
       {{ end }}
-      <a class="btn btn-link mb-2" href="{{ "/projects/" | relURL }}">All projects</a>
+      <a class="btn btn-link mb-2" href="{{ "/components/" | relURL }}">All components</a>
     </div>
   </div>
-  <div class="buildish-project-landing__body">
+  <div class="buildish-component-landing__body">
     {{ .Content }}
   </div>
   {{ partial "section-index.html" . -}}

@@ -28,7 +28,7 @@ from typing import Any
 import yaml
 
 from .constants import STAGED_VENDOR_ASSETS
-from .models import ProjectMetadata
+from .models import ComponentMetadata
 from .yaml_support import yaml_safe_value
 
 
@@ -52,20 +52,20 @@ def repo_root_from(start: Path | None = None) -> Path:
     return Path(__file__).resolve().parents[3]
 
 
-def load_project_metadata(repo_path: Path, metadata_relative: str | None, slug: str) -> tuple[ProjectMetadata, Path | None]:
-    """Load optional per-project metadata and validate its slug if present."""
+def load_component_metadata(repo_path: Path, metadata_relative: str | None, slug: str) -> tuple[ComponentMetadata, Path | None]:
+    """Load optional per-component metadata and validate its slug if present."""
 
     if not metadata_relative:
-        return ProjectMetadata(), None
+        return ComponentMetadata(), None
 
     metadata_path = safe_relative_path(repo_path, metadata_relative, f"metadataFile for {slug}")
     if metadata_path is None or not metadata_path.is_file():
-        return ProjectMetadata(), None
+        return ComponentMetadata(), None
 
-    metadata = ProjectMetadata.from_yaml_path(metadata_path)
-    metadata_slug = metadata.project.slug
+    metadata = ComponentMetadata.from_yaml_path(metadata_path)
+    metadata_slug = metadata.component.slug
     if metadata_slug is not None and str(metadata_slug) != slug:
-        raise ValueError(f"Project metadata slug mismatch for {slug}: {metadata_slug}")
+        raise ValueError(f"Component metadata slug mismatch for {slug}: {metadata_slug}")
 
     return metadata, metadata_path
 
@@ -93,7 +93,7 @@ def safe_repo_path(repo_root: Path, local_dir: str) -> Path:
     """Resolve a configured sibling-repository path within the workspace parent."""
 
     workspace_parent = repo_root.parent.resolve()
-    return _ensure_within(workspace_parent, workspace_parent / local_dir, "Project localDir")
+    return _ensure_within(workspace_parent, workspace_parent / local_dir, "Component localDir")
 
 
 def safe_relative_path(base: Path, relative_path: str | None, label: str) -> Path | None:

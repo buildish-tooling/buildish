@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 {{ define "main" }}
-{{ $projectsPage := .Site.GetPage "/projects" }}
-{{ $projectSections := slice }}
-{{ with $projectsPage }}{{ $projectSections = (where .Pages "Kind" "section").ByWeight }}{{ end }}
+{{ $componentsPage := .Site.GetPage "/components" }}
+{{ $componentSections := slice }}
+{{ with $componentsPage }}{{ $componentSections = (where .Pages "Kind" "section").ByWeight }}{{ end }}
 <div class="td-content">
   <div class="buildish-home-hero">
     <div class="buildish-home-hero__logo" aria-hidden="true">{{ partial "apache-buildish-pipeline-icon.html" (dict "gradientId" "buildish-home-panel") }}</div>
@@ -31,11 +31,11 @@ limitations under the License.
       </p>
     </div>
   </div>
-  {{ with $projectsPage }}
-  <h2>Projects</h2>
+  {{ with $componentsPage }}
+  <h2>Components</h2>
   <div class="section-index">
     <div class="row">
-      {{ range $projectSections }}
+      {{ range $componentSections }}
       <div class="col-12 col-md-6">
         <div class="entry">
           <h5><a href="{{ .RelPermalink }}">{{ .Title }}</a></h5>

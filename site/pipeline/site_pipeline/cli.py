@@ -39,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.command == "build":
         results = build()
-        print(f"Built {len(results)} project(s) into site/.stage and site/.preview")
+        print(f"Built {len(results)} component(s) into site/.stage and site/.preview")
         return 0
     if args.command == "clean":
         clean()

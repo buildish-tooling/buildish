@@ -13,35 +13,35 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
-{{- $project := .Params.buildishProject -}}
-{{- $page := .Params.buildishProjectPage -}}
+{{- $component := .Params.buildishComponent -}}
+{{- $page := .Params.buildishComponentPage -}}
 {{- $context := dict "enabled" false -}}
-{{- if $project -}}
+{{- if $component -}}
   {{- $paths := dict -}}
-  {{- with index $project "paths" }}{{ $paths = . }}{{ end -}}
-  {{- $projectPath := "" -}}
-  {{- with index $paths "project" }}{{ $projectPath = . }}{{ end -}}
+  {{- with index $component "paths" }}{{ $paths = . }}{{ end -}}
+  {{- $componentPath := "" -}}
+  {{- with index $paths "component" }}{{ $componentPath = . }}{{ end -}}
   {{- $docsPath := "" -}}
   {{- with index $paths "docs" }}{{ $docsPath = . }}{{ end -}}
   {{- $unreleasedLabel := "Unreleased" -}}
-  {{- with index $project "unreleasedLabel" }}{{ $unreleasedLabel = . }}{{ end -}}
+  {{- with index $component "unreleasedLabel" }}{{ $unreleasedLabel = . }}{{ end -}}
 
   {{- $releaseLines := slice -}}
-  {{- with index $project "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
+  {{- with index $component "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
   {{- $latestStable := dict -}}
-  {{- with index $project "latestStable" }}{{ $latestStable = . }}{{ end -}}
+  {{- with index $component "latestStable" }}{{ $latestStable = . }}{{ end -}}
 
   {{- $docsItems := slice -}}
-  {{- if $projectPath -}}
-    {{- $docsItems = $docsItems | append (dict "label" "Overview" "href" $projectPath) -}}
+  {{- if $componentPath -}}
+    {{- $docsItems = $docsItems | append (dict "label" "Overview" "href" $componentPath) -}}
   {{- end -}}
   {{- if $docsPath -}}
     {{- $docsItems = $docsItems | append (dict "label" $unreleasedLabel "href" $docsPath) -}}
   {{- end -}}
 
   {{- $releaseAnchor := "" -}}
-  {{- if $projectPath -}}
-    {{- $releaseAnchor = printf "%s#release-lines" $projectPath -}}
+  {{- if $componentPath -}}
+    {{- $releaseAnchor = printf "%s#release-lines" $componentPath -}}
   {{- end -}}
   {{- $releaseItems := slice -}}
   {{- with index $latestStable "version" -}}
@@ -64,27 +64,27 @@ limitations under the License.
     {{- end -}}
   {{- end -}}
 
-  {{- $isProjectLanding := false -}}
+  {{- $isComponentLanding := false -}}
   {{- with $page -}}
-    {{- $isProjectLanding = eq (index . "kind") "project-home" -}}
+    {{- $isComponentLanding = eq (index . "kind") "component-home" -}}
   {{- end -}}
 
   {{- $brandLabel := .Site.Title -}}
-  {{- with index $project "displayName" -}}
+  {{- with index $component "displayName" -}}
     {{- $brandLabel = printf "%s — %s" $.Site.Title . -}}
   {{- end -}}
 
   {{- $context = dict
     "enabled" true
-    "project" $project
+    "component" $component
     "page" $page
-    "projectPath" $projectPath
+    "componentPath" $componentPath
     "docsPath" $docsPath
     "docsItems" $docsItems
     "releaseAnchor" $releaseAnchor
     "releaseItems" $releaseItems
     "brandLabel" $brandLabel
-    "isProjectLanding" $isProjectLanding
+    "isComponentLanding" $isComponentLanding
     "hasReleaseContent" (or (gt (len $releaseItems) 0) (gt (len $releaseLines) 0))
   -}}
 {{- end -}}

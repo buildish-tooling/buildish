@@ -40,7 +40,7 @@ The Node.js files in `site/` support the Hugo + Docsy render path, while the Pyt
 `uv` project files now live under `site/pipeline/`.
 
 `make stage-local` runs the staging pipeline directly on the host. `make serve-local` keeps
-`site/.stage/` up to date while Hugo runs, including changes in project READMEs/docs/assets
+`site/.stage/` up to date while Hugo runs, including changes in component docs/assets
 that live outside `site/`. Use `make stage-watch-local` if you want to run only the native
 staging watcher without starting Hugo.
 
@@ -51,24 +51,24 @@ The full implementation is documented in [`site/site/docs/site-pipeline.md`](sit
 
 Known local-dev behavior:
 
-- changes to `site/projects.yaml` can take a short while to appear in the running Hugo server
-- newly added projects usually show up correctly after the watcher restages content
-- removed project routes can linger briefly in an already-running `make serve` session even after they disappear from
+- changes to `site/components.yaml` can take a short while to appear in the running Hugo server
+- newly added components usually show up correctly after the watcher restages content
+- removed component routes can linger briefly in an already-running `make serve` session even after they disappear from
   the staged catalog
 
 Treat that last case as an accepted development-only inconvenience. A fresh `make build` or a restarted
 `make serve-local` reflects the current catalog cleanly.
 
-## Current subproject contract
+## Current component contract
 
-The currently implemented catalog and subproject metadata contract is documented in
-[`../docs/site-subproject-contract.md`](site/docs/site-subproject-contract.md).
+The currently implemented catalog and component metadata contract is documented in
+[`../docs/site-component-contract.md`](site/docs/site-component-contract.md).
 
 That document describes:
 
-- `site/projects.yaml` defaults and per-project overrides
-- the preferred `site/project.yaml` structure
-- precedence rules between catalog values and subproject metadata
+- `site/components.yaml` defaults and per-component overrides
+- the preferred `site/component.yaml` structure
+- precedence rules between catalog values and component metadata
 - current staging outputs and safety constraints
 
 ## Containerized workflow
@@ -112,9 +112,9 @@ The containerized flow:
 - bind-mounts the parent workspace into `/workspace`, with this repository available at `/workspace/<repo-name>/`
 - uses that mount in read/write mode, not read-only, because the container writes generated outputs and caches back into
   this repository
-- can only stage/serve subprojects whose `localDir` resolves within that parent workspace; in practice that means
+- can only stage/serve components whose `localDir` resolves within that parent workspace; in practice that means
   sibling repositories next to the main repo (for example `../buildish-mammoth-cache-gradle`)
-- if your subproject repositories live somewhere else, prefer the native `make stage-local`, `make stage-watch-local`,
+- if your component repositories live somewhere else, prefer the native `make stage-local`, `make stage-watch-local`,
   or `make serve-local` workflow instead
 - writes generated outputs back into the working tree
 - keeps tool caches under `site/.container-home/`

@@ -16,16 +16,16 @@ limitations under the License.
 
 ---
 title: Apache Buildish Site Documentation
-description: Current documentation for the Apache Buildish site implementation, project contract, and infrastructure proposal.
+description: Current documentation for the Apache Buildish site implementation, component contract, and infrastructure proposal.
 ---
 
 # Apache Buildish Site Documentation
 
-This section documents the Apache Buildish website itself: the current implementation, the current project metadata contract, and the broader long-term site infrastructure proposal.
+This section documents the Apache Buildish website itself: the current component metadata contract, the current implementation, and the broader long-term site infrastructure proposal.
 
 ## Documents
 
 - [Current implementation](./site-pipeline/)
-- [Current project contract](./site-subproject-contract/)
+- [Current component contract](./site-component-contract/)
 - [CI build inputs and local workspace overrides](./site-ci-and-local-overrides/)
 - [Infrastructure proposal](./site-infra/)

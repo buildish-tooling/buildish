@@ -35,44 +35,44 @@ from .builder import build
 from .common import first_non_none
 from .constants import STAGED_VENDOR_ASSETS, WATCH_DEBOUNCE_MS, WATCH_IGNORE_PATH_PARTS, WATCH_IGNORE_SUFFIXES, WATCH_STEP_MS
 from .filesystem import (
-    load_project_metadata,
+    load_component_metadata,
     repo_root_from,
     resolve_vendor_asset_source,
     safe_relative_path,
     safe_repo_path,
     watchable_existing_path,
 )
-from .models import CatalogProject, ProjectCatalogDefaults, ProjectMetadata, ProjectsCatalog
+from .models import CatalogComponent, ComponentCatalogDefaults, ComponentMetadata, ComponentsCatalog
 
 
 def _configured_content_root(
-    project: CatalogProject,
-    metadata: ProjectMetadata,
-    defaults: ProjectCatalogDefaults,
+    component: CatalogComponent,
+    metadata: ComponentMetadata,
+    defaults: ComponentCatalogDefaults,
     field_name: str,
 ) -> str | None:
     """Resolve typed docs/assets settings for watch-root collection."""
 
     return first_non_none(
-        getattr(project, field_name),
+        getattr(component, field_name),
         getattr(metadata.content, field_name),
         getattr(defaults, field_name),
     )
 
 
-def _project_watch_roots(repo_root: Path, project: CatalogProject, defaults: ProjectCatalogDefaults) -> set[Path]:
-    """Return the filesystem paths that can affect one project's staged output."""
+def _component_watch_roots(repo_root: Path, component: CatalogComponent, defaults: ComponentCatalogDefaults) -> set[Path]:
+    """Return the filesystem paths that can affect one component's staged output."""
 
-    slug = project.slug
-    local_dir = project.local_dir
+    slug = component.slug
+    local_dir = component.local_dir
     repo_path = safe_repo_path(repo_root, local_dir)
     parent_fallback = repo_path.parent if repo_path.parent.exists() else repo_root.parent.resolve()
 
     if not repo_path.exists():
         return {watchable_existing_path(repo_path, parent_fallback)}
 
-    metadata_relative = project.metadata_file or defaults.metadata_file or "site/project.yaml"
-    metadata, _ = load_project_metadata(repo_path, metadata_relative, slug)
+    metadata_relative = component.metadata_file or defaults.metadata_file or "site/component.yaml"
+    metadata, _ = load_component_metadata(repo_path, metadata_relative, slug)
 
     watch_roots: set[Path] = set()
 
@@ -80,13 +80,13 @@ def _project_watch_roots(repo_root: Path, project: CatalogProject, defaults: Pro
     if metadata_path is not None:
         watch_roots.add(watchable_existing_path(metadata_path, repo_path))
 
-    docs_setting = _configured_content_root(project, metadata, defaults, "docs_root")
+    docs_setting = _configured_content_root(component, metadata, defaults, "docs_root")
     if docs_setting is not None:
         docs_path = safe_relative_path(repo_path, str(docs_setting), f"docsRoot for {slug}")
         if docs_path is not None:
             watch_roots.add(watchable_existing_path(docs_path, repo_path))
 
-    assets_setting = _configured_content_root(project, metadata, defaults, "assets_root")
+    assets_setting = _configured_content_root(component, metadata, defaults, "assets_root")
     if assets_setting is not None:
         assets_path = safe_relative_path(repo_path, str(assets_setting), f"assetsRoot for {slug}")
         if assets_path is not None:
@@ -117,10 +117,10 @@ def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
 
     resolved_repo_root = repo_root_from(repo_root)
     site_root = resolved_repo_root / "site"
-    catalog = ProjectsCatalog.from_yaml_path(site_root / "projects.yaml")
+    catalog = ComponentsCatalog.from_yaml_path(site_root / "components.yaml")
 
     watch_roots: set[Path] = {
-        watchable_existing_path(site_root / "projects.yaml", site_root),
+        watchable_existing_path(site_root / "components.yaml", site_root),
         watchable_existing_path(site_root / "content", site_root),
     }
     watch_roots.update(_pipeline_watch_roots(site_root))
@@ -130,8 +130,8 @@ def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
         if source.exists():
             watch_roots.add(source.resolve())
 
-    for project in catalog.projects:
-        watch_roots.update(_project_watch_roots(resolved_repo_root, project, catalog.defaults))
+    for component in catalog.components:
+        watch_roots.update(_component_watch_roots(resolved_repo_root, component, catalog.defaults))
 
     return sorted(watch_roots, key=str)
 
@@ -171,7 +171,7 @@ def watch_and_build(repo_root: Path | None = None, debounce_ms: int = WATCH_DEBO
 
     resolved_repo_root = repo_root_from(repo_root)
     results = build(resolved_repo_root, include_preview=False)
-    print(f"Built {len(results)} project(s) into site/.stage")
+    print(f"Built {len(results)} component(s) into site/.stage")
 
     while True:
         watch_roots = collect_watch_roots(resolved_repo_root)
@@ -208,7 +208,7 @@ def watch_and_build(repo_root: Path | None = None, debounce_ms: int = WATCH_DEBO
 
             try:
                 results = build(resolved_repo_root, include_preview=False)
-                print(f"Built {len(results)} project(s) into site/.stage")
+                print(f"Built {len(results)} component(s) into site/.stage")
             except Exception as exc:
                 print(f"Rebuild failed: {exc}", file=sys.stderr)
 

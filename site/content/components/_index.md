@@ -12,11 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-title: Projects
-description: Browsable project sections staged from the local catalog.
+title: Components
+description: Browsable component sections staged from the local catalog.
 type: docs
 ---
 
-Browse staged subprojects and supporting documentation collected from the local Apache Buildish catalog.
+Browse staged components and supporting documentation collected from the local Apache Buildish catalog.
 
-Each project section is assembled from local metadata, staged docs, and generated lifecycle information so the umbrella-project site stays close to the current development state.
+Each component section is assembled from local metadata, staged docs, and generated lifecycle information so the umbrella-project site stays close to the current development state.

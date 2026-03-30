@@ -24,8 +24,8 @@ Thank you for considering contributing to Apache Buildish. Contributions to code
 
 Open a GitHub issue in the most relevant Buildish repository.
 
-- For umbrella-project work such as the site, shared docs, or cross-project coordination, use the [apache/buildish](https://github.com/apache/buildish) repository.
-- For subproject-specific work, open the issue in that subproject's repository.
+- For umbrella-project work such as the site, shared docs, or cross-component coordination, use the [apache/buildish](https://github.com/apache/buildish) repository.
+- For component-specific work, open the issue in that component's repository.
 - If you are not sure where something belongs, start with the [development mailing list](mailto:dev@buildish.apache.org).
 
 If you find a security vulnerability, **do not** open a public issue. Follow the [Security Report](/community/security-report/) guidance instead.
@@ -84,5 +84,5 @@ Contributors may use AI tools while preparing changes, but the person opening th
 - Follow the existing style and structure of the repository you are changing.
 - Prefer small, reviewable pull requests over large unrelated batches.
 - Avoid unnecessary dependencies unless they have been discussed first.
-- Discuss public interfaces, extension points, or cross-project impact before requesting merge.
+- Discuss public interfaces, extension points, or cross-component impact before requesting merge.
 - Give reviewers time to respond, especially for non-trivial changes.

@@ -24,17 +24,17 @@ from .base import YamlModel
 from .staged import LifecycleLatestStable, StagedReleaseLine, VersionDescriptor
 
 
-class BuildishProjectPaths(YamlModel):
-    """Path map injected into staged project page front matter."""
+class BuildishComponentPaths(YamlModel):
+    """Path map injected into staged component page front matter."""
 
-    project: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    component: str | None = Field(default=None, exclude_if=lambda value: value is None)
     unreleased: str | None = Field(default=None, exclude_if=lambda value: value is None)
     docs: str | None = Field(default=None, exclude_if=lambda value: value is None)
     assets: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
-class BuildishProjectUnreleased(YamlModel):
-    """Unreleased-version metadata injected into staged project page front matter."""
+class BuildishComponentUnreleased(YamlModel):
+    """Unreleased-version metadata injected into staged component page front matter."""
 
     label: str
     path: str
@@ -42,8 +42,8 @@ class BuildishProjectUnreleased(YamlModel):
     assets_path: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
-class BuildishProjectPayload(YamlModel):
-    """Project context payload injected into staged Markdown front matter."""
+class BuildishComponentPayload(YamlModel):
+    """Component context payload injected into staged Markdown front matter."""
 
     slug: str
     display_name: str
@@ -53,20 +53,20 @@ class BuildishProjectPayload(YamlModel):
     repository: str | None = Field(default=None, exclude_if=lambda value: value is None)
     default_branch: str | None = Field(default=None, exclude_if=lambda value: value is None)
     navigation_section: str | None = Field(default=None, exclude_if=lambda value: value is None)
-    paths: BuildishProjectPaths
+    paths: BuildishComponentPaths
     unreleased_label: str
-    unreleased: BuildishProjectUnreleased
+    unreleased: BuildishComponentUnreleased
     latest_stable: LifecycleLatestStable | None = Field(default=None, exclude_if=lambda value: value is None)
     release_lines: tuple[StagedReleaseLine, ...] = Field(default_factory=tuple)
 
 
-class BuildishProjectPagePayload(YamlModel):
-    """Per-page context payload injected into staged project page front matter."""
+class BuildishComponentPagePayload(YamlModel):
+    """Per-page context payload injected into staged component page front matter."""
 
-    kind: Literal["project-home", "unreleased-home", "docs-home", "docs-page"]
-    section: Literal["project", "unreleased", "docs"]
+    kind: Literal["component-home", "unreleased-home", "docs-home", "docs-page"]
+    section: Literal["component", "unreleased", "docs"]
     path: str | None = Field(default=None, exclude_if=lambda value: value is None)
-    project_path: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    component_path: str | None = Field(default=None, exclude_if=lambda value: value is None)
     version: VersionDescriptor | None = Field(default=None, exclude_if=lambda value: value is None)
 
 

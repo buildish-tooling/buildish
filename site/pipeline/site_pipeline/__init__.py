@@ -21,15 +21,15 @@ filesystem, watch-mode, and build orchestration logic more easily.
 
 from __future__ import annotations
 
-from .builder import build, clean, serve, stage_project
+from .builder import build, clean, serve, stage_component
 from .cli import main, parse_args
 from .constants import WATCH_DEBOUNCE_MS
 from .markdown import extract_title_and_summary, normalize_markdown_doc
-from .models import ProjectBuildResult
+from .models import ComponentBuildResult
 from .watching import collect_watch_roots, is_relevant_watch_path, watch_and_build
 
 __all__ = [
-    "ProjectBuildResult",
+    "ComponentBuildResult",
     "WATCH_DEBOUNCE_MS",
     "build",
     "clean",
@@ -40,6 +40,6 @@ __all__ = [
     "normalize_markdown_doc",
     "parse_args",
     "serve",
-    "stage_project",
+    "stage_component",
     "watch_and_build",
 ]

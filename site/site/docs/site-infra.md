@@ -35,7 +35,7 @@ snapshot staging should wait until real tagged releases exist.
 
 > [!NOTE]
 > The current implementation already provides the local aggregation/rendering split,
-> central catalog plus sub-project metadata contract, unreleased staging, local
+> central catalog plus component metadata contract, unreleased staging, local
 > Hugo rendering, and containerized verification. The main gaps between the implementation
 > and this full proposal are released-docs handling from exact tags,
 > publication automation, redirect/search/indexing policy, and stricter content
@@ -44,11 +44,11 @@ snapshot staging should wait until real tagged releases exist.
 ## Goals
 
 - Publish one web site for the Apache Buildish project.
-- Keep sub-project specific documentation in the respective sub-project Git
+- Keep component specific documentation in the respective component Git
   repositories.
 - Publish docs for both:
-  - the current state of each sub-project's default branch, and
-  - released versions of each sub-project.
+  - the current state of each component's default branch, and
+  - released versions of each component.
 - Allow every developer to build and serve the site locally with whatever
   content is available in the local workspace.
 - Keep the architecture mostly immune to Hugo and/or Docsy implementation
@@ -58,10 +58,10 @@ snapshot staging should wait until real tagged releases exist.
 
 ## Non-goals
 
-- Allowing sub-projects to inject custom renderer logic, theme fragments,
+- Allowing components to inject custom renderer logic, theme fragments,
   shortcodes, or custom build steps.
 - Making alias tags such as `v1` or `v1.1` first-class published versions.
-- Requiring every developer to clone every sub-project repository.
+- Requiring every developer to clone every component repository.
 - Optimizing for bit-for-bit identical historical HTML rendering across all
   future renderer upgrades.
 
@@ -70,8 +70,8 @@ snapshot staging should wait until real tagged releases exist.
 The site infrastructure should be split into two layers:
 
 1. **Aggregation layer (owned by Buildish)**
-   - discovers locally available sub-project repositories,
-   - reads sub-project site metadata,
+   - discovers locally available component repositories,
+   - reads component site metadata,
    - collects current and release-specific content,
    - resolves version relationships and alias tags,
    - generates a normalized staging tree for the renderer.
@@ -125,16 +125,16 @@ Alias tags are moving references and therefore not stable identifiers. They are
 useful as convenience information for users, but they are unsuitable as the
 canonical identity of published release docs.
 
-### Why not let sub-projects customize rendering
+### Why not let components customize rendering
 
-Allowing each sub-project to inject custom rendering behavior would create:
+Allowing each component to inject custom rendering behavior would create:
 
 - upgrade fragility,
 - inconsistent look and feel,
 - higher security risk,
 - harder local and CI reproducibility.
 
-The proposal therefore keeps sub-project inputs limited to content, metadata,
+The proposal therefore keeps component inputs limited to content, metadata,
 and static assets.
 
 ## Content ownership model
@@ -150,18 +150,18 @@ The main repository owns:
 - the aggregation tooling,
 - the renderer integration,
 - the containerized build tooling,
-- the central catalog of known sub-projects.
+- the central catalog of known components.
 
-### Sub-project repositories
+### Component repositories
 
-Each sub-project repository should contain a `site/` directory with only:
+Each component repository should contain a `site/` directory with only:
 
 - Markdown and/or AsciiDoc content,
 - front matter / page metadata,
 - static assets,
-- sub-project-local metadata required by the aggregation layer.
+- component-local metadata required by the aggregation layer.
 
-Sub-project repositories must **not** contribute:
+Component repositories must **not** contribute:
 
 - custom Hugo layouts,
 - custom Docsy fragments,
@@ -171,10 +171,10 @@ Sub-project repositories must **not** contribute:
 
 ## Sub-project contract
 
-Each sub-project should expose a small, stable contract, for example:
+Each component should expose a small, stable contract, for example:
 
 - `site/`
-- `site/project.yaml` (or similar metadata file)
+- `site/component.yaml` (or similar metadata file)
 - `site/docs/` for documentation content
 
 The metadata should be kept intentionally small and may later include fields
@@ -191,16 +191,16 @@ such as:
 ### Draft metadata schema
 
 The exact schema can still evolve, but a good starting point is a small,
-renderer-neutral file such as `site/project.yaml`.
+renderer-neutral file such as `site/component.yaml`.
 
-The schema should be **default-heavy**. Most sub-projects should be able to use
+The schema should be **default-heavy**. Most components should be able to use
 the common conventions without repeating them in every repository.
 
 Example draft:
 
 ```yaml
 schemaVersion: 1
-project:
+component:
   slug: mammoth-cache-gradle
   displayName: Mammoth Cache Gradle
   repository: https://github.com/apache/buildish-mammoth-cache-gradle
@@ -215,7 +215,7 @@ versioning:
     - ^v[0-9]+$
     - ^v[0-9]+\.[0-9]+$
 navigation:
-  section: sub-projects
+  section: components
 ```
 
 Notes:
@@ -236,31 +236,31 @@ Notes:
 Unless explicitly overridden, the aggregation layer should assume defaults such
 as:
 
-- metadata file: `site/project.yaml`
+- metadata file: `site/component.yaml`
 - docs root: `site/docs`
 - assets root: `site/assets`
 - public unreleased label: `Unreleased`
 - exact release tag pattern: `vX.Y.Z`
 - alias tag patterns: `vX` and `vX.Y`
-- navigation section: `sub-projects`
+- navigation section: `components`
 
 Repository URL and default branch should usually be discoverable from Git or the
 central catalog and should not need to be repeated unless there is a reason.
 
 ### Minimal metadata example
 
-With defaults in place, many sub-projects should only need something like:
+With defaults in place, many components should only need something like:
 
 ```yaml
 schemaVersion: 1
-project:
+component:
   slug: mammoth-cache-gradle
   displayName: Mammoth Cache Gradle
 ```
 
 ### Proposed supported content profile
 
-To keep the contract portable across renderer upgrades, sub-project content
+To keep the contract portable across renderer upgrades, component content
 should stay within a documented supported subset.
 
 ### Goals of the supported subset
@@ -270,7 +270,7 @@ The supported subset should optimize for:
 - portability across renderer upgrades,
 - safe aggregation from multiple repositories,
 - predictable local and CI builds,
-- consistent authoring conventions across sub-projects.
+- consistent authoring conventions across components.
 
 ### Guaranteed portable features
 
@@ -335,7 +335,7 @@ Allowed:
 Limited support:
 
 - local `include::` usage may be supported only when it stays within the same
-  sub-project's approved content roots and does not depend on remote fetching or
+  component's approved content roots and does not depend on remote fetching or
   path traversal.
 
 Not part of the guaranteed subset:
@@ -350,20 +350,20 @@ Not part of the guaranteed subset:
 
 To keep versioned content stable and reusable:
 
-- links within a sub-project's docs should prefer relative links,
+- links within a component's docs should prefer relative links,
 - links should not hardcode the repository's default branch name,
 - links should not hardcode alias-tag URLs as canonical references,
 - links to released docs should prefer canonical exact-version URLs when an
   explicit version is intended,
 - links to other site sections may use stable root-relative site paths.
 
-Cross-project links are allowed, but authors should understand that locally
-missing projects may be absent from a partial workspace build.
+Cross-component links are allowed, but authors should understand that locally
+missing components may be absent from a partial workspace build.
 
 ### Asset rules
 
 Static assets are allowed only when they remain inside the approved content or
-asset roots for the sub-project.
+asset roots for the component.
 
 At minimum:
 
@@ -381,9 +381,9 @@ The documented subset should prefer:
 - YAML front matter for page-level metadata,
 - centrally documented fields such as title, description, weight, and other
   renderer-owned navigation metadata,
-- project-wide metadata in `site/project.yaml` rather than repeated per page.
+- component-wide metadata in `site/component.yaml` rather than repeated per page.
 
-Sub-projects should avoid depending on undocumented theme-specific metadata
+Components should avoid depending on undocumented theme-specific metadata
 fields.
 
 ### Admonitions and rich formatting
@@ -409,14 +409,14 @@ site explicitly standardizes a tightly controlled exception:
 - embedded remote content of any kind,
 - remote data fetching at build time,
 - undocumented front matter fields with renderer-specific behavior,
-- content that depends on a sub-project-specific theme customization.
+- content that depends on a component-specific theme customization.
 
 In particular:
 
 - `iframe`-based content is a no-go,
 - embedded remote content is a no-go because of privacy, compliance, and long-
   term reliability concerns,
-- embedded JavaScript is a no-go for sub-project content because it increases
+- embedded JavaScript is a no-go for component content because it increases
   security risk and maintenance burden.
 
 ### Validation expectation
@@ -429,14 +429,14 @@ the approved contract.
 
 ### Unreleased docs
 
-The current state of a sub-project's default branch should be published as
+The current state of a component's default branch should be published as
 **`unreleased`**.
 
 The site should clearly mark unreleased documentation as unstable, for example:
 
 - this content is work in progress,
 - it may change at any time without prior notice,
-- it is built from the sub-project's default branch,
+- it is built from the component's default branch,
 - it should include provenance such as branch name and commit SHA where useful.
 
 ### Released docs
@@ -478,7 +478,7 @@ The central idea is:
 - alias tags may point to the latest exact version within a release line,
 - the site should present maintenance state based on release-line metadata.
 
-At minimum, each project should be able to describe:
+At minimum, each component should be able to describe:
 
 - `latestStable`: the current latest stable exact version,
 - `releaseLines`: the known major/minor lines,
@@ -535,26 +535,26 @@ The public URL scheme should be:
 
 - stable,
 - human-readable,
-- project-first,
+- component-first,
 - based on canonical exact versions,
-- independent from the sub-project's actual branch naming.
+- independent from the component's actual branch naming.
 
 ### Canonical paths
 
 The proposal is to use canonical public URLs of the form:
 
-- `/projects/`
-- `/projects/<project-slug>/`
-- `/projects/<project-slug>/unreleased/`
-- `/projects/<project-slug>/unreleased/<page-path>/`
-- `/projects/<project-slug>/releases/<exact-version>/`
-- `/projects/<project-slug>/releases/<exact-version>/<page-path>/`
+- `/components/`
+- `/components/<component-slug>/`
+- `/components/<component-slug>/unreleased/`
+- `/components/<component-slug>/unreleased/<page-path>/`
+- `/components/<component-slug>/releases/<exact-version>/`
+- `/components/<component-slug>/releases/<exact-version>/<page-path>/`
 
 Examples:
 
-- `/projects/mammoth-cache-gradle/`
-- `/projects/mammoth-cache-gradle/unreleased/`
-- `/projects/mammoth-cache-gradle/releases/v1.3.5/`
+- `/components/mammoth-cache-gradle/`
+- `/components/mammoth-cache-gradle/unreleased/`
+- `/components/mammoth-cache-gradle/releases/v1.3.5/`
 
 ### URL behavior by version type
 
@@ -568,15 +568,15 @@ Examples:
 Convenience redirects may be added later, but they should not change the
 canonical identity of the content. In particular:
 
-- `/projects/<project-slug>/latest/` may redirect to the latest stable exact
+- `/components/<component-slug>/latest/` may redirect to the latest stable exact
   version,
 - alias-tag-based URLs, if added at all, should be redirects only.
 
-### Project landing pages
+### Component landing pages
 
-Each project landing page at `/projects/<project-slug>/` should summarize:
+Each component landing page at `/components/<component-slug>/` should summarize:
 
-- what the sub-project is,
+- what the component is,
 - the `unreleased` docs entry point,
 - the latest stable release docs,
 - maintained release lines,
@@ -594,14 +594,14 @@ The URL scheme is designed to support the indexing policy defined below:
 ## Redirect and indexing policy
 
 This section defines the expected behavior for canonical URLs, convenience
-redirects, and search-engine indexing for versioned project docs.
+redirects, and search-engine indexing for versioned component docs.
 
 ### Indexable content
 
 The following pages should be indexable by default:
 
-- project landing pages at `/projects/<project-slug>/`,
-- `unreleased` project docs,
+- component landing pages at `/components/<component-slug>/`,
+- `unreleased` component docs,
 - the latest stable exact release docs.
 
 This matches the earlier requirement that public discovery should focus on
@@ -625,7 +625,7 @@ release in search results.
 
 Canonical URL rules should be:
 
-- project landing pages should be self-canonical,
+- component landing pages should be self-canonical,
 - `unreleased` pages should be self-canonical,
 - latest stable exact release pages should be self-canonical,
 - non-latest exact release pages should also be self-canonical, even when they
@@ -641,10 +641,10 @@ Convenience URLs should resolve to canonical exact-version or `unreleased` URLs.
 
 Initial policy:
 
-- `/projects/<project-slug>/latest/` may redirect to the latest stable exact
+- `/components/<component-slug>/latest/` may redirect to the latest stable exact
   release root,
-- alias-tag-based URLs such as `/projects/<project-slug>/releases/v1/` or
-  `/projects/<project-slug>/releases/v1.2/` should, if exposed at all, redirect
+- alias-tag-based URLs such as `/components/<component-slug>/releases/v1/` or
+  `/components/<component-slug>/releases/v1.2/` should, if exposed at all, redirect
   to the corresponding exact version root,
 - redirect paths are convenience entry points only and must not be treated as
   canonical content locations.
@@ -671,10 +671,10 @@ indexed content.
 
 ### Robots policy for versioned docs
 
-For versioned project docs, the renderer should emit page metadata consistent
+For versioned component docs, the renderer should emit page metadata consistent
 with the following policy:
 
-- `index, follow` for project landing pages,
+- `index, follow` for component landing pages,
 - `index, follow` for `unreleased` pages,
 - `index, follow` for the latest stable exact release pages,
 - `noindex, follow` for all other exact release pages,
@@ -689,7 +689,7 @@ Site-local search should include only:
 
 - `unreleased`,
 - the latest stable exact release,
-- and any non-versioned top-level site content the project chooses to index.
+- and any non-versioned top-level site content the component chooses to index.
 
 Non-latest release docs should remain directly browsable but should be excluded
 from the primary search index.
@@ -698,7 +698,7 @@ from the primary search index.
 
 The generated sitemap should prefer:
 
-- project landing pages,
+- component landing pages,
 - `unreleased` docs,
 - latest stable exact release docs,
 - other top-level site content intended for discovery.
@@ -736,10 +736,10 @@ canonical release identity.
 ### Recommended `versioned-docs` layout
 
 If used, the `versioned-docs` branch should follow a simple, predictable
-structure per sub-project, for example:
+structure per component, for example:
 
 ```text
-<project-slug>/
+<component-slug>/
   releases/
     v1.2.3/
       docs/
@@ -775,8 +775,8 @@ One possible staging layout is:
   content/
     _index.md
     blog/
-    projects/
-      <project-slug>/
+    components/
+      <component-slug>/
         _index.md
         unreleased/
           docs/
@@ -790,7 +790,7 @@ One possible staging layout is:
             version.yaml
         lifecycle.yaml
   data/
-    projects.yaml
+    components.yaml
     aliases.yaml
     lifecycle.yaml
   static/
@@ -798,14 +798,14 @@ One possible staging layout is:
 
 ### Staging rules
 
-- Each project gets its own namespace under `content/projects/<project-slug>/`.
+- Each component gets its own namespace under `content/components/<component-slug>/`.
 - Unreleased content is always staged under `unreleased/` regardless of the
   repository's actual default branch name.
 - Released content is staged only under exact version identifiers.
 - Alias tags are recorded as metadata in `data/aliases.yaml` or equivalent, not
   as independent content directories.
 - Provenance metadata should be recorded for both unreleased and released docs.
-- The renderer must not need to inspect sub-project repositories directly.
+- The renderer must not need to inspect component repositories directly.
 
 ### Generated lifecycle metadata
 
@@ -815,51 +815,51 @@ state from raw tags or repository layout.
 
 The recommended model is to generate both:
 
-- a per-project lifecycle file at
-  `content/projects/<project-slug>/lifecycle.yaml`, and
+- a per-component lifecycle file at
+  `content/components/<component-slug>/lifecycle.yaml`, and
 - an aggregated lifecycle index at `data/lifecycle.yaml`.
 
-### Per-project lifecycle metadata
+### Per-component lifecycle metadata
 
-The per-project lifecycle file should contain the complete publication-oriented
-view for that project, for example:
+The per-component lifecycle file should contain the complete publication-oriented
+view for that component, for example:
 
 ```yaml
 schemaVersion: 1
-project:
+component:
   slug: mammoth-cache-gradle
   displayName: Mammoth Cache Gradle
 lifecycle:
   unreleased:
     label: Unreleased
-    path: /projects/mammoth-cache-gradle/unreleased/
+    path: /components/mammoth-cache-gradle/unreleased/
     robots: index,follow
   latestStable:
     version: v1.3.5
-    path: /projects/mammoth-cache-gradle/releases/v1.3.5/
+    path: /components/mammoth-cache-gradle/releases/v1.3.5/
   releaseLines:
     - line: v1
       status: maintained
       latest: v1.3.5
       aliases:
         - v1
-      path: /projects/mammoth-cache-gradle/releases/v1.3.5/
+      path: /components/mammoth-cache-gradle/releases/v1.3.5/
     - line: v1.2
       status: eol
       latest: v1.2.9
       aliases:
         - v1.2
-      path: /projects/mammoth-cache-gradle/releases/v1.2.9/
+      path: /components/mammoth-cache-gradle/releases/v1.2.9/
 ```
 
 ### Aggregated lifecycle index
 
 The aggregated lifecycle index at `data/lifecycle.yaml` should provide a compact
-lookup-oriented view across all projects, for example:
+lookup-oriented view across all components, for example:
 
 ```yaml
 schemaVersion: 1
-projects:
+components:
   mammoth-cache-gradle:
     latestStable: v1.3.5
     releaseLines:
@@ -934,28 +934,28 @@ Example layout:
 - `./buildish-mammoth-cache-gradle`
 - `./buildish-no-gradle-wrapper-jar`
 
-The build should include only sub-projects that are available locally.
-Missing sub-projects must be skipped cleanly.
+The build should include only components that are available locally.
+Missing components must be skipped cleanly.
 
-The main repository should maintain a central catalog of known sub-projects.
+The main repository should maintain a central catalog of known components.
 Local repo discovery may use conventional sibling directory layouts, but should
 also support local override configuration for non-standard checkout locations.
 
-## Central sub-project catalog
+## Central component catalog
 
 The main repository should maintain a central catalog file describing the known
-sub-projects that participate in the unified web site.
+components that participate in the unified web site.
 
 One possible location is:
 
-- `site/projects.yaml`
+- `site/components.yaml`
 
 ### Responsibilities of the catalog
 
 The catalog should provide:
 
-- the authoritative inventory of sub-projects expected on the published site,
-- default values that most sub-projects inherit,
+- the authoritative inventory of components expected on the published site,
+- default values that most components inherit,
 - repository discovery information for local development and CI,
 - cross-cutting metadata such as lifecycle state and navigation grouping.
 
@@ -964,7 +964,7 @@ The catalog should provide:
 ```yaml
 schemaVersion: 1
 defaults:
-  metadataFile: site/project.yaml
+  metadataFile: site/component.yaml
   docsRoot: site/docs
   assetsRoot: site/assets
   unreleasedLabel: Unreleased
@@ -972,8 +972,8 @@ defaults:
   aliasTagPatterns:
     - ^v[0-9]+$
     - ^v[0-9]+\.[0-9]+$
-  navigationSection: sub-projects
-projects:
+  navigationSection: components
+components:
   - slug: mammoth-cache-gradle
     repository: https://github.com/apache/buildish-mammoth-cache-gradle
     localDir: buildish-mammoth-cache-gradle
@@ -998,34 +998,34 @@ projects:
 
 ### Catalog design notes
 
-- Most project entries should stay very small.
+- Most component entries should stay very small.
 - `slug`, `repository`, and a conventional `localDir` are likely the only
   fields most entries need.
-- Catalog defaults should align with the sub-project metadata defaults so that
-  most sub-projects do not need local overrides.
+- Catalog defaults should align with the component metadata defaults so that
+  most components do not need local overrides.
 - Lifecycle state such as maintained vs EOL is a good fit for the central
   catalog because it is a publication concern, not just a property of a single
   source tree.
-- If lifecycle metadata is omitted for a project, the site should degrade
+- If lifecycle metadata is omitted for a component, the site should degrade
   gracefully and simply avoid showing maintained/EOL annotations until that
   metadata is provided.
 
 ### Precedence rules
 
-If both the central catalog and a sub-project metadata file provide related
+If both the central catalog and a component metadata file provide related
 values, the intended precedence should be:
 
 1. central catalog for site-wide inventory and publication policy,
-2. sub-project metadata for content-local configuration,
+2. component metadata for content-local configuration,
 3. built-in defaults for everything else.
 
-This keeps publication control centralized while still allowing sub-projects to
+This keeps publication control centralized while still allowing components to
 describe their own local content structure.
 
 ### Local workspace overrides
 
 For non-standard local checkouts, developers may use an ignored local override
-file, for example `site/projects.local.yaml`, to map a project slug to a custom
+file, for example `site/components.local.yaml`, to map a component slug to a custom
 filesystem path.
 
 That file should affect only local discovery, not the published site model.
@@ -1041,7 +1041,7 @@ versions of:
 - Node/npm if required,
 - AsciiDoc-related tooling if required.
 
-Developers should invoke the site tooling through a stable project-local
+Developers should invoke the site tooling through a stable component-local
 entrypoint such as `make -C site build`, not via raw `docker` or `podman`
 commands.
 
@@ -1052,7 +1052,7 @@ That entrypoint should handle:
 - workspace mounting,
 - runtime-specific compatibility differences.
 
-Project-local cache directories should be preferred over engine-specific named
+Component-local cache directories should be preferred over engine-specific named
 volumes where possible, because they are usually easier to debug and more
 portable across environments.
 
@@ -1073,7 +1073,7 @@ That baseline should rely on:
 
 This keeps the initial implementation simpler and avoids prematurely committing
 to cross-repository authentication and event-trigger design before those details
-have been fully reviewed. Sub-project-triggered publication is intentionally
+have been fully reviewed. Component-triggered publication is intentionally
 deferred to [Follow-ups](#follow-ups).
 
 Publishing must use a **strict concurrency setting** so that two publish jobs
@@ -1093,7 +1093,7 @@ force a rebuild without waiting for the next scheduled run.
 Scheduled reconciliation builds should be responsible for discovering:
 
 - new release snapshots,
-- changes to unreleased docs on sub-project default branches,
+- changes to unreleased docs on component default branches,
 - lifecycle or catalog changes that affect the published site.
 
 ### Recommended publication flow
@@ -1160,11 +1160,11 @@ The aggregation and rendering pipeline must apply conservative safety rules.
 
 At minimum:
 
-- no arbitrary custom code from sub-project repos,
+- no arbitrary custom code from component repos,
 - no remote content fetching during normal builds,
 - no `iframe`-based embeds,
 - no embedded remote content,
-- no arbitrary embedded JavaScript in sub-project content,
+- no arbitrary embedded JavaScript in component content,
 - no file inclusion outside approved content roots,
 - reject path traversal attempts,
 - reject symlink-based escapes from repository boundaries,
@@ -1176,9 +1176,9 @@ At minimum:
 The following items are intentionally left as follow-up design work rather than
 part of the initial publishing baseline.
 
-### Sub-project-triggered publication
+### Component-triggered publication
 
-As a future enhancement, sub-project repositories may trigger central site
+As a future enhancement, component repositories may trigger central site
 rebuilds immediately after release or documentation changes.
 
 That could reduce publication latency compared to a purely schedule-based model,
@@ -1189,7 +1189,7 @@ For now, publication remains main-repository-owned and schedule-driven.
 
 ### Potential trigger transport
 
-If sub-project-triggered publication is added later, the likely transport is a
+If component-triggered publication is added later, the likely transport is a
 cross-repository GitHub event such as `repository_dispatch` sent to the main
 site repository.
 

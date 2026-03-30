@@ -21,7 +21,7 @@ import re
 from pathlib import Path
 
 from .constants import SITE_TITLE
-from .models import ProjectBuildResult, ProjectLifecycleSettings, StagedAliasMapping, StagedReleaseLine
+from .models import ComponentBuildResult, ComponentLifecycleSettings, StagedAliasMapping, StagedReleaseLine
 
 
 def _relative_web_path(path: Path) -> str:
@@ -30,28 +30,28 @@ def _relative_web_path(path: Path) -> str:
     return "/" + path.as_posix().lstrip("/")
 
 
-def public_project_path(slug: str) -> str:
-    """Return the public URL of a staged project landing page."""
+def public_component_path(slug: str) -> str:
+    """Return the public URL of a staged component landing page."""
 
-    return f"/projects/{slug}/"
+    return f"/components/{slug}/"
 
 
 def public_unreleased_path(slug: str) -> str:
     """Return the public URL of a staged unreleased-docs landing page."""
 
-    return f"/projects/{slug}/unreleased/"
+    return f"/components/{slug}/unreleased/"
 
 
 def public_assets_root_path(slug: str) -> str:
     """Return the public URL prefix for staged unreleased assets."""
 
-    return f"/projects/{slug}/unreleased/assets/"
+    return f"/components/{slug}/unreleased/assets/"
 
 
 def _public_release_path(slug: str, version: str) -> str:
     """Return the public URL of a staged release landing page."""
 
-    return f"/projects/{slug}/releases/{version}/"
+    return f"/components/{slug}/releases/{version}/"
 
 
 def public_content_page_path(root_segments: list[str], relative_path: Path) -> str:
@@ -66,20 +66,20 @@ def public_content_page_path(root_segments: list[str], relative_path: Path) -> s
     return "/" + suffix.strip("/") + "/"
 
 
-def _release_index_web_path(project_root: Path, slug: str, version: str) -> str | None:
+def _release_index_web_path(component_root: Path, slug: str, version: str) -> str | None:
     """Return the staged URL of a release landing page if that page exists."""
 
-    release_index_path = project_root / "releases" / version / "_index.md"
+    release_index_path = component_root / "releases" / version / "_index.md"
     if not release_index_path.is_file():
         return None
     return _public_release_path(slug, version)
 
 
 def normalize_lifecycle(
-    lifecycle_fields: ProjectLifecycleSettings,
+    lifecycle_fields: ComponentLifecycleSettings,
     tag_pattern: re.Pattern[str],
     slug: str,
-    project_root: Path,
+    component_root: Path,
 ) -> tuple[str | None, str | None, tuple[StagedReleaseLine, ...], tuple[StagedAliasMapping, ...]]:
     """Validate lifecycle metadata and turn it into staged output structures."""
 
@@ -99,20 +99,20 @@ def normalize_lifecycle(
             )
 
         aliases = tuple(release_line_model.aliases)
-        path = _release_index_web_path(project_root, slug, latest)
+        path = _release_index_web_path(component_root, slug, latest)
         release_lines.append(StagedReleaseLine(line=line, latest=latest, status=status, aliases=aliases, path=path))
         for alias in aliases:
             alias_mappings.append(StagedAliasMapping(alias=alias, target=latest, line=line, status=status))
 
     latest_stable_path = None
     if latest_stable_version is not None:
-        latest_stable_path = _release_index_web_path(project_root, slug, latest_stable_version)
+        latest_stable_path = _release_index_web_path(component_root, slug, latest_stable_version)
 
     return latest_stable_version, latest_stable_path, tuple(release_lines), tuple(alias_mappings)
 
 
-def build_project_markdown(result: ProjectBuildResult) -> str:
-    """Build the staged landing-page body for one project."""
+def build_component_markdown(result: ComponentBuildResult) -> str:
+    """Build the staged landing-page body for one component."""
 
     lines: list[str] = []
     if result.repository:
@@ -145,8 +145,8 @@ def build_project_markdown(result: ProjectBuildResult) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def build_unreleased_index_markdown(result: ProjectBuildResult) -> str:
-    """Build the staged unreleased landing-page body for one project."""
+def build_unreleased_index_markdown(result: ComponentBuildResult) -> str:
+    """Build the staged unreleased landing-page body for one component."""
 
     lines: list[str] = []
     if result.default_branch:
@@ -159,7 +159,7 @@ def build_unreleased_index_markdown(result: ProjectBuildResult) -> str:
     if result.asset_count and result.raw_assets_root_path:
         lines.extend([f"- [Open staged assets]({result.raw_assets_root_path})", ""])
     if not result.doc_links:
-        lines.extend([f"No staged {result.unreleased_label.lower()} docs pages are currently available for this project.", ""])
+        lines.extend([f"No staged {result.unreleased_label.lower()} docs pages are currently available for this component.", ""])
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -186,14 +186,14 @@ def _html_page(title: str, body: str) -> str:
 """.format(title=html.escape(title), body=body)
 
 
-def build_preview_index(results: list[ProjectBuildResult]) -> str:
+def build_preview_index(results: list[ComponentBuildResult]) -> str:
     """Build the lightweight preview index shown outside Hugo."""
 
     items = []
     for result in results:
         status = "available" if result.available else "missing from local workspace"
         items.append(
-            f"<li><a href='/site/.preview/projects/{result.slug}/'>{html.escape(result.display_name)}</a>"
+            f"<li><a href='/site/.preview/components/{result.slug}/'>{html.escape(result.display_name)}</a>"
             f" — <span class='muted'>{html.escape(status)}</span></li>"
         )
     body = (
@@ -205,8 +205,8 @@ def build_preview_index(results: list[ProjectBuildResult]) -> str:
     return _html_page(SITE_TITLE, body)
 
 
-def build_project_preview(result: ProjectBuildResult) -> str:
-    """Build the lightweight preview page for one staged project."""
+def build_component_preview(result: ComponentBuildResult) -> str:
+    """Build the lightweight preview page for one staged component."""
 
     doc_items = "".join(
         f"<li><a href='{html.escape(entry.href)}'>{html.escape(entry.label)}</a></li>"
@@ -232,8 +232,8 @@ def build_project_preview(result: ProjectBuildResult) -> str:
             f"<p><strong>Staged assets:</strong> <a href='{html.escape(result.raw_assets_root_path)}'>"
             f"{result.asset_count} file(s)</a></p>"
         )
-    if result.raw_project_index_path:
-        body.append(f"<p><a href='{html.escape(result.raw_project_index_path)}'>Open staged project landing page</a></p>")
+    if result.raw_component_index_path:
+        body.append(f"<p><a href='{html.escape(result.raw_component_index_path)}'>Open staged component landing page</a></p>")
     if result.raw_unreleased_index_path:
         body.append(f"<p><a href='{html.escape(result.raw_unreleased_index_path)}'>Open {html.escape(result.unreleased_label)} docs index</a></p>")
     if doc_items:

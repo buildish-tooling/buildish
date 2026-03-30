@@ -29,16 +29,16 @@ tags is intentionally deferred until real release material exists.
 
 The code under `site/` currently provides:
 
-- catalog-driven aggregation from `site/projects.yaml`,
-- per-project metadata loading from each sub-project's `site/project.yaml`,
+- catalog-driven aggregation from `site/components.yaml`,
+- per-component metadata loading from each component's `site/component.yaml`,
 - normalized staged content and metadata under `site/.stage/`,
 - local Hugo + Docsy rendering from that staged tree,
 - watch-based restaging for interactive local development,
 - an optional lightweight Python preview under `site/.preview/`, and
 - containerized local/CI workflows with pinned tooling.
 
-The current sub-project metadata contract is documented separately in
-[`site-subproject-contract.md`](site-subproject-contract.md).
+The current component metadata contract is documented separately in
+[`site-component-contract.md`](site-component-contract.md).
 
 ## Architecture overview
 
@@ -46,9 +46,9 @@ The implementation is split into an aggregation layer and a rendering layer.
 
 ```mermaid
 flowchart LR
-    A[site/projects.yaml] --> P[Python staging pipeline]
-    B[subproject site/project.yaml] --> P
-    C[subproject site/docs and site/assets] --> P
+    A[site/components.yaml] --> P[Python staging pipeline]
+    B[component site/component.yaml] --> P
+    C[component site/docs and site/assets] --> P
     D[site/content and shared assets] --> P
     P --> S[site/.stage]
     P --> V[site/.preview]
@@ -60,7 +60,7 @@ flowchart LR
 
 The Python pipeline under `site/pipeline/site_pipeline/` is responsible for:
 
-- reading the catalog and sub-project metadata,
+- reading the catalog and component metadata,
 - copying approved docs and static assets into a normalized tree,
 - normalizing Markdown titles, summaries, and front matter,
 - generating YAML data consumed by templates,
@@ -76,7 +76,7 @@ Hugo consumes the staged contract via `site/hugo.yaml`:
 - `publishDir: .public`
 
 This keeps the public renderer fed from one Buildish-owned staged contract
-instead of reading arbitrary sub-project repositories directly.
+instead of reading arbitrary component repositories directly.
 
 ## Important directories
 
@@ -113,7 +113,7 @@ sequenceDiagram
     participant Watch as Python watcher
     participant Stage as site/.stage
     participant Hugo as hugo server
-    Dev->>Watch: edit site content / project docs / metadata
+    Dev->>Watch: edit site content / component docs / metadata
     Watch->>Watch: collect relevant changes
     Watch->>Stage: rebuild staged contract
     Hugo->>Stage: poll/read staged content
@@ -164,19 +164,19 @@ updates reliably during development.
 
 ### Inputs
 
-- `site/projects.yaml` in the main repository
-- `site/project.yaml` in each participating sub-project
-- `site/docs/` in each participating sub-project
-- optional `site/assets/` in each participating sub-project
+- `site/components.yaml` in the main repository
+- `site/component.yaml` in each participating component
+- `site/docs/` in each participating component
+- optional `site/assets/` in each participating component
 - authored site content under `site/content/`
 
 ### Outputs
 
-- `site/.stage/content/projects/<slug>/unreleased/...`
-- `site/.stage/data/projects.yaml`
+- `site/.stage/content/components/<slug>/unreleased/...`
+- `site/.stage/data/components.yaml`
 - `site/.stage/data/lifecycle.yaml`
 - `site/.stage/data/aliases.yaml`
-- `site/.stage/static/projects/<slug>/unreleased/assets/...`
+- `site/.stage/static/components/<slug>/unreleased/assets/...`
 - `site/.stage/manifest.yaml`
 - `site/.preview/` for the lightweight Python preview output
 - `site/.public/` for the Hugo-rendered site
@@ -190,7 +190,7 @@ proposal:
 - no path traversal outside approved repository roots,
 - no symlink-following during staged content copying,
 - no remote fetching during normal local builds,
-- no custom renderer logic contributed from sub-project repositories.
+- no custom renderer logic contributed from component repositories.
 
 ## Known development-only limitations
 

@@ -18,11 +18,11 @@ type: docs
 weight: 20
 ---
 
-Apache Buildish is looking for feedback on project structure, docs, workflows, and tooling ideas while the site and subprojects take shape.
+Apache Buildish is looking for feedback on project structure, docs, workflows, and tooling ideas while the site and components take shape.
 
 ## Ways to contribute
 
-- Try the staged subprojects and share what works or what feels rough.
+- Try the staged components and share what works or what feels rough.
 - Join the [development mailing list](mailto:dev@buildish.apache.org) to discuss ideas and priorities.
 - Browse the [source repository](https://github.com/apache/buildish) for issues, pull requests, and project structure.
 - Improve docs, examples, naming, onboarding notes, and contributor guidance.
