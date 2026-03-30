@@ -122,7 +122,7 @@ The containerized flow:
 - uses that mount in read/write mode, not read-only, because the container writes generated outputs and caches back into
   this repository
 - can only stage/serve components whose `localDir` resolves within that parent workspace; in practice that means
-  sibling repositories next to the main repo (for example `../buildish-mammoth-cache-gradle`)
+  sibling repositories next to the main repo (for example `../buildish-mammoth-cache`)
 - if your component repositories live somewhere else, prefer the native `make stage-local`, `make stage-watch-local`,
   or `make serve-local` workflow instead
 - writes generated outputs back into the working tree

@@ -54,8 +54,8 @@ Example:
 
 ```yaml
 components:
-  - slug: mammoth-cache-gradle
-    repository: https://github.com/apache/buildish-mammoth-cache-gradle
+  - slug: mammoth-cache
+    repository: https://github.com/apache/buildish-mammoth-cache
     sourceRoot: .
   - slug: site
     repository: https://github.com/apache/buildish
@@ -81,8 +81,8 @@ Example:
 schemaVersion: 1
 workspace:
   components:
-    mammoth-cache-gradle:
-      checkoutDir: ../src/buildish-mammoth-cache-gradle
+    mammoth-cache:
+      checkoutDir: ../src/buildish-mammoth-cache
     no-gradle-wrapper-jar:
       checkoutDir: /worktrees/no-gradle-wrapper-jar
     site:

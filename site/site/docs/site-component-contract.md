@@ -22,7 +22,7 @@ For the broader long-term design, see [`site-infra.md`](site-infra.md).
 ## Workspace model
 
 - the main repository is expected at `./buildish`
-- participating components are normally sibling checkouts such as `./buildish-mammoth-cache-gradle`
+- participating components are normally sibling checkouts such as `./buildish-mammoth-cache`
 - missing component repositories are allowed during local builds and CI; they are skipped cleanly
 
 ## Main repository catalog

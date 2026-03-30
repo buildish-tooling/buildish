@@ -57,7 +57,7 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         repo_root = self.workspace / "buildish"
         repo_root.mkdir()
         self.seed_main_repo(repo_root)
-        self.seed_mammoth_fixture(self.workspace / "buildish-mammoth-cache-gradle")
+        self.seed_mammoth_fixture(self.workspace / "buildish-mammoth-cache")
         self.seed_no_wrapper_fixture(self.workspace / "buildish-no-gradle-wrapper-jar")
         return repo_root
 
@@ -81,7 +81,7 @@ class MakeTargetIntegrationTest(unittest.TestCase):
 
         catalog = yaml.safe_load((SOURCE_REPO_ROOT / "site" / "components.yaml").read_text(encoding="utf-8"))
         catalog["components"] = [
-            {"slug": "mammoth-cache-gradle", "localDir": "buildish-mammoth-cache-gradle"},
+            {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
             {"slug": "no-gradle-wrapper-jar", "localDir": "buildish-no-gradle-wrapper-jar", "weight": 5},
             {"slug": "site", "localDir": "buildish/site", "weight": 100},
         ]
@@ -93,15 +93,15 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         (repo_root / "site" / "pages").mkdir(parents=True)
         (repo_root / "site" / "docs").mkdir(parents=True)
         (repo_root / "site" / "assets" / "images").mkdir(parents=True)
-        (repo_root / "README.md").write_text("# Mammoth Cache for Gradle\n\nFixture component summary.\n", encoding="utf-8")
+        (repo_root / "README.md").write_text("# Mammoth Cache for Gradle and Maven\n\nFixture component summary.\n", encoding="utf-8")
         with (repo_root / "site" / "component.yaml").open("w", encoding="utf-8") as handle:
             yaml.safe_dump(
                 {
                     "schemaVersion": 1,
                     "component": {
-                        "slug": "mammoth-cache-gradle",
-                        "displayName": "Fixture Mammoth Cache for Gradle",
-                        "repository": "https://github.com/apache/buildish-mammoth-cache-gradle",
+                        "slug": "mammoth-cache",
+                        "displayName": "Fixture Mammoth Cache for Gradle and Maven",
+                        "repository": "https://github.com/apache/buildish-mammoth-cache",
                         "defaultBranch": "main",
                     },
                     "lifecycle": {
@@ -114,7 +114,7 @@ class MakeTargetIntegrationTest(unittest.TestCase):
                 default_flow_style=False,
             )
         (repo_root / "site" / "pages" / "_index.md").write_text(
-            "# Mammoth Cache for Gradle\n\n"
+            "# Mammoth Cache for Gradle and Maven\n\n"
             "Fixture component landing page.\n\n"
             "{{< buildish-component-link kind=\"docs\" label=\"Read unreleased docs\" appearance=\"primary\" >}}\n\n"
             "{{< buildish-component-link kind=\"source\" label=\"Browse source\" appearance=\"outline-secondary\" >}}\n\n"
@@ -325,7 +325,7 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         result = self.run_make(repo_root / "site", "stage-local", os.environ.copy())
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertTrue((repo_root / "site" / ".stage" / "manifest.yaml").exists())
-        self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache-gradle" / "unreleased" / "docs" / "getting-started.md").exists())
+        self.assertTrue((repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md").exists())
 
     def test_make_build_renders_component_navigation_without_cross_component_sidebar(self) -> None:
         if shutil.which("hugo") is None:
@@ -349,7 +349,7 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         self.assertNotIn('class="nav-item navbar-group-separator"', home_index)
         self.assertNotIn('navbar-item--global', home_index)
 
-        docs_index = (repo_root / "site" / ".public" / "components" / "mammoth-cache-gradle" / "unreleased" / "docs" / "index.html").read_text(encoding="utf-8")
+        docs_index = (repo_root / "site" / ".public" / "components" / "mammoth-cache" / "unreleased" / "docs" / "index.html").read_text(encoding="utf-8")
         self.assertIn('class="td-navbar__top"', docs_index)
         self.assertIn('class="collapse d-md-flex td-navbar__main', docs_index)
         self.assertIn('navbar-mobile-section-title d-md-none', docs_index)
@@ -358,11 +358,11 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         self.assertIn('data-bs-target="#td-sidebar-search"', docs_index)
         self.assertIn('class="td-sidebar__search td-sidebar__search--mobile collapse d-md-none" id="td-sidebar-search"', docs_index)
         self.assertIn('class="navbar-brand__home" href="/"', docs_index)
-        self.assertIn('class="navbar-brand__component" href="/components/mammoth-cache-gradle/"', docs_index)
+        self.assertIn('class="navbar-brand__component" href="/components/mammoth-cache/"', docs_index)
         self.assertIn('class="navbar-brand__divider"', docs_index)
-        self.assertIn('<span class="navbar-brand__context">Fixture Mammoth Cache for Gradle</span>', docs_index)
+        self.assertIn('<span class="navbar-brand__context">Fixture Mammoth Cache for Gradle and Maven</span>', docs_index)
         self.assertNotIn('<a href="/components/">Components</a>', docs_index)
-        self.assertIn('href="https://github.com/apache/buildish-mammoth-cache-gradle"', docs_index)
+        self.assertIn('href="https://github.com/apache/buildish-mammoth-cache"', docs_index)
         self.assertIn('>Source</span>', docs_index)
         self.assertIn('navbar-item--component', docs_index)
         self.assertIn('class="nav-item navbar-group-separator"', docs_index)
@@ -371,12 +371,12 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         self.assertIn('/community/contributing-guidelines/', docs_index)
         self.assertIn('/community/community-guidelines/', docs_index)
 
-        component_index = (repo_root / "site" / ".public" / "components" / "mammoth-cache-gradle" / "index.html").read_text(encoding="utf-8")
+        component_index = (repo_root / "site" / ".public" / "components" / "mammoth-cache" / "index.html").read_text(encoding="utf-8")
         self.assertIn('Fixture component landing page.', component_index)
         self.assertIn('Read unreleased docs', component_index)
-        self.assertIn('href="/components/mammoth-cache-gradle/unreleased/docs/"', component_index)
+        self.assertIn('href="/components/mammoth-cache/unreleased/docs/"', component_index)
         self.assertIn('Browse source', component_index)
-        self.assertIn('href="https://github.com/apache/buildish-mammoth-cache-gradle"', component_index)
+        self.assertIn('href="https://github.com/apache/buildish-mammoth-cache"', component_index)
         self.assertIn('Current release lines', component_index)
         self.assertIn('Latest stable (v1.2.3)', component_index)
         self.assertIn('v1 — maintained (latest v1.2.3); aliases: v1', component_index)
@@ -384,7 +384,7 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         self.assertNotIn('buildish-component-landing__actions', component_index)
 
         sidebar = docs_index.split('<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">', 1)[1].split('<aside class="d-none d-xl-block col-xl-2 td-sidebar-toc d-print-none">', 1)[0]
-        self.assertNotIn('id="m-componentsmammoth-cache-gradle"', sidebar)
+        self.assertNotIn('id="m-componentsmammoth-cache"', sidebar)
         self.assertNotIn('id="m-componentsno-gradle-wrapper-jar"', sidebar)
         self.assertIn("Unreleased", sidebar)
 
@@ -410,9 +410,9 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         self.assertTrue((repo_root / "site" / ".stage" / "manifest.yaml").exists())
         self.assertTrue((repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "jquery.min.js").exists())
         components_payload = yaml.safe_load((repo_root / "site" / ".stage" / "data" / "components.yaml").read_text(encoding="utf-8"))
-        self.assertTrue(components_payload["components"]["mammoth-cache-gradle"]["available"])
-        self.assertIn("Mammoth Cache for Gradle", components_payload["components"]["mammoth-cache-gradle"]["displayName"])
-        self.assertEqual("/components/mammoth-cache-gradle/unreleased/docs/", components_payload["components"]["mammoth-cache-gradle"]["docsPath"])
+        self.assertTrue(components_payload["components"]["mammoth-cache"]["available"])
+        self.assertIn("Mammoth Cache for Gradle and Maven", components_payload["components"]["mammoth-cache"]["displayName"])
+        self.assertEqual("/components/mammoth-cache/unreleased/docs/", components_payload["components"]["mammoth-cache"]["docsPath"])
         container_log = (repo_root / "site" / "build" / "fake-container.log").read_text(encoding="utf-8")
         self.assertIn("run", container_log)
         self.assertIn("--init", container_log)
@@ -420,8 +420,8 @@ class MakeTargetIntegrationTest(unittest.TestCase):
 
     def test_make_stage_watch_local_rebuilds_after_doc_change(self) -> None:
         repo_root = self.prepare_fixture_workspace()
-        source_doc = self.workspace / "buildish-mammoth-cache-gradle" / "site" / "docs" / "getting-started.md"
-        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache-gradle" / "unreleased" / "docs" / "getting-started.md"
+        source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
+        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "stage-watch-local", os.environ.copy())
         self.wait_for("initial stage-watch build", lambda: staged_doc.exists(), process=process)
         time.sleep(1.0)
@@ -441,8 +441,8 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
-        source_doc = self.workspace / "buildish-mammoth-cache-gradle" / "site" / "docs" / "getting-started.md"
-        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache-gradle" / "unreleased" / "docs" / "getting-started.md"
+        source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
+        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "stage-watch", env)
         self.wait_for("initial containerized stage-watch build", lambda: staged_doc.exists(), process=process)
         time.sleep(1.0)
@@ -460,8 +460,8 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         bin_dir = self.seed_fake_tools(repo_root / "site", include_hugo=True, include_native_docsy=True)
         env = self.base_env(repo_root / "site", bin_dir)
         env["PORT"] = "8766"
-        source_doc = self.workspace / "buildish-mammoth-cache-gradle" / "site" / "docs" / "getting-started.md"
-        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache-gradle" / "unreleased" / "docs" / "getting-started.md"
+        source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
+        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "serve-local", env)
         self.wait_for("fake local Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(), process=process)
         source_doc.write_text("# Getting started\n\nUpdated by serve-local.\n", encoding="utf-8")
@@ -485,8 +485,8 @@ class MakeTargetIntegrationTest(unittest.TestCase):
         env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
-        source_doc = self.workspace / "buildish-mammoth-cache-gradle" / "site" / "docs" / "getting-started.md"
-        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache-gradle" / "unreleased" / "docs" / "getting-started.md"
+        source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
+        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "serve", env)
         self.wait_for(
             "fake containerized Hugo server readiness",

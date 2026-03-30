@@ -202,9 +202,9 @@ Example draft:
 ```yaml
 schemaVersion: 1
 component:
-  slug: mammoth-cache-gradle
-  displayName: Mammoth Cache Gradle
-  repository: https://github.com/apache/buildish-mammoth-cache-gradle
+  slug: mammoth-cache
+  displayName: Mammoth Cache for Gradle and Maven
+  repository: https://github.com/apache/buildish-mammoth-cache
   defaultBranch: main
 content:
   pagesRoot: pages
@@ -257,8 +257,8 @@ With defaults in place, many components should only need something like:
 ```yaml
 schemaVersion: 1
 component:
-  slug: mammoth-cache-gradle
-  displayName: Mammoth Cache Gradle
+  slug: mammoth-cache
+  displayName: Mammoth Cache for Gradle and Maven
 ```
 
 ### Proposed supported content profile
@@ -555,9 +555,9 @@ The proposal is to use canonical public URLs of the form:
 
 Examples:
 
-- `/components/mammoth-cache-gradle/`
-- `/components/mammoth-cache-gradle/unreleased/`
-- `/components/mammoth-cache-gradle/releases/v1.3.5/`
+- `/components/mammoth-cache/`
+- `/components/mammoth-cache/unreleased/`
+- `/components/mammoth-cache/releases/v1.3.5/`
 
 ### URL behavior by version type
 
@@ -831,29 +831,29 @@ view for that component, for example:
 ```yaml
 schemaVersion: 1
 component:
-  slug: mammoth-cache-gradle
-  displayName: Mammoth Cache Gradle
+  slug: mammoth-cache
+  displayName: Mammoth Cache for Gradle and Maven
 lifecycle:
   unreleased:
     label: Unreleased
-    path: /components/mammoth-cache-gradle/unreleased/
+    path: /components/mammoth-cache/unreleased/
     robots: index,follow
   latestStable:
     version: v1.3.5
-    path: /components/mammoth-cache-gradle/releases/v1.3.5/
+    path: /components/mammoth-cache/releases/v1.3.5/
   releaseLines:
     - line: v1
       status: maintained
       latest: v1.3.5
       aliases:
         - v1
-      path: /components/mammoth-cache-gradle/releases/v1.3.5/
+      path: /components/mammoth-cache/releases/v1.3.5/
     - line: v1.2
       status: eol
       latest: v1.2.9
       aliases:
         - v1.2
-      path: /components/mammoth-cache-gradle/releases/v1.2.9/
+      path: /components/mammoth-cache/releases/v1.2.9/
 ```
 
 ### Aggregated lifecycle index
@@ -864,7 +864,7 @@ lookup-oriented view across all components, for example:
 ```yaml
 schemaVersion: 1
 components:
-  mammoth-cache-gradle:
+  mammoth-cache:
     latestStable: v1.3.5
     releaseLines:
       - line: v1
@@ -935,7 +935,7 @@ Local development should work with a partial workspace.
 Example layout:
 
 - `./buildish`
-- `./buildish-mammoth-cache-gradle`
+- `./buildish-mammoth-cache`
 - `./buildish-no-gradle-wrapper-jar`
 
 The build should include only components that are available locally.
@@ -979,9 +979,9 @@ defaults:
     - ^v[0-9]+\.[0-9]+$
   navigationSection: components
 components:
-  - slug: mammoth-cache-gradle
-    repository: https://github.com/apache/buildish-mammoth-cache-gradle
-    localDir: buildish-mammoth-cache-gradle
+  - slug: mammoth-cache
+    repository: https://github.com/apache/buildish-mammoth-cache
+    localDir: buildish-mammoth-cache
   - slug: no-gradle-wrapper-jar
     repository: https://github.com/apache/buildish-no-gradle-wrapper-jar
     localDir: buildish-no-gradle-wrapper-jar
