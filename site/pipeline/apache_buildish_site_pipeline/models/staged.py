@@ -223,7 +223,7 @@ class ComponentBuildResult:
     local_dir: str
     repo_path: Path
     summary: str
-    raw_development_index_path: str | None
+    raw_development_index_path: str
     raw_component_index_path: str | None
     raw_docs_root_path: str | None
     raw_assets_root_path: str | None
