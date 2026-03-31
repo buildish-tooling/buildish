@@ -32,6 +32,10 @@ LOCAL_REGISTRY_TEST_TAG ?= integration-test
 LOCAL_REGISTRY_TEST_ARGS ?=
 UV_RUN := $(UV) run --project ./pipeline --frozen
 HELP_TARGETS := $(MAKEFILE_LIST)
+HELP_PUBLIC_COMMON_TARGETS := serve build
+HELP_PUBLIC_CHECK_TARGETS := test integration-test check clean
+HELP_PUBLIC_NATIVE_TARGETS := serve-local build-local
+HELP_PUBLIC_ADVANCED_TARGETS := render render-local stage-local stage-watch-local
 DOCSY_ENV = \
 	export NVM_DIR="$(NVM_DIR)"; \
 	if [ -s "$$NVM_DIR/nvm.sh" ]; then \
@@ -192,10 +196,16 @@ CONTAINER_SERVE_SCRIPT = \
 	make serve-local HUGO_SERVER_BIND=0.0.0.0 PORT=$(PORT); \
 	printf "==> [container-serve] serve exited\\n"
 
+CONTAINER_RENDER_SCRIPT = \
+	$(CONTAINER_PREPARE_SITE_ENV); \
+	printf "==> [container-render] running make render-local\\n"; \
+	make render-local; \
+	printf "==> [container-render] site render completed\\n"
+
 CONTAINER_BUILD_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
-	printf "==> [container-build] running make build\\n"; \
-	make build; \
+	printf "==> [container-build] running make build-local\\n"; \
+	make build-local; \
 	printf "==> [container-build] site render completed\\n"
 
 define RUN_MANAGED_CONTAINER
@@ -223,6 +233,7 @@ endef
 	clean \
 	container-engine-check \
 	container-build \
+	container-render \
 	container-check-fast \
 	container-image \
 	container-image-ensure \
@@ -234,11 +245,14 @@ endef
 	container-test \
 	docsy-check \
 	help \
+	help-all \
 	hugo-check \
 	integration-test \
 	render \
+	render-local \
 	sanity-check \
 	serve \
+	build-local \
 	serve-local \
 	stage \
 	stage-local \
@@ -247,8 +261,18 @@ endef
 	test \
 	vendor-assets
 
-help: ## Show available Make targets.
-	@awk 'BEGIN {FS = ":.*## "; printf "Available targets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(HELP_TARGETS)
+help: ## Show the curated Make targets for common site workflows.
+	@desc_for() { awk -v target="$$1" 'BEGIN {FS = ":.*## "} $$1 == target {print $$2; exit}' $(HELP_TARGETS); }; \
+	print_section() { title="$$1"; shift; printf "\n%s\n" "$$title"; for target in "$$@"; do printf "  %-18s %s\n" "$$target" "$$(desc_for "$$target")"; done; }; \
+	printf "Available targets:\n"; \
+	print_section "Common workflows:" $(HELP_PUBLIC_COMMON_TARGETS); \
+	print_section "Checks and cleanup:" $(HELP_PUBLIC_CHECK_TARGETS); \
+	print_section "Host-tool workflows:" $(HELP_PUBLIC_NATIVE_TARGETS); \
+	print_section "Less common workflows:" $(HELP_PUBLIC_ADVANCED_TARGETS); \
+	printf "\nFor advanced/internal targets, run 'make help-all'.\n"
+
+help-all: ## Show all Make targets, including advanced/internal ones.
+	@awk 'BEGIN {FS = ":.*## "; printf "Available targets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(HELP_TARGETS)
 
 sanity-check: ## Verify uv is available on PATH.
 	@command -v $(UV) >/dev/null 2>&1 || { \
@@ -275,20 +299,24 @@ vendor-assets: docsy-check ## Stage local vendor assets required by the renderer
 	@cp $(NODE_MODULES_DIR)/mermaid/dist/mermaid.min.js .stage/static/js/vendor/mermaid.min.js
 	@cp $(NODE_MODULES_DIR)/lunr/lunr.min.js .stage/static/js/vendor/lunr.min.js
 
-stage: container-stage ## Build the staged site contract and lightweight Python preview inside the build container.
+stage: container-stage ## Refresh staged site inputs in the build container.
 
-stage-local: sanity-check ## Build the staged site contract and lightweight Python preview natively.
+stage-local: sanity-check ## Refresh staged site inputs with host tools.
 	$(UV_RUN) $(PYTHON) $(SITE_PIPELINE) build
 
-stage-watch: container-stage-watch ## Watch site inputs and rebuild the staged site contract inside the build container.
+stage-watch: container-stage-watch ## Watch sources and refresh staged site inputs in the build container.
 
-stage-watch-local: sanity-check ## Watch site inputs and rebuild the staged site contract natively on changes.
+stage-watch-local: sanity-check ## Watch sources and refresh staged site inputs with host tools.
 	$(UV_RUN) $(PYTHON) $(SITE_PIPELINE) watch
 
-render: hugo-check docsy-check vendor-assets ## Render the staged site through local Hugo.
+render: container-render ## Render the current staged site in the build container.
+
+render-local: hugo-check docsy-check vendor-assets ## Render the current staged site with host tools.
 	@$(DOCSY_ENV); $(HUGO) --source . --config hugo.yaml --cleanDestinationDir
 
-build: stage-local render ## Build staged content and render the local Hugo site natively.
+build: container-build ## Stage and render the site in the build container.
+
+build-local: stage-local render-local ## Stage and render the site with host tools.
 
 container-engine-check: ## Verify Podman or Docker is available for containerized site targets.
 	@engine='$(strip $(CONTAINER_ENGINE))'; \
@@ -336,7 +364,14 @@ container-stage-watch: container-image-ensure ## Watch site inputs and rebuild t
 	@printf '==> [container-stage-watch] starting containerized site watch\n'
 	@$(call RUN_MANAGED_CONTAINER,stage-watch,$(CONTAINER_MANAGED_RUN),$(CONTAINER_STAGE_WATCH_SCRIPT))
 
-container-build: container-image ## Build the staged site and Hugo output inside the build container.
+container-render: container-image-ensure ## Render the staged site through Hugo inside the build container.
+	@printf '==> [container-render] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
+	@$(PREPARE_CONTAINER_SCRATCH)
+	@rm -f .hugo_build.lock
+	@printf '==> [container-render] starting containerized site render\n'
+	@$(CONTAINER_RUN) bash -c '$(CONTAINER_RENDER_SCRIPT)'
+
+container-build: container-image-ensure ## Build the staged site and Hugo output inside the build container.
 	@printf '==> [container-build] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
 	@$(PREPARE_CONTAINER_SCRATCH)
 	@printf '==> [container-build] starting containerized site render\n'
@@ -345,9 +380,9 @@ container-build: container-image ## Build the staged site and Hugo output inside
 container-image-local-registry-test: ## Run the localhost-registry integration test for the builder image.
 	$(CONTAINER_BUILD_DIR)/test-local-registry.sh --platforms '$(LOCAL_REGISTRY_TEST_PLATFORMS)' --tag '$(LOCAL_REGISTRY_TEST_TAG)' $(LOCAL_REGISTRY_TEST_ARGS)
 
-serve: container-serve ## Serve the staged site with Hugo and automatic restaging inside the build container; override PORT=<port> if needed.
+serve: container-serve ## Serve the site with live restaging in the build container; override PORT=<port> if needed.
 
-serve-local: sanity-check hugo-check docsy-check ## Serve the staged site with local Hugo and automatic restaging; override PORT=<port> if needed.
+serve-local: sanity-check hugo-check docsy-check ## Serve the site with live restaging using host tools; override PORT=<port> if needed.
 	@watch_pid=''; \
 	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
@@ -370,18 +405,18 @@ container-serve: container-image-ensure ## Serve the staged site with Hugo and a
 	@printf '==> [container-serve] starting containerized site server on http://127.0.0.1:%s/\n' '$(PORT)'
 	@$(call RUN_MANAGED_CONTAINER,serve,$(CONTAINER_MANAGED_SERVE_RUN),$(CONTAINER_SERVE_SCRIPT))
 
-clean: sanity-check ## Remove generated local preview outputs.
+clean: sanity-check ## Remove generated site output.
 	$(UV_RUN) $(PYTHON) $(SITE_PIPELINE) clean
 	rm -rf .public .hugo_build.lock resources
 
-test: sanity-check ## Run the site unit tests.
+test: sanity-check ## Run unit tests.
 	$(UV_RUN) $(PYTHON) -m unittest discover -s pipeline/tests -p 'test_*.py' -v
 
-integration-test: sanity-check ## Run the fixture-based site integration test.
+integration-test: sanity-check ## Run integration tests.
 	$(UV_RUN) $(PYTHON) -m unittest discover -s pipeline/tests -p 'integration_*_test.py' -v
 
-check: ## Run the site verification flow: clean, test, build.
+check: ## Run clean, tests, and build-local.
 	$(MAKE) clean
 	$(MAKE) test
 	$(MAKE) integration-test
-	$(MAKE) build
+	$(MAKE) build-local

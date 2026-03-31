@@ -101,16 +101,16 @@ Generated directories are ignored by Git and should usually be excluded in IDEs.
 
 From `site/`:
 
-- `make stage` — run one native staging pass
-- `make stage-watch` — keep `site/.stage/` up to date on source changes
-- `make build` — stage plus full Hugo render
 - `make serve` — run the staging watcher plus `hugo server` in a container
+- `make build` — stage plus full Hugo render in a container
+- `make render` — render the current staged site in a container
 
 The above workflows run in a container by default. There are non-containerized
-pendants for each target that run natively on the host (`-local` suffix).
+pendants for the main render workflows that run natively on the host (`-local` suffix).
 
-Containerized equivalents remain available as `make stage`, `make stage-watch`,
-and `make serve`.
+Native host workflows remain available as `make serve-local`, `make build-local`,
+and `make render-local`. Advanced containerized staging targets remain available as
+`make stage` and `make stage-watch`.
 
 If you want to inspect the static `site/.public/` output without running Hugo in
 watch mode, run `make build`, then serve it locally, for example with

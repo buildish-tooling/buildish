@@ -22,23 +22,30 @@ limitations under the License.
 The site uses Hugo + Docsy for rendering, with the Python staging pipeline implemented under
 `site/pipeline/site_pipeline/` and a small CLI entrypoint in `site/pipeline/main.py`.
 
-## Local native workflow
+## Common workflows
 
 From `site/`:
 
-- `make stage`
-- `make stage-watch`
-- `make build`
-- `make serve`
+- `make serve` — preview the site with live restaging in the build container
+- `make build` — stage and render a fresh static site in the build container
 
-- `make test`
-- `make integration-test`
-- `make stage-local`
-- `make stage-watch-local`
-- `make build`
-- `make serve-local`
+## Checks and cleanup
 
-The native workflow expects:
+From `site/`:
+
+- `make test` — run unit tests
+- `make integration-test` — run integration tests
+- `make check` — run clean, tests, and `build-local`
+- `make clean` — remove generated site output
+
+## Host-tool workflows
+
+From `site/`:
+
+- `make serve-local` — preview the site with live restaging using host tools
+- `make build-local` — stage and render a fresh static site using host tools
+
+Host-tool workflows expect:
 
 - `uv`
 - Hugo extended
@@ -47,13 +54,12 @@ The native workflow expects:
 The Node.js files in `site/` support the Hugo + Docsy render path, while the Python staging package, Python tests, and
 `uv` project files now live under `site/pipeline/`.
 
-`make stage-local` runs the staging pipeline directly on the host. `make serve-local` keeps
-`site/.stage/` up to date while Hugo runs, including changes in component docs/assets
-that live outside `site/`. Use `make stage-watch-local` if you want to run only the native
-staging watcher without starting Hugo.
+`make serve` and `make serve-local` both keep `site/.stage/` up to date while Hugo runs,
+including changes in component docs and assets that live outside `site/`.
 
 If you want to inspect a static build without running Hugo in watch mode, first run
-`make build`, then serve `site/.public/` over a tiny local HTTP server. From `site/`:
+`make build` (containerized default) or `make build-local` (native), then serve `site/.public/`
+over a tiny local HTTP server. From `site/`:
 
 - `python3 -m http.server --directory .public 8080`
 - `docker run --rm --init -p 127.0.0.1:8080:8080 -v "$PWD/.public:/www:ro" docker.io/library/busybox:1.36.1 httpd -f -p 8080 -h /www`
@@ -65,6 +71,18 @@ The watch loop intentionally watches only staged-source inputs and rebuilds only
 `site/.stage/`. It does **not** regenerate `site/.preview/` on every change. That keeps the
 live Hugo workflow focused on the staged contract and reduces external file churn seen by IDEs.
 The full implementation is documented in [`site/site/docs/site-pipeline.md`](site/docs/site-pipeline.md).
+
+## Less common workflows
+
+These are useful when you want direct control over staging versus rendering:
+
+- `make render` — rerun Hugo in the build container using the current `site/.stage/`
+- `make render-local` — rerun Hugo with host tools using the current `site/.stage/`
+- `make stage-local` — refresh `site/.stage/` and `site/.preview/` without running Hugo
+- `make stage-watch-local` — watch sources and refresh `site/.stage/` without running Hugo
+
+Containerized staging-only variants also exist as `make stage` and `make stage-watch`, but most
+developers will usually want `make serve` or `make build` instead.
 
 Known local-dev behavior:
 
@@ -98,14 +116,15 @@ entrypoint for local site workflows.
 
 From `site/`:
 
+- `make serve`
+- `make build`
+- `make render`
 - `make stage`
 - `make stage-watch`
-- `make serve`
 - `make container-image`
 - `make container-check-fast`
 - `make container-test`
 - `make container-integration-test`
-- `make container-build`
 
 Defaults:
 
@@ -117,12 +136,12 @@ You can override the engine if needed, for example:
 
 - `make CONTAINER_ENGINE=podman stage`
 - `make CONTAINER_ENGINE=docker serve`
-- `make CONTAINER_ENGINE=docker container-build`
+- `make CONTAINER_ENGINE=docker build`
 
-`make stage`, `make stage-watch`, and `make serve` are now the default containerized entrypoints.
+`make serve`, `make build`, and `make render` are the main containerized entrypoints.
 They reuse the local builder image when available and build it on demand when missing. The
-previous host-native entrypoints remain available as `make stage-local`,
-`make stage-watch-local`, and `make serve-local`.
+host-native entrypoints remain available as `make serve-local`, `make build-local`,
+`make render-local`, `make stage-local`, and `make stage-watch-local`.
 
 The containerized flow:
 

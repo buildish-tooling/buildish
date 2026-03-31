@@ -392,7 +392,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md",
         )
 
-    def test_make_build_renders_component_navigation_without_cross_component_sidebar(self) -> None:
+    def test_make_build_local_renders_component_navigation_without_cross_component_sidebar(self) -> None:
         if shutil.which("hugo") is None:
             self.skipTest("hugo is required for render integration coverage")
         if not (SOURCE_REPO_ROOT / "site" / "node_modules" / ".bin" / "postcss").exists():
@@ -401,7 +401,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         repo_root = self.prepare_fixture_workspace()
         env = os.environ.copy()
         env["NODE_MODULES_DIR"] = str(SOURCE_REPO_ROOT / "site" / "node_modules")
-        result = self.run_make(repo_root / "site", "build", env)
+        result = self.run_make(repo_root / "site", "build-local", env)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
         home_index = self.read_text(repo_root / "site" / ".public" / "index.html")
@@ -491,7 +491,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         container_log = self.read_text(repo_root / "site" / "build" / "fake-container.log")
         self.assert_contains_all(container_log, "run", "--init", "/workspace/buildish/site")
 
-    def test_make_container_build_exposes_postcss_to_hugo_via_npx(self) -> None:
+    def test_make_build_uses_containerized_path_and_exposes_postcss_to_hugo_via_npx(self) -> None:
         repo_root = self.prepare_fixture_workspace()
         bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
         env = self.base_env(repo_root / "site", bin_dir)
@@ -500,9 +500,45 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
         env["BUILDISH_FAKE_HUGO_REQUIRE_POSTCSS_NPX"] = "1"
-        result = self.run_make(repo_root / "site", "container-build", env)
+        result = self.run_make(repo_root / "site", "build", env)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assert_contains_all(self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"])), "--source .", "--config hugo.yaml")
+
+    def test_make_render_uses_containerized_path(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
+        env = self.base_env(repo_root / "site", bin_dir)
+        env["CONTAINER_ENGINE"] = "fake-container-engine"
+        env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
+        env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
+        result = self.run_make(repo_root / "site", "render", env)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assert_contains_all(self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"])), "--source .", "--config hugo.yaml")
+        self.assert_contains_all(self.read_text(repo_root / "site" / "build" / "fake-container.log"), "run", "--init")
+
+    def test_make_help_curates_public_targets(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        result = self.run_make(repo_root / "site", "help", os.environ.copy())
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assert_contains_all(
+            result.stdout,
+            "Common workflows:",
+            "Checks and cleanup:",
+            "Host-tool workflows:",
+            "Less common workflows:",
+            "serve              Serve the site with live restaging in the build container",
+            "build              Stage and render the site in the build container",
+            "test               Run unit tests.",
+            "check              Run clean, tests, and build-local.",
+            "serve-local        Serve the site with live restaging using host tools",
+            "build-local        Stage and render the site with host tools.",
+            "render             Render the current staged site in the build container.",
+            "render-local       Render the current staged site with host tools.",
+            "stage-local        Refresh staged site inputs with host tools.",
+            "For advanced/internal targets, run 'make help-all'.",
+        )
+        self.assert_not_contains_any(result.stdout, "container-serve", "hugo-check", "docsy-check", "vendor-assets", "container-build")
 
     def test_make_stage_watch_local_rebuilds_after_doc_change(self) -> None:
         repo_root = self.prepare_fixture_workspace()
