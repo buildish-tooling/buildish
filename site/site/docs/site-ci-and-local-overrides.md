@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Proposal: CI build inputs and local workspace overrides
+# CI build inputs and local workspace overrides
 
 This document complements [`site-infra.md`](site-infra.md). It focuses only on two design gaps:
 
@@ -35,7 +35,7 @@ That conflation becomes awkward in two common cases:
 1. one Git repository provides more than one logical site component,
 2. a developer has a non-standard checkout layout that should not be committed to the shared catalog.
 
-## Proposed model
+## Model
 
 The catalog should separate component identity from workspace discovery.
 
@@ -121,7 +121,7 @@ Developers can map component slugs to actual checkout roots without committing t
 
 The manifest turns moving references such as default branches and newly discovered tags into a fixed build input for one workflow run.
 
-## Proposed precedence rules
+## Precedence rules
 
 Source resolution should follow this order:
 

@@ -14,23 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Proposal: Apache Buildish web site infrastructure
+# Apache Buildish web site infrastructure
 
-## Status
+This document captures the current status for the Apache Buildish web site
+infrastructure.
 
-This document captures the current proposal for the Apache Buildish web site
-infrastructure. It is intentionally written as a proposal, not yet as a final
-implementation specification.
-
-Unless a section explicitly says otherwise, the content in this document should
-be read as the proposed **baseline implementation**. Ideas intentionally
-deferred beyond that baseline are collected in the [Follow-ups](#follow-ups)
-section.
+Ideas intentionally deferred beyond the current implementation baseline are
+collected in the [Follow-ups](#follow-ups) section.
 
 For the implementation and local development behavior, see
 [`site-pipeline.md`](site-pipeline.md).
 
-The current implementation is intentionally unreleased-only in practice; release
+The implementation is intentionally unreleased-only in practice; release
 snapshot staging should wait until real tagged releases exist.
 
 > [!NOTE]
@@ -1226,8 +1221,3 @@ remain authoritative. In particular:
 - publishing should proceed only from the resolved manifest,
 - unknown repositories or unexpected refs should be rejected,
 - trigger handling should be conservative and fail closed.
-
-## Open items
-
-There are currently no unresolved open items for the baseline proposal.
-Deferred enhancements remain tracked in [Follow-ups](#follow-ups).

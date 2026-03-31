@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Current site component contract
+# Site component contract
 
 This document describes the implemented input contract for the site pipeline.
 For the broader long-term design, see [`site-infra.md`](site-infra.md).
@@ -29,13 +29,13 @@ For the broader long-term design, see [`site-infra.md`](site-infra.md).
 
 The main repository owns `site/components.yaml`.
 
-Current supported top-level fields:
+Supported top-level fields:
 
 - `schemaVersion`
 - `defaults`
 - `components`
 
-Current supported `defaults` fields:
+Supported `defaults` fields:
 
 - `metadataFile`
 - `pagesRoot`
@@ -45,7 +45,7 @@ Current supported `defaults` fields:
 - `tagPattern`
 - `navigationSection`
 
-Each `components[]` entry currently supports:
+Each `components[]` entry supports:
 
 - required: `slug`, `localDir`
 - optional: `displayName`, `repository`, `defaultBranch`, `weight`
@@ -77,12 +77,12 @@ Preferred structure:
 - `navigation`
   - `section`
 
-The current implementation also accepts a few legacy/top-level fallbacks for content
+The implementation also accepts a few legacy/top-level fallbacks for content
 and navigation fields, but new metadata should prefer the nested structure above.
 
 ## Precedence rules
 
-The current implementation resolves values in this order:
+The implementation resolves values in this order:
 
 1. per-component overrides in `site/components.yaml`
 2. component metadata in `site/component.yaml`
@@ -145,10 +145,10 @@ hard-coding URLs in component-authored Markdown.
 
 Example landing-page usage:
 
-```text
-{{< buildish-component-link kind="docs" label="Read unreleased docs" appearance="primary" >}}
-{{< buildish-component-link kind="source" appearance="outline-secondary" >}}
-{{< buildish-component-releases heading="Current release lines" optional="true" >}}
+```go-template
+{{</* buildish-component-link kind="docs" label="Read unreleased docs" appearance="primary" */>}}
+{{</* buildish-component-link kind="source" appearance="outline-secondary" */>}}
+{{</* buildish-component-releases heading="Current release lines" optional="true" */>}}
 ```
 
 ## Lifecycle inputs
@@ -167,7 +167,7 @@ Only exact-version tags matching the configured `tagPattern` are accepted for
 
 ## Safety constraints
 
-The current aggregator enforces these guardrails:
+The aggregator enforces these guardrails:
 
 - configured paths must stay within the approved repository root
 - path traversal outside the allowed repo tree is rejected
@@ -190,8 +190,8 @@ Stage outputs are, at minimum:
 
 Each staged component Markdown page also receives pipeline-owned front matter under:
 
-- `buildishComponent` for the current component identity, navigation paths, and lifecycle summary
-- `buildishComponentPage` for the current staged page kind and active unreleased-version context
+- `buildishComponent` for the component identity, navigation paths, and lifecycle summary
+- `buildishComponentPage` for the staged page kind and active unreleased-version context
 
 ## Local commands
 

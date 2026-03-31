@@ -25,3 +25,5 @@ Use these pages for the stable, component-level overview. The unreleased docs co
 - the component contract used by participating Buildish repositories,
 - the shared site pipeline, preview flow, and generated metadata model,
 - infrastructure notes for staging, publishing, and local development.
+
+{{< buildish-component-link kind="docs" label="Site-Pipeline Docs" appearance="primary" >}}

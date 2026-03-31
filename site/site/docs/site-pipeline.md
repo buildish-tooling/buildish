@@ -14,21 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Current implementation: Buildish site infrastructure
+# Apache Buildish site infrastructure
 
-## Status
-
-This document describes the current implementation under `site/`.
+This document describes the implementation under `site/`.
 
 The broader target architecture and future publication/release goals remain in
-[`site-infra.md`](site-infra.md). The current implementation is still
+[`site-infra.md`](site-infra.md). The implementation is still
 **unreleased-first and unreleased-only** in practice for versioned docs; stable,
 non-versioned component landing pages come from authored `site/pages/_index.md`
 content, while version-specific docs come from `site/docs/`.
 
-## What the current implementation provides
+## What the implementation provides
 
-The code under `site/` currently provides:
+The code under `site/` provides:
 
 - catalog-driven aggregation from `site/components.yaml`,
 - per-component metadata loading from each component's `site/component.yaml`,
@@ -40,7 +38,7 @@ The code under `site/` currently provides:
 - an optional lightweight Python preview under `site/.preview/`, and
 - containerized local/CI workflows with pinned tooling.
 
-The current component metadata contract is documented separately in
+The component metadata contract is documented separately in
 [`site-component-contract.md`](site-component-contract.md).
 
 ## Architecture overview
@@ -103,10 +101,13 @@ Generated directories are ignored by Git and should usually be excluded in IDEs.
 
 From `site/`:
 
-- `make stage-local` — run one native staging pass
-- `make stage-watch-local` — keep `site/.stage/` up to date on source changes
+- `make stage` — run one native staging pass
+- `make stage-watch` — keep `site/.stage/` up to date on source changes
 - `make build` — stage plus full Hugo render
-- `make serve-local` — run the staging watcher plus `hugo server`
+- `make serve` — run the staging watcher plus `hugo server` in a container
+
+The above workflows run in a container by default. There are non-containerized
+pendants for each target that run natively on the host (`-local` suffix).
 
 Containerized equivalents remain available as `make stage`, `make stage-watch`,
 and `make serve`.
@@ -115,9 +116,9 @@ If you want to inspect the static `site/.public/` output without running Hugo in
 watch mode, run `make build`, then serve it locally, for example with
 `python3 -m http.server --directory .public 8080` from `site/`.
 
-## How `serve-local` works
+## How `serve` works
 
-`make serve-local` starts two long-lived processes:
+`make serve` starts two long-lived processes in a container:
 
 1. the Python watcher, which rebuilds `site/.stage/` when relevant inputs change
 2. `hugo server`, which serves from `site/.stage/`
@@ -138,8 +139,8 @@ sequenceDiagram
 ### Why watch mode only rebuilds `site/.stage/`
 
 Watch mode intentionally calls the Python build with preview generation disabled.
-That means repeated restaging during `make stage-watch-local` and
-`make serve-local` rewrites `site/.stage/` only and leaves `site/.preview/`
+That means repeated restaging during `make stage-watch` and
+`make serve` rewrites `site/.stage/` only and leaves `site/.preview/`
 untouched.
 
 This is intentional for two reasons:
@@ -170,12 +171,12 @@ over a much larger tree than the watcher actually needs.
 
 ### Why Hugo is configured with polling during serve
 
-`make serve-local` runs `hugo server` with `--poll 700ms`. The staged tree is
-rewritten by a separate Python process, so the current implementation uses Hugo
+`make serve` runs `hugo server` with `--poll 700ms`. The staged tree is
+rewritten by a separate Python process, so the implementation uses Hugo
 polling as the compatibility-oriented way to notice those external restaging
 updates reliably during development.
 
-## Current inputs and outputs
+## Inputs and outputs
 
 ### Inputs
 
@@ -202,7 +203,7 @@ updates reliably during development.
 
 ## Security and safety baseline
 
-The current implementation keeps the main safety guardrails from the broader
+The implementation keeps the main safety guardrails from the broader
 proposal:
 
 - no arbitrary code execution from staged content,
@@ -214,8 +215,7 @@ proposal:
 
 ## Known development-only limitations
 
-- route removals can linger briefly in an already-running `make serve-local`
+- route removals can linger briefly in an already-running `make serve`
   session until Hugo is restarted
 - release snapshot staging from exact tags is not implemented yet
-- search, redirects, sitemap policy, and publication automation remain future
-  work rather than part of the current local implementation
+- redirects, sitemap policy, and publication automation remain future work
