@@ -13,7 +13,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-{{ $gradientID := default "buildish-pipeline-panel" .gradientId }}
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 184 184" role="img" aria-labelledby="title desc">
   <title id="title">Apache Buildish logo proposal 3: Circuit B</title>
   <desc id="desc">A rounded-square emblem with a connected circuit-like B symbol beside the Apache Buildish wordmark and headline.</desc>

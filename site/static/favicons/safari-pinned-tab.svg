@@ -1,0 +1,24 @@
+<!--
+Copyright 2026 The Apache Software Foundation
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 184 184" role="img" aria-label="Apache Buildish pinned tab icon">
+  <path d="M56 42v100" fill="none" stroke="#000" stroke-linecap="round" stroke-width="16"/>
+  <path d="M68 54h52c19 0 30 10 30 26s-11 26-30 26H68" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <path d="M68 106h58c20 0 31 10 31 26s-11 26-31 26H68" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <circle cx="151" cy="80" r="8" fill="#000"/>
+  <circle cx="158" cy="132" r="8" fill="#000"/>
+  <circle cx="56" cy="42" r="8" fill="#000"/>
+  <circle cx="56" cy="142" r="8" fill="#000"/>
+</svg>

@@ -407,6 +407,15 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         home_index = self.read_text(repo_root / "site" / ".public" / "index.html")
         self.assert_contains_all(
             home_index,
+            'rel="shortcut icon" href="/favicons/favicon.ico"',
+            'rel="icon" href="/favicons/favicon.svg" type="image/svg+xml" sizes="any"',
+            'rel="icon" href="/favicons/favicon-32x32.png" type="image/png" sizes="32x32"',
+            'rel="icon" href="/favicons/favicon-16x16.png" type="image/png" sizes="16x16"',
+            'rel="apple-touch-icon" href="/favicons/apple-touch-icon.png" sizes="180x180"',
+            'rel="manifest" href="/favicons/site.webmanifest"',
+            'rel="mask-icon" href="/favicons/safari-pinned-tab.svg" color="#38bdf8"',
+            'name="msapplication-config" content="/favicons/browserconfig.xml"',
+            'name="theme-color" content="#0f172a"',
             'class="btn btn-primary me-2 mb-2" href="/community/">Community</a>',
             '/community/contributing-guidelines/',
             '/community/community-guidelines/',
@@ -482,6 +491,31 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             'href="/community/get-involved/"',
         )
         self.assert_not_contains_any(community_index, 'class="td-breadcrumbs', 'aria-label="breadcrumb"', 'col-12 col-md-3 col-xl-2 td-sidebar d-print-none')
+
+        favicons_dir = repo_root / "site" / ".public" / "favicons"
+        for favicon_name in (
+            "favicon.ico",
+            "favicon.svg",
+            "favicon-16x16.png",
+            "favicon-32x32.png",
+            "apple-touch-icon.png",
+            "android-chrome-192x192.png",
+            "android-chrome-512x512.png",
+            "mstile-150x150.png",
+            "safari-pinned-tab.svg",
+            "site.webmanifest",
+            "browserconfig.xml",
+        ):
+            self.assertTrue((favicons_dir / favicon_name).exists(), favicon_name)
+
+        webmanifest = self.read_text(favicons_dir / "site.webmanifest")
+        self.assert_contains_all(
+            webmanifest,
+            '"name": "Apache Buildish"',
+            '"src": "/favicons/android-chrome-192x192.png"',
+            '"src": "/favicons/android-chrome-512x512.png"',
+            '"theme_color": "#0f172a"',
+        )
 
         sidebar = docs_index.split('<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">', 1)[1].split('<aside class="d-none d-xl-block col-xl-2 td-sidebar-toc d-print-none">', 1)[0]
         self.assertNotIn('id="m-componentsmammoth-cache"', sidebar)
