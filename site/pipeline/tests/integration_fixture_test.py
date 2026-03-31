@@ -121,7 +121,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "mammoth-cache"
-                / "unreleased"
+                / "development"
                 / "docs"
                 / "getting-started.md",
                 repo_root
@@ -137,7 +137,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 / "static"
                 / "components"
                 / "mammoth-cache"
-                / "unreleased"
+                / "development"
                 / "assets"
                 / "images"
                 / "diagram.svg",
@@ -147,7 +147,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "no-gradle-wrapper-jar"
-                / "unreleased"
+                / "development"
                 / "docs"
                 / "_index.md",
                 repo_root
@@ -156,7 +156,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "site"
-                / "unreleased"
+                / "development"
                 / "docs"
                 / "_index.md",
                 repo_root / "site" / ".preview" / "index.html",
@@ -181,7 +181,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 components_data["components"]["site"]["componentPath"],
             )
             self.assertEqual(
-                "/components/site/unreleased/docs/",
+                "/components/site/development/docs/",
                 components_data["components"]["site"]["docsPath"],
             )
             self.assertEqual(0, components_data["components"]["site"]["assetCount"])
@@ -203,28 +203,28 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 ],
             )
 
-            site_unreleased_index = self.read_text(
+            site_development_index = self.read_text(
                 repo_root
                 / "site"
                 / ".stage"
                 / "content"
                 / "components"
                 / "site"
-                / "unreleased"
+                / "development"
                 / "_index.md"
             )
-            self.assert_contains_all(site_unreleased_index, "## Docs")
-            self.assert_not_contains_any(site_unreleased_index, "Open staged assets")
-            site_unreleased_front_matter = yaml.safe_load(
-                site_unreleased_index.split("---", 2)[1]
+            self.assert_contains_all(site_development_index, "## Docs")
+            self.assert_not_contains_any(site_development_index, "Open staged assets")
+            site_development_front_matter = yaml.safe_load(
+                site_development_index.split("---", 2)[1]
             )
             self.assertEqual(
                 "Site",
-                site_unreleased_front_matter["sitePipelineComponent"]["displayName"],
+                site_development_front_matter["sitePipelineComponent"]["displayName"],
             )
             self.assertEqual(
-                "unreleased-home",
-                site_unreleased_front_matter["sitePipelineComponentPage"]["kind"],
+                "development-home",
+                site_development_front_matter["sitePipelineComponentPage"]["kind"],
             )
 
             preview_index = self.read_text(

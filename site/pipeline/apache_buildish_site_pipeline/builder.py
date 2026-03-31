@@ -51,8 +51,8 @@ from .models import (
     DocsFrontMatter,
     LifecycleDataDocument,
     LifecycleDataEntry,
+    LifecycleDevelopment,
     LifecycleLatestStable,
-    LifecycleUnreleased,
     ManifestDocument,
     ManifestComponentEntry,
     ComponentAliasesEntry,
@@ -67,9 +67,9 @@ from .models import (
     ComponentsDataDocument,
     ComponentsDataEntry,
     SitePipelineComponentPagePayload,
+    SitePipelineComponentDevelopment,
     SitePipelineComponentPaths,
     SitePipelineComponentPayload,
-    SitePipelineComponentUnreleased,
     SitePipelinePayload,
     StagedDocLink,
     StagedComponentRef,
@@ -80,16 +80,16 @@ from .models import (
 from .rendering import (
     build_preview_index,
     build_component_preview,
-    build_unreleased_index_markdown,
+    build_development_index_markdown,
     normalize_lifecycle,
     public_assets_root_path,
     public_content_page_path,
     public_component_path,
-    public_unreleased_path,
+    public_development_path,
 )
 
 
-_RESERVED_COMPONENT_TOP_LEVEL_PATHS = {"unreleased", "releases", "lifecycle.yaml"}
+_RESERVED_COMPONENT_TOP_LEVEL_PATHS = {"development", "releases", "lifecycle.yaml"}
 
 
 def _content_setting(
@@ -123,7 +123,7 @@ def _stage_component_docs(
     )
     if docs_path and docs_path.is_dir():
         return copy_tree_without_symlinks(docs_path, docs_root)
-    warnings.append("No docs directory found; skipping unreleased docs staging.")
+    warnings.append("No docs directory found; skipping development docs staging.")
     return []
 
 
@@ -194,7 +194,7 @@ def _normalize_staged_docs(
         if copied.suffix.lower() not in {".md", ".markdown", ".adoc", ".asciidoc"}:
             continue
         raw_path = public_content_page_path(
-            ["components", slug, "unreleased", "docs"], copied
+            ["components", slug, "development", "docs"], copied
         )
         doc_links.append(StagedDocLink(label=doc_title, href=raw_path))
     return doc_links, summary
@@ -228,19 +228,19 @@ def _normalize_staged_component_pages(
     return summary
 
 
-def _write_unreleased_index(
-    result: ComponentBuildResult, unreleased_root: Path
+def _write_development_index(
+    result: ComponentBuildResult, development_root: Path
 ) -> None:
-    """Write the staged unreleased landing page for one component."""
+    """Write the staged development landing page for one component."""
 
-    unreleased_index_path = unreleased_root / "_index.md"
-    unreleased_index_path.parent.mkdir(parents=True, exist_ok=True)
-    unreleased_index_path.write_text(
+    development_index_path = development_root / "_index.md"
+    development_index_path.parent.mkdir(parents=True, exist_ok=True)
+    development_index_path.write_text(
         with_yaml_front_matter(
-            build_unreleased_index_markdown(result),
+            build_development_index_markdown(result),
             **DocsFrontMatter(
-                title=f"{result.display_name} {result.unreleased_label}",
-                link_title=result.unreleased_label,
+                title=f"{result.display_name} {result.development_label}",
+                link_title=result.development_label,
                 weight=10,
                 description=result.summary or None,
             ).to_yaml_data(),
@@ -265,15 +265,15 @@ def _site_pipeline_component_payload(
         navigation_section=result.navigation_section,
         paths=SitePipelineComponentPaths(
             component=result.raw_component_index_path,
-            unreleased=result.raw_unreleased_index_path,
+            development=result.raw_development_index_path,
             docs=result.raw_docs_root_path,
             assets=result.raw_assets_root_path,
         ),
-        unreleased_label=result.unreleased_label,
-        unreleased=SitePipelineComponentUnreleased(
-            label=result.unreleased_label,
-            path=result.raw_unreleased_index_path
-            or public_unreleased_path(result.slug),
+        development_label=result.development_label,
+        development=SitePipelineComponentDevelopment(
+            label=result.development_label,
+            path=result.raw_development_index_path
+            or public_development_path(result.slug),
             docs_path=result.raw_docs_root_path,
             assets_path=result.raw_assets_root_path,
         ),
@@ -292,9 +292,9 @@ def _site_pipeline_component_page_payload(
     result: ComponentBuildResult,
     *,
     kind: Literal[
-        "component-home", "component-page", "unreleased-home", "docs-home", "docs-page"
+        "component-home", "component-page", "development-home", "docs-home", "docs-page"
     ],
-    section: Literal["component", "unreleased", "docs"],
+    section: Literal["component", "development", "docs"],
     page_path: str | None,
 ) -> SitePipelineComponentPagePayload:
     """Build per-page context for staged component pages."""
@@ -306,12 +306,12 @@ def _site_pipeline_component_page_payload(
         component_path=result.raw_component_index_path,
         version=(
             None
-            if section not in {"unreleased", "docs"}
+            if section not in {"development", "docs"}
             else VersionDescriptor(
-                kind="unreleased",
-                label=result.unreleased_label,
-                path=result.raw_unreleased_index_path
-                or public_unreleased_path(result.slug),
+                kind="development",
+                label=result.development_label,
+                path=result.raw_development_index_path
+                or public_development_path(result.slug),
                 docs_path=result.raw_docs_root_path,
             )
         ),
@@ -322,7 +322,7 @@ def _annotate_staged_component_pages(
     result: ComponentBuildResult,
     site_pipeline: SitePipelinePayload,
     component_root: Path,
-    unreleased_root: Path,
+    development_root: Path,
     copied_component_pages: list[Path],
     docs_root: Path,
     copied_docs: list[Path],
@@ -355,17 +355,17 @@ def _annotate_staged_component_pages(
             encoding="utf-8",
         )
 
-    unreleased_index_path = unreleased_root / "_index.md"
-    unreleased_index_path.write_text(
+    development_index_path = development_root / "_index.md"
+    development_index_path.write_text(
         update_markdown_front_matter(
-            unreleased_index_path.read_text(encoding="utf-8"),
+            development_index_path.read_text(encoding="utf-8"),
             sitePipeline=site_pipeline,
             sitePipelineComponent=component_payload,
             sitePipelineComponentPage=_site_pipeline_component_page_payload(
                 result,
-                kind="unreleased-home",
-                section="unreleased",
-                page_path=result.raw_unreleased_index_path,
+                kind="development-home",
+                section="development",
+                page_path=result.raw_development_index_path,
             ),
         ),
         encoding="utf-8",
@@ -379,7 +379,7 @@ def _annotate_staged_component_pages(
         ):
             continue
         page_path = public_content_page_path(
-            ["components", result.slug, "unreleased", "docs"], copied
+            ["components", result.slug, "development", "docs"], copied
         )
         staged_doc_path.write_text(
             update_markdown_front_matter(
@@ -400,7 +400,7 @@ def _annotate_staged_component_pages(
 def _write_component_metadata_files(
     result: ComponentBuildResult,
     component_root: Path,
-    unreleased_root: Path,
+    development_root: Path,
     metadata_relative: str,
     metadata_loaded: bool,
     pages_relative: str,
@@ -409,8 +409,8 @@ def _write_component_metadata_files(
 ) -> None:
     """Write the YAML metadata files consumed by the staged site."""
 
-    raw_unreleased_index_path = public_unreleased_path(result.slug)
-    version_metadata_path = unreleased_root / "version.yaml"
+    raw_development_index_path = public_development_path(result.slug)
+    version_metadata_path = development_root / "version.yaml"
     lifecycle_metadata_path = component_root / "lifecycle.yaml"
 
     write_yaml_like(
@@ -421,9 +421,9 @@ def _write_component_metadata_files(
                 slug=result.slug, display_name=result.display_name
             ),
             version=VersionDescriptor(
-                kind="unreleased",
-                label=result.unreleased_label,
-                path=raw_unreleased_index_path,
+                kind="development",
+                label=result.development_label,
+                path=raw_development_index_path,
                 docs_path=result.raw_docs_root_path,
             ),
             source=VersionSource(
@@ -450,9 +450,9 @@ def _write_component_metadata_files(
                 slug=result.slug, display_name=result.display_name
             ),
             lifecycle=ComponentLifecycleDocumentData(
-                unreleased=LifecycleUnreleased(
-                    label=result.unreleased_label,
-                    path=raw_unreleased_index_path,
+                development=LifecycleDevelopment(
+                    label=result.development_label,
+                    path=raw_development_index_path,
                     docs_path=result.raw_docs_root_path,
                     robots="index,follow",
                 ),
@@ -555,12 +555,12 @@ def stage_component(
     assets_setting = _content_setting(component, metadata, defaults, "assets_root")
     assets_relative = "" if assets_setting is None else str(assets_setting)
 
-    unreleased_label = str(
+    development_label = str(
         first_non_none(
-            component.unreleased_label,
-            metadata.versioning.unreleased_label,
-            defaults.unreleased_label,
-            "Unreleased",
+            component.development_label,
+            metadata.versioning.development_label,
+            defaults.development_label,
+            "Development",
         )
     )
     tag_pattern = first_non_none(
@@ -572,10 +572,10 @@ def stage_component(
         tag_pattern = re.compile(DEFAULT_TAG_PATTERN)
 
     component_root = stage_root / "content" / "components" / slug
-    unreleased_root = component_root / "unreleased"
-    docs_root = unreleased_root / "docs"
+    development_root = component_root / "development"
+    docs_root = development_root / "docs"
     staged_assets_root = (
-        stage_root / "static" / "components" / slug / "unreleased" / "assets"
+        stage_root / "static" / "components" / slug / "development" / "assets"
     )
 
     if available:
@@ -611,13 +611,13 @@ def stage_component(
     if not summary:
         summary = docs_summary
 
-    raw_unreleased_index_path = public_unreleased_path(slug)
+    raw_development_index_path = public_development_path(slug)
     raw_component_index_path = (
         public_component_path(slug) if copied_component_pages else None
     )
     raw_docs_root_path = (
         public_content_page_path(
-            ["components", slug, "unreleased", "docs"], Path("_index.md")
+            ["components", slug, "development", "docs"], Path("_index.md")
         )
         if (docs_root / "_index.md").is_file()
         else None
@@ -641,11 +641,11 @@ def stage_component(
         local_dir=local_dir,
         repo_path=repo_path,
         summary=summary,
-        raw_unreleased_index_path=raw_unreleased_index_path,
+        raw_development_index_path=raw_development_index_path,
         raw_component_index_path=raw_component_index_path,
         raw_docs_root_path=raw_docs_root_path,
         raw_assets_root_path=raw_assets_root_path,
-        unreleased_label=unreleased_label,
+        development_label=development_label,
         default_branch=str(default_branch) if default_branch else None,
         navigation_section=str(navigation_section) if navigation_section else None,
         asset_count=len(copied_assets),
@@ -657,11 +657,11 @@ def stage_component(
         warnings=warnings,
     )
 
-    _write_unreleased_index(result, unreleased_root)
+    _write_development_index(result, development_root)
     _write_component_metadata_files(
         result,
         component_root,
-        unreleased_root,
+        development_root,
         metadata_relative=metadata_relative,
         metadata_loaded=metadata_path is not None,
         pages_relative=pages_relative,
@@ -672,7 +672,7 @@ def stage_component(
         result,
         site_pipeline,
         component_root,
-        unreleased_root,
+        development_root,
         copied_component_pages,
         docs_root,
         copied_docs,
@@ -749,7 +749,7 @@ def build(
                     repository=result.repository,
                     default_branch=result.default_branch,
                     component_path=result.raw_component_index_path,
-                    unreleased_path=result.raw_unreleased_index_path,
+                    development_path=result.raw_development_index_path,
                     docs_path=result.raw_docs_root_path,
                 )
                 for result in results
@@ -770,9 +770,9 @@ def build(
                     summary=result.summary,
                     default_branch=result.default_branch,
                     navigation_section=result.navigation_section,
-                    unreleased_label=result.unreleased_label,
+                    development_label=result.development_label,
                     component_path=result.raw_component_index_path,
-                    unreleased_path=result.raw_unreleased_index_path,
+                    development_path=result.raw_development_index_path,
                     docs_path=result.raw_docs_root_path,
                     asset_count=result.asset_count,
                     assets_path=result.raw_assets_root_path,
@@ -792,10 +792,10 @@ def build(
                 result.slug: LifecycleDataEntry(
                     latest_stable=result.latest_stable_version,
                     release_lines=result.release_lines,
-                    unreleased=LifecycleUnreleased(
-                        label=result.unreleased_label,
-                        path=result.raw_unreleased_index_path
-                        or public_unreleased_path(result.slug),
+                    development=LifecycleDevelopment(
+                        label=result.development_label,
+                        path=result.raw_development_index_path
+                        or public_development_path(result.slug),
                         docs_path=result.raw_docs_root_path,
                     ),
                 )

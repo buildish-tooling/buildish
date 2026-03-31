@@ -18,7 +18,7 @@ limitations under the License.
 
 Buildish Site provides the shared website, component contract, and publishing pipeline for Apache Buildish.
 
-Use these pages for the stable, component-level overview. The unreleased docs cover implementation details, pipeline behavior, and authoring conventions for the current branch.
+Use these pages for the stable, component-level overview. The development docs cover implementation details, pipeline behavior, and authoring conventions for the current branch.
 
 ## What you'll find here
 

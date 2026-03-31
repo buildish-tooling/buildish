@@ -47,7 +47,7 @@ Supported `defaults` fields:
 - `pagesRoot`
 - `docsRoot`
 - `assetsRoot`
-- `unreleasedLabel`
+- `developmentLabel`
 - `tagPattern`
 - `navigationSection`
 
@@ -56,7 +56,7 @@ Each `components[]` entry supports:
 - required: `slug`, `localDir`
 - optional: `displayName`, `repository`, `defaultBranch`, `weight`
 - optional overrides: `metadataFile`, `pagesRoot`, `docsRoot`, `assetsRoot`
-- optional publication/navigation hints: `unreleasedLabel`, `tagPattern`, `navigationSection`
+- optional publication/navigation hints: `developmentLabel`, `tagPattern`, `navigationSection`
 
 ## Component metadata file
 
@@ -75,7 +75,7 @@ Preferred structure:
   - `docsRoot`
   - `assetsRoot`
 - `versioning`
-  - `unreleasedLabel`
+  - `developmentLabel`
   - `tagPattern`
 - `lifecycle`
   - `latestStable`
@@ -115,21 +115,21 @@ must include `_index.md`.
 
 `docsRoot` is the version-specific documentation tree. In the current
 implementation, the working-tree copy stages to
-`content/components/<slug>/unreleased/docs/...`.
+`content/components/<slug>/development/docs/...`.
 
 The docs tree should include a site-oriented `_index.md` landing page for that
 versioned docs section.
 
 Because `pagesRoot` stages directly into `content/components/<slug>/...`, the
-top-level names `unreleased/`, `releases/`, and `lifecycle.yaml` are reserved
+top-level names `development/`, `releases/`, and `lifecycle.yaml` are reserved
 for pipeline-owned output.
 
-If the docs tree is missing, unreleased docs staging is skipped for that
+If the docs tree is missing, development docs staging is skipped for that
 component.
 
 The renderer does not inject a mandatory component-home hero, CTA button row, or
 release-card shell. Component authors own the landing-page body in
-`pagesRoot/_index.md` and can place links to unreleased docs, releases, source,
+`pagesRoot/_index.md` and can place links to development docs, releases, source,
 or any other component-specific content where they want.
 
 ### Landing-page shortcodes
@@ -139,7 +139,7 @@ They read the pipeline-owned `sitePipelineComponent` front matter and avoid
 hard-coding URLs in component-authored Markdown.
 
 - `buildish-component-link`
-  - supported `kind` values: `overview`, `component`, `docs`, `unreleased`, `source`
+  - supported `kind` values: `overview`, `component`, `docs`, `development`, `source`
   - optional `label`
   - optional `appearance`: `link`, `primary`, `secondary`, `outline-primary`, `outline-secondary`
   - optional `optional="true"` to suppress output when a target is unavailable
@@ -152,7 +152,7 @@ hard-coding URLs in component-authored Markdown.
 Example landing-page usage:
 
 ```go-template
-{{</* buildish-component-link kind="docs" label="Read unreleased docs" appearance="primary" */>}}
+{{</* buildish-component-link kind="docs" label="Read development docs" appearance="primary" */>}}
 {{</* buildish-component-link kind="source" appearance="outline-secondary" */>}}
 {{</* buildish-component-releases heading="Current release lines" optional="true" */>}}
 ```
@@ -186,18 +186,18 @@ Stage outputs are, at minimum:
 
 - `site/.stage/content/components/<slug>/_index.md`
 - `site/.stage/content/components/<slug>/...` for any additional authored component pages
-- `site/.stage/content/components/<slug>/unreleased/docs/...`
-- `site/.stage/content/components/<slug>/unreleased/version.yaml`
+- `site/.stage/content/components/<slug>/development/docs/...`
+- `site/.stage/content/components/<slug>/development/version.yaml`
 - `site/.stage/content/components/<slug>/lifecycle.yaml`
 - `site/.stage/data/components.yaml`
 - `site/.stage/data/lifecycle.yaml`
 - `site/.stage/data/aliases.yaml`
-- `site/.stage/static/components/<slug>/unreleased/assets/...` when assets exist
+- `site/.stage/static/components/<slug>/development/assets/...` when assets exist
 
 Each staged component Markdown page also receives pipeline-owned front matter under:
 
 - `sitePipelineComponent` for the component identity, navigation paths, and lifecycle summary
-- `sitePipelineComponentPage` for the staged page kind and active unreleased-version context
+- `sitePipelineComponentPage` for the staged page kind and active development-version context
 
 ## Local commands
 

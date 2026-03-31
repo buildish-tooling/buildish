@@ -28,16 +28,16 @@ limitations under the License.
 {{- $href := "" -}}
 {{- $label := "" -}}
 {{- $external := false -}}
-{{- $unreleasedLabel := "Unreleased" -}}
-{{- with index $component "unreleasedLabel" }}{{ $unreleasedLabel = . }}{{ end -}}
+{{- $developmentLabel := "Development" -}}
+{{- with index $component "developmentLabel" }}{{ $developmentLabel = . }}{{ end -}}
 {{- if or (eq $kind "component") (eq $kind "overview") -}}
   {{- with index $paths "component" }}{{ $href = . }}{{ end -}}
   {{- $label = "Overview" -}}
 {{- else if eq $kind "docs" -}}
   {{- with index $paths "docs" }}{{ $href = . }}{{ end -}}
-  {{- $label = printf "%s docs" $unreleasedLabel -}}
-{{- else if eq $kind "unreleased" -}}
-  {{- with index $component "unreleased" -}}
+  {{- $label = printf "%s docs" $developmentLabel -}}
+{{- else if eq $kind "development" -}}
+  {{- with index $component "development" -}}
     {{- with index . "path" }}{{ $href = . }}{{ end -}}
     {{- with index . "label" }}{{ $label = . }}{{ end -}}
   {{- end -}}

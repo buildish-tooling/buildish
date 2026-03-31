@@ -38,17 +38,17 @@ from pipeline.apache_buildish_site_pipeline.models import (
     ComponentsLocalOverrides,
     DocsFrontMatter,
     LifecycleDataDocument,
+    LifecycleDevelopment,
     LifecycleLatestStable,
-    LifecycleUnreleased,
     ManifestDocument,
     ComponentLifecycleDocument,
     ComponentsCatalog,
     ComponentsDataDocument,
     ComponentVersionDocument,
     SitePipelineComponentPagePayload,
+    SitePipelineComponentDevelopment,
     SitePipelineComponentPaths,
     SitePipelineComponentPayload,
-    SitePipelineComponentUnreleased,
     StagedReleaseLine,
     VersionDescriptor,
 )
@@ -126,18 +126,20 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
     def test_staged_section_to_yaml_data_omits_null_optional_fields(self) -> None:
         self.assertEqual(
             {
-                "kind": "unreleased",
+                "kind": "development",
                 "label": "Preview",
-                "path": "/components/foo/unreleased/",
+                "path": "/components/foo/development/",
             },
             VersionDescriptor(
-                kind="unreleased", label="Preview", path="/components/foo/unreleased/"
+                kind="development",
+                label="Preview",
+                path="/components/foo/development/",
             ).to_yaml_data(),
         )
         self.assertEqual(
-            {"label": "Preview", "path": "/components/foo/unreleased/"},
-            LifecycleUnreleased(
-                label="Preview", path="/components/foo/unreleased/"
+            {"label": "Preview", "path": "/components/foo/development/"},
+            LifecycleDevelopment(
+                label="Preview", path="/components/foo/development/"
             ).to_yaml_data(),
         )
         self.assertEqual(
@@ -157,11 +159,11 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 local_dir="buildish-mammoth-cache",
                 paths=SitePipelineComponentPaths(
                     component="/components/mammoth-cache/",
-                    unreleased="/components/mammoth-cache/unreleased/",
+                    development="/components/mammoth-cache/development/",
                 ),
-                unreleased_label="Preview",
-                unreleased=SitePipelineComponentUnreleased(
-                    label="Preview", path="/components/mammoth-cache/unreleased/"
+                development_label="Preview",
+                development=SitePipelineComponentDevelopment(
+                    label="Preview", path="/components/mammoth-cache/development/"
                 ),
                 release_lines=(
                     StagedReleaseLine(line="v1", latest="v1.2.3", status="maintained"),
@@ -170,12 +172,12 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             sitePipelineComponentPage=SitePipelineComponentPagePayload(
                 kind="docs-home",
                 section="docs",
-                path="/components/mammoth-cache/unreleased/docs/",
+                path="/components/mammoth-cache/development/docs/",
                 component_path="/components/mammoth-cache/",
                 version=VersionDescriptor(
-                    kind="unreleased",
+                    kind="development",
                     label="Preview",
-                    path="/components/mammoth-cache/unreleased/",
+                    path="/components/mammoth-cache/development/",
                 ),
             ),
         )
@@ -186,7 +188,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             front_matter["sitePipelineComponent"]["displayName"],
         )
         self.assertEqual(
-            "Preview", front_matter["sitePipelineComponent"]["unreleased"]["label"]
+            "Preview", front_matter["sitePipelineComponent"]["development"]["label"]
         )
         self.assertNotIn("latestStable", front_matter["sitePipelineComponent"])
         self.assertEqual("docs-home", front_matter["sitePipelineComponentPage"]["kind"])
@@ -315,7 +317,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                         "assetsRoot": None,
                     },
                     "versioning": {
-                        "unreleasedLabel": "Preview",
+                        "developmentLabel": "Preview",
                         "tagPattern": r"^v[0-9]+\.[0-9]+\.[0-9]+$",
                     },
                     "lifecycle": {
@@ -352,7 +354,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             self.assertEqual("site/pages", metadata.content.pages_root)
             self.assertEqual("site/docs", metadata.content.docs_root)
             self.assertIsNone(metadata.content.assets_root)
-            self.assertEqual("Preview", metadata.versioning.unreleased_label)
+            self.assertEqual("Preview", metadata.versioning.development_label)
             self.assertEqual("v1.2.3", metadata.lifecycle.latest_stable)
             self.assertEqual(2, len(metadata.lifecycle.release_lines))
             self.assertEqual(("v1",), metadata.lifecycle.release_lines[0].aliases)
@@ -476,7 +478,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "mammoth-cache"
-                / "unreleased"
+                / "development"
                 / "docs"
                 / "_index.md",
             )
@@ -494,7 +496,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                     "pagesRoot": "site/pages",
                     "docsRoot": "site/docs",
                     "assetsRoot": "site/assets",
-                    "unreleasedLabel": "Unreleased",
+                    "developmentLabel": "Development",
                     "tagPattern": r"^v[0-9]+\.[0-9]+\.[0-9]+$",
                     "navigationSection": "components",
                 },
@@ -524,7 +526,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
 
                         Buildish site publishing and shared documentation tooling.
 
-                        Use the authored component pages for the stable overview and the unreleased docs for implementation details.
+                        Use the authored component pages for the stable overview and the development docs for implementation details.
                         """
                     ),
                     "docs/_index.md": text_block(
@@ -572,7 +574,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                         "defaultBranch": "trunk",
                     },
                     "content": {"docsRoot": "site/docs", "assetsRoot": "site/assets"},
-                    "versioning": {"unreleasedLabel": "Preview"},
+                    "versioning": {"developmentLabel": "Preview"},
                     "lifecycle": {
                         "latestStable": "v1.3.5",
                         "releaseLines": [
@@ -602,7 +604,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
 
                         Secure Gradle wrapper provisioning.
 
-                        Use the unreleased docs to evaluate planned changes before they ship.
+                        Use the development docs to evaluate planned changes before they ship.
                         """
                     ),
                     "site/pages/faq.md": text_block(
@@ -680,7 +682,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "mammoth-cache"
-                / "unreleased"
+                / "development"
                 / "docs"
                 / "wrapper-provisioning.md",
                 repo_root
@@ -689,7 +691,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 / "static"
                 / "components"
                 / "mammoth-cache"
-                / "unreleased"
+                / "development"
                 / "assets"
                 / "images"
                 / "logo.svg",
@@ -699,7 +701,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "no-gradle-wrapper-jar"
-                / "unreleased"
+                / "development"
                 / "_index.md",
                 repo_root
                 / "site"
@@ -707,7 +709,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "site"
-                / "unreleased"
+                / "development"
                 / "docs"
                 / "_index.md",
                 repo_root / "site" / ".preview" / "index.html",
@@ -756,7 +758,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 "title: Mammoth Cache for Gradle® and Apache Maven™",
                 "weight: 10",
                 "description: Secure Gradle wrapper provisioning.",
-                "Use the unreleased docs to evaluate planned changes before they ship.",
+                "Use the development docs to evaluate planned changes before they ship.",
             )
             self.assert_not_contains_any(
                 component_index,
@@ -788,7 +790,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 component_front_matter["sitePipelineComponent"]["displayName"],
             )
             self.assertEqual(
-                "/components/mammoth-cache/unreleased/docs/",
+                "/components/mammoth-cache/development/docs/",
                 component_front_matter["sitePipelineComponent"]["paths"]["docs"],
             )
             self.assertEqual(
@@ -817,30 +819,30 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 mammoth_component_front_matter["sitePipelineComponentPage"]["path"],
             )
 
-            mammoth_unreleased_index = (
+            mammoth_development_index = (
                 repo_root
                 / "site"
                 / ".stage"
                 / "content"
                 / "components"
                 / "mammoth-cache"
-                / "unreleased"
+                / "development"
                 / "_index.md"
             ).read_text(encoding="utf-8")
             self.assert_contains_all(
-                mammoth_unreleased_index,
+                mammoth_development_index,
                 "title: Mammoth Cache for Gradle® and Apache Maven™ Preview",
                 "linkTitle: Preview",
             )
             self.assert_not_contains_any(
-                mammoth_unreleased_index, "\nSecure Gradle wrapper provisioning.\n"
+                mammoth_development_index, "\nSecure Gradle wrapper provisioning.\n"
             )
-            mammoth_unreleased_front_matter = yaml.safe_load(
-                mammoth_unreleased_index.split("---", 2)[1]
+            mammoth_development_front_matter = yaml.safe_load(
+                mammoth_development_index.split("---", 2)[1]
             )
             self.assertEqual(
-                "unreleased-home",
-                mammoth_unreleased_front_matter["sitePipelineComponentPage"]["kind"],
+                "development-home",
+                mammoth_development_front_matter["sitePipelineComponentPage"]["kind"],
             )
 
             mammoth_docs_index = (
@@ -850,7 +852,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "mammoth-cache"
-                / "unreleased"
+                / "development"
                 / "docs"
                 / "_index.md"
             ).read_text(encoding="utf-8")
@@ -863,7 +865,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 mammoth_docs_front_matter["sitePipelineComponentPage"]["kind"],
             )
             self.assertEqual(
-                "/components/mammoth-cache/unreleased/docs/",
+                "/components/mammoth-cache/development/docs/",
                 mammoth_docs_front_matter["sitePipelineComponentPage"]["path"],
             )
 
@@ -963,7 +965,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "mammoth-cache"
-                / "unreleased"
+                / "development"
                 / "docs"
                 / "wrapper-provisioning.md"
             ).read_text(encoding="utf-8")
@@ -983,7 +985,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "mammoth-cache"
-                / "unreleased"
+                / "development"
                 / "version.yaml"
             )
             version_metadata = (
@@ -993,23 +995,23 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "mammoth-cache"
-                / "unreleased"
+                / "development"
                 / "version.yaml"
             ).read_text(encoding="utf-8")
             self.assertIn("metadataLoaded: true", version_metadata)
             self.assertIn("metadataFile: site/component.yaml", version_metadata)
             self.assertIn("label: Preview", version_metadata)
             self.assertIn(
-                "path: /components/mammoth-cache/unreleased/", version_metadata
+                "path: /components/mammoth-cache/development/", version_metadata
             )
             self.assertIn(
-                "docsPath: /components/mammoth-cache/unreleased/docs/", version_metadata
+                "docsPath: /components/mammoth-cache/development/docs/", version_metadata
             )
             self.assertIn("defaultBranch: trunk", version_metadata)
             self.assertIn("assetsRoot: site/assets", version_metadata)
             self.assertIn("count: 1", version_metadata)
             self.assertIn(
-                "path: /components/mammoth-cache/unreleased/assets/", version_metadata
+                "path: /components/mammoth-cache/development/assets/", version_metadata
             )
             self.assertEqual("mammoth-cache", version_document.component.slug)
             self.assertEqual("Preview", version_document.version.label)
@@ -1044,7 +1046,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             self.assertIn("status: maintained", lifecycle_metadata)
             self.assertIn("- v1", lifecycle_metadata)
             self.assertIn(
-                "docsPath: /components/mammoth-cache/unreleased/docs/",
+                "docsPath: /components/mammoth-cache/development/docs/",
                 lifecycle_metadata,
             )
             self.assertEqual("mammoth-cache", lifecycle_document.component.slug)
@@ -1065,14 +1067,14 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             self.assertIn("latestStable: v1.3.5", aggregated_lifecycle)
             self.assertIn("line: v1.2", aggregated_lifecycle)
             self.assertIn(
-                "docsPath: /components/mammoth-cache/unreleased/docs/",
+                "docsPath: /components/mammoth-cache/development/docs/",
                 aggregated_lifecycle,
             )
             self.assertEqual(
                 "v1.3.5", lifecycle_data.components["mammoth-cache"].latest_stable
             )
             self.assertEqual(
-                "Preview", lifecycle_data.components["mammoth-cache"].unreleased.label
+                "Preview", lifecycle_data.components["mammoth-cache"].development.label
             )
 
             components_data = ComponentsDataDocument.from_yaml_path(
@@ -1083,7 +1085,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 components_data.components["mammoth-cache"].component_path,
             )
             self.assertEqual(
-                "/components/mammoth-cache/unreleased/docs/",
+                "/components/mammoth-cache/development/docs/",
                 components_data.components["mammoth-cache"].docs_path,
             )
             self.assertEqual(
@@ -1145,22 +1147,22 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 "Site implementation and infrastructure docs.", site_component_index
             )
 
-            site_unreleased_index = (
+            site_development_index = (
                 repo_root
                 / "site"
                 / ".stage"
                 / "content"
                 / "components"
                 / "site"
-                / "unreleased"
+                / "development"
                 / "_index.md"
             ).read_text(encoding="utf-8")
-            self.assertIn("## Docs", site_unreleased_index)
+            self.assertIn("## Docs", site_development_index)
             self.assertIn(
-                "[Apache Buildish Site Documentation](/components/site/unreleased/docs/)",
-                site_unreleased_index,
+                "[Apache Buildish Site Documentation](/components/site/development/docs/)",
+                site_development_index,
             )
-            self.assertNotIn("Open staged assets", site_unreleased_index)
+            self.assertNotIn("Open staged assets", site_development_index)
 
             site_version_document = ComponentVersionDocument.from_yaml_path(
                 repo_root
@@ -1169,7 +1171,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "site"
-                / "unreleased"
+                / "development"
                 / "version.yaml"
             )
             site_version_metadata = (
@@ -1179,11 +1181,11 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "site"
-                / "unreleased"
+                / "development"
                 / "version.yaml"
             ).read_text(encoding="utf-8")
             self.assertIn(
-                "docsPath: /components/site/unreleased/docs/", site_version_metadata
+                "docsPath: /components/site/development/docs/", site_version_metadata
             )
             self.assertIn("pagesRoot: site/pages", site_version_metadata)
             self.assertIn("assetsRoot: site/assets", site_version_metadata)
@@ -1351,7 +1353,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 / "content"
                 / "components"
                 / "mammoth-cache"
-                / "unreleased"
+                / "development"
                 / "docs"
                 / "_index.md",
             )
@@ -2119,7 +2121,7 @@ Additional details.
                         Landing page.
                         """
                     ),
-                    "site/pages/unreleased/overview.md": text_block(
+                    "site/pages/development/overview.md": text_block(
                         """
                         # Bad path
                         """

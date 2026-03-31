@@ -98,7 +98,7 @@ CI should not rely on local-style path guessing. Instead, it should produce a re
 - `slug`,
 - `repository`,
 - `sourceRoot`,
-- ref kind (`unreleased` or `release`),
+- ref kind (`development` or `release`),
 - branch or exact tag,
 - resolved commit SHA,
 - checkout path or snapshot path used during the build.
@@ -147,11 +147,11 @@ The main site workflow should split into two concerns:
 ```mermaid
 flowchart TD
     A[load site/components.yaml] --> B[resolve component repositories]
-    B --> C[resolve unreleased refs to exact SHAs]
+    B --> C[resolve development refs to exact SHAs]
     B --> D[discover release snapshots or new exact tags]
     C --> E[write build manifest]
     D --> E
-    E --> F[materialize unreleased checkouts]
+    E --> F[materialize development checkouts]
     E --> G[materialize release snapshots]
     F --> H[aggregate staged site tree]
     G --> H
@@ -162,7 +162,7 @@ flowchart TD
 
 ## Scaling with many components and many tags
 
-The expensive part is not the unreleased build; it is release aggregation if every site build re-checks every historical tag for every component.
+The expensive part is not the development build; it is release aggregation if every site build re-checks every historical tag for every component.
 
 ### Cost of the naive model
 
@@ -177,16 +177,16 @@ Even if tag discovery itself is cheap, materializing every tagged docs tree on e
 
 ### Recommended model: incremental release snapshots
 
-The site build should treat unreleased and released content differently:
+The site build should treat development and released content differently:
 
-- **unreleased docs**: resolve and stage from a live checkout of each component's default branch for the current run,
+- **development docs**: resolve and stage from a live checkout of each component's default branch for the current run,
 - **released docs**: consume from an incremental snapshot store, not from re-checking every historical tag.
 
 The snapshot store can be the `versioned-docs` branch described in [`site-infra.md`](site-infra.md), or an equivalent immutable snapshot artifact store.
 
 Under that model:
 
-- unreleased aggregation cost is roughly **O(P)**,
+- development aggregation cost is roughly **O(P)**,
 - release discovery cost is roughly **O(P + new-tags)**,
 - release content materialization cost is roughly **O(new-releases)** instead of **O(all-releases)**.
 
@@ -207,7 +207,7 @@ This keeps the steady-state site build bounded even when the historical tag coun
 The workflow should avoid repeated full clones where possible.
 
 - Repositories that back multiple site components should be checked out once and reused.
-- Unreleased content should use one working tree per repository, not per slug.
+- Development content should use one working tree per repository, not per slug.
 - Release snapshots should be read from the snapshot store rather than from repeated tag checkouts.
 - The final aggregation step should consume resolved filesystem inputs only.
 
@@ -248,7 +248,7 @@ Override paths should still be validated conservatively:
 1. Add `sourceRoot` to the shared catalog and treat it as the logical component root inside a repository.
 2. Introduce `site/components.local.yaml` as an ignored local path-binding file.
 3. Deprecate `localDir` in favor of a clearer name such as `checkoutHint` or `workspaceDir`.
-4. Add manifest generation that resolves unreleased refs to exact SHAs at the start of CI.
+4. Add manifest generation that resolves development refs to exact SHAs at the start of CI.
 5. Add incremental release snapshot discovery and reuse.
 
 ## Recommendation

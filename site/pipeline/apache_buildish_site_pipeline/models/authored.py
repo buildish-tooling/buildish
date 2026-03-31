@@ -31,7 +31,7 @@ class ComponentCatalogDefaults(YamlModel):
     pages_root: str | None = None
     docs_root: str | None = None
     assets_root: str | None = None
-    unreleased_label: str | None = None
+    development_label: str | None = None
     tag_pattern: re.Pattern[str] | None = None
     navigation_section: str | None = None
 
@@ -48,7 +48,7 @@ class CatalogComponent(YamlModel):
     pages_root: str | None = None
     docs_root: str | None = None
     assets_root: str | None = None
-    unreleased_label: str | None = None
+    development_label: str | None = None
     tag_pattern: re.Pattern[str] | None = None
     navigation_section: str | None = None
     weight: int | None = None
@@ -101,7 +101,7 @@ class ComponentContentSettings(YamlModel):
 class ComponentVersioningSettings(YamlModel):
     """Typed versioning settings from ``component.yaml``."""
 
-    unreleased_label: str | None = None
+    development_label: str | None = None
     tag_pattern: re.Pattern[str] | None = None
 
 

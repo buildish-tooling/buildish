@@ -20,7 +20,7 @@ This document describes the implementation under `site/`.
 
 The broader target architecture and future publication/release goals remain in
 [`site-infra.md`](site-infra.md). The implementation is still
-**unreleased-first and unreleased-only** in practice for versioned docs; stable,
+**development-first and development-only** in practice for versioned docs; stable,
 non-versioned component landing pages come from authored `site/pages/_index.md`
 content, while version-specific docs come from `site/docs/`.
 
@@ -31,7 +31,7 @@ The code under `site/` provides:
 - catalog-driven aggregation from a repo-owned catalog, defaulting to `site/components.yaml`,
 - per-component metadata loading from each component's `site/component.yaml`,
 - authored component landing pages and version-independent component pages from each component's `site/pages/`,
-- version-specific docs from each component's `site/docs/`, staged today as unreleased docs,
+- version-specific docs from each component's `site/docs/`, staged today as development docs,
 - normalized staged content and metadata under `site/.stage/`,
 - local Hugo + Docsy rendering from that staged tree,
 - watch-based restaging for interactive local development,
@@ -212,13 +212,13 @@ updates reliably during development.
 ### Outputs
 
 - `site/.stage/content/components/<slug>/_index.md` and any additional authored component pages
-- `site/.stage/content/components/<slug>/unreleased/docs/...`
-- `site/.stage/content/components/<slug>/unreleased/version.yaml`
-- `site/.stage/content/components/<slug>/unreleased/_index.md`
+- `site/.stage/content/components/<slug>/development/docs/...`
+- `site/.stage/content/components/<slug>/development/version.yaml`
+- `site/.stage/content/components/<slug>/development/_index.md`
 - `site/.stage/data/components.yaml`
 - `site/.stage/data/lifecycle.yaml`
 - `site/.stage/data/aliases.yaml`
-- `site/.stage/static/components/<slug>/unreleased/assets/...`
+- `site/.stage/static/components/<slug>/development/assets/...`
 - `site/.stage/manifest.yaml`
 - `site/.preview/` for the lightweight Python preview output
 - `site/.public/` for the Hugo-rendered site
@@ -231,7 +231,7 @@ proposal:
 - no arbitrary code execution from staged content,
 - no path traversal outside approved repository roots,
 - no symlink-following during staged content copying,
-- reserved pipeline-owned component paths such as `unreleased/`, `releases/`, and `lifecycle.yaml` cannot be shadowed by authored `site/pages/` content,
+- reserved pipeline-owned component paths such as `development/`, `releases/`, and `lifecycle.yaml` cannot be shadowed by authored `site/pages/` content,
 - no remote fetching during normal local builds,
 - no custom renderer logic contributed from component repositories.
 

@@ -35,7 +35,7 @@ limitations under the License.
 {{ with index $componentContext "docsItems" }}{{ $componentDocsItems = . }}{{ end -}}
 {{ with index $componentContext "releaseItems" }}{{ $componentReleaseItems = . }}{{ end -}}
 {{ with index $componentContext "component" }}{{ with index . "displayName" }}{{ $componentDisplayName = . }}{{ end }}{{ end -}}
-{{ with index $componentPage "section" }}{{ $componentDocsActive = in (slice "component" "unreleased" "docs") . }}{{ $componentReleasesActive = eq . "releases" }}{{ end -}}
+{{ with index $componentPage "section" }}{{ $componentDocsActive = in (slice "component" "development" "docs") . }}{{ $componentReleasesActive = eq . "releases" }}{{ end -}}
 
 <nav class="td-navbar js-navbar-scroll" data-bs-theme="dark">
 <div class="td-navbar-container container-fluid flex-column flex-md-row">

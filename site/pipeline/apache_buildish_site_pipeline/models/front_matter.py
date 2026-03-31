@@ -37,13 +37,15 @@ class SitePipelineComponentPaths(YamlModel):
     """Path map injected into staged component page front matter."""
 
     component: str | None = Field(default=None, exclude_if=lambda value: value is None)
-    unreleased: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    development: str | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
     docs: str | None = Field(default=None, exclude_if=lambda value: value is None)
     assets: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
-class SitePipelineComponentUnreleased(YamlModel):
-    """Unreleased-version metadata injected into staged component page front matter."""
+class SitePipelineComponentDevelopment(YamlModel):
+    """Development-version metadata injected into staged component page front matter."""
 
     label: str
     path: str
@@ -69,8 +71,8 @@ class SitePipelineComponentPayload(YamlModel):
         default=None, exclude_if=lambda value: value is None
     )
     paths: SitePipelineComponentPaths
-    unreleased_label: str
-    unreleased: SitePipelineComponentUnreleased
+    development_label: str
+    development: SitePipelineComponentDevelopment
     latest_stable: LifecycleLatestStable | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
@@ -81,9 +83,13 @@ class SitePipelineComponentPagePayload(YamlModel):
     """Per-page context payload injected into staged component page front matter."""
 
     kind: Literal[
-        "component-home", "component-page", "unreleased-home", "docs-home", "docs-page"
+        "component-home",
+        "component-page",
+        "development-home",
+        "docs-home",
+        "docs-page",
     ]
-    section: Literal["component", "unreleased", "docs"]
+    section: Literal["component", "development", "docs"]
     path: str | None = Field(default=None, exclude_if=lambda value: value is None)
     component_path: str | None = Field(
         default=None, exclude_if=lambda value: value is None

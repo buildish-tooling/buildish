@@ -36,7 +36,7 @@ from .front_matter import (
     SitePipelineComponentPagePayload,
     SitePipelineComponentPaths,
     SitePipelineComponentPayload,
-    SitePipelineComponentUnreleased,
+    SitePipelineComponentDevelopment,
     SitePipelinePayload,
     DocsFrontMatter,
 )
@@ -45,7 +45,7 @@ from .staged import (
     LifecycleDataDocument,
     LifecycleDataEntry,
     LifecycleLatestStable,
-    LifecycleUnreleased,
+    LifecycleDevelopment,
     ManifestDocument,
     ManifestComponentEntry,
     ComponentAliasesEntry,

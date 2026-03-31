@@ -54,8 +54,6 @@ project-specific integration decisions.
 
 ### Still coupled to Buildish or in-repo execution
 
-- The core contract still uses `unreleased` terminology in models, paths, and
-  generated data.
 - The workspace contract is only partially configurable; the catalog path is now
   explicit, but authored content roots and output roots are still mostly fixed
   by convention.
@@ -138,10 +136,6 @@ Remaining work:
   - add configuration for remaining fixed inputs that should be overrideable
   - explicitly define the remaining contract for repo root, authored content
     roots, and output roots
-- replace `unreleased` with `development` across the core contract:
-  - rename core models and generated data fields
-  - change staged paths from `/unreleased/` to `/development/`
-  - update tests and docs at the same time
 - reduce Buildish-shaped integration assumptions in the core:
   - move Buildish-specific presentation decisions fully into the Buildish site
     layer
@@ -173,6 +167,5 @@ Remaining work:
 
 1. Define the remaining workspace override contract for authored content roots
    and output roots.
-2. Perform the `unreleased` to `development` rename across the core contract.
-3. Reduce the remaining Buildish-shaped integration assumptions in the core.
+2. Reduce the remaining Buildish-shaped integration assumptions in the core.
 

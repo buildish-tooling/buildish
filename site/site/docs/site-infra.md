@@ -25,12 +25,12 @@ collected in the [Follow-ups](#follow-ups) section.
 For the implementation and local development behavior, see
 [`site-pipeline.md`](site-pipeline.md).
 
-The implementation is intentionally unreleased-only in practice; release
+The implementation is intentionally development-only in practice; release
 snapshot staging should wait until real tagged releases exist.
 
 > [!NOTE]
 > The current implementation already provides the local aggregation/rendering split,
-> central catalog plus component metadata contract, unreleased staging, local
+> central catalog plus component metadata contract, development staging, local
 > Hugo rendering, and containerized verification. The main gaps between the implementation
 > and this full proposal are released-docs handling from exact tags,
 > publication automation, redirect/search/indexing policy, and stricter content
@@ -206,7 +206,7 @@ content:
   docsRoot: docs
   assetsRoot: assets
 versioning:
-  unreleasedLabel: Unreleased
+  developmentLabel: Development
   tagPattern: ^v[0-9]+\.[0-9]+\.[0-9]+$
   aliasTagPatterns:
     - ^v[0-9]+$
@@ -222,7 +222,7 @@ Notes:
 - `schemaVersion` allows careful evolution of the contract.
 - `slug` is the stable identifier used in URLs and staged content paths.
 - `defaultBranch` is source metadata only; the public site should still present
-  this content as `unreleased`.
+  this content as `development`.
 - `pagesRoot` and `docsRoot` are relative to the repository's `site/` directory.
 - release line lifecycle state such as maintained vs EOL should likely be
   tracked outside this file, because it changes over time and is not purely a
@@ -237,7 +237,7 @@ as:
 - pages root: `site/pages`
 - docs root: `site/docs`
 - assets root: `site/assets`
-- public unreleased label: `Unreleased`
+- public development label: `Development`
 - exact release tag pattern: `vX.Y.Z`
 - alias tag patterns: `vX` and `vX.Y`
 - navigation section: `components`
@@ -425,12 +425,12 @@ the approved contract.
 
 ## Version model
 
-### Unreleased docs
+### Development docs
 
 The current state of a component's default branch should be published as
-**`unreleased`**.
+**`development`**.
 
-The site should clearly mark unreleased documentation as unstable, for example:
+The site should clearly mark development documentation as unstable, for example:
 
 - this content is work in progress,
 - it may change at any time without prior notice,
@@ -459,7 +459,7 @@ metadata, but not as the primary stored version identity.
 
 The site should distinguish between at least:
 
-- unreleased,
+- development,
 - latest stable,
 - actively maintained release lines,
 - end-of-life (EOL) release lines.
@@ -513,7 +513,7 @@ lifecycle:
 - alias mappings should be informational and should never replace exact version
   identifiers in stored release metadata.
 - a released version inherits its maintenance status from its release line.
-- `unreleased` is not part of any release line and should always be presented as
+- `development` is not part of any release line and should always be presented as
   work in progress.
 
 ### Why line-level lifecycle metadata matters
@@ -543,20 +543,20 @@ The proposal is to use canonical public URLs of the form:
 
 - `/components/`
 - `/components/<component-slug>/`
-- `/components/<component-slug>/unreleased/`
-- `/components/<component-slug>/unreleased/<page-path>/`
+- `/components/<component-slug>/development/`
+- `/components/<component-slug>/development/<page-path>/`
 - `/components/<component-slug>/releases/<exact-version>/`
 - `/components/<component-slug>/releases/<exact-version>/<page-path>/`
 
 Examples:
 
 - `/components/mammoth-cache/`
-- `/components/mammoth-cache/unreleased/`
+- `/components/mammoth-cache/development/`
 - `/components/mammoth-cache/releases/v1.3.5/`
 
 ### URL behavior by version type
 
-- `unreleased` is always the public path for content built from the default
+- `development` is always the public path for content built from the default
   branch, even if the branch is named `main`, `master`, or something else.
 - exact versions such as `v1.3.5` are the canonical published release URLs.
 - alias tags such as `v1` or `v1.1` should not be canonical content paths.
@@ -575,7 +575,7 @@ canonical identity of the content. In particular:
 Each component landing page at `/components/<component-slug>/` should summarize:
 
 - what the component is,
-- the `unreleased` docs entry point,
+- the `development` docs entry point,
 - the latest stable release docs,
 - maintained release lines,
 - EOL release lines,
@@ -585,7 +585,7 @@ Each component landing page at `/components/<component-slug>/` should summarize:
 
 The URL scheme is designed to support the indexing policy defined below:
 
-- `unreleased` and latest stable are the primary discovery entry points,
+- `development` and latest stable are the primary discovery entry points,
 - older exact releases remain linkable and browsable,
 - older versions should not become the default surface presented by search.
 
@@ -599,11 +599,11 @@ redirects, and search-engine indexing for versioned component docs.
 The following pages should be indexable by default:
 
 - component landing pages at `/components/<component-slug>/`,
-- `unreleased` component docs,
+- `development` component docs,
 - the latest stable exact release docs.
 
 This matches the earlier requirement that public discovery should focus on
-`unreleased` and the latest stable release, while older versions remain
+`development` and the latest stable release, while older versions remain
 available primarily for direct navigation.
 
 ### Non-indexable content
@@ -616,7 +616,7 @@ The following pages should default to `noindex, follow`:
 - any alias-tag-based paths if such paths are exposed at all.
 
 This means that even a maintained but non-latest release line remains browsable
-and linkable, but should not compete with `unreleased` or the latest stable
+and linkable, but should not compete with `development` or the latest stable
 release in search results.
 
 ### Canonical URL rules
@@ -624,7 +624,7 @@ release in search results.
 Canonical URL rules should be:
 
 - component landing pages should be self-canonical,
-- `unreleased` pages should be self-canonical,
+- `development` pages should be self-canonical,
 - latest stable exact release pages should be self-canonical,
 - non-latest exact release pages should also be self-canonical, even when they
   are marked `noindex, follow`.
@@ -635,7 +635,7 @@ direct-linkable identities.
 
 ### Redirect policy
 
-Convenience URLs should resolve to canonical exact-version or `unreleased` URLs.
+Convenience URLs should resolve to canonical exact-version or `development` URLs.
 
 Initial policy:
 
@@ -673,7 +673,7 @@ For versioned component docs, the renderer should emit page metadata consistent
 with the following policy:
 
 - `index, follow` for component landing pages,
-- `index, follow` for `unreleased` pages,
+- `index, follow` for `development` pages,
 - `index, follow` for the latest stable exact release pages,
 - `noindex, follow` for all other exact release pages,
 - `noindex, follow` for redirect-only pages.
@@ -685,7 +685,7 @@ used, but page-level metadata should remain sufficient for static hosting.
 
 Site-local search should include only:
 
-- `unreleased`,
+- `development`,
 - the latest stable exact release,
 - and any non-versioned top-level site content the component chooses to index.
 
@@ -697,7 +697,7 @@ from the primary search index.
 The generated sitemap should prefer:
 
 - component landing pages,
-- `unreleased` docs,
+- `development` docs,
 - latest stable exact release docs,
 - other top-level site content intended for discovery.
 
@@ -776,7 +776,7 @@ One possible staging layout is:
     components/
       <component-slug>/
         _index.md
-        unreleased/
+        development/
           docs/
           version.yaml
         releases/
@@ -797,13 +797,13 @@ One possible staging layout is:
 ### Staging rules
 
 - Each component gets its own namespace under `content/components/<component-slug>/`.
-- Authored version-independent component pages stage at the component root; `unreleased/`, `releases/`, and `lifecycle.yaml` remain pipeline-owned reserved names.
-- Unreleased content is always staged under `unreleased/` regardless of the
+- Authored version-independent component pages stage at the component root; `development/`, `releases/`, and `lifecycle.yaml` remain pipeline-owned reserved names.
+- Development content is always staged under `development/` regardless of the
   repository's actual default branch name.
 - Released content is staged only under exact version identifiers.
 - Alias tags are recorded as metadata in `data/aliases.yaml` or equivalent, not
   as independent content directories.
-- Provenance metadata should be recorded for both unreleased and released docs.
+- Provenance metadata should be recorded for both development and released docs.
 - The renderer must not need to inspect component repositories directly.
 
 ### Generated lifecycle metadata
@@ -829,9 +829,9 @@ component:
   slug: mammoth-cache
   displayName: Mammoth Cache for Gradle® and Apache Maven™
 lifecycle:
-  unreleased:
-    label: Unreleased
-    path: /components/mammoth-cache/unreleased/
+  development:
+    label: Development
+    path: /components/mammoth-cache/development/
     robots: index,follow
   latestStable:
     version: v1.3.5
@@ -899,7 +899,7 @@ metadata:
 - each release line must reference its latest exact version,
 - release line `status` must come from the controlled lifecycle vocabulary,
 - alias mappings must be informational only,
-- `unreleased` must always be represented separately from release lines,
+- `development` must always be represented separately from release lines,
 - missing lifecycle input should degrade gracefully by omitting annotations
   rather than failing the whole build unless the catalog marks the metadata as
   required.
@@ -967,7 +967,7 @@ defaults:
   pagesRoot: site/pages
   docsRoot: site/docs
   assetsRoot: site/assets
-  unreleasedLabel: Unreleased
+  developmentLabel: Development
   tagPattern: ^v[0-9]+\.[0-9]+\.[0-9]+$
   aliasTagPatterns:
     - ^v[0-9]+$
@@ -1093,7 +1093,7 @@ force a rebuild without waiting for the next scheduled run.
 Scheduled reconciliation builds should be responsible for discovering:
 
 - new release snapshots,
-- changes to unreleased docs on component default branches,
+- changes to development docs on component default branches,
 - lifecycle or catalog changes that affect the published site.
 
 ### Recommended publication flow
@@ -1134,7 +1134,7 @@ That manifest should capture, for each included content source:
 - repository,
 - branch or tag name,
 - resolved commit SHA,
-- content kind (`unreleased` or exact release),
+- content kind (`development` or exact release),
 - any alias mappings to display,
 - any lifecycle metadata to display.
 
@@ -1144,7 +1144,7 @@ The remaining build steps should operate only on that resolved manifest.
 
 The baseline search behavior should be intentionally limited:
 
-- site-local search should index only `unreleased`, the latest stable release,
+- site-local search should index only `development`, the latest stable release,
   and any selected non-versioned top-level site content,
 - older versions should remain browsable but should not dominate default search
   results,
@@ -1208,7 +1208,7 @@ small, and should identify at least:
 - the source event kind,
 - the relevant branch and/or exact tag,
 - the best-known resolved commit SHA,
-- whether the content kind is `unreleased` or `release`.
+- whether the content kind is `development` or `release`.
 
 ### Potential validation rules
 

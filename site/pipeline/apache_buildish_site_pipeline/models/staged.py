@@ -98,8 +98,8 @@ class ComponentVersionDocument(YamlModel):
     assets: VersionAssets
 
 
-class LifecycleUnreleased(YamlModel):
-    """The ``unreleased`` section used in staged lifecycle YAML files."""
+class LifecycleDevelopment(YamlModel):
+    """The ``development`` section used in staged lifecycle YAML files."""
 
     label: str
     path: str
@@ -117,7 +117,7 @@ class LifecycleLatestStable(YamlModel):
 class ComponentLifecycleDocumentData(YamlModel):
     """The ``lifecycle`` section of a component ``lifecycle.yaml`` file."""
 
-    unreleased: LifecycleUnreleased
+    development: LifecycleDevelopment
     latest_stable: LifecycleLatestStable | None = None
     release_lines: tuple[StagedReleaseLine, ...] = Field(default_factory=tuple)
 
@@ -141,7 +141,7 @@ class ManifestComponentEntry(YamlModel):
     repository: str | None = None
     default_branch: str | None = None
     component_path: str | None = None
-    unreleased_path: str | None = None
+    development_path: str | None = None
     docs_path: str | None = None
 
 
@@ -165,9 +165,9 @@ class ComponentsDataEntry(YamlModel):
     summary: str
     default_branch: str | None = None
     navigation_section: str | None = None
-    unreleased_label: str
+    development_label: str
     component_path: str | None = None
-    unreleased_path: str | None = None
+    development_path: str | None = None
     docs_path: str | None = None
     asset_count: int
     assets_path: str | None = None
@@ -188,7 +188,7 @@ class LifecycleDataEntry(YamlModel):
 
     latest_stable: str | None = None
     release_lines: tuple[StagedReleaseLine, ...] = Field(default_factory=tuple)
-    unreleased: LifecycleUnreleased | None = None
+    development: LifecycleDevelopment | None = None
 
 
 class LifecycleDataDocument(YamlModel):
@@ -223,11 +223,11 @@ class ComponentBuildResult:
     local_dir: str
     repo_path: Path
     summary: str
-    raw_unreleased_index_path: str | None
+    raw_development_index_path: str | None
     raw_component_index_path: str | None
     raw_docs_root_path: str | None
     raw_assets_root_path: str | None
-    unreleased_label: str
+    development_label: str
     default_branch: str | None
     navigation_section: str | None
     asset_count: int

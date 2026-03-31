@@ -40,16 +40,16 @@ def public_component_path(slug: str) -> str:
     return f"/components/{slug}/"
 
 
-def public_unreleased_path(slug: str) -> str:
-    """Return the public URL of a staged unreleased-docs landing page."""
+def public_development_path(slug: str) -> str:
+    """Return the public URL of a staged development-docs landing page."""
 
-    return f"/components/{slug}/unreleased/"
+    return f"/components/{slug}/development/"
 
 
 def public_assets_root_path(slug: str) -> str:
-    """Return the public URL prefix for staged unreleased assets."""
+    """Return the public URL prefix for staged development assets."""
 
-    return f"/components/{slug}/unreleased/assets/"
+    return f"/components/{slug}/development/assets/"
 
 
 def _public_release_path(slug: str, version: str) -> str:
@@ -137,8 +137,8 @@ def normalize_lifecycle(
     )
 
 
-def build_unreleased_index_markdown(result: ComponentBuildResult) -> str:
-    """Build the staged unreleased landing-page body for one component."""
+def build_development_index_markdown(result: ComponentBuildResult) -> str:
+    """Build the staged development landing-page body for one component."""
 
     lines: list[str] = []
     if result.default_branch:
@@ -155,7 +155,7 @@ def build_unreleased_index_markdown(result: ComponentBuildResult) -> str:
     if not result.doc_links:
         lines.extend(
             [
-                f"No staged {result.unreleased_label.lower()} docs pages are currently available for this component.",
+                f"No staged {result.development_label.lower()} docs pages are currently available for this component.",
                 "",
             ]
         )
@@ -242,9 +242,9 @@ def build_component_preview(result: ComponentBuildResult) -> str:
         body.append(
             f"<p><a href='{html.escape(result.raw_component_index_path)}'>Open staged component landing page</a></p>"
         )
-    if result.raw_unreleased_index_path:
+    if result.raw_development_index_path:
         body.append(
-            f"<p><a href='{html.escape(result.raw_unreleased_index_path)}'>Open {html.escape(result.unreleased_label)} docs index</a></p>"
+            f"<p><a href='{html.escape(result.raw_development_index_path)}'>Open {html.escape(result.development_label)} docs index</a></p>"
         )
     if doc_items:
         body.append(f"<h2>Docs</h2><ul>{doc_items}</ul>")

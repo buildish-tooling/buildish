@@ -25,8 +25,8 @@ limitations under the License.
   {{- with index $paths "docs" }}{{ $docsPath = . }}{{ end -}}
   {{- $repositoryPath := "" -}}
   {{- with index $component "repository" }}{{ $repositoryPath = . }}{{ end -}}
-  {{- $unreleasedLabel := "Unreleased" -}}
-  {{- with index $component "unreleasedLabel" }}{{ $unreleasedLabel = . }}{{ end -}}
+  {{- $developmentLabel := "Development" -}}
+  {{- with index $component "developmentLabel" }}{{ $developmentLabel = . }}{{ end -}}
 
   {{- $releaseLines := slice -}}
   {{- with index $component "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
@@ -38,7 +38,7 @@ limitations under the License.
     {{- $docsItems = $docsItems | append (dict "label" "Overview" "href" $componentPath) -}}
   {{- end -}}
   {{- if $docsPath -}}
-    {{- $docsItems = $docsItems | append (dict "label" $unreleasedLabel "href" $docsPath) -}}
+    {{- $docsItems = $docsItems | append (dict "label" $developmentLabel "href" $docsPath) -}}
   {{- end -}}
 
   {{- $releaseAnchor := "" -}}

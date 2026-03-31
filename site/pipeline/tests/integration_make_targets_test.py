@@ -77,7 +77,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
 
                 Fixture component landing page.
 
-                {{< buildish-component-link kind="docs" label="Read unreleased docs" appearance="primary" >}}
+                {{< buildish-component-link kind="docs" label="Read development docs" appearance="primary" >}}
 
                 {{< buildish-component-link kind="source" label="Browse source" appearance="outline-secondary" >}}
 
@@ -322,15 +322,22 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         return env
 
     def run_make(self, site_root: Path, target: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(["make", target], cwd=site_root, env=env, capture_output=True, text=True, check=False)
+        return subprocess.run(  # noqa: S603,S607
+            ["make", target],  # noqa: S607
+            cwd=site_root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
 
     def start_make(self, site_root: Path, target: str, env: dict[str, str]) -> subprocess.Popen[str]:
         log_dir = self.workspace / "process-logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = log_dir / f"{target}-{len(self.processes)}.log"
         log_handle = log_path.open("w+", encoding="utf-8")
-        process = subprocess.Popen(
-            ["make", target],
+        process = subprocess.Popen(  # noqa: S603,S607
+            ["make", target],  # noqa: S607
             cwd=site_root,
             env=env,
             stdout=log_handle,
@@ -389,7 +396,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assert_paths_exist(
             repo_root / "site" / ".stage" / "manifest.yaml",
-            repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md",
+            repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md",
         )
 
     def test_make_build_local_renders_component_navigation_without_cross_component_sidebar(self) -> None:
@@ -441,7 +448,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         self.assertGreater(trademark_card_index, incubator_index)
         self.assert_not_contains_any(home_index, "Browse components", 'Community &amp; contact', 'class="nav-item navbar-group-separator"', 'navbar-item--global')
 
-        docs_index = self.read_text(repo_root / "site" / ".public" / "components" / "mammoth-cache" / "unreleased" / "docs" / "index.html")
+        docs_index = self.read_text(repo_root / "site" / ".public" / "components" / "mammoth-cache" / "development" / "docs" / "index.html")
         self.assert_contains_all(
             docs_index,
             'class="td-navbar__top"',
@@ -471,8 +478,8 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         self.assert_contains_all(
             component_index,
             'Fixture component landing page.',
-            'Read unreleased docs',
-            'href="/components/mammoth-cache/unreleased/docs/"',
+            'Read development docs',
+            'href="/components/mammoth-cache/development/docs/"',
             'Browse source',
             'href="https://github.com/apache/buildish-mammoth-cache"',
             'Current release lines',
@@ -529,7 +536,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         sidebar = docs_index.split('<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">', 1)[1].split('<aside class="d-none d-xl-block col-xl-2 td-sidebar-toc d-print-none">', 1)[0]
         self.assertNotIn('id="m-componentsmammoth-cache"', sidebar)
         self.assertNotIn('id="m-componentsno-gradle-wrapper-jar"', sidebar)
-        self.assertIn("Unreleased", sidebar)
+        self.assertIn("Development", sidebar)
 
         contributing_guidelines = self.read_text(repo_root / "site" / ".public" / "community" / "contributing-guidelines" / "index.html")
         self.assert_contains_all(
@@ -567,7 +574,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         components_payload = yaml.safe_load((repo_root / "site" / ".stage" / "data" / "components.yaml").read_text(encoding="utf-8"))
         self.assertTrue(components_payload["components"]["mammoth-cache"]["available"])
         self.assertIn("Mammoth Cache for Gradle® and Apache Maven™", components_payload["components"]["mammoth-cache"]["displayName"])
-        self.assertEqual("/components/mammoth-cache/unreleased/docs/", components_payload["components"]["mammoth-cache"]["docsPath"])
+        self.assertEqual("/components/mammoth-cache/development/docs/", components_payload["components"]["mammoth-cache"]["docsPath"])
         container_log = self.read_text(repo_root / "site" / "build" / "fake-container.log")
         self.assert_contains_all(container_log, "run", "--init", "/workspace/buildish/site")
 
@@ -623,7 +630,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
     def test_make_stage_watch_local_rebuilds_after_doc_change(self) -> None:
         repo_root = self.prepare_fixture_workspace()
         source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
-        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md"
+        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "stage-watch-local", os.environ.copy())
         self.wait_for("initial stage-watch build", lambda: staged_doc.exists(), process=process)
         time.sleep(1.0)
@@ -653,7 +660,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
         source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
-        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md"
+        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "stage-watch", env)
         self.wait_for("initial containerized stage-watch build", lambda: staged_doc.exists(), process=process)
         time.sleep(1.0)
@@ -681,7 +688,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env = self.base_env(repo_root / "site", bin_dir)
         env["PORT"] = "8766"
         source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
-        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md"
+        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "serve-local", env)
         self.wait_for("fake local Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(), process=process)
         source_doc.write_text(
@@ -713,7 +720,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
         source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
-        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md"
+        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "serve", env)
         self.wait_for(
             "fake containerized Hugo server readiness",
