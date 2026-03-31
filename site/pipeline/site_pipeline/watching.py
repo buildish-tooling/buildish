@@ -33,7 +33,13 @@ from pathlib import Path
 
 from .builder import build
 from .common import first_non_none
-from .constants import STAGED_VENDOR_ASSETS, WATCH_DEBOUNCE_MS, WATCH_IGNORE_PATH_PARTS, WATCH_IGNORE_SUFFIXES, WATCH_STEP_MS
+from .constants import (
+    STAGED_VENDOR_ASSETS,
+    WATCH_DEBOUNCE_MS,
+    WATCH_IGNORE_PATH_PARTS,
+    WATCH_IGNORE_SUFFIXES,
+    WATCH_STEP_MS,
+)
 from .filesystem import (
     load_component_metadata,
     load_components_local_overrides,
@@ -43,7 +49,12 @@ from .filesystem import (
     safe_relative_path,
     watchable_existing_path,
 )
-from .models import CatalogComponent, ComponentCatalogDefaults, ComponentMetadata, ComponentsCatalog
+from .models import (
+    CatalogComponent,
+    ComponentCatalogDefaults,
+    ComponentMetadata,
+    ComponentsCatalog,
+)
 from .models import ComponentsLocalOverrides
 
 
@@ -72,35 +83,51 @@ def _component_watch_roots(
 
     slug = component.slug
     repo_path = resolve_component_repo_path(repo_root, component, local_overrides)
-    parent_fallback = repo_path.parent if repo_path.parent.exists() else repo_root.parent.resolve()
+    parent_fallback = (
+        repo_path.parent if repo_path.parent.exists() else repo_root.parent.resolve()
+    )
 
     if not repo_path.exists():
         return {watchable_existing_path(repo_path, parent_fallback)}
 
-    metadata_relative = component.metadata_file or defaults.metadata_file or "site/component.yaml"
+    metadata_relative = (
+        component.metadata_file or defaults.metadata_file or "site/component.yaml"
+    )
     metadata, _ = load_component_metadata(repo_path, metadata_relative, slug)
 
     watch_roots: set[Path] = set()
 
-    metadata_path = safe_relative_path(repo_path, metadata_relative, f"metadataFile for {slug}")
+    metadata_path = safe_relative_path(
+        repo_path, metadata_relative, f"metadataFile for {slug}"
+    )
     if metadata_path is not None:
         watch_roots.add(watchable_existing_path(metadata_path, repo_path))
 
-    pages_setting = _configured_content_root(component, metadata, defaults, "pages_root")
+    pages_setting = _configured_content_root(
+        component, metadata, defaults, "pages_root"
+    )
     if pages_setting is not None:
-        pages_path = safe_relative_path(repo_path, str(pages_setting), f"pagesRoot for {slug}")
+        pages_path = safe_relative_path(
+            repo_path, str(pages_setting), f"pagesRoot for {slug}"
+        )
         if pages_path is not None:
             watch_roots.add(watchable_existing_path(pages_path, repo_path))
 
     docs_setting = _configured_content_root(component, metadata, defaults, "docs_root")
     if docs_setting is not None:
-        docs_path = safe_relative_path(repo_path, str(docs_setting), f"docsRoot for {slug}")
+        docs_path = safe_relative_path(
+            repo_path, str(docs_setting), f"docsRoot for {slug}"
+        )
         if docs_path is not None:
             watch_roots.add(watchable_existing_path(docs_path, repo_path))
 
-    assets_setting = _configured_content_root(component, metadata, defaults, "assets_root")
+    assets_setting = _configured_content_root(
+        component, metadata, defaults, "assets_root"
+    )
     if assets_setting is not None:
-        assets_path = safe_relative_path(repo_path, str(assets_setting), f"assetsRoot for {slug}")
+        assets_path = safe_relative_path(
+            repo_path, str(assets_setting), f"assetsRoot for {slug}"
+        )
         if assets_path is not None:
             watch_roots.add(watchable_existing_path(assets_path, repo_path))
 
@@ -117,7 +144,12 @@ def _pipeline_watch_roots(site_root: Path) -> set[Path]:
 
     pipeline_root = site_root / "pipeline"
     watch_roots: set[Path] = set()
-    for relative_path in (Path("main.py"), Path("pyproject.toml"), Path("uv.lock"), Path("site_pipeline")):
+    for relative_path in (
+        Path("main.py"),
+        Path("pyproject.toml"),
+        Path("uv.lock"),
+        Path("site_pipeline"),
+    ):
         candidate = pipeline_root / relative_path
         if candidate.exists():
             watch_roots.add(candidate.resolve())
@@ -147,7 +179,11 @@ def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
             watch_roots.add(source.resolve())
 
     for component in catalog.components:
-        watch_roots.update(_component_watch_roots(resolved_repo_root, component, catalog.defaults, local_overrides))
+        watch_roots.update(
+            _component_watch_roots(
+                resolved_repo_root, component, catalog.defaults, local_overrides
+            )
+        )
 
     return sorted(watch_roots, key=str)
 
@@ -174,7 +210,9 @@ def _format_watch_path(path: Path, repo_root: Path) -> str:
         return str(resolved_path)
 
 
-def watch_and_build(repo_root: Path | None = None, debounce_ms: int = WATCH_DEBOUNCE_MS) -> None:
+def watch_and_build(
+    repo_root: Path | None = None, debounce_ms: int = WATCH_DEBOUNCE_MS
+) -> None:
     """Continuously rebuild ``site/.stage`` whenever relevant inputs change.
 
     Watch mode intentionally skips preview generation because local Hugo serve

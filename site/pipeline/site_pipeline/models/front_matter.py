@@ -39,7 +39,9 @@ class BuildishComponentUnreleased(YamlModel):
     label: str
     path: str
     docs_path: str | None = Field(default=None, exclude_if=lambda value: value is None)
-    assets_path: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    assets_path: str | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
 
 class BuildishComponentPayload(YamlModel):
@@ -51,23 +53,35 @@ class BuildishComponentPayload(YamlModel):
     available: StrictBool
     local_dir: str
     repository: str | None = Field(default=None, exclude_if=lambda value: value is None)
-    default_branch: str | None = Field(default=None, exclude_if=lambda value: value is None)
-    navigation_section: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    default_branch: str | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+    navigation_section: str | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
     paths: BuildishComponentPaths
     unreleased_label: str
     unreleased: BuildishComponentUnreleased
-    latest_stable: LifecycleLatestStable | None = Field(default=None, exclude_if=lambda value: value is None)
+    latest_stable: LifecycleLatestStable | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
     release_lines: tuple[StagedReleaseLine, ...] = Field(default_factory=tuple)
 
 
 class BuildishComponentPagePayload(YamlModel):
     """Per-page context payload injected into staged component page front matter."""
 
-    kind: Literal["component-home", "component-page", "unreleased-home", "docs-home", "docs-page"]
+    kind: Literal[
+        "component-home", "component-page", "unreleased-home", "docs-home", "docs-page"
+    ]
     section: Literal["component", "unreleased", "docs"]
     path: str | None = Field(default=None, exclude_if=lambda value: value is None)
-    component_path: str | None = Field(default=None, exclude_if=lambda value: value is None)
-    version: VersionDescriptor | None = Field(default=None, exclude_if=lambda value: value is None)
+    component_path: str | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+    version: VersionDescriptor | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
 
 class DocsFrontMatter(YamlModel):
@@ -77,4 +91,6 @@ class DocsFrontMatter(YamlModel):
     link_title: str | None = Field(default=None, exclude_if=lambda value: value is None)
     weight: int | None = Field(default=None, exclude_if=lambda value: value is None)
     type: Literal["docs"] = "docs"
-    description: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    description: str | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )

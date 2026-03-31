@@ -39,7 +39,13 @@ from .filesystem import (
     stage_vendor_assets,
     write_yaml_like,
 )
-from .markdown import humanized_stem, normalize_markdown_doc, split_paragraphs, update_markdown_front_matter, with_yaml_front_matter
+from .markdown import (
+    humanized_stem,
+    normalize_markdown_doc,
+    split_paragraphs,
+    update_markdown_front_matter,
+    with_yaml_front_matter,
+)
 from .models import (
     AliasesDataDocument,
     BuildishComponentPagePayload,
@@ -110,14 +116,20 @@ def _stage_component_docs(
 ) -> list[Path]:
     """Copy a component's docs tree into the staged Hugo content tree."""
 
-    docs_path = safe_relative_path(repo_path, docs_relative, f"docsRoot for {slug}") if docs_relative else None
+    docs_path = (
+        safe_relative_path(repo_path, docs_relative, f"docsRoot for {slug}")
+        if docs_relative
+        else None
+    )
     if docs_path and docs_path.is_dir():
         return copy_tree_without_symlinks(docs_path, docs_root)
     warnings.append("No docs directory found; skipping unreleased docs staging.")
     return []
 
 
-def _stage_component_pages(repo_path: Path, pages_relative: str, component_root: Path, slug: str) -> list[Path]:
+def _stage_component_pages(
+    repo_path: Path, pages_relative: str, component_root: Path, slug: str
+) -> list[Path]:
     """Copy a component's authored non-versioned pages into the staged Hugo tree."""
 
     if not pages_relative:
@@ -129,7 +141,9 @@ def _stage_component_pages(repo_path: Path, pages_relative: str, component_root:
     for copied in copied_pages:
         top_level = copied.parts[0] if copied.parts else ""
         if top_level in _RESERVED_COMPONENT_TOP_LEVEL_PATHS:
-            raise ValueError(f"pagesRoot for {slug} uses reserved staged path: {top_level}")
+            raise ValueError(
+                f"pagesRoot for {slug} uses reserved staged path: {top_level}"
+            )
     if Path("_index.md") not in copied_pages:
         raise ValueError(f"pagesRoot for {slug} must contain _index.md")
     return copied_pages
@@ -143,7 +157,11 @@ def _stage_component_assets(
 ) -> list[Path]:
     """Copy a component's static assets into the staged site tree."""
 
-    assets_path = safe_relative_path(repo_path, assets_relative, f"assetsRoot for {slug}") if assets_relative else None
+    assets_path = (
+        safe_relative_path(repo_path, assets_relative, f"assetsRoot for {slug}")
+        if assets_relative
+        else None
+    )
     if assets_path and assets_path.is_dir():
         return copy_tree_without_symlinks(assets_path, staged_assets_root)
     return []
@@ -166,14 +184,18 @@ def _normalize_staged_docs(
             normalized_doc, doc_title, doc_summary = normalize_markdown_doc(
                 doc_text,
                 humanized_stem(copied),
-                **DocsFrontMatter(link_title="Docs" if copied == Path("_index.md") else None).to_yaml_data(),
+                **DocsFrontMatter(
+                    link_title="Docs" if copied == Path("_index.md") else None
+                ).to_yaml_data(),
             )
             staged_doc_path.write_text(normalized_doc, encoding="utf-8")
             if copied == Path("_index.md"):
                 summary = doc_summary
         if copied.suffix.lower() not in {".md", ".markdown", ".adoc", ".asciidoc"}:
             continue
-        raw_path = public_content_page_path(["components", slug, "unreleased", "docs"], copied)
+        raw_path = public_content_page_path(
+            ["components", slug, "unreleased", "docs"], copied
+        )
         doc_links.append(StagedDocLink(label=doc_title, href=raw_path))
     return doc_links, summary
 
@@ -188,12 +210,17 @@ def _normalize_staged_component_pages(
     summary = ""
     for copied in copied_pages:
         staged_page_path = component_root / copied
-        if copied.suffix.lower() not in {".md", ".markdown"} or not staged_page_path.is_file():
+        if (
+            copied.suffix.lower() not in {".md", ".markdown"}
+            or not staged_page_path.is_file()
+        ):
             continue
         normalized_page, _, page_summary = normalize_markdown_doc(
             staged_page_path.read_text(encoding="utf-8"),
             humanized_stem(copied),
-            **DocsFrontMatter(weight=navigation_weight if copied == Path("_index.md") else None).to_yaml_data(),
+            **DocsFrontMatter(
+                weight=navigation_weight if copied == Path("_index.md") else None
+            ).to_yaml_data(),
         )
         staged_page_path.write_text(normalized_page, encoding="utf-8")
         if copied == Path("_index.md"):
@@ -201,7 +228,9 @@ def _normalize_staged_component_pages(
     return summary
 
 
-def _write_unreleased_index(result: ComponentBuildResult, unreleased_root: Path) -> None:
+def _write_unreleased_index(
+    result: ComponentBuildResult, unreleased_root: Path
+) -> None:
     """Write the staged unreleased landing page for one component."""
 
     unreleased_index_path = unreleased_root / "_index.md"
@@ -220,7 +249,9 @@ def _write_unreleased_index(result: ComponentBuildResult, unreleased_root: Path)
     )
 
 
-def _buildish_component_payload(result: ComponentBuildResult) -> BuildishComponentPayload:
+def _buildish_component_payload(
+    result: ComponentBuildResult,
+) -> BuildishComponentPayload:
     """Build the component-context payload injected into staged Markdown pages."""
 
     return BuildishComponentPayload(
@@ -241,14 +272,17 @@ def _buildish_component_payload(result: ComponentBuildResult) -> BuildishCompone
         unreleased_label=result.unreleased_label,
         unreleased=BuildishComponentUnreleased(
             label=result.unreleased_label,
-            path=result.raw_unreleased_index_path or public_unreleased_path(result.slug),
+            path=result.raw_unreleased_index_path
+            or public_unreleased_path(result.slug),
             docs_path=result.raw_docs_root_path,
             assets_path=result.raw_assets_root_path,
         ),
         latest_stable=(
             None
             if result.latest_stable_version is None
-            else LifecycleLatestStable(version=result.latest_stable_version, path=result.latest_stable_path)
+            else LifecycleLatestStable(
+                version=result.latest_stable_version, path=result.latest_stable_path
+            )
         ),
         release_lines=result.release_lines,
     )
@@ -257,7 +291,9 @@ def _buildish_component_payload(result: ComponentBuildResult) -> BuildishCompone
 def _buildish_component_page_payload(
     result: ComponentBuildResult,
     *,
-    kind: Literal["component-home", "component-page", "unreleased-home", "docs-home", "docs-page"],
+    kind: Literal[
+        "component-home", "component-page", "unreleased-home", "docs-home", "docs-page"
+    ],
     section: Literal["component", "unreleased", "docs"],
     page_path: str | None,
 ) -> BuildishComponentPagePayload:
@@ -274,7 +310,8 @@ def _buildish_component_page_payload(
             else VersionDescriptor(
                 kind="unreleased",
                 label=result.unreleased_label,
-                path=result.raw_unreleased_index_path or public_unreleased_path(result.slug),
+                path=result.raw_unreleased_index_path
+                or public_unreleased_path(result.slug),
                 docs_path=result.raw_docs_root_path,
             )
         ),
@@ -294,7 +331,10 @@ def _annotate_staged_component_pages(
     component_payload = _buildish_component_payload(result)
     for copied in copied_component_pages:
         staged_page_path = component_root / copied
-        if copied.suffix.lower() not in {".md", ".markdown"} or not staged_page_path.is_file():
+        if (
+            copied.suffix.lower() not in {".md", ".markdown"}
+            or not staged_page_path.is_file()
+        ):
             continue
         page_path = public_content_page_path(["components", result.slug], copied)
         staged_page_path.write_text(
@@ -303,7 +343,9 @@ def _annotate_staged_component_pages(
                 buildishComponent=component_payload,
                 buildishComponentPage=_buildish_component_page_payload(
                     result,
-                    kind="component-home" if copied == Path("_index.md") else "component-page",
+                    kind="component-home"
+                    if copied == Path("_index.md")
+                    else "component-page",
                     section="component",
                     page_path=page_path,
                 ),
@@ -328,9 +370,14 @@ def _annotate_staged_component_pages(
 
     for copied in copied_docs:
         staged_doc_path = docs_root / copied
-        if copied.suffix.lower() not in {".md", ".markdown"} or not staged_doc_path.is_file():
+        if (
+            copied.suffix.lower() not in {".md", ".markdown"}
+            or not staged_doc_path.is_file()
+        ):
             continue
-        page_path = public_content_page_path(["components", result.slug, "unreleased", "docs"], copied)
+        page_path = public_content_page_path(
+            ["components", result.slug, "unreleased", "docs"], copied
+        )
         staged_doc_path.write_text(
             update_markdown_front_matter(
                 staged_doc_path.read_text(encoding="utf-8"),
@@ -366,7 +413,9 @@ def _write_component_metadata_files(
         version_metadata_path,
         ComponentVersionDocument(
             schema_version=1,
-            component=StagedComponentRef(slug=result.slug, display_name=result.display_name),
+            component=StagedComponentRef(
+                slug=result.slug, display_name=result.display_name
+            ),
             version=VersionDescriptor(
                 kind="unreleased",
                 label=result.unreleased_label,
@@ -383,7 +432,9 @@ def _write_component_metadata_files(
                 docs_root=docs_relative or None,
                 assets_root=assets_relative or None,
             ),
-            assets=VersionAssets(count=result.asset_count, path=result.raw_assets_root_path),
+            assets=VersionAssets(
+                count=result.asset_count, path=result.raw_assets_root_path
+            ),
         ),
     )
 
@@ -391,7 +442,9 @@ def _write_component_metadata_files(
         lifecycle_metadata_path,
         ComponentLifecycleDocument(
             schema_version=1,
-            component=StagedComponentRef(slug=result.slug, display_name=result.display_name),
+            component=StagedComponentRef(
+                slug=result.slug, display_name=result.display_name
+            ),
             lifecycle=ComponentLifecycleDocumentData(
                 unreleased=LifecycleUnreleased(
                     label=result.unreleased_label,
@@ -413,7 +466,9 @@ def _write_component_metadata_files(
     )
 
 
-def _stage_authored_site_content(site_root: Path, stage_root: Path, incubator_disclaimer_paragraphs: list[str]) -> None:
+def _stage_authored_site_content(
+    site_root: Path, stage_root: Path, incubator_disclaimer_paragraphs: list[str]
+) -> None:
     """Copy the site's hand-authored content into the staged Hugo tree."""
 
     source_content_root = site_root / "content"
@@ -446,17 +501,27 @@ def stage_component(
     repo_path = resolve_component_repo_path(repo_root, component, local_overrides)
     warnings: list[str] = []
     available = repo_path.is_dir()
-    navigation_weight = component.weight if component.weight is not None else catalog_index * 10
+    navigation_weight = (
+        component.weight if component.weight is not None else catalog_index * 10
+    )
 
-    metadata_relative = component.metadata_file or defaults.metadata_file or "site/component.yaml"
+    metadata_relative = (
+        component.metadata_file or defaults.metadata_file or "site/component.yaml"
+    )
     metadata = ComponentMetadata()
     metadata_path: Path | None = None
     if available:
-        metadata, metadata_path = load_component_metadata(repo_path, metadata_relative, slug)
+        metadata, metadata_path = load_component_metadata(
+            repo_path, metadata_relative, slug
+        )
 
-    display_name = str(first_non_none(component.display_name, metadata.component.display_name, slug))
+    display_name = str(
+        first_non_none(component.display_name, metadata.component.display_name, slug)
+    )
     repository = first_non_none(component.repository, metadata.component.repository)
-    default_branch = first_non_none(component.default_branch, metadata.component.default_branch)
+    default_branch = first_non_none(
+        component.default_branch, metadata.component.default_branch
+    )
     navigation_section = first_non_none(
         component.navigation_section,
         metadata.navigation.section,
@@ -491,34 +556,62 @@ def stage_component(
     component_root = stage_root / "content" / "components" / slug
     unreleased_root = component_root / "unreleased"
     docs_root = unreleased_root / "docs"
-    staged_assets_root = stage_root / "static" / "components" / slug / "unreleased" / "assets"
+    staged_assets_root = (
+        stage_root / "static" / "components" / slug / "unreleased" / "assets"
+    )
 
     if available:
-        copied_component_pages = _stage_component_pages(repo_path, pages_relative, component_root, slug)
-        copied_docs = _stage_component_docs(repo_path, docs_relative, docs_root, slug, warnings)
-        copied_assets = _stage_component_assets(repo_path, assets_relative, staged_assets_root, slug)
+        copied_component_pages = _stage_component_pages(
+            repo_path, pages_relative, component_root, slug
+        )
+        copied_docs = _stage_component_docs(
+            repo_path, docs_relative, docs_root, slug, warnings
+        )
+        copied_assets = _stage_component_assets(
+            repo_path, assets_relative, staged_assets_root, slug
+        )
     else:
         copied_component_pages = []
         copied_docs = []
         copied_assets = []
-        warnings.append("Local repository directory is missing; component was skipped for staged page and docs content.")
+        warnings.append(
+            "Local repository directory is missing; component was skipped for staged page and docs content."
+        )
 
-    summary = _normalize_staged_component_pages(component_root, copied_component_pages, navigation_weight) if copied_component_pages else ""
+    summary = (
+        _normalize_staged_component_pages(
+            component_root, copied_component_pages, navigation_weight
+        )
+        if copied_component_pages
+        else ""
+    )
     doc_links, docs_summary = _normalize_staged_docs(docs_root, slug, copied_docs)
     if copied_docs and not (docs_root / "_index.md").is_file():
-        warnings.append("Docs root is missing _index.md; add a site-oriented docs landing page.")
+        warnings.append(
+            "Docs root is missing _index.md; add a site-oriented docs landing page."
+        )
     if not summary:
         summary = docs_summary
 
     raw_unreleased_index_path = public_unreleased_path(slug)
-    raw_component_index_path = public_component_path(slug) if copied_component_pages else None
-    raw_docs_root_path = public_content_page_path(["components", slug, "unreleased", "docs"], Path("_index.md")) if (docs_root / "_index.md").is_file() else None
+    raw_component_index_path = (
+        public_component_path(slug) if copied_component_pages else None
+    )
+    raw_docs_root_path = (
+        public_content_page_path(
+            ["components", slug, "unreleased", "docs"], Path("_index.md")
+        )
+        if (docs_root / "_index.md").is_file()
+        else None
+    )
     raw_assets_root_path = public_assets_root_path(slug) if copied_assets else None
-    latest_stable_version, latest_stable_path, release_lines, alias_mappings = normalize_lifecycle(
-        metadata.lifecycle,
-        tag_pattern,
-        slug,
-        component_root,
+    latest_stable_version, latest_stable_path, release_lines, alias_mappings = (
+        normalize_lifecycle(
+            metadata.lifecycle,
+            tag_pattern,
+            slug,
+            component_root,
+        )
     )
 
     result = ComponentBuildResult(
@@ -557,11 +650,20 @@ def stage_component(
         docs_relative=docs_relative,
         assets_relative=assets_relative,
     )
-    _annotate_staged_component_pages(result, component_root, unreleased_root, copied_component_pages, docs_root, copied_docs)
+    _annotate_staged_component_pages(
+        result,
+        component_root,
+        unreleased_root,
+        copied_component_pages,
+        docs_root,
+        copied_docs,
+    )
     return result
 
 
-def build(repo_root: Path | None = None, *, include_preview: bool = True) -> list[ComponentBuildResult]:
+def build(
+    repo_root: Path | None = None, *, include_preview: bool = True
+) -> list[ComponentBuildResult]:
     """Build the staged site contract and, optionally, the lightweight preview pages.
 
     ``include_preview=False`` is used by watch mode so repeated restaging only
@@ -581,10 +683,19 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
         reset_output_directory(preview_root)
 
     results = [
-        stage_component(resolved_repo_root, stage_root, component, catalog.defaults, index, local_overrides=local_overrides)
+        stage_component(
+            resolved_repo_root,
+            stage_root,
+            component,
+            catalog.defaults,
+            index,
+            local_overrides=local_overrides,
+        )
         for index, component in enumerate(catalog.components, start=1)
     ]
-    incubator_disclaimer = read_text_if_exists(resolved_repo_root / "DISCLAIMER").strip()
+    incubator_disclaimer = read_text_if_exists(
+        resolved_repo_root / "DISCLAIMER"
+    ).strip()
     incubator_disclaimer_paragraphs = split_paragraphs(incubator_disclaimer)
     _stage_authored_site_content(site_root, stage_root, incubator_disclaimer_paragraphs)
     stage_vendor_assets(site_root, stage_root)
@@ -650,7 +761,8 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
                     release_lines=result.release_lines,
                     unreleased=LifecycleUnreleased(
                         label=result.unreleased_label,
-                        path=result.raw_unreleased_index_path or public_unreleased_path(result.slug),
+                        path=result.raw_unreleased_index_path
+                        or public_unreleased_path(result.slug),
                         docs_path=result.raw_docs_root_path,
                     ),
                 )
@@ -662,16 +774,23 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
         stage_root / "data" / "aliases.yaml",
         AliasesDataDocument(
             schema_version=1,
-            components={result.slug: ComponentAliasesEntry(aliases=result.alias_mappings) for result in results},
+            components={
+                result.slug: ComponentAliasesEntry(aliases=result.alias_mappings)
+                for result in results
+            },
         ),
     )
 
     if include_preview:
-        (preview_root / "index.html").write_text(build_preview_index(results), encoding="utf-8")
+        (preview_root / "index.html").write_text(
+            build_preview_index(results), encoding="utf-8"
+        )
         for result in results:
             component_preview = preview_root / "components" / result.slug / "index.html"
             component_preview.parent.mkdir(parents=True, exist_ok=True)
-            component_preview.write_text(build_component_preview(result), encoding="utf-8")
+            component_preview.write_text(
+                build_component_preview(result), encoding="utf-8"
+            )
     return results
 
 
@@ -690,7 +809,9 @@ def serve(repo_root: Path | None = None, port: int = 8000) -> None:
 
     resolved_repo_root = repo_root_from(repo_root)
     build(resolved_repo_root)
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(resolved_repo_root))
+    handler = functools.partial(
+        http.server.SimpleHTTPRequestHandler, directory=str(resolved_repo_root)
+    )
     with socketserver.TCPServer(("127.0.0.1", port), handler) as httpd:
         print(f"Serving local preview at http://127.0.0.1:{port}/site/.preview/")
         httpd.serve_forever()

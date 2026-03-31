@@ -239,6 +239,9 @@ endef
 	container-image-ensure \
 	container-image-local-registry-test \
 	container-integration-test \
+	pipeline-format \
+	pipeline-lint \
+	pipeline-typecheck \
 	container-serve \
 	container-stage \
 	container-stage-watch \
@@ -409,14 +412,25 @@ clean: sanity-check ## Remove generated site output.
 	$(UV_RUN) $(PYTHON) $(SITE_PIPELINE) clean
 	rm -rf .public .hugo_build.lock resources
 
+pipeline-format: sanity-check ## Format Python sources under site/pipeline.
+	cd pipeline && $(UV) run --frozen ruff format .
+
+pipeline-lint: sanity-check ## Run Ruff checks for Python sources under site/pipeline.
+	cd pipeline && $(UV) run --frozen ruff check .
+
+pipeline-typecheck: sanity-check ## Run Mypy checks for Python sources under site/pipeline.
+	cd pipeline && $(UV) run --frozen mypy
+
 test: sanity-check ## Run unit tests.
 	$(UV_RUN) $(PYTHON) -m unittest discover -s pipeline/tests -p 'test_*.py' -v
 
 integration-test: sanity-check ## Run integration tests.
 	$(UV_RUN) $(PYTHON) -m unittest discover -s pipeline/tests -p 'integration_*_test.py' -v
 
-check: ## Run clean, tests, and build-local.
+check: ## Run lint, type checks, tests, and build-local.
 	$(MAKE) clean
+	$(MAKE) pipeline-lint
+	$(MAKE) pipeline-typecheck
 	$(MAKE) test
 	$(MAKE) integration-test
 	$(MAKE) build-local

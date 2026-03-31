@@ -601,7 +601,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             "serve              Serve the site with live restaging in the build container",
             "build              Stage and render the site in the build container",
             "test               Run unit tests.",
-            "check              Run clean, tests, and build-local.",
+            "check              Run lint, type checks, tests, and build-local.",
             "serve-local        Serve the site with live restaging using host tools",
             "build-local        Stage and render the site with host tools.",
             "render             Render the current staged site in the build container.",

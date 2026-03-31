@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+
 def first_non_none[ValueT](*values: ValueT | None) -> ValueT | None:
     """Return the first value that is not ``None``."""
 

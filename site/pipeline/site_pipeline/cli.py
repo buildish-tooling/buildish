@@ -27,9 +27,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments for the site pipeline helper."""
 
     parser = argparse.ArgumentParser(description="Site pipeline helper")
-    parser.add_argument("command", choices=["build", "clean", "serve", "watch"], nargs="?", default="build")
-    parser.add_argument("--port", type=int, default=8000, help="Port for the local preview server")
-    parser.add_argument("--debounce-ms", type=int, default=WATCH_DEBOUNCE_MS, help="Debounce window for watch mode")
+    parser.add_argument(
+        "command",
+        choices=["build", "clean", "serve", "watch"],
+        nargs="?",
+        default="build",
+    )
+    parser.add_argument(
+        "--port", type=int, default=8000, help="Port for the local preview server"
+    )
+    parser.add_argument(
+        "--debounce-ms",
+        type=int,
+        default=WATCH_DEBOUNCE_MS,
+        help="Debounce window for watch mode",
+    )
     return parser.parse_args(argv)
 
 

@@ -21,7 +21,12 @@ import re
 from pathlib import Path
 
 from .constants import SITE_TITLE
-from .models import ComponentBuildResult, ComponentLifecycleSettings, StagedAliasMapping, StagedReleaseLine
+from .models import (
+    ComponentBuildResult,
+    ComponentLifecycleSettings,
+    StagedAliasMapping,
+    StagedReleaseLine,
+)
 
 
 def _relative_web_path(path: Path) -> str:
@@ -66,7 +71,9 @@ def public_content_page_path(root_segments: list[str], relative_path: Path) -> s
     return "/" + suffix.strip("/") + "/"
 
 
-def _release_index_web_path(component_root: Path, slug: str, version: str) -> str | None:
+def _release_index_web_path(
+    component_root: Path, slug: str, version: str
+) -> str | None:
     """Return the staged URL of a release landing page if that page exists."""
 
     release_index_path = component_root / "releases" / version / "_index.md"
@@ -80,12 +87,19 @@ def normalize_lifecycle(
     tag_pattern: re.Pattern[str],
     slug: str,
     component_root: Path,
-) -> tuple[str | None, str | None, tuple[StagedReleaseLine, ...], tuple[StagedAliasMapping, ...]]:
+) -> tuple[
+    str | None,
+    str | None,
+    tuple[StagedReleaseLine, ...],
+    tuple[StagedAliasMapping, ...],
+]:
     """Validate lifecycle metadata and turn it into staged output structures."""
 
     latest_stable_version = lifecycle_fields.latest_stable
     if latest_stable_version and tag_pattern.fullmatch(latest_stable_version) is None:
-        raise ValueError(f"Invalid latestStable for {slug}: expected an exact version tag matching {tag_pattern.pattern!r}")
+        raise ValueError(
+            f"Invalid latestStable for {slug}: expected an exact version tag matching {tag_pattern.pattern!r}"
+        )
 
     release_lines: list[StagedReleaseLine] = []
     alias_mappings: list[StagedAliasMapping] = []
@@ -100,15 +114,28 @@ def normalize_lifecycle(
 
         aliases = tuple(release_line_model.aliases)
         path = _release_index_web_path(component_root, slug, latest)
-        release_lines.append(StagedReleaseLine(line=line, latest=latest, status=status, aliases=aliases, path=path))
+        release_lines.append(
+            StagedReleaseLine(
+                line=line, latest=latest, status=status, aliases=aliases, path=path
+            )
+        )
         for alias in aliases:
-            alias_mappings.append(StagedAliasMapping(alias=alias, target=latest, line=line, status=status))
+            alias_mappings.append(
+                StagedAliasMapping(alias=alias, target=latest, line=line, status=status)
+            )
 
     latest_stable_path = None
     if latest_stable_version is not None:
-        latest_stable_path = _release_index_web_path(component_root, slug, latest_stable_version)
+        latest_stable_path = _release_index_web_path(
+            component_root, slug, latest_stable_version
+        )
 
-    return latest_stable_version, latest_stable_path, tuple(release_lines), tuple(alias_mappings)
+    return (
+        latest_stable_version,
+        latest_stable_path,
+        tuple(release_lines),
+        tuple(alias_mappings),
+    )
 
 
 def build_unreleased_index_markdown(result: ComponentBuildResult) -> str:
@@ -116,7 +143,9 @@ def build_unreleased_index_markdown(result: ComponentBuildResult) -> str:
 
     lines: list[str] = []
     if result.default_branch:
-        lines.extend([f"Built from the local `{result.default_branch}` branch snapshot.", ""])
+        lines.extend(
+            [f"Built from the local `{result.default_branch}` branch snapshot.", ""]
+        )
     if result.doc_links:
         lines.extend(["## Docs", ""])
         for doc_link in result.doc_links:
@@ -125,7 +154,12 @@ def build_unreleased_index_markdown(result: ComponentBuildResult) -> str:
     if result.asset_count and result.raw_assets_root_path:
         lines.extend([f"- [Open staged assets]({result.raw_assets_root_path})", ""])
     if not result.doc_links:
-        lines.extend([f"No staged {result.unreleased_label.lower()} docs pages are currently available for this component.", ""])
+        lines.extend(
+            [
+                f"No staged {result.unreleased_label.lower()} docs pages are currently available for this component.",
+                "",
+            ]
+        )
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -184,11 +218,17 @@ def build_component_preview(result: ComponentBuildResult) -> str:
     body.append(f"<h1>{html.escape(result.display_name)}</h1>")
     if result.summary:
         body.append(f"<p>{html.escape(result.summary)}</p>")
-    body.append(f"<p><strong>Workspace directory:</strong> <code>{html.escape(result.local_dir)}</code></p>")
+    body.append(
+        f"<p><strong>Workspace directory:</strong> <code>{html.escape(result.local_dir)}</code></p>"
+    )
     if result.repository:
-        body.append(f"<p><strong>Repository:</strong> <a href='{html.escape(result.repository)}'>{html.escape(result.repository)}</a></p>")
+        body.append(
+            f"<p><strong>Repository:</strong> <a href='{html.escape(result.repository)}'>{html.escape(result.repository)}</a></p>"
+        )
     if result.default_branch:
-        body.append(f"<p><strong>Default branch:</strong> <code>{html.escape(result.default_branch)}</code></p>")
+        body.append(
+            f"<p><strong>Default branch:</strong> <code>{html.escape(result.default_branch)}</code></p>"
+        )
     if result.latest_stable_version:
         latest_stable = f"<code>{html.escape(result.latest_stable_version)}</code>"
         if result.latest_stable_path:
@@ -200,9 +240,13 @@ def build_component_preview(result: ComponentBuildResult) -> str:
             f"{result.asset_count} file(s)</a></p>"
         )
     if result.raw_component_index_path:
-        body.append(f"<p><a href='{html.escape(result.raw_component_index_path)}'>Open staged component landing page</a></p>")
+        body.append(
+            f"<p><a href='{html.escape(result.raw_component_index_path)}'>Open staged component landing page</a></p>"
+        )
     if result.raw_unreleased_index_path:
-        body.append(f"<p><a href='{html.escape(result.raw_unreleased_index_path)}'>Open {html.escape(result.unreleased_label)} docs index</a></p>")
+        body.append(
+            f"<p><a href='{html.escape(result.raw_unreleased_index_path)}'>Open {html.escape(result.unreleased_label)} docs index</a></p>"
+        )
     if doc_items:
         body.append(f"<h2>Docs</h2><ul>{doc_items}</ul>")
     if result.release_lines:
@@ -213,7 +257,11 @@ def build_component_preview(result: ComponentBuildResult) -> str:
                 latest = f"<a href='{html.escape(release_line.path)}'>{html.escape(release_line.latest)}</a>"
             aliases = ""
             if release_line.aliases:
-                aliases = " (aliases: " + ", ".join(html.escape(alias) for alias in release_line.aliases) + ")"
+                aliases = (
+                    " (aliases: "
+                    + ", ".join(html.escape(alias) for alias in release_line.aliases)
+                    + ")"
+                )
             release_items.append(
                 f"<li><code>{html.escape(release_line.line)}</code> — {html.escape(release_line.status)}; latest {latest}{aliases}</li>"
             )

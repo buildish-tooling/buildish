@@ -52,20 +52,26 @@ def repo_root_from(start: Path | None = None) -> Path:
     return Path(__file__).resolve().parents[3]
 
 
-def load_component_metadata(repo_path: Path, metadata_relative: str | None, slug: str) -> tuple[ComponentMetadata, Path | None]:
+def load_component_metadata(
+    repo_path: Path, metadata_relative: str | None, slug: str
+) -> tuple[ComponentMetadata, Path | None]:
     """Load optional per-component metadata and validate its slug if present."""
 
     if not metadata_relative:
         return ComponentMetadata(), None
 
-    metadata_path = safe_relative_path(repo_path, metadata_relative, f"metadataFile for {slug}")
+    metadata_path = safe_relative_path(
+        repo_path, metadata_relative, f"metadataFile for {slug}"
+    )
     if metadata_path is None or not metadata_path.is_file():
         return ComponentMetadata(), None
 
     metadata = ComponentMetadata.from_yaml_path(metadata_path)
     metadata_slug = metadata.component.slug
     if metadata_slug is not None and str(metadata_slug) != slug:
-        raise ValueError(f"Component metadata slug mismatch for {slug}: {metadata_slug}")
+        raise ValueError(
+            f"Component metadata slug mismatch for {slug}: {metadata_slug}"
+        )
 
     return metadata, metadata_path
 
@@ -75,7 +81,13 @@ def write_yaml_like(path: Path, payload: Any) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(yaml_safe_value(payload), handle, sort_keys=False, allow_unicode=True, default_flow_style=False)
+        yaml.safe_dump(
+            yaml_safe_value(payload),
+            handle,
+            sort_keys=False,
+            allow_unicode=True,
+            default_flow_style=False,
+        )
 
 
 def _ensure_within(parent: Path, candidate: Path, label: str) -> Path:
@@ -143,7 +155,9 @@ def resolve_component_repo_path(
     return safe_repo_path(repo_root, component.local_dir)
 
 
-def safe_relative_path(base: Path, relative_path: str | None, label: str) -> Path | None:
+def safe_relative_path(
+    base: Path, relative_path: str | None, label: str
+) -> Path | None:
     """Resolve an optional relative path beneath ``base``."""
 
     if not relative_path:
@@ -158,7 +172,9 @@ def copy_tree_without_symlinks(source: Path, destination: Path) -> list[Path]:
     for current_root, dir_names, file_names in os.walk(source):
         current = Path(current_root)
         dir_names[:] = sorted(
-            name for name in dir_names if not (current / name).is_symlink() and not name.startswith(".")
+            name
+            for name in dir_names
+            if not (current / name).is_symlink() and not name.startswith(".")
         )
         for file_name in sorted(file_names):
             source_file = current / file_name

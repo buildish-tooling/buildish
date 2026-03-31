@@ -26,10 +26,23 @@ DEFAULT_TAG_PATTERN = r"^v[0-9]+\.[0-9]+\.[0-9]+$"
 SITE_TITLE = "Apache Buildish (Incubating)"
 WATCH_DEBOUNCE_MS = 300
 WATCH_STEP_MS = 50
-WATCH_IGNORE_PATH_PARTS = {".container-home", ".git", ".preview", ".public", ".stage", "__pycache__"}
+WATCH_IGNORE_PATH_PARTS = {
+    ".container-home",
+    ".git",
+    ".preview",
+    ".public",
+    ".stage",
+    "__pycache__",
+}
 WATCH_IGNORE_SUFFIXES = (".swp", ".swx", "~", ".tmp")
 STAGED_VENDOR_ASSETS = (
-    (Path("node_modules/jquery/dist/jquery.min.js"), Path("static/js/vendor/jquery.min.js")),
-    (Path("node_modules/mermaid/dist/mermaid.min.js"), Path("static/js/vendor/mermaid.min.js")),
+    (
+        Path("node_modules/jquery/dist/jquery.min.js"),
+        Path("static/js/vendor/jquery.min.js"),
+    ),
+    (
+        Path("node_modules/mermaid/dist/mermaid.min.js"),
+        Path("static/js/vendor/mermaid.min.js"),
+    ),
     (Path("node_modules/lunr/lunr.min.js"), Path("static/js/vendor/lunr.min.js")),
 )

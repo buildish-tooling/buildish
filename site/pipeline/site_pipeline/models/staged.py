@@ -44,7 +44,9 @@ class StagedReleaseLine(YamlModel):
     line: str
     latest: str
     status: str
-    aliases: tuple[str, ...] = Field(default_factory=tuple, exclude_if=lambda value: not value)
+    aliases: tuple[str, ...] = Field(
+        default_factory=tuple, exclude_if=lambda value: not value
+    )
     path: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 

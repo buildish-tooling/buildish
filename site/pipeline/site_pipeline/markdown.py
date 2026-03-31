@@ -32,7 +32,9 @@ from mistletoe import Document, block_token, span_token
 from .yaml_support import yaml_safe_value
 
 
-_LEADING_HTML_COMMENT_PATTERN = re.compile(r"\A(?:[ \t\r\n]*<!--.*?-->[ \t\r\n]*)+", flags=re.DOTALL)
+_LEADING_HTML_COMMENT_PATTERN = re.compile(
+    r"\A(?:[ \t\r\n]*<!--.*?-->[ \t\r\n]*)+", flags=re.DOTALL
+)
 _FRONT_MATTER_HANDLER = YAMLHandler()
 
 
@@ -54,7 +56,11 @@ def _token_plain_text(token: Any) -> str:
         return "\n"
 
     children = getattr(token, "children", None)
-    children_text = "".join(_token_plain_text(child) for child in children) if children is not None else ""
+    children_text = (
+        "".join(_token_plain_text(child) for child in children)
+        if children is not None
+        else ""
+    )
     if isinstance(token, span_token.InlineCode):
         return f"`{children_text}`"
     if isinstance(token, span_token.Emphasis):
@@ -84,7 +90,9 @@ def _block_plain_text(block: Any) -> str:
 def _paragraph_plain_text(block: Any) -> str:
     """Return a paragraph block collapsed into a single summary line."""
 
-    return " ".join(line.strip() for line in _block_plain_text(block).splitlines() if line.strip())
+    return " ".join(
+        line.strip() for line in _block_plain_text(block).splitlines() if line.strip()
+    )
 
 
 def _split_leading_html_comments(markdown_text: str) -> tuple[str, str]:
@@ -118,7 +126,9 @@ def _analyze_markdown(blocks: list[Any], fallback_title: str) -> _MarkdownAnalys
 
     title = _paragraph_plain_text(blocks[title_index]) or fallback_title
     remaining_indexes = significant_indexes[1:]
-    first_significant_after_title_index = remaining_indexes[0] if remaining_indexes else None
+    first_significant_after_title_index = (
+        remaining_indexes[0] if remaining_indexes else None
+    )
     for index in remaining_indexes:
         block = blocks[index]
         heading_level = _heading_level(block)
@@ -142,7 +152,9 @@ def _analyze_markdown(blocks: list[Any], fallback_title: str) -> _MarkdownAnalys
     )
 
 
-def _remove_blocks(markdown_text: str, blocks: list[Any], block_indexes: list[int]) -> str:
+def _remove_blocks(
+    markdown_text: str, blocks: list[Any], block_indexes: list[int]
+) -> str:
     """Remove parsed blocks from Markdown text using mistletoe line metadata."""
 
     if not block_indexes:
@@ -164,21 +176,29 @@ def _remove_blocks(markdown_text: str, blocks: list[Any], block_indexes: list[in
         for line_index in range(line_number - 1, min(next_line_number - 1, len(lines))):
             skip[line_index] = True
 
-    return "".join(line for line_index, line in enumerate(lines) if not skip[line_index])
+    return "".join(
+        line for line_index, line in enumerate(lines) if not skip[line_index]
+    )
 
 
-def extract_title_and_summary(markdown_text: str, fallback_title: str) -> tuple[str, str]:
+def extract_title_and_summary(
+    markdown_text: str, fallback_title: str
+) -> tuple[str, str]:
     """Extract a page title and short summary from Markdown content."""
 
     _, analyzable_body = _split_leading_html_comments(markdown_text)
-    analysis = _analyze_markdown(list(Document(analyzable_body).children or ()), fallback_title)
+    analysis = _analyze_markdown(
+        list(Document(analyzable_body).children or ()), fallback_title
+    )
     return analysis.title, analysis.summary
 
 
 def with_yaml_front_matter(markdown: str, **fields: Any) -> str:
     """Wrap a Markdown body with YAML front matter fields."""
 
-    front_matter = _FRONT_MATTER_HANDLER.export(yaml_safe_value(fields), sort_keys=False).rstrip()
+    front_matter = _FRONT_MATTER_HANDLER.export(
+        yaml_safe_value(fields), sort_keys=False
+    ).rstrip()
     body = markdown.lstrip()
     return f"---\n{front_matter}\n---\n\n{body}"
 
@@ -206,7 +226,9 @@ def update_markdown_front_matter(markdown: str, **fields: Any) -> str:
     return with_yaml_front_matter(body, **existing_fields)
 
 
-def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: Any) -> tuple[str, str, str]:
+def normalize_markdown_doc(
+    markdown_text: str, fallback_title: str, **fields: Any
+) -> tuple[str, str, str]:
     """Normalize staged Markdown so Hugo pages have predictable metadata."""
 
     existing_fields, body = _split_markdown_front_matter(markdown_text)
@@ -222,7 +244,9 @@ def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: An
     title = analysis.title
     summary = analysis.summary
     existing_description = existing_fields.get("description")
-    has_explicit_description = isinstance(existing_description, str) and bool(existing_description.strip())
+    has_explicit_description = isinstance(existing_description, str) and bool(
+        existing_description.strip()
+    )
     if not summary and isinstance(existing_description, str):
         summary = existing_description.strip()
 
@@ -236,7 +260,11 @@ def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: An
         and analysis.summary_is_first_body_block
     ):
         removed_blocks.append(analysis.summary_index)
-    normalized_body = _remove_blocks(analyzable_body, blocks, removed_blocks) if analysis.title_index is not None else body
+    normalized_body = (
+        _remove_blocks(analyzable_body, blocks, removed_blocks)
+        if analysis.title_index is not None
+        else body
+    )
 
     updated_fields = dict(existing_fields)
     updated_fields.update(fields)

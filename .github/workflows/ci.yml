@@ -13,7 +13,7 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 
-name: RAT Check
+name: CI
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ on:
   push:
 
 jobs:
-  rat-check:
+  ci:
     runs-on: ubuntu-latest
     permissions:
       contents: read

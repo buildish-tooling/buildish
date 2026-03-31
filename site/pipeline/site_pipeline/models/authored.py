@@ -118,7 +118,9 @@ class ComponentLifecycleSettings(YamlModel):
     """Typed lifecycle settings from ``component.yaml``."""
 
     latest_stable: str | None = None
-    release_lines: tuple[ComponentLifecycleReleaseLine, ...] = Field(default_factory=tuple)
+    release_lines: tuple[ComponentLifecycleReleaseLine, ...] = Field(
+        default_factory=tuple
+    )
 
 
 class ComponentNavigationSettings(YamlModel):
@@ -133,6 +135,12 @@ class ComponentMetadata(YamlModel):
     schema_version: int | None = None
     component: ComponentIdentity = Field(default_factory=ComponentIdentity)
     content: ComponentContentSettings = Field(default_factory=ComponentContentSettings)
-    versioning: ComponentVersioningSettings = Field(default_factory=ComponentVersioningSettings)
-    lifecycle: ComponentLifecycleSettings = Field(default_factory=ComponentLifecycleSettings)
-    navigation: ComponentNavigationSettings = Field(default_factory=ComponentNavigationSettings)
+    versioning: ComponentVersioningSettings = Field(
+        default_factory=ComponentVersioningSettings
+    )
+    lifecycle: ComponentLifecycleSettings = Field(
+        default_factory=ComponentLifecycleSettings
+    )
+    navigation: ComponentNavigationSettings = Field(
+        default_factory=ComponentNavigationSettings
+    )
