@@ -26,13 +26,13 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from pipeline import site_pipeline
-from pipeline.site_pipeline.filesystem import load_component_metadata
-from pipeline.site_pipeline.markdown import (
+from pipeline import apache_buildish_site_pipeline as site_pipeline
+from pipeline.apache_buildish_site_pipeline.filesystem import load_component_metadata
+from pipeline.apache_buildish_site_pipeline.markdown import (
     update_markdown_front_matter,
     with_yaml_front_matter,
 )
-from pipeline.site_pipeline.models import (
+from pipeline.apache_buildish_site_pipeline.models import (
     AliasesDataDocument,
     ComponentsLocalOverrides,
     DocsFrontMatter,
@@ -1381,7 +1381,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                         version = 1
                         """
                     ),
-                    "site/pipeline/site_pipeline/__init__.py": text_block(
+                    "site/pipeline/apache_buildish_site_pipeline/__init__.py": text_block(
                         """
                         # watcher stub
                         """
@@ -1824,7 +1824,7 @@ Additional details.
                         version = 1
                         """
                     ),
-                    "site/pipeline/site_pipeline/__init__.py": text_block(
+                    "site/pipeline/apache_buildish_site_pipeline/__init__.py": text_block(
                         """
                         # watcher stub
                         """
@@ -1890,7 +1890,9 @@ Additional details.
                 (repo_root / "site" / "pipeline" / "uv.lock").resolve(), watch_roots
             )
             self.assertIn(
-                (repo_root / "site" / "pipeline" / "site_pipeline").resolve(),
+                (
+                    repo_root / "site" / "pipeline" / "apache_buildish_site_pipeline"
+                ).resolve(),
                 watch_roots,
             )
             self.assertIn((mammoth / "site" / "component.yaml").resolve(), watch_roots)

@@ -46,14 +46,14 @@ project-specific integration decisions.
   - `retired`
 - The builder no longer depends on repository `DISCLAIMER` content.
 - `site/Makefile` delegates pipeline-local targets to `site/pipeline/Makefile`.
+- The implementation package/module is now `apache_buildish_site_pipeline`.
+- Local workflows now invoke the installable `site-pipeline` CLI through the
+  local `uv` project.
 - Buildish-specific project-status presentation now lives in the Buildish site
   layer.
 
 ### Still coupled to Buildish or in-repo execution
 
-- The Python package/module name is still `site_pipeline`.
-- Local execution still uses `python -m site_pipeline` instead of an installed
-  `site-pipeline` CLI.
 - The core contract still uses `unreleased` terminology in models, paths, and
   generated data.
 - The workspace contract is only partially configurable; some paths are still
@@ -132,10 +132,6 @@ Status: in progress.
 
 Remaining work:
 
-- finalize the public product identity:
-  - rename the Python package/module to `apache_buildish_site_pipeline`
-  - add the final installable `site-pipeline` CLI entry point
-  - update Makefiles, docs, tests, and local workflows to use the final names
 - make the workspace contract fully explicit:
   - document every workspace path the pipeline assumes today
   - add configuration for remaining fixed inputs that should be overrideable
@@ -174,8 +170,8 @@ Remaining work:
 
 ## Immediate next steps
 
-1. Rename the package/module and add the final CLI entry point.
-2. Define the remaining workspace override contract, especially the catalog
+1. Define the remaining workspace override contract, especially the catalog
    path.
-3. Perform the `unreleased` to `development` rename across the core contract.
+2. Perform the `unreleased` to `development` rename across the core contract.
+3. Reduce the remaining Buildish-shaped integration assumptions in the core.
 

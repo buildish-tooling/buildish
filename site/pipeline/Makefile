@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SITE_PIPELINE ?= -m site_pipeline
-PIPELINE_PYTHONPATH ?= ./pipeline
+SITE_PIPELINE ?= site-pipeline
 SITE_PIPELINE_ARGS ?=
 
-PIPELINE_LOCAL_RUNTIME = PYTHONPATH=$(PIPELINE_PYTHONPATH) $(UV_RUN) $(PYTHON) $(SITE_PIPELINE) $(SITE_PIPELINE_ARGS)
+PIPELINE_LOCAL_RUNTIME = $(UV_RUN) --with-editable ./pipeline $(SITE_PIPELINE) $(SITE_PIPELINE_ARGS)
 
 .PHONY: pipeline-stage-local pipeline-watch-local pipeline-clean-local
 

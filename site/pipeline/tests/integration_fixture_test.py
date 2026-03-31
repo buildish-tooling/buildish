@@ -26,7 +26,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from pipeline import site_pipeline
+from pipeline import apache_buildish_site_pipeline as site_pipeline
 from pipeline.tests.test_support import (
     TestCaseHelpers,
     seed_api_fixture_main_repo,
@@ -37,8 +37,16 @@ from pipeline.tests.test_support import (
 
 
 SOURCE_REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_FIXTURE_BUILD_ROOT = SOURCE_REPO_ROOT / "site" / "build" / "tests" / f"integration-fixture-workspace-{os.getpid()}"
-FIXTURE_BUILD_ROOT = Path(os.environ.get("BUILDISH_SITE_FIXTURE_WORKSPACE", str(DEFAULT_FIXTURE_BUILD_ROOT)))
+DEFAULT_FIXTURE_BUILD_ROOT = (
+    SOURCE_REPO_ROOT
+    / "site"
+    / "build"
+    / "tests"
+    / f"integration-fixture-workspace-{os.getpid()}"
+)
+FIXTURE_BUILD_ROOT = Path(
+    os.environ.get("BUILDISH_SITE_FIXTURE_WORKSPACE", str(DEFAULT_FIXTURE_BUILD_ROOT))
+)
 
 
 class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
@@ -107,36 +115,127 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
             self.assertEqual(3, len(second_results))
 
             self.assert_paths_exist(
-                repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "docs" / "getting-started.md",
-                repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "_index.md",
-                repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache" / "unreleased" / "assets" / "images" / "diagram.svg",
-                repo_root / "site" / ".stage" / "content" / "components" / "no-gradle-wrapper-jar" / "unreleased" / "docs" / "_index.md",
-                repo_root / "site" / ".stage" / "content" / "components" / "site" / "unreleased" / "docs" / "_index.md",
+                repo_root
+                / "site"
+                / ".stage"
+                / "content"
+                / "components"
+                / "mammoth-cache"
+                / "unreleased"
+                / "docs"
+                / "getting-started.md",
+                repo_root
+                / "site"
+                / ".stage"
+                / "content"
+                / "components"
+                / "mammoth-cache"
+                / "_index.md",
+                repo_root
+                / "site"
+                / ".stage"
+                / "static"
+                / "components"
+                / "mammoth-cache"
+                / "unreleased"
+                / "assets"
+                / "images"
+                / "diagram.svg",
+                repo_root
+                / "site"
+                / ".stage"
+                / "content"
+                / "components"
+                / "no-gradle-wrapper-jar"
+                / "unreleased"
+                / "docs"
+                / "_index.md",
+                repo_root
+                / "site"
+                / ".stage"
+                / "content"
+                / "components"
+                / "site"
+                / "unreleased"
+                / "docs"
+                / "_index.md",
                 repo_root / "site" / ".preview" / "index.html",
             )
 
-            components_data = self.load_yaml(repo_root / "site" / ".stage" / "data" / "components.yaml")
-            self.assertEqual("Fixture Mammoth Cache for Gradle® and Apache Maven™", components_data["components"]["mammoth-cache"]["displayName"])
-            self.assertEqual("buildish-no-gradle-wrapper-jar", components_data["components"]["no-gradle-wrapper-jar"]["localDir"])
-            self.assertEqual("Site", components_data["components"]["site"]["displayName"])
-            self.assertEqual("/components/site/", components_data["components"]["site"]["componentPath"])
-            self.assertEqual("/components/site/unreleased/docs/", components_data["components"]["site"]["docsPath"])
+            components_data = self.load_yaml(
+                repo_root / "site" / ".stage" / "data" / "components.yaml"
+            )
+            self.assertEqual(
+                "Fixture Mammoth Cache for Gradle® and Apache Maven™",
+                components_data["components"]["mammoth-cache"]["displayName"],
+            )
+            self.assertEqual(
+                "buildish-no-gradle-wrapper-jar",
+                components_data["components"]["no-gradle-wrapper-jar"]["localDir"],
+            )
+            self.assertEqual(
+                "Site", components_data["components"]["site"]["displayName"]
+            )
+            self.assertEqual(
+                "/components/site/",
+                components_data["components"]["site"]["componentPath"],
+            )
+            self.assertEqual(
+                "/components/site/unreleased/docs/",
+                components_data["components"]["site"]["docsPath"],
+            )
             self.assertEqual(0, components_data["components"]["site"]["assetCount"])
-            self.assertEqual("Fixture component landing page.", components_data["components"]["mammoth-cache"]["summary"])
+            self.assertEqual(
+                "Fixture component landing page.",
+                components_data["components"]["mammoth-cache"]["summary"],
+            )
 
-            lifecycle_data = self.load_yaml(repo_root / "site" / ".stage" / "data" / "lifecycle.yaml")
-            self.assertEqual("v1.2.3", lifecycle_data["components"]["mammoth-cache"]["latestStable"])
-            self.assertEqual("maintained", lifecycle_data["components"]["mammoth-cache"]["releaseLines"][0]["status"])
+            lifecycle_data = self.load_yaml(
+                repo_root / "site" / ".stage" / "data" / "lifecycle.yaml"
+            )
+            self.assertEqual(
+                "v1.2.3", lifecycle_data["components"]["mammoth-cache"]["latestStable"]
+            )
+            self.assertEqual(
+                "maintained",
+                lifecycle_data["components"]["mammoth-cache"]["releaseLines"][0][
+                    "status"
+                ],
+            )
 
-            site_unreleased_index = self.read_text(repo_root / "site" / ".stage" / "content" / "components" / "site" / "unreleased" / "_index.md")
+            site_unreleased_index = self.read_text(
+                repo_root
+                / "site"
+                / ".stage"
+                / "content"
+                / "components"
+                / "site"
+                / "unreleased"
+                / "_index.md"
+            )
             self.assert_contains_all(site_unreleased_index, "## Docs")
             self.assert_not_contains_any(site_unreleased_index, "Open staged assets")
-            site_unreleased_front_matter = yaml.safe_load(site_unreleased_index.split("---", 2)[1])
-            self.assertEqual("Site", site_unreleased_front_matter["sitePipelineComponent"]["displayName"])
-            self.assertEqual("unreleased-home", site_unreleased_front_matter["sitePipelineComponentPage"]["kind"])
+            site_unreleased_front_matter = yaml.safe_load(
+                site_unreleased_index.split("---", 2)[1]
+            )
+            self.assertEqual(
+                "Site",
+                site_unreleased_front_matter["sitePipelineComponent"]["displayName"],
+            )
+            self.assertEqual(
+                "unreleased-home",
+                site_unreleased_front_matter["sitePipelineComponentPage"]["kind"],
+            )
 
-            preview_index = self.read_text(repo_root / "site" / ".preview" / "index.html")
-            self.assert_contains_all(preview_index, "Fixture Mammoth Cache for Gradle® and Apache Maven™", "Fixture no-gradle-wrapper-jar", "Site")
+            preview_index = self.read_text(
+                repo_root / "site" / ".preview" / "index.html"
+            )
+            self.assert_contains_all(
+                preview_index,
+                "Fixture Mammoth Cache for Gradle® and Apache Maven™",
+                "Fixture no-gradle-wrapper-jar",
+                "Site",
+            )
         finally:
             shutil.rmtree(FIXTURE_BUILD_ROOT, ignore_errors=True)
 

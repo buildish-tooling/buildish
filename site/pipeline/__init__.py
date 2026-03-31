@@ -15,5 +15,6 @@
 """Python support for the Buildish site.
 
 The ``site/pipeline`` directory contains the local ``uv`` project, a tiny CLI
-entrypoint, the ``site_pipeline`` implementation package, and its tests.
+entrypoint, the ``apache_buildish_site_pipeline`` implementation package, and
+its tests.
 """

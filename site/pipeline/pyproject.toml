@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 [project]
-name = "apache-site-pipeline"
+name = "apache-buildish-site-pipeline"
 version = "0.1.0"
 description = "Reusable multi-repository site staging pipeline"
 requires-python = ">=3.13"
@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [project.scripts]
-site-pipeline = "site_pipeline.cli:main"
+site-pipeline = "apache_buildish_site_pipeline.cli:main"
 
 [dependency-groups]
 dev = [
@@ -41,11 +41,11 @@ extend-exclude = ["tests"]
 select = ["F", "B", "UP", "S"]
 
 [tool.ruff.lint.per-file-ignores]
-"site_pipeline/models/__init__.py" = ["F401"]
+"apache_buildish_site_pipeline/models/__init__.py" = ["F401"]
 
 [tool.mypy]
 python_version = "3.13"
-files = ["main.py", "site_pipeline"]
+files = ["main.py", "apache_buildish_site_pipeline"]
 explicit_package_bases = true
 disable_error_code = ["import-untyped"]
 warn_redundant_casts = true

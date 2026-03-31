@@ -148,7 +148,7 @@ def _pipeline_watch_roots(site_root: Path) -> set[Path]:
         Path("main.py"),
         Path("pyproject.toml"),
         Path("uv.lock"),
-        Path("site_pipeline"),
+        Path("apache_buildish_site_pipeline"),
     ):
         candidate = pipeline_root / relative_path
         if candidate.exists():

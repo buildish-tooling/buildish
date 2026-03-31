@@ -75,7 +75,7 @@ flowchart LR
 
 ### Aggregation layer
 
-The Python pipeline under `site/pipeline/site_pipeline/` is responsible for:
+The Python pipeline under `site/pipeline/apache_buildish_site_pipeline/` is responsible for:
 
 - reading the catalog and component metadata,
 - copying approved non-versioned pages, versioned docs, and static assets into a normalized tree,
@@ -175,7 +175,7 @@ Instead it watches a curated subset:
 - `site/pipeline/main.py`
 - `site/pipeline/pyproject.toml`
 - `site/pipeline/uv.lock`
-- `site/pipeline/site_pipeline/`
+- `site/pipeline/apache_buildish_site_pipeline/`
 
 This avoids recursively watching tool-managed directories such as:
 

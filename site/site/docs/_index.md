@@ -20,7 +20,8 @@ limitations under the License.
 -->
 
 The site uses Hugo + Docsy for rendering, with the Python staging pipeline implemented under
-`site/pipeline/site_pipeline/` and exposed through the neutral `python -m site_pipeline` entrypoint.
+`site/pipeline/apache_buildish_site_pipeline/` and exposed through the installable
+`site-pipeline` CLI.
 
 ## Common workflows
 

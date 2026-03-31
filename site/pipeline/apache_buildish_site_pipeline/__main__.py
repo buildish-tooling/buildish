@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module entrypoint for ``python -m site_pipeline``."""
+"""Module entrypoint for ``python -m apache_buildish_site_pipeline``."""
 
 from .cli import main
 

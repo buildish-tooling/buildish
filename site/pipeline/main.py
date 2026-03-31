@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from site_pipeline import main
+from apache_buildish_site_pipeline import main
 
 
 if __name__ == "__main__":
