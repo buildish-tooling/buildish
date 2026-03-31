@@ -2298,6 +2298,94 @@ Additional details.
                 (repo_root / "site" / "pipeline" / ".idea").resolve(), watch_roots
             )
 
+    def test_collect_watch_roots_uses_local_pipeline_dependency_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            repo_root = workspace / "buildish"
+            repo_root.mkdir()
+            write_files(
+                repo_root,
+                {
+                    "site/pipeline/main.py": text_block(
+                        """
+                        raise SystemExit(0)
+                        """
+                    ),
+                    "site/pipeline/pyproject.toml": text_block(
+                        """
+                        [project]
+                        name='consumer'
+
+                        [tool.uv.sources]
+                        apache-buildish-site-pipeline = { path = "../../buildish-site-pipeline" }
+                        """
+                    ),
+                    "site/pipeline/uv.lock": text_block(
+                        """
+                        version = 1
+                        """
+                    ),
+                    "buildish-site-pipeline/apache_buildish_site_pipeline/__init__.py": text_block(
+                        """
+                        # extracted watcher stub
+                        """
+                    ),
+                    "site/content/_index.md": text_block(
+                        """
+                        # Root
+                        """
+                    ),
+                },
+            )
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
+                    {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
+                    defaults=self.default_catalog_defaults(),
+                ),
+            )
+
+            mammoth = workspace / "buildish-mammoth-cache"
+            write_files(
+                mammoth,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Mammoth
+
+                        Landing page.
+                        """
+                    )
+                },
+            )
+            (mammoth / "site" / "docs").mkdir(parents=True)
+            self.write_yaml(
+                mammoth / "site" / "component.yaml",
+                {"schemaVersion": 1, "component": {"displayName": "Mammoth"}},
+            )
+
+            watch_roots = set(site_pipeline.collect_watch_roots(repo_root))
+
+            self.assertIn(
+                (repo_root / "site" / "pipeline" / "main.py").resolve(), watch_roots
+            )
+            self.assertIn(
+                (repo_root / "site" / "pipeline" / "pyproject.toml").resolve(),
+                watch_roots,
+            )
+            self.assertIn(
+                (repo_root / "site" / "pipeline" / "uv.lock").resolve(), watch_roots
+            )
+            self.assertIn(
+                (repo_root / "buildish-site-pipeline").resolve(), watch_roots
+            )
+            self.assertNotIn(
+                (
+                    repo_root / "site" / "pipeline" / "apache_buildish_site_pipeline"
+                ).resolve(),
+                watch_roots,
+            )
+
     def test_collect_watch_roots_uses_configured_authored_site_content_path(
         self,
     ) -> None:

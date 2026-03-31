@@ -29,6 +29,7 @@ the amount of external file activity observed by IDE file watchers.
 from __future__ import annotations
 
 import sys
+import tomllib
 from pathlib import Path
 
 from .builder import build
@@ -134,12 +135,44 @@ def _component_watch_roots(
     return watch_roots
 
 
-def _pipeline_watch_roots(site_root: Path) -> set[Path]:
-    """Return the narrow set of pipeline paths that can affect watch-mode rebuilds.
+def _local_pipeline_source_root(project_root: Path, repo_root: Path) -> Path | None:
+    """Return a local dependency source root for the pipeline package if configured.
+
+    The Buildish consumer project can point at a local checkout of the extracted
+    pipeline repository via ``tool.uv.sources``. When present, watch mode should
+    rebuild after changes in that source tree instead of assuming the package
+    lives directly beneath ``site/pipeline/``.
+    """
+
+    pyproject_path = project_root / "pyproject.toml"
+    if not pyproject_path.is_file():
+        return None
+
+    pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+    sources = pyproject.get("tool", {}).get("uv", {}).get("sources", {})
+    package_source = sources.get("apache-buildish-site-pipeline")
+    if not isinstance(package_source, dict):
+        return None
+
+    source_path = package_source.get("path")
+    if not isinstance(source_path, str) or not source_path:
+        return None
+
+    candidate = (project_root / source_path).resolve(strict=False)
+    try:
+        candidate.relative_to(repo_root.resolve(strict=False))
+    except ValueError:
+        return None
+    return candidate
+
+
+def _pipeline_watch_roots(site_root: Path, repo_root: Path) -> set[Path]:
+    """Return the narrow set of consumer-project paths that affect watch mode.
 
     Watching all of ``site/pipeline/`` recursively would also subscribe to tool
     directories such as ``.venv`` and ``.idea``. The watch loop only needs the
-    entrypoint, dependency metadata, and the package source tree itself.
+    entrypoint, dependency metadata, and either the in-project package tree or
+    an explicitly configured local dependency source.
     """
 
     pipeline_root = site_root / "pipeline"
@@ -148,11 +181,19 @@ def _pipeline_watch_roots(site_root: Path) -> set[Path]:
         Path("main.py"),
         Path("pyproject.toml"),
         Path("uv.lock"),
-        Path("apache_buildish_site_pipeline"),
     ):
         candidate = pipeline_root / relative_path
         if candidate.exists():
             watch_roots.add(candidate.resolve())
+
+    local_source_root = _local_pipeline_source_root(pipeline_root, repo_root)
+    if local_source_root is not None:
+        watch_roots.add(watchable_existing_path(local_source_root, repo_root))
+        return watch_roots
+
+    package_root = pipeline_root / "apache_buildish_site_pipeline"
+    if package_root.exists():
+        watch_roots.add(package_root.resolve())
     return watch_roots
 
 
@@ -193,7 +234,7 @@ def collect_watch_roots(
         watch_roots.add(components_local_path.resolve())
     if resolved_config.config_path is not None:
         watch_roots.add(resolved_config.config_path.resolve())
-    watch_roots.update(_pipeline_watch_roots(site_root))
+    watch_roots.update(_pipeline_watch_roots(site_root, resolved_repo_root))
 
     for source_relative, _ in STAGED_VENDOR_ASSETS:
         source = resolve_vendor_asset_source(site_root, source_relative)

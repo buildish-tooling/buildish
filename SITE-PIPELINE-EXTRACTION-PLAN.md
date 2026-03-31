@@ -27,6 +27,10 @@ project-specific integration decisions.
 
 ## Current state
 
+## Dependency additions during extraction
+
+- Phase 1: no new external dependencies added.
+
 ### Implemented
 
 - The front matter contract is namespaced as:
@@ -136,14 +140,15 @@ Document and preserve:
 
 ### Phase 1: finish in-place productization
 
-Status: in progress.
+Status: complete.
 
 Remaining work:
 
-- reduce Buildish-shaped integration assumptions in the core:
-  - move Buildish-specific presentation decisions fully into the Buildish site
-    layer
-  - keep the pipeline focused on deterministic staged outputs and generic
+- completed:
+  - reduced Buildish-shaped integration assumptions in the core by making watch
+    mode follow the consumer project's dependency metadata instead of assuming
+    the implementation package always lives directly under `site/pipeline/`
+  - kept the pipeline focused on deterministic staged outputs and generic
     metadata, with the staged tree remaining the single source of truth for
     published component paths
 
@@ -170,5 +175,7 @@ Remaining work:
 
 ## Immediate next steps
 
-1. Reduce the remaining Buildish-shaped integration assumptions in the core.
+1. Create the extracted `buildish-site-pipeline/` repository skeleton inside
+   this repository and populate it with the reusable implementation, tests, and
+   contract docs.
 
