@@ -213,6 +213,11 @@ Each staged component Markdown page also receives pipeline-owned front matter un
 - `sitePipelineComponent` for the component identity, navigation paths, and lifecycle summary
 - `sitePipelineComponentPage` for the staged page kind and active development-version context
 
+Public component/docs/release paths in that staged metadata are derived from the
+staged content tree itself. The lightweight preview HTML derives its local links
+from the resolved `workspace.stagePath` / `workspace.previewPath` outputs rather
+than from a second hard-coded Buildish preview/route table.
+
 ## Local commands
 
 From `site/`:

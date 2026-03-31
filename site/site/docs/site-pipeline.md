@@ -104,6 +104,13 @@ The rendering layer also provides a small set of site-owned shortcodes under
 `site/layouts/shortcodes/` so component landing pages can link to pipeline-owned
 component metadata without hard-coding URLs.
 
+The core pipeline now derives public component/docs/release URLs from the
+staged content tree itself instead of maintaining a second hard-coded route
+table. The lightweight preview HTML likewise derives its links from the
+resolved `workspace.stagePath` / `workspace.previewPath` outputs, so custom
+workspace roots do not require Buildish-specific preview assumptions in the
+Python package.
+
 ### Rendering layer
 
 Hugo consumes the staged contract via `site/hugo.yaml`:

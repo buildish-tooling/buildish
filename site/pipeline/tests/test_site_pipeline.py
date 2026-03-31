@@ -726,7 +726,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 staged_root_index, "redirect_url:", "## Incubation status"
             )
             root_front_matter = yaml.safe_load(staged_root_index.split("---", 2)[1])
-            self.assertEqual("Apache Buildish (Incubating)", root_front_matter["title"])
+            self.assertEqual("Apache Project Site", root_front_matter["title"])
             self.assertEqual(
                 "Apache Buildish develops build automation, CI integrations, and supporting tooling.",
                 root_front_matter["description"],
@@ -736,7 +736,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 root_front_matter["trademark_attribution"],
             )
             self.assertEqual(
-                "Apache Buildish (Incubating)",
+                "Apache Project Site",
                 root_front_matter["sitePipeline"]["siteTitle"],
             )
             self.assertEqual(
@@ -974,7 +974,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             preview_index = (repo_root / "site" / ".preview" / "index.html").read_text(
                 encoding="utf-8"
             )
-            self.assertIn("Apache Buildish (Incubating)", preview_index)
+            self.assertIn("Apache Project Site", preview_index)
             self.assertIn("Mammoth Cache for Gradle® and Apache Maven™", preview_index)
             self.assertIn("Site", preview_index)
 
@@ -1897,7 +1897,7 @@ Additional details.
                 {"schemaVersion": 1, "component": {"displayName": "Mammoth Cache"}},
             )
 
-            site_pipeline.build(repo_root)
+            results = site_pipeline.build(repo_root)
 
             self.assert_paths_exist(
                 repo_root / "build" / "site-stage" / "manifest.yaml",
@@ -1911,6 +1911,30 @@ Additional details.
                 / "_index.md",
                 repo_root / "build" / "site-preview" / "index.html",
             )
+            self.assertEqual("/components/mammoth-cache/", results[0].raw_component_index_path)
+            self.assertEqual(
+                "/components/mammoth-cache/development/",
+                results[0].raw_development_index_path,
+            )
+
+            preview_index = (
+                repo_root / "build" / "site-preview" / "index.html"
+            ).read_text(encoding="utf-8")
+            self.assertIn("href='/build/site-stage/content/_index.md'", preview_index)
+            self.assertIn(
+                "href='/build/site-preview/components/mammoth-cache/'",
+                preview_index,
+            )
+
+            component_preview = (
+                repo_root
+                / "build"
+                / "site-preview"
+                / "components"
+                / "mammoth-cache"
+                / "index.html"
+            ).read_text(encoding="utf-8")
+            self.assertIn("href='/build/site-preview/'", component_preview)
             self.assertFalse((repo_root / "site" / ".stage").exists())
             self.assertFalse((repo_root / "site" / ".preview").exists())
 

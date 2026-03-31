@@ -32,7 +32,7 @@ DEFAULT_CATALOG_PATH = Path("site/components.yaml")
 DEFAULT_AUTHORED_SITE_CONTENT_PATH = Path("site/content")
 DEFAULT_STAGE_PATH = Path("site/.stage")
 DEFAULT_PREVIEW_PATH = Path("site/.preview")
-DEFAULT_SITE_TITLE = "Apache Buildish (Incubating)"
+DEFAULT_SITE_TITLE = "Apache Project Site"
 DEFAULT_PROJECT_STATUS: ProjectStatus = "incubating"
 
 

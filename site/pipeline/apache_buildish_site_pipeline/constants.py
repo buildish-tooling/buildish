@@ -23,7 +23,7 @@ from __future__ import annotations
 from pathlib import Path
 
 DEFAULT_TAG_PATTERN = r"^v[0-9]+\.[0-9]+\.[0-9]+$"
-SITE_TITLE = "Apache Buildish (Incubating)"
+SITE_TITLE = "Apache Project Site"
 WATCH_DEBOUNCE_MS = 300
 WATCH_STEP_MS = 50
 WATCH_IGNORE_PATH_PARTS = {

@@ -34,28 +34,15 @@ def _relative_web_path(path: Path) -> str:
     return "/" + path.as_posix().lstrip("/")
 
 
-def public_component_path(slug: str) -> str:
-    """Return the public URL of a staged component landing page."""
+def public_directory_path(relative_root: Path) -> str:
+    """Return the public URL of a staged directory relative to its web root."""
 
-    return f"/components/{slug}/"
-
-
-def public_development_path(slug: str) -> str:
-    """Return the public URL of a staged development-docs landing page."""
-
-    return f"/components/{slug}/development/"
-
-
-def public_assets_root_path(slug: str) -> str:
-    """Return the public URL prefix for staged development assets."""
-
-    return f"/components/{slug}/development/assets/"
-
-
-def _public_release_path(slug: str, version: str) -> str:
-    """Return the public URL of a staged release landing page."""
-
-    return f"/components/{slug}/releases/{version}/"
+    suffix = "/".join(
+        segment for segment in Path(relative_root).parts if segment not in {"."}
+    )
+    if not suffix:
+        return "/"
+    return "/" + suffix.strip("/") + "/"
 
 
 def public_content_page_path(root_segments: list[str], relative_path: Path) -> str:
@@ -71,14 +58,14 @@ def public_content_page_path(root_segments: list[str], relative_path: Path) -> s
 
 
 def _release_index_web_path(
-    component_root: Path, slug: str, version: str
+    component_root: Path, stage_content_root: Path, version: str
 ) -> str | None:
     """Return the staged URL of a release landing page if that page exists."""
 
     release_index_path = component_root / "releases" / version / "_index.md"
     if not release_index_path.is_file():
         return None
-    return _public_release_path(slug, version)
+    return public_content_page_path([], release_index_path.relative_to(stage_content_root))
 
 
 def normalize_lifecycle(
@@ -86,6 +73,7 @@ def normalize_lifecycle(
     tag_pattern: re.Pattern[str],
     slug: str,
     component_root: Path,
+    stage_content_root: Path,
 ) -> tuple[
     str | None,
     str | None,
@@ -112,7 +100,7 @@ def normalize_lifecycle(
             )
 
         aliases = tuple(release_line_model.aliases)
-        path = _release_index_web_path(component_root, slug, latest)
+        path = _release_index_web_path(component_root, stage_content_root, latest)
         release_lines.append(
             StagedReleaseLine(
                 line=line, latest=latest, status=status, aliases=aliases, path=path
@@ -126,7 +114,7 @@ def normalize_lifecycle(
     latest_stable_path = None
     if latest_stable_version is not None:
         latest_stable_path = _release_index_web_path(
-            component_root, slug, latest_stable_version
+            component_root, stage_content_root, latest_stable_version
         )
 
     return (
@@ -186,26 +174,31 @@ def _html_page(title: str, body: str) -> str:
 """
 
 
-def build_preview_index(results: list[ComponentBuildResult], site_title: str) -> str:
+def build_preview_index(
+    results: list[ComponentBuildResult],
+    site_title: str,
+    preview_root_path: str,
+    staged_root_markdown_path: str,
+) -> str:
     """Build the lightweight preview index shown outside Hugo."""
 
     items = []
     for result in results:
         status = "available" if result.available else "missing from local workspace"
         items.append(
-            f"<li><a href='/site/.preview/components/{result.slug}/'>{html.escape(result.display_name)}</a>"
+            f"<li><a href='{html.escape(preview_root_path)}components/{result.slug}/'>{html.escape(result.display_name)}</a>"
             f" — <span class='muted'>{html.escape(status)}</span></li>"
         )
     body = (
         f"<h1>{html.escape(site_title)}</h1>"
         "<p>This is a lightweight local preview for the staged site contract.</p>"
-        "<p><a href='/site/.stage/content/_index.md'>Open staged root markdown</a></p>"
+        f"<p><a href='{html.escape(staged_root_markdown_path)}'>Open staged root markdown</a></p>"
         f"<ul>{''.join(items)}</ul>"
     )
     return _html_page(site_title, body)
 
 
-def build_component_preview(result: ComponentBuildResult) -> str:
+def build_component_preview(result: ComponentBuildResult, preview_root_path: str) -> str:
     """Build the lightweight preview page for one staged component."""
 
     doc_items = "".join(
@@ -213,7 +206,9 @@ def build_component_preview(result: ComponentBuildResult) -> str:
         for entry in result.doc_links
     )
     warning_items = "".join(f"<li>{html.escape(item)}</li>" for item in result.warnings)
-    body = ["<p><a href='/site/.preview/'>&larr; Back to preview index</a></p>"]
+    body = [
+        f"<p><a href='{html.escape(preview_root_path)}'>&larr; Back to preview index</a></p>"
+    ]
     body.append(f"<h1>{html.escape(result.display_name)}</h1>")
     if result.summary:
         body.append(f"<p>{html.escape(result.summary)}</p>")

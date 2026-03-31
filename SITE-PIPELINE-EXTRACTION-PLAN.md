@@ -59,11 +59,15 @@ project-specific integration decisions.
   local `uv` project.
 - Buildish-specific project-status presentation now lives in the Buildish site
   layer.
+- Public component/docs/release URLs are now derived from the staged content
+  tree, and preview HTML links are derived from the resolved workspace output
+  paths instead of from hard-coded Buildish defaults.
 
 ### Still coupled to Buildish or in-repo execution
 
-- The pipeline still contains Buildish/Hugo-shaped assumptions such as the
-  current URL and preview conventions.
+- The current staged contract is still shaped around the Buildish Hugo/Docsy
+  integration, even though the duplicated URL/preview conventions were removed
+  from the core.
 - Buildish still executes the in-repo implementation instead of consuming a
   released package.
 
@@ -140,7 +144,8 @@ Remaining work:
   - move Buildish-specific presentation decisions fully into the Buildish site
     layer
   - keep the pipeline focused on deterministic staged outputs and generic
-    metadata
+    metadata, with the staged tree remaining the single source of truth for
+    published component paths
 
 ### Phase 2: create the extracted repository
 

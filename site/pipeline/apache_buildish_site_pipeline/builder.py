@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Core build and cleanup operations for the Buildish site pipeline."""
+"""Core build and cleanup operations for the site pipeline."""
 
 from __future__ import annotations
 
@@ -78,14 +78,12 @@ from .models import (
     VersionSource,
 )
 from .rendering import (
-    build_preview_index,
     build_component_preview,
+    build_preview_index,
     build_development_index_markdown,
     normalize_lifecycle,
-    public_assets_root_path,
     public_content_page_path,
-    public_component_path,
-    public_development_path,
+    public_directory_path,
 )
 
 
@@ -168,8 +166,8 @@ def _stage_component_assets(
 
 
 def _normalize_staged_docs(
+    stage_content_root: Path,
     docs_root: Path,
-    slug: str,
     copied_docs: list[Path],
 ) -> tuple[list[StagedDocLink], str]:
     """Normalize staged Markdown docs and build their preview links."""
@@ -194,7 +192,7 @@ def _normalize_staged_docs(
         if copied.suffix.lower() not in {".md", ".markdown", ".adoc", ".asciidoc"}:
             continue
         raw_path = public_content_page_path(
-            ["components", slug, "development", "docs"], copied
+            [], (docs_root / copied).relative_to(stage_content_root)
         )
         doc_links.append(StagedDocLink(label=doc_title, href=raw_path))
     return doc_links, summary
@@ -272,8 +270,7 @@ def _site_pipeline_component_payload(
         development_label=result.development_label,
         development=SitePipelineComponentDevelopment(
             label=result.development_label,
-            path=result.raw_development_index_path
-            or public_development_path(result.slug),
+            path=result.raw_development_index_path,
             docs_path=result.raw_docs_root_path,
             assets_path=result.raw_assets_root_path,
         ),
@@ -310,8 +307,7 @@ def _site_pipeline_component_page_payload(
             else VersionDescriptor(
                 kind="development",
                 label=result.development_label,
-                path=result.raw_development_index_path
-                or public_development_path(result.slug),
+                path=result.raw_development_index_path,
                 docs_path=result.raw_docs_root_path,
             )
         ),
@@ -321,6 +317,7 @@ def _site_pipeline_component_page_payload(
 def _annotate_staged_component_pages(
     result: ComponentBuildResult,
     site_pipeline: SitePipelinePayload,
+    stage_content_root: Path,
     component_root: Path,
     development_root: Path,
     copied_component_pages: list[Path],
@@ -337,7 +334,9 @@ def _annotate_staged_component_pages(
             or not staged_page_path.is_file()
         ):
             continue
-        page_path = public_content_page_path(["components", result.slug], copied)
+        page_path = public_content_page_path(
+            [], (component_root / copied).relative_to(stage_content_root)
+        )
         staged_page_path.write_text(
             update_markdown_front_matter(
                 staged_page_path.read_text(encoding="utf-8"),
@@ -379,7 +378,7 @@ def _annotate_staged_component_pages(
         ):
             continue
         page_path = public_content_page_path(
-            ["components", result.slug, "development", "docs"], copied
+            [], (docs_root / copied).relative_to(stage_content_root)
         )
         staged_doc_path.write_text(
             update_markdown_front_matter(
@@ -409,7 +408,7 @@ def _write_component_metadata_files(
 ) -> None:
     """Write the YAML metadata files consumed by the staged site."""
 
-    raw_development_index_path = public_development_path(result.slug)
+    raw_development_index_path = result.raw_development_index_path
     version_metadata_path = development_root / "version.yaml"
     lifecycle_metadata_path = component_root / "lifecycle.yaml"
 
@@ -573,11 +572,11 @@ def stage_component(
         tag_pattern = re.compile(DEFAULT_TAG_PATTERN)
 
     component_root = stage_root / "content" / "components" / slug
+    stage_content_root = stage_root / "content"
+    stage_static_root = stage_root / "static"
     development_root = component_root / "development"
     docs_root = development_root / "docs"
-    staged_assets_root = (
-        stage_root / "static" / "components" / slug / "development" / "assets"
-    )
+    staged_assets_root = stage_static_root / "components" / slug / "development" / "assets"
 
     if available:
         copied_component_pages = _stage_component_pages(
@@ -604,7 +603,9 @@ def stage_component(
         if copied_component_pages
         else ""
     )
-    doc_links, docs_summary = _normalize_staged_docs(docs_root, slug, copied_docs)
+    doc_links, docs_summary = _normalize_staged_docs(
+        stage_content_root, docs_root, copied_docs
+    )
     if copied_docs and not (docs_root / "_index.md").is_file():
         warnings.append(
             "Docs root is missing _index.md; add a site-oriented docs landing page."
@@ -612,24 +613,33 @@ def stage_component(
     if not summary:
         summary = docs_summary
 
-    raw_development_index_path = public_development_path(slug)
+    raw_development_index_path = public_content_page_path(
+        [], (development_root / "_index.md").relative_to(stage_content_root)
+    )
     raw_component_index_path = (
-        public_component_path(slug) if copied_component_pages else None
+        public_content_page_path(
+            [], (component_root / "_index.md").relative_to(stage_content_root)
+        )
+        if copied_component_pages
+        else None
     )
     raw_docs_root_path = (
-        public_content_page_path(
-            ["components", slug, "development", "docs"], Path("_index.md")
-        )
+        public_content_page_path([], (docs_root / "_index.md").relative_to(stage_content_root))
         if (docs_root / "_index.md").is_file()
         else None
     )
-    raw_assets_root_path = public_assets_root_path(slug) if copied_assets else None
+    raw_assets_root_path = (
+        public_directory_path(staged_assets_root.relative_to(stage_static_root))
+        if copied_assets
+        else None
+    )
     latest_stable_version, latest_stable_path, release_lines, alias_mappings = (
         normalize_lifecycle(
             metadata.lifecycle,
             tag_pattern,
             slug,
             component_root,
+            stage_content_root,
         )
     )
 
@@ -672,6 +682,7 @@ def stage_component(
     _annotate_staged_component_pages(
         result,
         site_pipeline,
+        stage_content_root,
         component_root,
         development_root,
         copied_component_pages,
@@ -721,6 +732,10 @@ def build(
 
     stage_root = resolved_config.stage_path
     preview_root = resolved_config.preview_path
+    preview_root_path = public_directory_path(preview_root.relative_to(resolved_repo_root))
+    staged_root_markdown_path = "/" + (
+        stage_root / "content" / "_index.md"
+    ).relative_to(resolved_repo_root).as_posix()
     reset_output_directory(stage_root)
     if include_preview:
         reset_output_directory(preview_root)
@@ -805,8 +820,7 @@ def build(
                     release_lines=result.release_lines,
                     development=LifecycleDevelopment(
                         label=result.development_label,
-                        path=result.raw_development_index_path
-                        or public_development_path(result.slug),
+                        path=result.raw_development_index_path,
                         docs_path=result.raw_docs_root_path,
                     ),
                 )
@@ -827,14 +841,22 @@ def build(
 
     if include_preview:
         (preview_root / "index.html").write_text(
-            build_preview_index(results, site_title=site_pipeline.site_title),
+            build_preview_index(
+                results,
+                site_title=site_pipeline.site_title,
+                preview_root_path=preview_root_path,
+                staged_root_markdown_path=staged_root_markdown_path,
+            ),
             encoding="utf-8",
         )
         for result in results:
             component_preview = preview_root / "components" / result.slug / "index.html"
             component_preview.parent.mkdir(parents=True, exist_ok=True)
             component_preview.write_text(
-                build_component_preview(result), encoding="utf-8"
+                build_component_preview(
+                    result, preview_root_path=preview_root_path
+                ),
+                encoding="utf-8",
             )
     return results
 
