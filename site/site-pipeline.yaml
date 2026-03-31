@@ -16,6 +16,9 @@
 schemaVersion: 1
 workspace:
   catalogPath: site/components.yaml
+  authoredSiteContentPath: site/content
+  stagePath: site/.stage
+  previewPath: site/.preview
 site:
   siteTitle: Apache Buildish (Incubating)
   projectStatus: incubating

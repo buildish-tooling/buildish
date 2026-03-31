@@ -25,6 +25,9 @@ For the broader long-term design, see [`site-infra.md`](site-infra.md).
 - participating components are normally sibling checkouts such as `./buildish-mammoth-cache`
 - missing component repositories are allowed during local builds and CI; they are skipped cleanly
 - the main repository owns the component catalog, defaulting to `site/components.yaml`
+- repo-authored site content defaults to `site/content`
+- pipeline-managed outputs default to `site/.stage` and `site/.preview`
+- all configured workspace paths must remain inside the main repository root
 
 ## Main repository catalog
 
@@ -34,6 +37,16 @@ The main repository owns the component catalog. By default it lives at
 The effective catalog path may be overridden by `workspace.catalogPath` in
 `site/site-pipeline.yaml` or by the CLI `--catalog` flag. The resolved path must
 stay within the main repository root.
+
+The repo-authored site content root may be overridden by
+`workspace.authoredSiteContentPath` in `site/site-pipeline.yaml` or by the CLI
+`--authored-site-content` flag. The stage and preview output roots may be
+overridden by `workspace.stagePath` / `workspace.previewPath` or by the CLI
+`--stage-path` / `--preview-path` flags.
+
+The implementation rejects workspace configurations where these roots would
+escape the repository boundary, overlap each other, or overlap protected
+pipeline/source roots.
 
 Supported top-level fields:
 
@@ -182,17 +195,18 @@ The aggregator enforces these guardrails:
 
 ## Staged outputs
 
-Stage outputs are, at minimum:
+Stage outputs are, at minimum, written beneath the configured
+`workspace.stagePath` root (default `site/.stage`):
 
-- `site/.stage/content/components/<slug>/_index.md`
-- `site/.stage/content/components/<slug>/...` for any additional authored component pages
-- `site/.stage/content/components/<slug>/development/docs/...`
-- `site/.stage/content/components/<slug>/development/version.yaml`
-- `site/.stage/content/components/<slug>/lifecycle.yaml`
-- `site/.stage/data/components.yaml`
-- `site/.stage/data/lifecycle.yaml`
-- `site/.stage/data/aliases.yaml`
-- `site/.stage/static/components/<slug>/development/assets/...` when assets exist
+- `workspace.stagePath/content/components/<slug>/_index.md`
+- `workspace.stagePath/content/components/<slug>/...` for any additional authored component pages
+- `workspace.stagePath/content/components/<slug>/development/docs/...`
+- `workspace.stagePath/content/components/<slug>/development/version.yaml`
+- `workspace.stagePath/content/components/<slug>/lifecycle.yaml`
+- `workspace.stagePath/data/components.yaml`
+- `workspace.stagePath/data/lifecycle.yaml`
+- `workspace.stagePath/data/aliases.yaml`
+- `workspace.stagePath/static/components/<slug>/development/assets/...` when assets exist
 
 Each staged component Markdown page also receives pipeline-owned front matter under:
 

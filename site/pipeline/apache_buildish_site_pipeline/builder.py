@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Literal
 
 from .common import first_non_none
-from .config import ProjectStatus, resolve_pipeline_config
+from .config import ProjectStatus, resolve_pipeline_config, resolve_workspace_paths
 from .constants import DEFAULT_TAG_PATTERN
 from .filesystem import (
     copy_tree_without_symlinks,
@@ -471,15 +471,16 @@ def _write_component_metadata_files(
 
 
 def _stage_authored_site_content(
-    site_root: Path, stage_root: Path, site_pipeline: SitePipelinePayload
+    authored_site_content_root: Path,
+    stage_root: Path,
+    site_pipeline: SitePipelinePayload,
 ) -> None:
     """Copy the site's hand-authored content into the staged Hugo tree."""
 
-    source_content_root = site_root / "content"
     copied_site_pages: list[Path] = []
-    if source_content_root.is_dir():
+    if authored_site_content_root.is_dir():
         copied_site_pages = copy_tree_without_symlinks(
-            source_content_root, stage_root / "content"
+            authored_site_content_root, stage_root / "content"
         )
 
     for copied in copied_site_pages:
@@ -686,6 +687,9 @@ def build(
     include_preview: bool = True,
     config_path: str | Path | None = None,
     catalog_path: str | Path | None = None,
+    authored_site_content_path: str | Path | None = None,
+    stage_path: str | Path | None = None,
+    preview_path: str | Path | None = None,
     site_title: str | None = None,
     project_status: ProjectStatus | None = None,
 ) -> list[ComponentBuildResult]:
@@ -700,11 +704,14 @@ def build(
         repo_root,
         config_path=config_path,
         catalog_path=catalog_path,
+        authored_site_content_path=authored_site_content_path,
+        stage_path=stage_path,
+        preview_path=preview_path,
         site_title=site_title,
         project_status=project_status,
     )
     resolved_repo_root = resolved_config.repo_root
-    site_root = resolved_repo_root / "site"
+    site_root = resolved_config.site_root
     site_pipeline = SitePipelinePayload(
         site_title=resolved_config.site_title,
         project_status=resolved_config.project_status,
@@ -712,8 +719,8 @@ def build(
     catalog = ComponentsCatalog.from_yaml_path(resolved_config.catalog_path)
     local_overrides = load_components_local_overrides(site_root)
 
-    stage_root = site_root / ".stage"
-    preview_root = site_root / ".preview"
+    stage_root = resolved_config.stage_path
+    preview_root = resolved_config.preview_path
     reset_output_directory(stage_root)
     if include_preview:
         reset_output_directory(preview_root)
@@ -730,7 +737,11 @@ def build(
         )
         for index, component in enumerate(catalog.components, start=1)
     ]
-    _stage_authored_site_content(site_root, stage_root, site_pipeline)
+    _stage_authored_site_content(
+        resolved_config.authored_site_content_path,
+        stage_root,
+        site_pipeline,
+    )
     stage_vendor_assets(site_root, stage_root)
 
     write_yaml_like(
@@ -828,14 +839,27 @@ def build(
     return results
 
 
-def clean(repo_root: Path | None = None) -> None:
+def clean(
+    repo_root: Path | None = None,
+    *,
+    config_path: str | Path | None = None,
+    authored_site_content_path: str | Path | None = None,
+    stage_path: str | Path | None = None,
+    preview_path: str | Path | None = None,
+) -> None:
     """Remove generated staging and preview directories."""
 
-    resolved_repo_root = repo_root_from(repo_root)
-    shutil.rmtree(resolved_repo_root / "site" / ".stage", ignore_errors=True)
-    shutil.rmtree(resolved_repo_root / "site" / ".preview", ignore_errors=True)
-    shutil.rmtree(resolved_repo_root / ".site-stage", ignore_errors=True)
-    shutil.rmtree(resolved_repo_root / ".site-preview", ignore_errors=True)
+    resolved_paths = resolve_workspace_paths(
+        repo_root,
+        config_path=config_path,
+        authored_site_content_path=authored_site_content_path,
+        stage_path=stage_path,
+        preview_path=preview_path,
+    )
+    shutil.rmtree(resolved_paths.stage_path, ignore_errors=True)
+    shutil.rmtree(resolved_paths.preview_path, ignore_errors=True)
+    shutil.rmtree(resolved_paths.repo_root / ".site-stage", ignore_errors=True)
+    shutil.rmtree(resolved_paths.repo_root / ".site-preview", ignore_errors=True)
 
 
 def serve(
@@ -844,6 +868,9 @@ def serve(
     *,
     config_path: str | Path | None = None,
     catalog_path: str | Path | None = None,
+    authored_site_content_path: str | Path | None = None,
+    stage_path: str | Path | None = None,
+    preview_path: str | Path | None = None,
     site_title: str | None = None,
     project_status: ProjectStatus | None = None,
 ) -> None:
@@ -854,12 +881,25 @@ def serve(
         resolved_repo_root,
         config_path=config_path,
         catalog_path=catalog_path,
+        authored_site_content_path=authored_site_content_path,
+        stage_path=stage_path,
+        preview_path=preview_path,
         site_title=site_title,
         project_status=project_status,
+    )
+    resolved_workspace = resolve_workspace_paths(
+        resolved_repo_root,
+        config_path=config_path,
+        authored_site_content_path=authored_site_content_path,
+        stage_path=stage_path,
+        preview_path=preview_path,
     )
     handler = functools.partial(
         http.server.SimpleHTTPRequestHandler, directory=str(resolved_repo_root)
     )
     with socketserver.TCPServer(("127.0.0.1", port), handler) as httpd:
-        print(f"Serving local preview at http://127.0.0.1:{port}/site/.preview/")
+        preview_relative = resolved_workspace.preview_path.relative_to(
+            resolved_workspace.repo_root
+        ).as_posix()
+        print(f"Serving local preview at http://127.0.0.1:{port}/{preview_relative}/")
         httpd.serve_forever()

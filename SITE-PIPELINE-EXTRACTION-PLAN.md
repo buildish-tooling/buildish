@@ -39,7 +39,15 @@ project-specific integration decisions.
   1. CLI arguments
   2. configuration file
   3. built-in defaults
-- `siteTitle`, `projectStatus`, and `workspace.catalogPath` are configuration-driven.
+- `siteTitle`, `projectStatus`, and the workspace paths below are
+  configuration-driven:
+  - `workspace.catalogPath`
+  - `workspace.authoredSiteContentPath`
+  - `workspace.stagePath`
+  - `workspace.previewPath`
+- Workspace paths are resolved relative to the repository root and validated so
+  authored inputs and generated outputs cannot overlap protected source roots or
+  escape the repository boundary.
 - `projectStatus` is restricted to:
   - `incubating`
   - `graduated`
@@ -54,9 +62,6 @@ project-specific integration decisions.
 
 ### Still coupled to Buildish or in-repo execution
 
-- The workspace contract is only partially configurable; the catalog path is now
-  explicit, but authored content roots and output roots are still mostly fixed
-  by convention.
 - The pipeline still contains Buildish/Hugo-shaped assumptions such as the
   current URL and preview conventions.
 - Buildish still executes the in-repo implementation instead of consuming a
@@ -131,11 +136,6 @@ Status: in progress.
 
 Remaining work:
 
-- make the workspace contract fully explicit:
-  - document every workspace path the pipeline assumes today
-  - add configuration for remaining fixed inputs that should be overrideable
-  - explicitly define the remaining contract for repo root, authored content
-    roots, and output roots
 - reduce Buildish-shaped integration assumptions in the core:
   - move Buildish-specific presentation decisions fully into the Buildish site
     layer
@@ -165,7 +165,5 @@ Remaining work:
 
 ## Immediate next steps
 
-1. Define the remaining workspace override contract for authored content roots
-   and output roots.
-2. Reduce the remaining Buildish-shaped integration assumptions in the core.
+1. Reduce the remaining Buildish-shaped integration assumptions in the core.
 

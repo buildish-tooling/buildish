@@ -94,11 +94,11 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
         }
 
     @staticmethod
-    def seed_authored_site_content(repo_root: Path) -> None:
+    def seed_authored_site_content(
+        repo_root: Path, target_relative: str = "site/content"
+    ) -> None:
         source_content = Path(__file__).resolve().parents[2] / "content"
-        shutil.copytree(
-            source_content, repo_root / "site" / "content", dirs_exist_ok=True
-        )
+        shutil.copytree(source_content, repo_root / target_relative, dirs_exist_ok=True)
 
     @staticmethod
     def seed_docsy_vendor_assets(repo_root: Path) -> None:
@@ -1846,6 +1846,126 @@ Additional details.
                 ).is_file()
             )
 
+    def test_build_reads_workspace_paths_from_config_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            repo_root = workspace / "buildish"
+            repo_root.mkdir()
+            (repo_root / "site").mkdir(parents=True)
+            self.seed_authored_site_content(repo_root, target_relative="docs-src")
+            self.write_yaml(
+                repo_root / "site" / "site-pipeline.yaml",
+                {
+                    "schemaVersion": 1,
+                    "workspace": {
+                        "authoredSiteContentPath": "docs-src",
+                        "stagePath": "build/site-stage",
+                        "previewPath": "build/site-preview",
+                    },
+                },
+            )
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
+                    {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
+                    defaults=self.default_catalog_defaults(),
+                ),
+            )
+
+            mammoth = workspace / "buildish-mammoth-cache"
+            write_files(
+                mammoth,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Overview
+
+                        Landing page.
+                        """
+                    ),
+                    "site/docs/_index.md": text_block(
+                        """
+                        # Overview
+
+                        Hello.
+                        """
+                    ),
+                },
+            )
+            self.write_yaml(
+                mammoth / "site" / "component.yaml",
+                {"schemaVersion": 1, "component": {"displayName": "Mammoth Cache"}},
+            )
+
+            site_pipeline.build(repo_root)
+
+            self.assert_paths_exist(
+                repo_root / "build" / "site-stage" / "manifest.yaml",
+                repo_root / "build" / "site-stage" / "content" / "_index.md",
+                repo_root
+                / "build"
+                / "site-stage"
+                / "content"
+                / "components"
+                / "mammoth-cache"
+                / "_index.md",
+                repo_root / "build" / "site-preview" / "index.html",
+            )
+            self.assertFalse((repo_root / "site" / ".stage").exists())
+            self.assertFalse((repo_root / "site" / ".preview").exists())
+
+    def test_resolve_pipeline_config_prefers_explicit_workspace_paths_over_config_file(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "buildish"
+            (repo_root / "site" / "catalogs").mkdir(parents=True)
+            self.write_yaml(
+                repo_root / "site" / "site-pipeline.yaml",
+                {
+                    "schemaVersion": 1,
+                    "workspace": {
+                        "catalogPath": "site/catalogs/from-config.yaml",
+                        "authoredSiteContentPath": "site/content-from-config",
+                        "stagePath": "build/stage-from-config",
+                        "previewPath": "build/preview-from-config",
+                    },
+                },
+            )
+            self.write_yaml(
+                repo_root / "site" / "catalogs" / "from-config.yaml",
+                self.catalog_payload(),
+            )
+            self.write_yaml(
+                repo_root / "site" / "catalogs" / "from-cli.yaml",
+                self.catalog_payload(),
+            )
+
+            resolved = resolve_pipeline_config(
+                repo_root,
+                catalog_path="site/catalogs/from-cli.yaml",
+                authored_site_content_path="site/content-from-cli",
+                stage_path="build/stage-from-cli",
+                preview_path="build/preview-from-cli",
+            )
+
+            self.assertEqual(
+                (repo_root / "site" / "catalogs" / "from-cli.yaml").resolve(),
+                resolved.catalog_path,
+            )
+            self.assertEqual(
+                (repo_root / "site" / "content-from-cli").resolve(),
+                resolved.authored_site_content_path,
+            )
+            self.assertEqual(
+                (repo_root / "build" / "stage-from-cli").resolve(),
+                resolved.stage_path,
+            )
+            self.assertEqual(
+                (repo_root / "build" / "preview-from-cli").resolve(),
+                resolved.preview_path,
+            )
+
     def test_resolve_pipeline_config_prefers_explicit_catalog_path_over_config_file(
         self,
     ) -> None:
@@ -1907,6 +2027,45 @@ Additional details.
                 ValueError, "Catalog path must stay within the repository root"
             ):
                 site_pipeline.build(repo_root, catalog_path=outside_catalog)
+
+    def test_build_rejects_stage_paths_outside_repo_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            repo_root = workspace / "buildish"
+            repo_root.mkdir()
+            (repo_root / "site").mkdir(parents=True)
+            self.write_yaml(repo_root / "site" / "components.yaml", self.catalog_payload())
+
+            with self.assertRaisesRegex(
+                ValueError, "Stage output path must stay within the repository root"
+            ):
+                site_pipeline.build(repo_root, stage_path="../outside-stage")
+
+    def test_build_rejects_output_path_overlapping_protected_site_source_root(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            repo_root = workspace / "buildish"
+            repo_root.mkdir()
+            write_files(
+                repo_root,
+                {
+                    "site/components.yaml": text_block(
+                        """
+                        schemaVersion: 1
+                        components: []
+                        """
+                    ),
+                    "site/layouts/home.html": "{{ define \"main\" }}Home{{ end }}\n",
+                },
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "Stage output path must not overlap with protected site source root",
+            ):
+                site_pipeline.build(repo_root, stage_path="site/layouts")
 
     def test_collect_watch_roots_includes_catalog_component_inputs_and_missing_repo_parent(
         self,
@@ -2095,6 +2254,110 @@ Additional details.
             self.assertNotIn(
                 (repo_root / "site" / "pipeline" / ".idea").resolve(), watch_roots
             )
+
+    def test_collect_watch_roots_uses_configured_authored_site_content_path(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            repo_root = workspace / "buildish"
+            repo_root.mkdir()
+            write_files(
+                repo_root,
+                {
+                    "site/pipeline/main.py": text_block(
+                        """
+                        raise SystemExit(0)
+                        """
+                    ),
+                    "site/pipeline/pyproject.toml": text_block(
+                        """
+                        [project]
+                        name='stub'
+                        """
+                    ),
+                    "site/pipeline/uv.lock": text_block(
+                        """
+                        version = 1
+                        """
+                    ),
+                    "site/pipeline/apache_buildish_site_pipeline/__init__.py": text_block(
+                        """
+                        # watcher stub
+                        """
+                    ),
+                    "docs-src/_index.md": text_block(
+                        """
+                        # Docs source
+                        """
+                    ),
+                },
+            )
+            self.write_yaml(
+                repo_root / "site" / "site-pipeline.yaml",
+                {
+                    "schemaVersion": 1,
+                    "workspace": {"authoredSiteContentPath": "docs-src"},
+                },
+            )
+            self.write_yaml(
+                repo_root / "site" / "components.yaml",
+                self.catalog_payload(
+                    {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
+                    defaults=self.default_catalog_defaults(),
+                ),
+            )
+
+            mammoth = workspace / "buildish-mammoth-cache"
+            write_files(
+                mammoth,
+                {
+                    "site/pages/_index.md": text_block(
+                        """
+                        # Mammoth
+
+                        Landing page.
+                        """
+                    )
+                },
+            )
+            (mammoth / "site" / "docs").mkdir(parents=True)
+            self.write_yaml(
+                mammoth / "site" / "component.yaml",
+                {"schemaVersion": 1, "component": {"displayName": "Mammoth"}},
+            )
+
+            watch_roots = set(site_pipeline.collect_watch_roots(repo_root))
+
+            self.assertIn((repo_root / "docs-src").resolve(), watch_roots)
+            self.assertNotIn((repo_root / "site" / "content").resolve(), watch_roots)
+
+    def test_clean_removes_configured_output_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "buildish"
+            (repo_root / "site").mkdir(parents=True)
+            self.write_yaml(
+                repo_root / "site" / "site-pipeline.yaml",
+                {
+                    "schemaVersion": 1,
+                    "workspace": {
+                        "stagePath": "build/site-stage",
+                        "previewPath": "build/site-preview",
+                    },
+                },
+            )
+            write_files(
+                repo_root,
+                {
+                    "build/site-stage/manifest.yaml": "schemaVersion: 1\n",
+                    "build/site-preview/index.html": "<html></html>\n",
+                },
+            )
+
+            site_pipeline.clean(repo_root, config_path="site/site-pipeline.yaml")
+
+            self.assertFalse((repo_root / "build" / "site-stage").exists())
+            self.assertFalse((repo_root / "build" / "site-preview").exists())
 
     def test_build_rejects_reserved_component_pages_paths(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

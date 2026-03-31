@@ -161,6 +161,9 @@ def collect_watch_roots(
     *,
     config_path: str | Path | None = None,
     catalog_path: str | Path | None = None,
+    authored_site_content_path: str | Path | None = None,
+    stage_path: str | Path | None = None,
+    preview_path: str | Path | None = None,
 ) -> list[Path]:
     """Collect every path that should trigger a staged rebuild in watch mode."""
 
@@ -168,9 +171,12 @@ def collect_watch_roots(
         repo_root,
         config_path=config_path,
         catalog_path=catalog_path,
+        authored_site_content_path=authored_site_content_path,
+        stage_path=stage_path,
+        preview_path=preview_path,
     )
     resolved_repo_root = resolved_config.repo_root
-    site_root = resolved_repo_root / "site"
+    site_root = resolved_config.site_root
     catalog = ComponentsCatalog.from_yaml_path(resolved_config.catalog_path)
     local_overrides = load_components_local_overrides(site_root)
 
@@ -178,7 +184,9 @@ def collect_watch_roots(
         watchable_existing_path(
             resolved_config.catalog_path, resolved_config.catalog_path.parent
         ),
-        watchable_existing_path(site_root / "content", site_root),
+        watchable_existing_path(
+            resolved_config.authored_site_content_path, resolved_repo_root
+        ),
     }
     components_local_path = site_root / "components.local.yaml"
     if components_local_path.is_file():
@@ -230,6 +238,9 @@ def watch_and_build(
     *,
     config_path: str | Path | None = None,
     catalog_path: str | Path | None = None,
+    authored_site_content_path: str | Path | None = None,
+    stage_path: str | Path | None = None,
+    preview_path: str | Path | None = None,
     site_title: str | None = None,
     project_status: ProjectStatus | None = None,
 ) -> None:
@@ -247,25 +258,37 @@ def watch_and_build(
         repo_root,
         config_path=config_path,
         catalog_path=catalog_path,
+        authored_site_content_path=authored_site_content_path,
+        stage_path=stage_path,
+        preview_path=preview_path,
         site_title=site_title,
         project_status=project_status,
     )
     resolved_repo_root = resolved_config.repo_root
+    stage_root = resolved_config.stage_path
     results = build(
         resolved_repo_root,
         include_preview=False,
         config_path=config_path,
         catalog_path=catalog_path,
+        authored_site_content_path=authored_site_content_path,
+        stage_path=stage_path,
+        preview_path=preview_path,
         site_title=site_title,
         project_status=project_status,
     )
-    print(f"Built {len(results)} component(s) into site/.stage")
+    print(
+        f"Built {len(results)} component(s) into {stage_root.relative_to(resolved_repo_root).as_posix()}"
+    )
 
     while True:
         watch_roots = collect_watch_roots(
             resolved_repo_root,
             config_path=config_path,
             catalog_path=catalog_path,
+            authored_site_content_path=authored_site_content_path,
+            stage_path=stage_path,
+            preview_path=preview_path,
         )
         print("Watching staged-source inputs:")
         for root in watch_roots:
@@ -304,10 +327,15 @@ def watch_and_build(
                     include_preview=False,
                     config_path=config_path,
                     catalog_path=catalog_path,
+                    authored_site_content_path=authored_site_content_path,
+                    stage_path=stage_path,
+                    preview_path=preview_path,
                     site_title=site_title,
                     project_status=project_status,
                 )
-                print(f"Built {len(results)} component(s) into site/.stage")
+                print(
+                    f"Built {len(results)} component(s) into {stage_root.relative_to(resolved_repo_root).as_posix()}"
+                )
             except Exception as exc:
                 print(f"Rebuild failed: {exc}", file=sys.stderr)
 
@@ -316,6 +344,9 @@ def watch_and_build(
                     resolved_repo_root,
                     config_path=config_path,
                     catalog_path=catalog_path,
+                    authored_site_content_path=authored_site_content_path,
+                    stage_path=stage_path,
+                    preview_path=preview_path,
                 )
             except Exception as exc:
                 print(f"Re-evaluating watch roots failed: {exc}", file=sys.stderr)

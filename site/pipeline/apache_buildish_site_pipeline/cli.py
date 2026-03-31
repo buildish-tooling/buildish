@@ -36,6 +36,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     common.add_argument(
         "--catalog", help="Component catalog path relative to the repository root"
     )
+    common.add_argument(
+        "--authored-site-content",
+        help="Authored site content path relative to the repository root",
+    )
+    common.add_argument(
+        "--stage-path",
+        help="Stage output path relative to the repository root",
+    )
+    common.add_argument(
+        "--preview-path",
+        help="Preview output path relative to the repository root",
+    )
     common.add_argument("--site-title", help="Override the effective site title")
     common.add_argument(
         "--project-status",
@@ -83,14 +95,23 @@ def main(argv: list[str] | None = None) -> int:
             repo_root=args.repo_root,
             config_path=args.config,
             catalog_path=args.catalog,
+            authored_site_content_path=args.authored_site_content,
+            stage_path=args.stage_path,
+            preview_path=args.preview_path,
             site_title=args.site_title,
             project_status=args.project_status,
         )
-        print(f"Built {len(results)} component(s) into site/.stage and site/.preview")
+        print(f"Built {len(results)} component(s)")
         return 0
     if args.command == "clean":
-        clean(repo_root=args.repo_root)
-        print("Removed site/.stage and site/.preview")
+        clean(
+            repo_root=args.repo_root,
+            config_path=args.config,
+            authored_site_content_path=args.authored_site_content,
+            stage_path=args.stage_path,
+            preview_path=args.preview_path,
+        )
+        print("Removed generated outputs")
         return 0
     if args.command == "watch":
         watch_and_build(
@@ -98,6 +119,9 @@ def main(argv: list[str] | None = None) -> int:
             debounce_ms=args.debounce_ms,
             config_path=args.config,
             catalog_path=args.catalog,
+            authored_site_content_path=args.authored_site_content,
+            stage_path=args.stage_path,
+            preview_path=args.preview_path,
             site_title=args.site_title,
             project_status=args.project_status,
         )
@@ -107,6 +131,9 @@ def main(argv: list[str] | None = None) -> int:
         port=args.port,
         config_path=args.config,
         catalog_path=args.catalog,
+        authored_site_content_path=args.authored_site_content,
+        stage_path=args.stage_path,
+        preview_path=args.preview_path,
         site_title=args.site_title,
         project_status=args.project_status,
     )

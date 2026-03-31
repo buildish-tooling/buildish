@@ -55,8 +55,10 @@ Host-tool workflows expect:
 The Node.js files in `site/` support the Hugo + Docsy render path, while the Python staging package, Python tests, and
 `uv` project files now live under `site/pipeline/`.
 
-`make serve` and `make serve-local` both keep `site/.stage/` up to date while Hugo runs,
-including changes in component docs and assets that live outside `site/`.
+`make serve` and `make serve-local` both keep the configured stage root up to
+date while Hugo runs, including changes in component docs and assets that live
+outside `site/`. In the default Buildish workspace, that stage root is
+`site/.stage/`.
 
 If you want to inspect a static build without running Hugo in watch mode, first run
 `make build` (containerized default) or `make build-local` (native), then serve `site/.public/`
@@ -69,8 +71,10 @@ over a tiny local HTTP server. From `site/`:
 If you prefer Podman, replace `docker` with `podman` in the same command.
 
 The watch loop intentionally watches only staged-source inputs and rebuilds only
-`site/.stage/`. It does **not** regenerate `site/.preview/` on every change. That keeps the
-live Hugo workflow focused on the staged contract and reduces external file churn seen by IDEs.
+the configured stage root. It does **not** regenerate the configured preview
+root on every change. In the default Buildish workspace, those paths are
+`site/.stage/` and `site/.preview/`. That keeps the live Hugo workflow focused
+on the staged contract and reduces external file churn seen by IDEs.
 The full implementation is documented in [`site/site/docs/site-pipeline.md`](site/docs/site-pipeline.md).
 
 ## Less common workflows
@@ -170,7 +174,7 @@ the same staged-site and Hugo build flow with pinned tooling.
 
 ## Produced outputs
 
-Builds write to:
+Builds write to these default output paths:
 
 - `site/.stage/`
 - `site/.preview/`
