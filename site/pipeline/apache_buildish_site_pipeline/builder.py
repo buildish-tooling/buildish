@@ -512,7 +512,7 @@ def stage_component(
     catalog_index: int,
     local_overrides: ComponentsLocalOverrides | None = None,
 ) -> ComponentBuildResult:
-    """Stage one component described in ``site/components.yaml``."""
+    """Stage one component described in the resolved component catalog."""
 
     slug = component.slug
     local_dir = component.local_dir
@@ -685,6 +685,7 @@ def build(
     *,
     include_preview: bool = True,
     config_path: str | Path | None = None,
+    catalog_path: str | Path | None = None,
     site_title: str | None = None,
     project_status: ProjectStatus | None = None,
 ) -> list[ComponentBuildResult]:
@@ -698,6 +699,7 @@ def build(
     resolved_config = resolve_pipeline_config(
         repo_root,
         config_path=config_path,
+        catalog_path=catalog_path,
         site_title=site_title,
         project_status=project_status,
     )
@@ -707,7 +709,7 @@ def build(
         site_title=resolved_config.site_title,
         project_status=resolved_config.project_status,
     )
-    catalog = ComponentsCatalog.from_yaml_path(site_root / "components.yaml")
+    catalog = ComponentsCatalog.from_yaml_path(resolved_config.catalog_path)
     local_overrides = load_components_local_overrides(site_root)
 
     stage_root = site_root / ".stage"
@@ -841,6 +843,7 @@ def serve(
     port: int = 8000,
     *,
     config_path: str | Path | None = None,
+    catalog_path: str | Path | None = None,
     site_title: str | None = None,
     project_status: ProjectStatus | None = None,
 ) -> None:
@@ -850,6 +853,7 @@ def serve(
     build(
         resolved_repo_root,
         config_path=config_path,
+        catalog_path=catalog_path,
         site_title=site_title,
         project_status=project_status,
     )

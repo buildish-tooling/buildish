@@ -157,18 +157,27 @@ def _pipeline_watch_roots(site_root: Path) -> set[Path]:
 
 
 def collect_watch_roots(
-    repo_root: Path | None = None, *, config_path: str | Path | None = None
+    repo_root: Path | None = None,
+    *,
+    config_path: str | Path | None = None,
+    catalog_path: str | Path | None = None,
 ) -> list[Path]:
     """Collect every path that should trigger a staged rebuild in watch mode."""
 
-    resolved_config = resolve_pipeline_config(repo_root, config_path=config_path)
+    resolved_config = resolve_pipeline_config(
+        repo_root,
+        config_path=config_path,
+        catalog_path=catalog_path,
+    )
     resolved_repo_root = resolved_config.repo_root
     site_root = resolved_repo_root / "site"
-    catalog = ComponentsCatalog.from_yaml_path(site_root / "components.yaml")
+    catalog = ComponentsCatalog.from_yaml_path(resolved_config.catalog_path)
     local_overrides = load_components_local_overrides(site_root)
 
     watch_roots: set[Path] = {
-        watchable_existing_path(site_root / "components.yaml", site_root),
+        watchable_existing_path(
+            resolved_config.catalog_path, resolved_config.catalog_path.parent
+        ),
         watchable_existing_path(site_root / "content", site_root),
     }
     components_local_path = site_root / "components.local.yaml"
@@ -220,6 +229,7 @@ def watch_and_build(
     debounce_ms: int = WATCH_DEBOUNCE_MS,
     *,
     config_path: str | Path | None = None,
+    catalog_path: str | Path | None = None,
     site_title: str | None = None,
     project_status: ProjectStatus | None = None,
 ) -> None:
@@ -236,6 +246,7 @@ def watch_and_build(
     resolved_config = resolve_pipeline_config(
         repo_root,
         config_path=config_path,
+        catalog_path=catalog_path,
         site_title=site_title,
         project_status=project_status,
     )
@@ -243,15 +254,18 @@ def watch_and_build(
     results = build(
         resolved_repo_root,
         include_preview=False,
-        config_path=resolved_config.config_path,
-        site_title=resolved_config.site_title,
-        project_status=resolved_config.project_status,
+        config_path=config_path,
+        catalog_path=catalog_path,
+        site_title=site_title,
+        project_status=project_status,
     )
     print(f"Built {len(results)} component(s) into site/.stage")
 
     while True:
         watch_roots = collect_watch_roots(
-            resolved_repo_root, config_path=resolved_config.config_path
+            resolved_repo_root,
+            config_path=config_path,
+            catalog_path=catalog_path,
         )
         print("Watching staged-source inputs:")
         for root in watch_roots:
@@ -288,9 +302,10 @@ def watch_and_build(
                 results = build(
                     resolved_repo_root,
                     include_preview=False,
-                    config_path=resolved_config.config_path,
-                    site_title=resolved_config.site_title,
-                    project_status=resolved_config.project_status,
+                    config_path=config_path,
+                    catalog_path=catalog_path,
+                    site_title=site_title,
+                    project_status=project_status,
                 )
                 print(f"Built {len(results)} component(s) into site/.stage")
             except Exception as exc:
@@ -298,7 +313,9 @@ def watch_and_build(
 
             try:
                 updated_watch_roots = collect_watch_roots(
-                    resolved_repo_root, config_path=resolved_config.config_path
+                    resolved_repo_root,
+                    config_path=config_path,
+                    catalog_path=catalog_path,
                 )
             except Exception as exc:
                 print(f"Re-evaluating watch roots failed: {exc}", file=sys.stderr)

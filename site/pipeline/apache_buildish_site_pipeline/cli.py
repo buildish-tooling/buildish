@@ -33,6 +33,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     common.add_argument(
         "--config", help="Config file path relative to the repository root"
     )
+    common.add_argument(
+        "--catalog", help="Component catalog path relative to the repository root"
+    )
     common.add_argument("--site-title", help="Override the effective site title")
     common.add_argument(
         "--project-status",
@@ -79,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         results = build(
             repo_root=args.repo_root,
             config_path=args.config,
+            catalog_path=args.catalog,
             site_title=args.site_title,
             project_status=args.project_status,
         )
@@ -93,6 +97,7 @@ def main(argv: list[str] | None = None) -> int:
             repo_root=args.repo_root,
             debounce_ms=args.debounce_ms,
             config_path=args.config,
+            catalog_path=args.catalog,
             site_title=args.site_title,
             project_status=args.project_status,
         )
@@ -101,6 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         repo_root=args.repo_root,
         port=args.port,
         config_path=args.config,
+        catalog_path=args.catalog,
         site_title=args.site_title,
         project_status=args.project_status,
     )

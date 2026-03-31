@@ -39,7 +39,7 @@ project-specific integration decisions.
   1. CLI arguments
   2. configuration file
   3. built-in defaults
-- `siteTitle` and `projectStatus` are configuration-driven.
+- `siteTitle`, `projectStatus`, and `workspace.catalogPath` are configuration-driven.
 - `projectStatus` is restricted to:
   - `incubating`
   - `graduated`
@@ -56,8 +56,9 @@ project-specific integration decisions.
 
 - The core contract still uses `unreleased` terminology in models, paths, and
   generated data.
-- The workspace contract is only partially configurable; some paths are still
-  effectively fixed by convention.
+- The workspace contract is only partially configurable; the catalog path is now
+  explicit, but authored content roots and output roots are still mostly fixed
+  by convention.
 - The pipeline still contains Buildish/Hugo-shaped assumptions such as the
   current URL and preview conventions.
 - Buildish still executes the in-repo implementation instead of consuming a
@@ -135,8 +136,8 @@ Remaining work:
 - make the workspace contract fully explicit:
   - document every workspace path the pipeline assumes today
   - add configuration for remaining fixed inputs that should be overrideable
-  - explicitly define the contract for repo root, catalog path, authored
-    content roots, and output roots
+  - explicitly define the remaining contract for repo root, authored content
+    roots, and output roots
 - replace `unreleased` with `development` across the core contract:
   - rename core models and generated data fields
   - change staged paths from `/unreleased/` to `/development/`
@@ -170,8 +171,8 @@ Remaining work:
 
 ## Immediate next steps
 
-1. Define the remaining workspace override contract, especially the catalog
-   path.
+1. Define the remaining workspace override contract for authored content roots
+   and output roots.
 2. Perform the `unreleased` to `development` rename across the core contract.
 3. Reduce the remaining Buildish-shaped integration assumptions in the core.
 

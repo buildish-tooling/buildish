@@ -24,10 +24,16 @@ For the broader long-term design, see [`site-infra.md`](site-infra.md).
 - the main repository is expected at `./buildish`
 - participating components are normally sibling checkouts such as `./buildish-mammoth-cache`
 - missing component repositories are allowed during local builds and CI; they are skipped cleanly
+- the main repository owns the component catalog, defaulting to `site/components.yaml`
 
 ## Main repository catalog
 
-The main repository owns `site/components.yaml`.
+The main repository owns the component catalog. By default it lives at
+`site/components.yaml`.
+
+The effective catalog path may be overridden by `workspace.catalogPath` in
+`site/site-pipeline.yaml` or by the CLI `--catalog` flag. The resolved path must
+stay within the main repository root.
 
 Supported top-level fields:
 
@@ -84,9 +90,9 @@ and navigation fields, but new metadata should prefer the nested structure above
 
 The implementation resolves values in this order:
 
-1. per-component overrides in `site/components.yaml`
+1. per-component overrides in the configured catalog
 2. component metadata in `site/component.yaml`
-3. catalog defaults from `site/components.yaml`
+3. catalog defaults from the configured catalog
 4. built-in defaults in the aggregator
 
 In practice, that means the central catalog controls inventory and local discovery,

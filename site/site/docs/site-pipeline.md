@@ -28,7 +28,7 @@ content, while version-specific docs come from `site/docs/`.
 
 The code under `site/` provides:
 
-- catalog-driven aggregation from `site/components.yaml`,
+- catalog-driven aggregation from a repo-owned catalog, defaulting to `site/components.yaml`,
 - per-component metadata loading from each component's `site/component.yaml`,
 - authored component landing pages and version-independent component pages from each component's `site/pages/`,
 - version-specific docs from each component's `site/docs/`, staged today as unreleased docs,
@@ -46,8 +46,9 @@ The component metadata contract is documented separately in
 The staging CLI now supports both command-line overrides and an optional
 workspace-owned configuration file at `site/site-pipeline.yaml`.
 
-Current site-facing settings include:
+Current supported settings include:
 
+- `workspace.catalogPath` for the component catalog, defaulting to `site/components.yaml`
 - `site.siteTitle`
 - `site.projectStatus` with allowed values `incubating`, `graduated`, or `retired`
 
@@ -56,6 +57,9 @@ Precedence is:
 1. command-line arguments
 2. `site/site-pipeline.yaml`
 3. pipeline defaults
+
+Both `--config` and `--catalog` are resolved relative to the repository root and
+are rejected if they escape that boundary.
 
 ## Architecture overview
 
@@ -196,9 +200,10 @@ updates reliably during development.
 
 ### Inputs
 
-- `site/components.yaml` in the main repository
+- the component catalog in the main repository, defaulting to `site/components.yaml`
 - `site/component.yaml` in each participating component
-- optional `site/site-pipeline.yaml` in the main repository for pipeline/site defaults
+- optional `site/site-pipeline.yaml` in the main repository for pipeline/site defaults,
+  including `workspace.catalogPath`
 - `site/pages/` in each participating component for non-versioned component pages
 - `site/docs/` in each participating component for version-specific docs
 - optional `site/assets/` in each participating component
