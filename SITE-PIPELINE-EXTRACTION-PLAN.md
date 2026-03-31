@@ -30,6 +30,9 @@ project-specific integration decisions.
 ## Dependency additions during extraction
 
 - Phase 1: no new external dependencies added.
+- Phase 2: no new external dependencies added; the extracted
+  `buildish-site-pipeline/` repo currently reuses the same dependency set as the
+  in-repo package.
 
 ### Implemented
 
@@ -154,9 +157,19 @@ Remaining work:
 
 ### Phase 2: create the extracted repository
 
-- define the extracted repository layout
-- move the reusable implementation, tests, and contract docs into that
-  repository
+Status: complete.
+
+Completed:
+
+- defined the extracted repository layout under `buildish-site-pipeline/`
+- copied the reusable implementation, entrypoint, package metadata, and lockfile
+  into that repository
+- copied the reusable contract docs into `buildish-site-pipeline/docs/`
+- added a self-contained `Makefile`, `README.md`, and generic unit tests so the
+  extracted repo can already run `make check`
+
+Follow-up work carried by later phases:
+
 - keep example integration material separate from the core API description
 - keep runtime/container assets optional unless they are truly generic
 
@@ -175,7 +188,6 @@ Remaining work:
 
 ## Immediate next steps
 
-1. Create the extracted `buildish-site-pipeline/` repository skeleton inside
-   this repository and populate it with the reusable implementation, tests, and
-   contract docs.
+1. Switch Buildish to consume `buildish-site-pipeline/` through its consumer
+   project instead of executing the in-repo implementation directly.
 
