@@ -19,7 +19,7 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 
 from .base import YamlModel
 
@@ -101,7 +101,10 @@ class ComponentContentSettings(YamlModel):
 class ComponentVersioningSettings(YamlModel):
     """Typed versioning settings from ``component.yaml``."""
 
-    development_label: str | None = None
+    development_label: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("developmentLabel", "unreleasedLabel"),
+    )
     tag_pattern: re.Pattern[str] | None = None
 
 

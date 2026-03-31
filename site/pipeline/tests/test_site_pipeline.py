@@ -361,6 +361,25 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             self.assertEqual(("stable",), metadata.lifecycle.release_lines[1].aliases)
             self.assertEqual("components", metadata.navigation.section)
 
+    def test_load_component_metadata_accepts_legacy_unreleased_label(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "buildish-mammoth-cache"
+            (repo_root / "site").mkdir(parents=True)
+            self.write_yaml(
+                repo_root / "site" / "component.yaml",
+                {
+                    "schemaVersion": 1,
+                    "versioning": {"unreleasedLabel": "Unreleased"},
+                },
+            )
+
+            metadata, metadata_path = load_component_metadata(
+                repo_root, "site/component.yaml", "mammoth-cache"
+            )
+
+            self.assertEqual(repo_root / "site" / "component.yaml", metadata_path)
+            self.assertEqual("Unreleased", metadata.versioning.development_label)
+
     def test_load_component_metadata_rejects_invalid_tag_pattern(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "buildish-mammoth-cache"
