@@ -124,14 +124,19 @@ menu:
     - identifier: community
       name: Community
       weight: 20
+    - identifier: community-overview
+      name: Overview
+      pageRef: /community
+      parent: community
+      weight: 5
+    - identifier: community-contact
+      name: Contact
+      pageRef: /community/contact
+      parent: community
+      weight: 10
     - identifier: get-involved
       name: Get Involved
       pageRef: /community/get-involved
-      parent: community
-      weight: 10
-    - identifier: community-contact
-      name: Community & Contact
-      pageRef: /community/contact
       parent: community
       weight: 20
     - identifier: contributing-guidelines
@@ -144,14 +149,14 @@ menu:
       pageRef: /community/community-guidelines
       parent: community
       weight: 40
-    - identifier: source-code
-      name: Source Code
-      url: https://github.com/apache/buildish
-      parent: community
-      weight: 50
     - identifier: security-report
       name: Security Report
       pageRef: /community/security-report
+      parent: community
+      weight: 50
+    - identifier: source-code
+      name: Source Code
+      url: https://github.com/apache/buildish
       parent: community
       weight: 60
     - identifier: asf

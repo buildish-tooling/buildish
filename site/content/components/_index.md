@@ -15,6 +15,7 @@
 title: Components
 description: Browsable component sections staged from the local catalog.
 type: docs
+buildish_landing_page: true
 ---
 
 Browse staged components and supporting documentation collected from the local Apache Buildish catalog.

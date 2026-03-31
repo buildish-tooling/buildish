@@ -14,20 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 {{ $componentContext := partial "buildish-component-context.html" . }}
-{{ $hideSidebar := index $componentContext "isComponentLanding" }}
+{{ $isComponentLanding := index $componentContext "isComponentLanding" }}
+{{ $isLandingPage := or $isComponentLanding .Params.buildish_landing_page }}
 <!doctype html>
 <html itemscope itemtype="http://schema.org/WebPage" lang="{{ .Site.Language.Lang }}" class="no-js">
   <head>
     {{ partial "head.html" . }}
   </head>
-  <body class="td-{{ .Kind }}{{ with .Page.Params.body_class }} {{ . }}{{ end }}{{ if $hideSidebar }} buildish-component-landing-page{{ end }}">
+  <body class="td-{{ .Kind }}{{ with .Page.Params.body_class }} {{ . }}{{ end }}{{ if $isLandingPage }} buildish-docs-landing-page{{ end }}{{ if $isComponentLanding }} buildish-component-landing-page{{ end }}">
     <header>
       {{ partial "navbar.html" . }}
     </header>
     <div class="container-fluid td-outer">
       <div class="td-main">
         <div class="row flex-xl-nowrap">
-          {{ if not $hideSidebar }}
+          {{ if not $isLandingPage }}
           <aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">
             {{ partial "sidebar.html" . }}
           </aside>
@@ -37,9 +38,9 @@ limitations under the License.
             {{ partial "toc.html" . }}
             {{ partial "taxonomy_terms_clouds.html" . }}
           </aside>
-          <main class="{{ if $hideSidebar }}col-12 col-xl-10 ps-xl-4{{ else }}col-12 col-md-9 col-xl-8 ps-md-5{{ end }}" role="main">
+          <main class="{{ if $isLandingPage }}col-12 col-xl-10 ps-xl-4{{ else }}col-12 col-md-9 col-xl-8 ps-md-5{{ end }}" role="main">
             {{ partial "version-banner.html" . }}
-            {{ if not .Site.Params.ui.breadcrumb_disable }}{{ partial "breadcrumb.html" . }}{{ end }}
+            {{ if and (not .Site.Params.ui.breadcrumb_disable) (not $isLandingPage) }}{{ partial "breadcrumb.html" . }}{{ end }}
             {{ block "main" . }}{{ end }}
           </main>
         </div>

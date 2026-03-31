@@ -407,18 +407,27 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         home_index = self.read_text(repo_root / "site" / ".public" / "index.html")
         self.assert_contains_all(
             home_index,
+            'class="btn btn-primary me-2 mb-2" href="/community/">Community</a>',
             '/community/contributing-guidelines/',
             '/community/community-guidelines/',
+            'href="/community/">Overview</a>',
+            'href="/community/contact/">Contact</a>',
             'class="navbar-toggler td-navbar__toggle collapsed d-md-none"',
             'data-bs-target="#main_navbar"',
             'navbar-mobile-section-title d-md-none',
         )
-        self.assert_not_contains_any(home_index, "Browse components", 'class="nav-item navbar-group-separator"', 'navbar-item--global')
+        overview_index = home_index.find('href="/community/">Overview</a>')
+        self.assertNotEqual(-1, overview_index)
+        divider_index = home_index.find('class="dropdown-divider"', overview_index)
+        self.assertNotEqual(-1, divider_index)
+        self.assertGreater(home_index.find('href="/community/contact/">Contact</a>'), divider_index)
+        self.assert_not_contains_any(home_index, "Browse components", 'Community &amp; contact', 'class="nav-item navbar-group-separator"', 'navbar-item--global')
 
         docs_index = self.read_text(repo_root / "site" / ".public" / "components" / "mammoth-cache" / "unreleased" / "docs" / "index.html")
         self.assert_contains_all(
             docs_index,
             'class="td-navbar__top"',
+            'class="td-breadcrumbs',
             'class="collapse d-md-flex td-navbar__main',
             'navbar-mobile-section-title d-md-none',
             'class="td-sidebar__controls d-flex d-md-none align-items-center"',
@@ -452,7 +461,27 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             'Latest stable (v1.2.3)',
             'v1 — maintained (latest v1.2.3); aliases: v1',
         )
-        self.assert_not_contains_any(component_index, 'buildish-component-landing__hero', 'buildish-component-landing__actions')
+        self.assert_not_contains_any(component_index, 'buildish-component-landing__hero', 'buildish-component-landing__actions', 'class="td-breadcrumbs', 'aria-label="breadcrumb"')
+
+        components_index = self.read_text(repo_root / "site" / ".public" / "components" / "index.html")
+        self.assert_contains_all(
+            components_index,
+            '<h1>Components</h1>',
+            'class="section-index"',
+            'href="/components/mammoth-cache/"',
+            'href="/components/no-gradle-wrapper-jar/"',
+        )
+        self.assert_not_contains_any(components_index, 'class="td-breadcrumbs', 'aria-label="breadcrumb"', 'col-12 col-md-3 col-xl-2 td-sidebar d-print-none')
+
+        community_index = self.read_text(repo_root / "site" / ".public" / "community" / "index.html")
+        self.assert_contains_all(
+            community_index,
+            '<h1>Community</h1>',
+            'class="section-index"',
+            'href="/community/contact/"',
+            'href="/community/get-involved/"',
+        )
+        self.assert_not_contains_any(community_index, 'class="td-breadcrumbs', 'aria-label="breadcrumb"', 'col-12 col-md-3 col-xl-2 td-sidebar d-print-none')
 
         sidebar = docs_index.split('<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">', 1)[1].split('<aside class="d-none d-xl-block col-xl-2 td-sidebar-toc d-print-none">', 1)[0]
         self.assertNotIn('id="m-componentsmammoth-cache"', sidebar)
@@ -469,6 +498,14 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
 
         community_guidelines = self.read_text(repo_root / "site" / ".public" / "community" / "community-guidelines" / "index.html")
         self.assert_contains_all(community_guidelines, "Community Guidelines", "Apache Way")
+
+        contact_index = self.read_text(repo_root / "site" / ".public" / "community" / "contact" / "index.html")
+        self.assert_contains_all(
+            contact_index,
+            'class="dropdown-item active" href="/community/contact/"',
+            'href="/community/contact/">Contact</a>',
+        )
+        self.assertNotIn('class="dropdown-item active" href="/community/"', contact_index)
 
     def test_make_stage_uses_containerized_path_and_stages_vendor_assets(self) -> None:
         repo_root = self.prepare_fixture_workspace()

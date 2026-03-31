@@ -25,7 +25,7 @@ limitations under the License.
       {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
       {{ .Content }}
       <p class="buildish-home-actions mb-4">
-        <a class="btn btn-primary me-2 mb-2" href="{{ "/community/contact/" | relURL }}">Community &amp; contact</a>
+        <a class="btn btn-primary me-2 mb-2" href="{{ "/community/" | relURL }}">Community</a>
         <a class="btn btn-outline-secondary me-2 mb-2" href="{{ "/about/" | relURL }}">About Buildish</a>
         <a class="btn btn-link mb-2" href="{{ "/community/security-report/" | relURL }}">Security report</a>
       </p>

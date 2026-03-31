@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-title: Community & Contact
+title: Contact
 description: How to reach the Apache Buildish project and where to find its public development channels.
 type: docs
 weight: 10

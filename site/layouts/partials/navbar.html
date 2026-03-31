@@ -105,13 +105,14 @@ limitations under the License.
           <li><a class="dropdown-item{{ if or (eq $p.RelPermalink .RelPermalink) ($p.IsDescendant .) }} active{{ end }}" href="{{ .RelPermalink }}">{{ .Title }}</a></li>
           {{ end }}
           {{ else }}
-          {{ range $menu.Children }}
+          {{ range $child := $menu.Children }}
           {{ $childHref := "" }}
-          {{ with .Page }}{{ $childHref = .RelPermalink }}{{ else }}{{ $childHref = .URL | relLangURL }}{{ end }}
-          {{ $childActive := or ($p.IsMenuCurrent "main" .) ($p.HasMenuCurrent "main" .) }}
-          {{ $parsedChildURL := urls.Parse .URL }}
-          {{ $isExternal := and .URL $parsedChildURL.Host (ne $baseURL.Host $parsedChildURL.Host) }}
-          <li><a class="dropdown-item{{ if $childActive }} active{{ end }}" href="{{ $childHref }}"{{ if $isExternal }} target="_blank" rel="noopener"{{ end }}>{{ .Name }}</a></li>
+          {{ with $child.Page }}{{ $childHref = .RelPermalink }}{{ else }}{{ $childHref = $child.URL | relLangURL }}{{ end }}
+          {{ $childActive := $p.IsMenuCurrent "main" $child }}
+          {{ $parsedChildURL := urls.Parse $child.URL }}
+          {{ $isExternal := and $child.URL $parsedChildURL.Host (ne $baseURL.Host $parsedChildURL.Host) }}
+          <li><a class="dropdown-item{{ if $childActive }} active{{ end }}" href="{{ $childHref }}"{{ if $isExternal }} target="_blank" rel="noopener"{{ end }}>{{ $child.Name }}</a></li>
+          {{ if and (eq $menu.Identifier "community") (eq $child.Identifier "community-overview") }}<li><hr class="dropdown-divider"></li>{{ end }}
           {{ end }}
           {{ end }}
         </ul>

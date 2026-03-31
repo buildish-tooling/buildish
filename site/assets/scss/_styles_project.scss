@@ -101,6 +101,21 @@ html[data-bs-theme='dark'] .td-sidebar .td-sidebar-link:focus {
   background-color: rgba(59, 130, 246, 0.12);
 }
 
+.td-navbar .dropdown-menu .dropdown-item {
+  transition:
+    background-color 0.16s ease,
+    box-shadow 0.16s ease,
+    color 0.16s ease;
+}
+
+html[data-bs-theme='dark'] .td-navbar .dropdown-menu .dropdown-item:hover,
+html[data-bs-theme='dark'] .td-navbar .dropdown-menu .dropdown-item:focus,
+html[data-bs-theme='dark'] .td-navbar .dropdown-menu .dropdown-item:focus-visible {
+  background-color: rgba(59, 130, 246, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.22);
+  color: #f8fafc;
+}
+
 html[data-bs-theme='dark'] .breadcrumb,
 html[data-bs-theme='dark'] .text-body-secondary,
 html[data-bs-theme='dark'] .td-sidebar,

@@ -15,13 +15,24 @@ limitations under the License.
 */}}
 {{ define "main" }}
 {{ $componentContext := partial "buildish-component-context.html" . }}
-{{ if index $componentContext "isComponentLanding" }}
+{{ $isComponentLanding := index $componentContext "isComponentLanding" }}
+{{ $isLandingPage := or $isComponentLanding .Params.buildish_landing_page }}
+{{ if $isComponentLanding }}
 <div class="td-content">
   <h1>{{ .Title }}</h1>
   {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
   {{ .Content }}
   {{ partial "feedback.html" . -}}
   {{ partial "page-meta-lastmod.html" . -}}
+</div>
+{{ else if $isLandingPage }}
+<div class="td-content">
+	<h1>{{ .Title }}</h1>
+  {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
+	{{ .Content }}
+  {{ partial "section-index.html" . -}}
+	{{ partial "feedback.html" . -}}
+	{{ partial "page-meta-lastmod.html" . -}}
 </div>
 {{ else }}
 <div class="td-content">

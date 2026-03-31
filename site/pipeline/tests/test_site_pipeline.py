@@ -593,12 +593,13 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
 
             community_index = (repo_root / "site" / ".stage" / "content" / "community" / "_index.md").read_text(encoding="utf-8")
             self.assertIn("title: Community", community_index)
-            self.assertIn("[Community & Contact](/community/contact/)", community_index)
+            self.assertIn("buildish_landing_page: true", community_index)
+            self.assertIn("[Contact](/community/contact/)", community_index)
             self.assertIn("[Contributing Guidelines](/community/contributing-guidelines/)", community_index)
             self.assertIn("[Community Guidelines](/community/community-guidelines/)", community_index)
 
             contact_page = (repo_root / "site" / ".stage" / "content" / "community" / "contact.md").read_text(encoding="utf-8")
-            self.assertIn("title: Community & Contact", contact_page)
+            self.assertIn("title: Contact", contact_page)
             self.assertIn("https://github.com/apache/buildish", contact_page)
             self.assertIn("dev@buildish.apache.org", contact_page)
 
