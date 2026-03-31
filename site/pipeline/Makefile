@@ -14,17 +14,16 @@
 
 SITE_PIPELINE ?= site-pipeline
 SITE_PIPELINE_ARGS ?=
-
-PIPELINE_LOCAL_RUNTIME = $(UV_RUN) --with-editable ./pipeline $(SITE_PIPELINE) $(SITE_PIPELINE_ARGS)
+PIPELINE_REPO_ROOT ?= ..
 
 .PHONY: pipeline-stage-local pipeline-watch-local pipeline-clean-local
 
 pipeline-stage-local: sanity-check ## Refresh staged site inputs with host tools.
-	$(PIPELINE_LOCAL_RUNTIME) build
+	$(UV_RUN) $(SITE_PIPELINE) build --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS)
 
 pipeline-watch-local: sanity-check ## Watch sources and refresh staged site inputs with host tools.
-	$(PIPELINE_LOCAL_RUNTIME) watch
+	$(UV_RUN) $(SITE_PIPELINE) watch --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS)
 
 pipeline-clean-local: sanity-check ## Remove staged site-pipeline output with host tools.
-	$(PIPELINE_LOCAL_RUNTIME) clean
+	$(UV_RUN) $(SITE_PIPELINE) clean --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS)
 

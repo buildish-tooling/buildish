@@ -21,6 +21,7 @@ import unittest
 from pathlib import Path
 
 import apache_buildish_site_pipeline as site_pipeline
+from apache_buildish_site_pipeline.filesystem import repo_root_from
 from apache_buildish_site_pipeline.filesystem import load_component_metadata
 
 from tests.test_support import dump_yaml, text_block, write_files
@@ -153,4 +154,11 @@ class ExtractedSitePipelineTest(unittest.TestCase):
 
             watch_roots = set(site_pipeline.collect_watch_roots(repo_root))
             self.assertIn((repo_root / "buildish-site-pipeline").resolve(), watch_roots)
+
+    def test_repo_root_from_accepts_string_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "consumer"
+            repo_root.mkdir()
+
+            self.assertEqual(repo_root.resolve(), repo_root_from(str(repo_root)))
 

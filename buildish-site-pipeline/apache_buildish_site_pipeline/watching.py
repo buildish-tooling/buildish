@@ -198,7 +198,7 @@ def _pipeline_watch_roots(site_root: Path, repo_root: Path) -> set[Path]:
 
 
 def collect_watch_roots(
-    repo_root: Path | None = None,
+    repo_root: str | Path | None = None,
     *,
     config_path: str | Path | None = None,
     catalog_path: str | Path | None = None,
@@ -274,7 +274,7 @@ def _format_watch_path(path: Path, repo_root: Path) -> str:
 
 
 def watch_and_build(
-    repo_root: Path | None = None,
+    repo_root: str | Path | None = None,
     debounce_ms: int = WATCH_DEBOUNCE_MS,
     *,
     config_path: str | Path | None = None,

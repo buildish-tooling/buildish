@@ -84,7 +84,7 @@ class ResolvedPipelineConfig(ResolvedWorkspacePaths):
 
 
 def resolve_workspace_paths(
-    repo_root: Path | None = None,
+    repo_root: str | Path | None = None,
     *,
     config_path: str | Path | None = None,
     catalog_path: str | Path | None = None,
@@ -110,7 +110,7 @@ def resolve_workspace_paths(
 
 
 def resolve_pipeline_config(
-    repo_root: Path | None = None,
+    repo_root: str | Path | None = None,
     *,
     config_path: str | Path | None = None,
     catalog_path: str | Path | None = None,

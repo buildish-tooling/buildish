@@ -12,20 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 [project]
-name = "apache-buildish-site-pipeline"
+name = "apache-buildish-site-consumer"
 version = "0.1.0"
-description = "Reusable multi-repository site staging pipeline"
+description = "Buildish consumer environment for the extracted site pipeline"
 requires-python = ">=3.13"
 dependencies = [
-    "mistletoe>=1,<2",
-    "pydantic>=2.11,<3",
-    "python-frontmatter>=1,<2",
-    "pyyaml>=6.0.3",
-    "watchfiles>=1.1.1",
+    "apache-buildish-site-pipeline",
 ]
-
-[project.scripts]
-site-pipeline = "apache_buildish_site_pipeline.cli:main"
 
 [dependency-groups]
 dev = [
@@ -35,20 +28,18 @@ dev = [
 
 [tool.ruff]
 target-version = "py313"
-extend-exclude = ["tests"]
 
 [tool.ruff.lint]
 select = ["F", "B", "UP", "S"]
 
-[tool.ruff.lint.per-file-ignores]
-"apache_buildish_site_pipeline/models/__init__.py" = ["F401"]
-
 [tool.mypy]
 python_version = "3.13"
-files = ["main.py", "apache_buildish_site_pipeline"]
-explicit_package_bases = true
+files = ["main.py"]
 disable_error_code = ["import-untyped"]
 warn_redundant_casts = true
 warn_unreachable = true
 warn_unused_ignores = true
 no_implicit_optional = true
+
+[tool.uv.sources]
+apache-buildish-site-pipeline = { path = "../../buildish-site-pipeline", editable = true }

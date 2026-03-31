@@ -693,7 +693,7 @@ def stage_component(
 
 
 def build(
-    repo_root: Path | None = None,
+    repo_root: str | Path | None = None,
     *,
     include_preview: bool = True,
     config_path: str | Path | None = None,
@@ -862,7 +862,7 @@ def build(
 
 
 def clean(
-    repo_root: Path | None = None,
+    repo_root: str | Path | None = None,
     *,
     config_path: str | Path | None = None,
     authored_site_content_path: str | Path | None = None,
@@ -885,7 +885,7 @@ def clean(
 
 
 def serve(
-    repo_root: Path | None = None,
+    repo_root: str | Path | None = None,
     port: int = 8000,
     *,
     config_path: str | Path | None = None,

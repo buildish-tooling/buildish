@@ -242,6 +242,7 @@ endef
 	container-image-local-registry-test \
 	container-integration-test \
 	pipeline-format \
+	pipeline-core-check \
 	pipeline-lint \
 	pipeline-typecheck \
 	container-serve \
@@ -323,6 +324,9 @@ build: container-build ## Stage and render the site in the build container.
 
 build-local: stage-local render-local ## Stage and render the site with host tools.
 
+pipeline-core-check: sanity-check ## Run the extracted pipeline repository checks.
+	$(MAKE) --no-print-directory -C ../buildish-site-pipeline check
+
 container-engine-check: ## Verify Podman or Docker is available for containerized site targets.
 	@engine='$(strip $(CONTAINER_ENGINE))'; \
 	if [ -z "$$engine" ]; then \
@@ -391,7 +395,7 @@ serve-local: sanity-check hugo-check docsy-check ## Serve the site with live res
 	@watch_pid=''; \
 	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
-	$(PIPELINE_LOCAL_RUNTIME) watch & \
+	$(UV_RUN) $(SITE_PIPELINE) watch --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS) & \
 	watch_pid=$$!; \
 	while [ ! -f .stage/manifest.yaml ]; do \
 		if ! kill -0 "$$watch_pid" 2>/dev/null; then \
@@ -431,6 +435,7 @@ integration-test: sanity-check ## Run integration tests.
 
 check: ## Run lint, type checks, tests, and build-local.
 	$(MAKE) clean
+	$(MAKE) pipeline-core-check
 	$(MAKE) pipeline-lint
 	$(MAKE) pipeline-typecheck
 	$(MAKE) test

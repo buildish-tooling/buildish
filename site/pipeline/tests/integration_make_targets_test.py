@@ -20,7 +20,6 @@ import os
 import shutil
 import signal
 import subprocess
-import sys
 import time
 import unittest
 from pathlib import Path
@@ -28,9 +27,7 @@ from typing import TextIO
 
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from pipeline.tests.test_support import (
+from test_support import (
     SOURCE_REPO_ROOT,
     TestCaseHelpers,
     seed_make_fixture_main_repo,

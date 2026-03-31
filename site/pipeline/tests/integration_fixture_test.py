@@ -18,16 +18,14 @@ from __future__ import annotations
 
 import os
 import shutil
-import sys
 import unittest
 from pathlib import Path
 
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import apache_buildish_site_pipeline as site_pipeline
 
-from pipeline import apache_buildish_site_pipeline as site_pipeline
-from pipeline.tests.test_support import (
+from test_support import (
     TestCaseHelpers,
     seed_api_fixture_main_repo,
     seed_mammoth_fixture,

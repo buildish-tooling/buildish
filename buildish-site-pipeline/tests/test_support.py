@@ -16,9 +16,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from textwrap import dedent
-from typing import Mapping
 
 import yaml
 

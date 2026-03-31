@@ -17,7 +17,7 @@ UV_RUN = uv run --frozen
 .PHONY: lint typecheck test check
 
 lint:
-	$(UV_RUN) ruff check .
+	$(UV_RUN) ruff check main.py apache_buildish_site_pipeline tests
 
 typecheck:
 	$(UV_RUN) mypy

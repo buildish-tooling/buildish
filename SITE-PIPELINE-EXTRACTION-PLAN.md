@@ -33,6 +33,9 @@ project-specific integration decisions.
 - Phase 2: no new external dependencies added; the extracted
   `buildish-site-pipeline/` repo currently reuses the same dependency set as the
   in-repo package.
+- Phase 3: no new external dependencies added; `site/pipeline` now depends on
+  `buildish-site-pipeline/` as a local editable `uv` source instead of carrying
+  the implementation package itself.
 
 ### Implemented
 
@@ -75,8 +78,9 @@ project-specific integration decisions.
 - The current staged contract is still shaped around the Buildish Hugo/Docsy
   integration, even though the duplicated URL/preview conventions were removed
   from the core.
-- Buildish still executes the in-repo implementation instead of consuming a
-  released package.
+- Buildish now consumes the extracted repository through its consumer project,
+  but the temporary bootstrap still uses a local editable path source until the
+  extracted repository is split out and versioned independently.
 
 ## Target split
 
@@ -175,10 +179,21 @@ Follow-up work carried by later phases:
 
 ### Phase 3: convert Buildish into consumer #1
 
-- stop executing the in-repo implementation directly
-- make `site/pipeline/Makefile` invoke the installed `site-pipeline` CLI
-- pin a released version of the extracted pipeline in Buildish
-- keep end-to-end tests that validate Buildish as a normal consumer
+Status: complete.
+
+Completed:
+
+- stopped executing the in-repo implementation directly from `site/pipeline`
+- converted `site/pipeline` into a consumer project that depends on
+  `buildish-site-pipeline/` through `uv`
+- removed the old in-repo implementation copy from the Buildish consumer
+  project
+- updated Buildish Make targets to invoke the installed `site-pipeline` CLI
+  with an explicit `--repo-root`
+- kept end-to-end tests that validate Buildish as a normal consumer and updated
+  them to exercise the extracted repository path
+- updated top-level `site/Makefile` so `make check` also validates the
+  extracted repo
 
 ### Phase 4: broaden adoption and harden the public contract
 
@@ -188,6 +203,7 @@ Follow-up work carried by later phases:
 
 ## Immediate next steps
 
-1. Switch Buildish to consume `buildish-site-pipeline/` through its consumer
-   project instead of executing the in-repo implementation directly.
+1. Rewrite the extracted repository docs and examples so they describe the
+   generic cross-repository contract instead of Buildish-internal paths and
+   workflow assumptions.
 

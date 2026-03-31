@@ -44,11 +44,11 @@ def resolve_vendor_asset_source(site_root: Path, source_relative: Path) -> Path:
     return site_root / source_relative
 
 
-def repo_root_from(start: Path | None = None) -> Path:
+def repo_root_from(start: str | Path | None = None) -> Path:
     """Resolve the repository root for the current pipeline invocation."""
 
     if start is not None:
-        return start.resolve()
+        return Path(start).resolve()
     return Path(__file__).resolve().parents[3]
 
 

@@ -17,23 +17,20 @@
 from __future__ import annotations
 
 import shutil
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from pipeline import apache_buildish_site_pipeline as site_pipeline
-from pipeline.apache_buildish_site_pipeline.config import resolve_pipeline_config
-from pipeline.apache_buildish_site_pipeline.filesystem import load_component_metadata
-from pipeline.apache_buildish_site_pipeline.markdown import (
+import apache_buildish_site_pipeline as site_pipeline
+from apache_buildish_site_pipeline.config import resolve_pipeline_config
+from apache_buildish_site_pipeline.filesystem import load_component_metadata
+from apache_buildish_site_pipeline.markdown import (
     update_markdown_front_matter,
     with_yaml_front_matter,
 )
-from pipeline.apache_buildish_site_pipeline.models import (
+from apache_buildish_site_pipeline.models import (
     AliasesDataDocument,
     ComponentsLocalOverrides,
     DocsFrontMatter,
@@ -52,7 +49,7 @@ from pipeline.apache_buildish_site_pipeline.models import (
     StagedReleaseLine,
     VersionDescriptor,
 )
-from pipeline.tests.test_support import (
+from test_support import (
     TestCaseHelpers,
     text_block,
     write_files,

@@ -17,13 +17,15 @@
 from __future__ import annotations
 
 import shutil
+from collections.abc import Mapping
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Mapping
+from typing import Any
 
 import yaml
 
 SOURCE_REPO_ROOT = Path(__file__).resolve().parents[3]
+EXTRACTED_PIPELINE_ROOT = SOURCE_REPO_ROOT / "buildish-site-pipeline"
 PIPELINE_FIXTURE_IGNORE = shutil.ignore_patterns(
     ".venv",
     "__pycache__",
@@ -142,6 +144,12 @@ def seed_make_fixture_main_repo(repo_root: Path) -> None:
     shutil.copytree(
         SOURCE_REPO_ROOT / "site" / "pipeline",
         site_root / "pipeline",
+        dirs_exist_ok=True,
+        ignore=PIPELINE_FIXTURE_IGNORE,
+    )
+    shutil.copytree(
+        EXTRACTED_PIPELINE_ROOT,
+        repo_root / "buildish-site-pipeline",
         dirs_exist_ok=True,
         ignore=PIPELINE_FIXTURE_IGNORE,
     )
