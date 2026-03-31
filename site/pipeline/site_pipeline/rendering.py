@@ -132,12 +132,13 @@ def build_unreleased_index_markdown(result: ComponentBuildResult) -> str:
 def _html_page(title: str, body: str) -> str:
     """Wrap a preview-page body in a tiny standalone HTML document."""
 
-    return """<!doctype html>
+    escaped_title = html.escape(title)
+    return f"""<!doctype html>
 <html lang=\"en\">
 <head>
   <meta charset=\"utf-8\">
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-  <title>{title}</title>
+  <title>{escaped_title}</title>
   <style>
     body {{ font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 58rem; padding: 0 1rem; line-height: 1.5; }}
     code {{ background: #f3f4f6; padding: 0.1rem 0.3rem; border-radius: 0.2rem; }}
@@ -149,7 +150,7 @@ def _html_page(title: str, body: str) -> str:
 {body}
 </body>
 </html>
-""".format(title=html.escape(title), body=body)
+"""
 
 
 def build_preview_index(results: list[ComponentBuildResult]) -> str:

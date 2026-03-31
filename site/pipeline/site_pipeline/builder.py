@@ -23,6 +23,7 @@ import re
 import shutil
 import socketserver
 from pathlib import Path
+from typing import Literal
 
 from .common import first_non_none
 from .constants import DEFAULT_TAG_PATTERN
@@ -56,6 +57,7 @@ from .models import (
     ComponentAliasesEntry,
     ComponentBuildResult,
     ComponentCatalogDefaults,
+    ComponentsLocalOverrides,
     ComponentLifecycleDocument,
     ComponentLifecycleDocumentData,
     ComponentMetadata,
@@ -255,8 +257,8 @@ def _buildish_component_payload(result: ComponentBuildResult) -> BuildishCompone
 def _buildish_component_page_payload(
     result: ComponentBuildResult,
     *,
-    kind: str,
-    section: str,
+    kind: Literal["component-home", "component-page", "unreleased-home", "docs-home", "docs-page"],
+    section: Literal["component", "unreleased", "docs"],
     page_path: str | None,
 ) -> BuildishComponentPagePayload:
     """Build per-page context for staged component pages."""
@@ -591,7 +593,7 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
         stage_root / "manifest.yaml",
         ManifestDocument(
             schema_version=1,
-            generated_at=dt.datetime.now(dt.timezone.utc).isoformat(),
+            generated_at=dt.datetime.now(dt.UTC).isoformat(),
             repo_root=str(resolved_repo_root),
             components=tuple(
                 ManifestComponentEntry(
@@ -648,7 +650,7 @@ def build(repo_root: Path | None = None, *, include_preview: bool = True) -> lis
                     release_lines=result.release_lines,
                     unreleased=LifecycleUnreleased(
                         label=result.unreleased_label,
-                        path=result.raw_unreleased_index_path,
+                        path=result.raw_unreleased_index_path or public_unreleased_path(result.slug),
                         docs_path=result.raw_docs_root_path,
                     ),
                 )

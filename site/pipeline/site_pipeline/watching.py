@@ -44,6 +44,7 @@ from .filesystem import (
     watchable_existing_path,
 )
 from .models import CatalogComponent, ComponentCatalogDefaults, ComponentMetadata, ComponentsCatalog
+from .models import ComponentsLocalOverrides
 
 
 def _configured_content_root(

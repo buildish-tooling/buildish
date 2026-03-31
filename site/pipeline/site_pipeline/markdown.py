@@ -171,7 +171,7 @@ def extract_title_and_summary(markdown_text: str, fallback_title: str) -> tuple[
     """Extract a page title and short summary from Markdown content."""
 
     _, analyzable_body = _split_leading_html_comments(markdown_text)
-    analysis = _analyze_markdown(list(Document(analyzable_body).children), fallback_title)
+    analysis = _analyze_markdown(list(Document(analyzable_body).children or ()), fallback_title)
     return analysis.title, analysis.summary
 
 
@@ -217,7 +217,7 @@ def normalize_markdown_doc(markdown_text: str, fallback_title: str, **fields: An
     if isinstance(existing_title, str) and existing_title.strip():
         effective_fallback_title = existing_title.strip()
 
-    blocks = list(Document(analyzable_body).children)
+    blocks = list(Document(analyzable_body).children or ())
     analysis = _analyze_markdown(blocks, effective_fallback_title)
     title = analysis.title
     summary = analysis.summary

@@ -16,13 +16,7 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
-
-
-ValueT = TypeVar("ValueT")
-
-
-def first_non_none(*values: ValueT | None) -> ValueT | None:
+def first_non_none[ValueT](*values: ValueT | None) -> ValueT | None:
     """Return the first value that is not ``None``."""
 
     for value in values:
