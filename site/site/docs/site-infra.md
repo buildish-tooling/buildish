@@ -198,7 +198,7 @@ Example draft:
 schemaVersion: 1
 component:
   slug: mammoth-cache
-  displayName: Mammoth Cache for Gradle and Maven
+  displayName: Mammoth Cache for Gradle® and Apache Maven™
   repository: https://github.com/apache/buildish-mammoth-cache
   defaultBranch: main
 content:
@@ -253,7 +253,7 @@ With defaults in place, many components should only need something like:
 schemaVersion: 1
 component:
   slug: mammoth-cache
-  displayName: Mammoth Cache for Gradle and Maven
+  displayName: Mammoth Cache for Gradle® and Apache Maven™
 ```
 
 ### Proposed supported content profile
@@ -827,7 +827,7 @@ view for that component, for example:
 schemaVersion: 1
 component:
   slug: mammoth-cache
-  displayName: Mammoth Cache for Gradle and Maven
+  displayName: Mammoth Cache for Gradle® and Apache Maven™
 lifecycle:
   unreleased:
     label: Unreleased

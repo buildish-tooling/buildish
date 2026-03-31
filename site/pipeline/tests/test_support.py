@@ -160,14 +160,14 @@ def seed_mammoth_fixture(
 ) -> None:
     """Seed the shared Mammoth Cache component fixture."""
 
-    write_text(repo_root / "README.md", "# Mammoth Cache for Gradle and Maven\n\nFixture component summary.\n")
+    write_text(repo_root / "README.md", "# Mammoth Cache for Gradle® and Apache Maven™\n\nFixture component summary.\n")
     dump_yaml(
         repo_root / "site" / "component.yaml",
         {
             "schemaVersion": 1,
             "component": {
                 "slug": "mammoth-cache",
-                "displayName": "Fixture Mammoth Cache for Gradle and Maven",
+                "displayName": "Fixture Mammoth Cache for Gradle® and Apache Maven™",
                 "repository": "https://github.com/apache/buildish-mammoth-cache",
                 "defaultBranch": "main",
             },

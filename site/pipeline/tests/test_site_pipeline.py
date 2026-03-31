@@ -112,7 +112,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             "Body\n",
             buildishComponent=BuildishComponentPayload(
                 slug="mammoth-cache",
-                display_name="Mammoth Cache for Gradle and Maven",
+                display_name="Mammoth Cache for Gradle® and Apache Maven™",
                 available=True,
                 local_dir="buildish-mammoth-cache",
                 paths=BuildishComponentPaths(component="/components/mammoth-cache/", unreleased="/components/mammoth-cache/unreleased/"),
@@ -134,7 +134,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
         )
 
         front_matter = yaml.safe_load(markdown.split("---", 2)[1])
-        self.assertEqual("Mammoth Cache for Gradle and Maven", front_matter["buildishComponent"]["displayName"])
+        self.assertEqual("Mammoth Cache for Gradle® and Apache Maven™", front_matter["buildishComponent"]["displayName"])
         self.assertEqual("Preview", front_matter["buildishComponent"]["unreleased"]["label"])
         self.assertNotIn("latestStable", front_matter["buildishComponent"])
         self.assertEqual("docs-home", front_matter["buildishComponentPage"]["kind"])
@@ -224,7 +224,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                     "schemaVersion": 1,
                     "component": {
                         "slug": "mammoth-cache",
-                        "displayName": "Mammoth Cache for Gradle and Maven",
+                        "displayName": "Mammoth Cache for Gradle® and Apache Maven™",
                         "repository": "https://github.com/apache/buildish-mammoth-cache",
                     },
                     "content": {"pagesRoot": "site/pages", "docsRoot": "site/docs", "assetsRoot": None},
@@ -244,7 +244,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
 
             self.assertEqual(repo_root / "site" / "component.yaml", metadata_path)
             self.assertEqual(1, metadata.schema_version)
-            self.assertEqual("Mammoth Cache for Gradle and Maven", metadata.component.display_name)
+            self.assertEqual("Mammoth Cache for Gradle® and Apache Maven™", metadata.component.display_name)
             self.assertEqual("site/pages", metadata.content.pages_root)
             self.assertEqual("site/docs", metadata.content.docs_root)
             self.assertIsNone(metadata.content.assets_root)
@@ -310,7 +310,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 {
                     "site/pages/_index.md": text_block(
                         """
-                        # Mammoth Cache for Gradle and Maven
+                        # Mammoth Cache for Gradle® and Apache Maven™
 
                         Component landing page.
                         """
@@ -353,7 +353,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 "components": [
                     {
                         "slug": "mammoth-cache",
-                        "displayName": "Mammoth Cache for Gradle and Maven",
+                        "displayName": "Mammoth Cache for Gradle® and Apache Maven™",
                         "localDir": "buildish-mammoth-cache",
                     },
                     {
@@ -403,7 +403,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 mammoth / "README.md",
                 text_block(
                     """
-                    # Apache Buildish Mammoth Cache for Gradle and Maven
+                    # Apache Buildish Mammoth Cache for Gradle® and Apache Maven™
 
                     Secure Gradle wrapper provisioning.
                     """
@@ -415,7 +415,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                     "schemaVersion": 1,
                     "component": {
                         "slug": "mammoth-cache",
-                        "displayName": "Apache Buildish Mammoth Cache for Gradle and Maven",
+                        "displayName": "Apache Buildish Mammoth Cache for Gradle® and Apache Maven™",
                         "repository": "https://github.com/apache/buildish-mammoth-cache",
                         "defaultBranch": "trunk",
                     },
@@ -436,7 +436,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 {
                     "site/pages/_index.md": text_block(
                         """
-                        # Mammoth Cache for Gradle and Maven
+                        # Mammoth Cache for Gradle® and Apache Maven™
 
                         Secure Gradle wrapper provisioning.
 
@@ -528,6 +528,10 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             root_front_matter = yaml.safe_load(staged_root_index.split("---", 2)[1])
             self.assertEqual("Apache Buildish (Incubating)", root_front_matter["title"])
             self.assertEqual("Apache Buildish develops build automation, CI integrations, and supporting tooling.", root_front_matter["description"])
+            self.assertEqual(
+                "Apache® is a registered trademark of The Apache Software Foundation. Apache Maven™ and Maven™ are trademarks of The Apache Software Foundation. Gradle® is a registered trademark of Gradle, Inc.",
+                root_front_matter["trademark_attribution"],
+            )
             self.assertEqual(3, len(root_front_matter["incubator_disclaimer_paragraphs"]))
             self.assert_contains_all(
                 root_front_matter["incubator_disclaimer_paragraphs"][0],
@@ -541,7 +545,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             component_index = (repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "_index.md").read_text(encoding="utf-8")
             self.assert_contains_all(
                 component_index,
-                "title: Mammoth Cache for Gradle and Maven",
+                "title: Mammoth Cache for Gradle® and Apache Maven™",
                 "weight: 10",
                 "description: Secure Gradle wrapper provisioning.",
                 "Use the unreleased docs to evaluate planned changes before they ship.",
@@ -550,7 +554,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 component_index,
                 "linkTitle:",
                 "\nSecure Gradle wrapper provisioning.\n",
-                "\n# Mammoth Cache for Gradle and Maven\n",
+                "\n# Mammoth Cache for Gradle® and Apache Maven™\n",
             )
             self.assert_contains_all(
                 (repo_root / "site" / ".stage" / "content" / "components" / "site" / "_index.md").read_text(encoding="utf-8"),
@@ -558,7 +562,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             )
             component_front_matter = yaml.safe_load(component_index.split("---", 2)[1])
             self.assertEqual("mammoth-cache", component_front_matter["buildishComponent"]["slug"])
-            self.assertEqual("Mammoth Cache for Gradle and Maven", component_front_matter["buildishComponent"]["displayName"])
+            self.assertEqual("Mammoth Cache for Gradle® and Apache Maven™", component_front_matter["buildishComponent"]["displayName"])
             self.assertEqual("/components/mammoth-cache/unreleased/docs/", component_front_matter["buildishComponent"]["paths"]["docs"])
             self.assertEqual("component-home", component_front_matter["buildishComponentPage"]["kind"])
 
@@ -568,7 +572,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             self.assertEqual("/components/mammoth-cache/faq/", mammoth_component_front_matter["buildishComponentPage"]["path"])
 
             mammoth_unreleased_index = (repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "unreleased" / "_index.md").read_text(encoding="utf-8")
-            self.assert_contains_all(mammoth_unreleased_index, "title: Mammoth Cache for Gradle and Maven Preview", "linkTitle: Preview")
+            self.assert_contains_all(mammoth_unreleased_index, "title: Mammoth Cache for Gradle® and Apache Maven™ Preview", "linkTitle: Preview")
             self.assert_not_contains_any(mammoth_unreleased_index, "\nSecure Gradle wrapper provisioning.\n")
             mammoth_unreleased_front_matter = yaml.safe_load(mammoth_unreleased_index.split("---", 2)[1])
             self.assertEqual("unreleased-home", mammoth_unreleased_front_matter["buildishComponentPage"]["kind"])
@@ -621,7 +625,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
 
             preview_index = (repo_root / "site" / ".preview" / "index.html").read_text(encoding="utf-8")
             self.assertIn("Apache Buildish (Incubating)", preview_index)
-            self.assertIn("Mammoth Cache for Gradle and Maven", preview_index)
+            self.assertIn("Mammoth Cache for Gradle® and Apache Maven™", preview_index)
             self.assertIn("Site", preview_index)
 
             version_document = ComponentVersionDocument.from_yaml_path(
@@ -1070,7 +1074,7 @@ Additional details.
                     ),
                 },
             )
-            self.write_yaml(mammoth / "site" / "component.yaml", {"schemaVersion": 1, "component": {"displayName": "Mammoth Cache for Gradle and Maven"}})
+            self.write_yaml(mammoth / "site" / "component.yaml", {"schemaVersion": 1, "component": {"displayName": "Mammoth Cache for Gradle® and Apache Maven™"}})
 
             preview_sentinel = repo_root / "site" / ".preview" / "keep.txt"
             preview_sentinel.parent.mkdir(parents=True, exist_ok=True)
@@ -1181,7 +1185,7 @@ Additional details.
                 {
                     "site/pages/_index.md": text_block(
                         """
-                        # Mammoth Cache for Gradle and Maven
+                        # Mammoth Cache for Gradle® and Apache Maven™
 
                         Landing page.
                         """

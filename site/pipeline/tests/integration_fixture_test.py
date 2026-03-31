@@ -51,7 +51,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
             repo_root,
             landing_page=text_block(
                 """
-                # Mammoth Cache for Gradle and Maven
+                # Mammoth Cache for Gradle® and Apache Maven™
 
                 Fixture component landing page.
                 """
@@ -116,7 +116,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
             )
 
             components_data = self.load_yaml(repo_root / "site" / ".stage" / "data" / "components.yaml")
-            self.assertEqual("Fixture Mammoth Cache for Gradle and Maven", components_data["components"]["mammoth-cache"]["displayName"])
+            self.assertEqual("Fixture Mammoth Cache for Gradle® and Apache Maven™", components_data["components"]["mammoth-cache"]["displayName"])
             self.assertEqual("buildish-no-gradle-wrapper-jar", components_data["components"]["no-gradle-wrapper-jar"]["localDir"])
             self.assertEqual("Site", components_data["components"]["site"]["displayName"])
             self.assertEqual("/components/site/", components_data["components"]["site"]["componentPath"])
@@ -136,7 +136,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
             self.assertEqual("unreleased-home", site_unreleased_front_matter["buildishComponentPage"]["kind"])
 
             preview_index = self.read_text(repo_root / "site" / ".preview" / "index.html")
-            self.assert_contains_all(preview_index, "Fixture Mammoth Cache for Gradle and Maven", "Fixture no-gradle-wrapper-jar", "Site")
+            self.assert_contains_all(preview_index, "Fixture Mammoth Cache for Gradle® and Apache Maven™", "Fixture no-gradle-wrapper-jar", "Site")
         finally:
             shutil.rmtree(FIXTURE_BUILD_ROOT, ignore_errors=True)
 

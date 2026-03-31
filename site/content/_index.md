@@ -14,6 +14,7 @@
 # limitations under the License.
 title: Apache Buildish (Incubating)
 description: Apache Buildish develops build automation, CI integrations, and supporting tooling.
+trademark_attribution: Apache® is a registered trademark of The Apache Software Foundation. Apache Maven™ and Maven™ are trademarks of The Apache Software Foundation. Gradle® is a registered trademark of Gradle, Inc.
 ---
 
 Apache Buildish is an incubating Apache umbrella project focused on practical tooling for build engineering and CI-aware developer workflows.

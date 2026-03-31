@@ -73,7 +73,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             repo_root,
             landing_page=text_block(
                 """
-                # Mammoth Cache for Gradle and Maven
+                # Mammoth Cache for Gradle® and Apache Maven™
 
                 Fixture component landing page.
 
@@ -424,12 +424,21 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             'class="navbar-toggler td-navbar__toggle collapsed d-md-none"',
             'data-bs-target="#main_navbar"',
             'navbar-mobile-section-title d-md-none',
+            'Gradle® is a registered trademark of Gradle, Inc.',
         )
         overview_index = home_index.find('href="/community/">Overview</a>')
         self.assertNotEqual(-1, overview_index)
         divider_index = home_index.find('class="dropdown-divider"', overview_index)
         self.assertNotEqual(-1, divider_index)
         self.assertGreater(home_index.find('href="/community/contact/">Contact</a>'), divider_index)
+        incubator_index = home_index.find('>Incubation status</h2>')
+        self.assertNotEqual(-1, incubator_index)
+        trademark_index = home_index.find('Apache® is a registered trademark of The Apache Software Foundation.')
+        self.assertNotEqual(-1, trademark_index)
+        self.assertGreater(trademark_index, incubator_index)
+        trademark_card_index = home_index.find('buildish-home-legal-card')
+        self.assertNotEqual(-1, trademark_card_index)
+        self.assertGreater(trademark_card_index, incubator_index)
         self.assert_not_contains_any(home_index, "Browse components", 'Community &amp; contact', 'class="nav-item navbar-group-separator"', 'navbar-item--global')
 
         docs_index = self.read_text(repo_root / "site" / ".public" / "components" / "mammoth-cache" / "unreleased" / "docs" / "index.html")
@@ -446,7 +455,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             'class="navbar-brand__home" href="/"',
             'class="navbar-brand__component" href="/components/mammoth-cache/"',
             'class="navbar-brand__divider"',
-            '<span class="navbar-brand__context">Fixture Mammoth Cache for Gradle and Maven</span>',
+            '<span class="navbar-brand__context">Fixture Mammoth Cache for Gradle® and Apache Maven™</span>',
             'href="https://github.com/apache/buildish-mammoth-cache"',
             '>Source</span>',
             'navbar-item--component',
@@ -557,7 +566,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         )
         components_payload = yaml.safe_load((repo_root / "site" / ".stage" / "data" / "components.yaml").read_text(encoding="utf-8"))
         self.assertTrue(components_payload["components"]["mammoth-cache"]["available"])
-        self.assertIn("Mammoth Cache for Gradle and Maven", components_payload["components"]["mammoth-cache"]["displayName"])
+        self.assertIn("Mammoth Cache for Gradle® and Apache Maven™", components_payload["components"]["mammoth-cache"]["displayName"])
         self.assertEqual("/components/mammoth-cache/unreleased/docs/", components_payload["components"]["mammoth-cache"]["docsPath"])
         container_log = self.read_text(repo_root / "site" / "build" / "fake-container.log")
         self.assert_contains_all(container_log, "run", "--init", "/workspace/buildish/site")

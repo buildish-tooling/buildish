@@ -399,20 +399,36 @@ html[data-bs-theme='dark'] .td-sidebar .td-sidebar-nav-active-item {
   }
 }
 
-.buildish-incubator-disclaimer {
+.buildish-incubator-disclaimer,
+.buildish-home-legal-card {
   background: #2c3136;
   border-radius: 0.5rem;
   color: #fff;
-  padding: 1.25rem;
+}
+
+.buildish-incubator-disclaimer {
+  padding: 1rem 1.1rem;
 
   h2,
   p {
     color: inherit;
   }
 
+  h2 {
+    margin-bottom: 0.65rem;
+  }
+
+  p {
+    margin-bottom: 0.75rem;
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+
   &__logo {
     display: inline-flex;
-    width: 220px;
+    width: 200px;
     flex: 0 0 auto;
   }
 
@@ -421,6 +437,24 @@ html[data-bs-theme='dark'] .td-sidebar .td-sidebar-nav-active-item {
     height: auto;
     width: 100%;
   }
+}
+
+.buildish-home-legal-card {
+  padding: 0.7rem 1rem;
+
+  p,
+  a {
+    color: inherit;
+  }
+
+  a {
+    text-decoration-thickness: 0.08em;
+  }
+}
+
+.td-home .td-footer {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
 }
 
 .td-navbar .navbar-brand__context {

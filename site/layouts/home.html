@@ -48,7 +48,7 @@ limitations under the License.
   {{ end }}
   {{ with .Params.incubator_disclaimer_paragraphs }}
   <hr class="my-5">
-  <div class="buildish-incubator-disclaimer d-flex flex-column flex-md-row gap-4 align-items-start">
+  <div class="buildish-incubator-disclaimer d-flex flex-column flex-md-row gap-3 align-items-start">
     <a class="buildish-incubator-disclaimer__logo" href="https://incubator.apache.org/" target="_blank" rel="noopener" aria-label="Apache Incubator">
       <span class="visually-hidden">Apache Incubator</span>
       {{ partial "apache-incubator-logo.html" . }}
@@ -59,6 +59,11 @@ limitations under the License.
       <p>{{ . }}</p>
       {{ end }}
     </div>
+  </div>
+  {{ end }}
+  {{ with .Params.trademark_attribution }}
+  <div class="buildish-home-legal-card mt-3">
+    <p class="mb-0 small">{{ . | markdownify }}</p>
   </div>
   {{ end }}
 </div>
