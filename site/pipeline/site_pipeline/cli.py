@@ -26,23 +26,49 @@ from .watching import watch_and_build
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments for the site pipeline helper."""
 
-    parser = argparse.ArgumentParser(description="Site pipeline helper")
-    parser.add_argument(
-        "command",
-        choices=["build", "clean", "serve", "watch"],
-        nargs="?",
-        default="build",
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
+        "--repo-root", help="Repository root to build from (defaults to this checkout)"
     )
-    parser.add_argument(
+    common.add_argument(
+        "--config", help="Config file path relative to the repository root"
+    )
+    common.add_argument("--site-title", help="Override the effective site title")
+    common.add_argument(
+        "--project-status",
+        choices=["incubating", "graduated", "retired"],
+        help="Override the effective project status",
+    )
+
+    parser = argparse.ArgumentParser(
+        description="Site pipeline helper", parents=[common]
+    )
+    subparsers = parser.add_subparsers(dest="command")
+
+    build_parser = subparsers.add_parser("build", parents=[common])
+    clean_parser = subparsers.add_parser("clean", parents=[common])
+    serve_parser = subparsers.add_parser("serve", parents=[common])
+    watch_parser = subparsers.add_parser("watch", parents=[common])
+
+    serve_parser.add_argument(
         "--port", type=int, default=8000, help="Port for the local preview server"
     )
-    parser.add_argument(
+    watch_parser.add_argument(
         "--debounce-ms",
         type=int,
         default=WATCH_DEBOUNCE_MS,
         help="Debounce window for watch mode",
     )
-    return parser.parse_args(argv)
+    build_parser.set_defaults(command="build")
+    clean_parser.set_defaults(command="clean")
+    serve_parser.set_defaults(command="serve")
+    watch_parser.set_defaults(command="watch")
+    args = parser.parse_args(argv)
+    if args.command is None:
+        args.command = "build"
+        args.port = 8000
+        args.debounce_ms = WATCH_DEBOUNCE_MS
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -50,15 +76,32 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parse_args(argv)
     if args.command == "build":
-        results = build()
+        results = build(
+            repo_root=args.repo_root,
+            config_path=args.config,
+            site_title=args.site_title,
+            project_status=args.project_status,
+        )
         print(f"Built {len(results)} component(s) into site/.stage and site/.preview")
         return 0
     if args.command == "clean":
-        clean()
+        clean(repo_root=args.repo_root)
         print("Removed site/.stage and site/.preview")
         return 0
     if args.command == "watch":
-        watch_and_build(debounce_ms=args.debounce_ms)
+        watch_and_build(
+            repo_root=args.repo_root,
+            debounce_ms=args.debounce_ms,
+            config_path=args.config,
+            site_title=args.site_title,
+            project_status=args.project_status,
+        )
         return 0
-    serve(port=args.port)
+    serve(
+        repo_root=args.repo_root,
+        port=args.port,
+        config_path=args.config,
+        site_title=args.site_title,
+        project_status=args.project_status,
+    )
     return 0

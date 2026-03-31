@@ -23,8 +23,17 @@ from pydantic import Field, StrictBool
 from .base import YamlModel
 from .staged import LifecycleLatestStable, StagedReleaseLine, VersionDescriptor
 
+ProjectStatus = Literal["incubating", "graduated", "retired"]
 
-class BuildishComponentPaths(YamlModel):
+
+class SitePipelinePayload(YamlModel):
+    """Pipeline-owned site context exposed to staged templates/pages."""
+
+    site_title: str
+    project_status: ProjectStatus
+
+
+class SitePipelineComponentPaths(YamlModel):
     """Path map injected into staged component page front matter."""
 
     component: str | None = Field(default=None, exclude_if=lambda value: value is None)
@@ -33,7 +42,7 @@ class BuildishComponentPaths(YamlModel):
     assets: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
-class BuildishComponentUnreleased(YamlModel):
+class SitePipelineComponentUnreleased(YamlModel):
     """Unreleased-version metadata injected into staged component page front matter."""
 
     label: str
@@ -44,7 +53,7 @@ class BuildishComponentUnreleased(YamlModel):
     )
 
 
-class BuildishComponentPayload(YamlModel):
+class SitePipelineComponentPayload(YamlModel):
     """Component context payload injected into staged Markdown front matter."""
 
     slug: str
@@ -59,16 +68,16 @@ class BuildishComponentPayload(YamlModel):
     navigation_section: str | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
-    paths: BuildishComponentPaths
+    paths: SitePipelineComponentPaths
     unreleased_label: str
-    unreleased: BuildishComponentUnreleased
+    unreleased: SitePipelineComponentUnreleased
     latest_stable: LifecycleLatestStable | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
     release_lines: tuple[StagedReleaseLine, ...] = Field(default_factory=tuple)
 
 
-class BuildishComponentPagePayload(YamlModel):
+class SitePipelineComponentPagePayload(YamlModel):
     """Per-page context payload injected into staged component page front matter."""
 
     kind: Literal[

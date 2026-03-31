@@ -41,6 +41,22 @@ The code under `site/` provides:
 The component metadata contract is documented separately in
 [`site-component-contract.md`](site-component-contract.md).
 
+## Pipeline configuration
+
+The staging CLI now supports both command-line overrides and an optional
+workspace-owned configuration file at `site/site-pipeline.yaml`.
+
+Current site-facing settings include:
+
+- `site.siteTitle`
+- `site.projectStatus` with allowed values `incubating`, `graduated`, or `retired`
+
+Precedence is:
+
+1. command-line arguments
+2. `site/site-pipeline.yaml`
+3. pipeline defaults
+
 ## Architecture overview
 
 The implementation is split into an aggregation layer and a rendering layer.
@@ -182,6 +198,7 @@ updates reliably during development.
 
 - `site/components.yaml` in the main repository
 - `site/component.yaml` in each participating component
+- optional `site/site-pipeline.yaml` in the main repository for pipeline/site defaults
 - `site/pages/` in each participating component for non-versioned component pages
 - `site/docs/` in each participating component for version-specific docs
 - optional `site/assets/` in each participating component

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Public API for the Buildish site pipeline package.
+"""Public API for the site pipeline package.
 
 Most callers only need the exported build helpers from this module. The package
 internals are split into smaller modules so contributors can find the Markdown,

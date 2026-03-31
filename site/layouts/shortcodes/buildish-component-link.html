@@ -13,9 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
-{{- $component := .Page.Params.buildishComponent -}}
+{{- $component := .Page.Params.sitePipelineComponent -}}
 {{- if not $component -}}
-  {{- errorf "%q shortcode requires buildishComponent context on %s" .Name .Page.RelPermalink -}}
+  {{- errorf "%q shortcode requires sitePipelineComponent context on %s" .Name .Page.RelPermalink -}}
 {{- end -}}
 {{- $paths := dict -}}
 {{- with index $component "paths" }}{{ $paths = . }}{{ end -}}

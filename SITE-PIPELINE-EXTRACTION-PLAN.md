@@ -16,266 +16,166 @@ limitations under the License.
 
 # Site Pipeline Extraction Plan
 
-## Status and design stance
+## Objective
 
-This document describes how to turn the current site pipeline into its own reusable component in a separate Git repository so other Apache projects can adopt it.
+Extract the current site pipeline into a reusable Apache-hosted component that
+Buildish consumes as a normal dependency.
 
-**Important:** this work happens before the wider Buildish stack goes public. There is **no legacy or backward-compatibility obligation** to preserve. We should optimize for the cleanest long-term design now, even if that means:
+The pipeline should own generic staging, validation, configuration, and local
+workflow logic. Buildish should keep its own site presentation, content, and
+project-specific integration decisions.
 
-- renaming files, packages, and commands,
-- changing schemas,
-- changing staged output layouts,
-- changing repository structure,
-- deleting Buildish-specific assumptions,
-- and breaking any current in-repo internal contract.
+## Current state
 
-This is the right time to make the design correct.
+### Implemented
 
-## Goal
+- The front matter contract is namespaced as:
+  - `sitePipeline`
+  - `sitePipelineComponent`
+  - `sitePipelineComponentPage`
+- The pipeline supports configuration from both CLI arguments and
+  `site/site-pipeline.yaml`.
+- Configuration precedence is:
+  1. CLI arguments
+  2. configuration file
+  3. built-in defaults
+- `siteTitle` and `projectStatus` are configuration-driven.
+- `projectStatus` is restricted to:
+  - `incubating`
+  - `graduated`
+  - `retired`
+- The builder no longer depends on repository `DISCLAIMER` content.
+- `site/Makefile` delegates pipeline-local targets to `site/pipeline/Makefile`.
+- Buildish-specific project-status presentation now lives in the Buildish site
+  layer.
 
-Create a reusable Apache-hosted site-pipeline component that can:
+### Still coupled to Buildish or in-repo execution
 
-- aggregate content from multiple repositories,
-- validate and normalize project metadata,
-- stage content into a deterministic contract for a static site generator,
-- support local build and watch workflows,
-- and optionally provide reference CI/container integration.
+- The Python package/module name is still `site_pipeline`.
+- Local execution still uses `python -m site_pipeline` instead of an installed
+  `site-pipeline` CLI.
+- The core contract still uses `unreleased` terminology in models, paths, and
+  generated data.
+- The workspace contract is only partially configurable; some paths are still
+  effectively fixed by convention.
+- The pipeline still contains Buildish/Hugo-shaped assumptions such as the
+  current URL and preview conventions.
+- Buildish still executes the in-repo implementation instead of consuming a
+  released package.
 
-Buildish becomes the first consumer of that component rather than the long-term home of its implementation.
+## Target split
 
-## Non-goals for the first extraction
+### Moves to the extracted repository
 
-The first extraction should **not** try to move every Buildish site concern into the new repo.
+- reusable staging, build, clean, serve, and watch logic
+- input validation and safety checks
+- configuration loading and precedence rules
+- staged output/data contract
+- generic CLI and tests
+- optional runtime/container assets if they remain generic
 
-Do not treat these as phase-1 scope:
-
-- the Buildish homepage content,
-- Buildish-specific Hugo pages and copy,
-- Buildish-specific incubation/trademark/footer presentation,
-- Buildish-specific publishing workflow details,
-- Buildish branding, navigation, or component naming conventions.
-
-## Product split
-
-We should split the current `site/` implementation into three conceptual deliverables.
-
-### 1. Core staging pipeline
-
-Reusable and generic:
-
-- catalog loading,
-- per-component metadata loading,
-- safety checks,
-- content staging,
-- staged data generation,
-- watch support,
-- CLI entry points.
-
-This is the first thing to extract.
-
-### 2. Optional build/runtime packaging
-
-Reusable but not core to the API:
-
-- reproducible container image,
-- tool bootstrap for CI,
-- example build wrappers.
-
-### 3. Reference presentation/integration
-
-Reusable examples, but intentionally optional:
-
-- Hugo integration guidance,
-- shortcodes/layout examples,
-- example workflows,
-- example publish flow.
-
-## What moves to the new repo
-
-Initial target:
-
-- `site/pipeline/`
-  - package code
-  - tests
-  - CLI
-  - `pyproject.toml`
-  - lockfile
-- the minimum docs needed to describe:
-  - input schemas
-  - staged output contract
-  - trust/security model
-  - CLI usage
-- optional container-image build assets if they are kept generic
-
-## What stays in Buildish
-
-Keep these in this repository:
+### Stays in Buildish
 
 - `site/content/`
 - `site/layouts/`
 - `site/static/`
 - `site/assets/`
 - `site/hugo.yaml`
-- Buildish-specific workflows
-- Buildish-specific homepage/legal/incubator presentation
-- Buildish-specific catalog content and component examples
+- Buildish-specific project-status/legal presentation
+- Buildish-specific navigation, branding, and publishing workflows
 
-Buildish should consume the extracted pipeline as a dependency.
+## Naming target
 
-## Proposed new repository shape
+- Repository: `buildish-site-pipeline`
+- Python package: `apache_buildish_site_pipeline`
+- CLI: `site-pipeline`
 
-Suggested neutral structure:
-
-- `README.md`
-- `docs/`
-- `examples/`
-- `pipeline/`
-  - `pyproject.toml`
-  - `uv.lock`
-  - `src/<neutral_package_name>/`
-  - `tests/`
-- `Containerfile-site-pipeline` (optional)
-- `.github/workflows/`
-
-The new repo should look like a standalone product, not like a copied subdirectory from Buildish.
-
-## Naming recommendations
-
-Use neutral names from the start.
-
-### Avoid
-
-- package names containing `buildish`
-- CLI names containing `buildish`
-- repo names that imply Buildish-only usage
-
-### Prefer
-
-- a neutral repo name such as `apache-site-pipeline` or `multi-repo-site-pipeline`
-- a neutral Python package name
-- a neutral CLI command such as `site-pipeline`
-
-Exact naming can be finalized in phase 1, but neutrality is required.
-
-## Contracts that must be made explicit
-
-Before extraction, we need to define stable contracts instead of relying on current Buildish behavior.
+## Required contracts
 
 ### Input contract
 
 Document and version:
 
-- catalog file schema,
-- component metadata schema,
-- expected content directories,
-- optional fields and defaults,
-- reserved names.
+- catalog schema
+- component metadata schema
+- pipeline configuration schema
+- workspace defaults and override points
+- reserved names and reserved paths
 
 ### Output contract
 
 Document and version:
 
-- staged content tree,
-- staged data files,
-- staged static assets,
-- manifest/lifecycle outputs,
-- watch/build side effects.
+- staged content tree
+- staged data files
+- staged static assets
+- manifest/lifecycle outputs
+- watch/build side effects
+- front matter namespaces and payload shapes
 
 ### Security contract
 
 Document and preserve:
 
-- path traversal protections,
-- symlink handling,
-- reserved pipeline-owned paths,
-- no network fetching in normal builds,
-- trust model for local overrides,
-- no component-supplied arbitrary renderer logic.
+- path traversal protections
+- symlink handling rules
+- repository-root restrictions for config and workspace inputs
+- reserved pipeline-owned paths
+- no network fetching in normal builds
+- no component-supplied arbitrary renderer logic
 
-## Buildish migration target
+## Remaining phases
 
-After extraction, Buildish should stop calling in-repo Python files directly.
+### Phase 1: finish in-place productization
 
-Current model:
+Status: in progress.
 
-- `site/Makefile` points to `pipeline/main.py`
+Remaining work:
 
-Target model:
+- finalize the public product identity:
+  - rename the Python package/module to `apache_buildish_site_pipeline`
+  - add the final installable `site-pipeline` CLI entry point
+  - update Makefiles, docs, tests, and local workflows to use the final names
+- make the workspace contract fully explicit:
+  - document every workspace path the pipeline assumes today
+  - add configuration for remaining fixed inputs that should be overrideable
+  - explicitly define the contract for repo root, catalog path, authored
+    content roots, and output roots
+- replace `unreleased` with `development` across the core contract:
+  - rename core models and generated data fields
+  - change staged paths from `/unreleased/` to `/development/`
+  - update tests and docs at the same time
+- reduce Buildish-shaped integration assumptions in the core:
+  - move Buildish-specific presentation decisions fully into the Buildish site
+    layer
+  - keep the pipeline focused on deterministic staged outputs and generic
+    metadata
 
-- `site/Makefile` calls an installed CLI or package entry point
-- Buildish pins a released version of the pipeline
-- integration tests exercise Buildish as a real consumer
+### Phase 2: create the extracted repository
 
-This is critical. Buildish must not keep a privileged/private integration path after the split.
+- define the extracted repository layout
+- move the reusable implementation, tests, and contract docs into that
+  repository
+- keep example integration material separate from the core API description
+- keep runtime/container assets optional unless they are truly generic
 
-## Recommended phases
+### Phase 3: convert Buildish into consumer #1
 
-## Phase 1: productize the pipeline in-place
+- stop executing the in-repo implementation directly
+- make `site/pipeline/Makefile` invoke the installed `site-pipeline` CLI
+- pin a released version of the extracted pipeline in Buildish
+- keep end-to-end tests that validate Buildish as a normal consumer
 
-Do this in the current repo first.
+### Phase 4: broaden adoption and harden the public contract
 
-1. Remove Buildish-specific assumptions from the Python pipeline.
-2. Introduce neutral package/module/CLI naming.
-3. Define and document explicit input/output/security contracts.
-4. Separate core pipeline logic from presentation/theme assumptions.
-5. Make Buildish’s `site/Makefile` capable of using an installed CLI instead of `pipeline/main.py`.
-6. Add tests that validate the contract, not just current implementation details.
+- publish migration and integration guidance for other adopters
+- add reusable examples for common Apache site setups
+- stabilize the public contract based on consumer feedback
 
-### Phase-1 deliverable
+## Immediate next steps
 
-At the end of phase 1, the pipeline should be extractable with minimal code movement and without hidden Buildish coupling.
+1. Rename the package/module and add the final CLI entry point.
+2. Define the remaining workspace override contract, especially the catalog
+   path.
+3. Perform the `unreleased` to `development` rename across the core contract.
 
-## Phase 2: create the new repo
-
-1. Move the generic pipeline package and tests.
-2. Add standalone docs and examples.
-3. Add release automation for source releases.
-4. Optionally add generic container-image build support.
-
-## Phase 3: convert Buildish into consumer #1
-
-1. Replace in-tree execution with dependency usage.
-2. Update CI and local tooling to use the released component.
-3. Keep Buildish-specific site rendering and publishing logic in this repo.
-4. Add an end-to-end test that proves Buildish works as an external consumer.
-
-## Phase 4: enable broader Apache adoption
-
-1. Publish example integrations.
-2. Provide reusable workflow examples.
-3. Provide migration docs for single-repo and multi-repo adopters.
-4. Stabilize toward a `1.0` contract after enough consumer feedback.
-
-## Concrete phase-1 work items
-
-Phase 1 should produce these artifacts here in this repo:
-
-- a neutral naming proposal,
-- a documented schema for catalog and component metadata,
-- a documented staged output contract,
-- a documented trust/security model,
-- a package/CLI layout that can be moved as-is,
-- tests that cover contract-level behavior,
-- a Buildish integration path that uses the future external CLI shape.
-
-## Success criteria
-
-We are ready to extract when all of the following are true:
-
-- the core pipeline has no Buildish-specific naming or assumptions,
-- Buildish-specific site presentation remains in this repo,
-- the pipeline can be used via a neutral CLI,
-- contracts are documented and versioned,
-- Buildish passes as a normal consumer,
-- moving the code to a new repo is mostly file relocation, not redesign.
-
-## Immediate next step
-
-Start **phase 1** in this repository.
-
-That means we should first inventory and remove current Buildish-specific assumptions from the pipeline package and decide the neutral naming for:
-
-- the future repo,
-- the Python package,
-- the CLI,
-- and the schema/version identifiers.

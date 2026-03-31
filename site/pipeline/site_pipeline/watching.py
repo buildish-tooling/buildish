@@ -33,6 +33,7 @@ from pathlib import Path
 
 from .builder import build
 from .common import first_non_none
+from .config import ProjectStatus, resolve_pipeline_config
 from .constants import (
     STAGED_VENDOR_ASSETS,
     WATCH_DEBOUNCE_MS,
@@ -43,7 +44,6 @@ from .constants import (
 from .filesystem import (
     load_component_metadata,
     load_components_local_overrides,
-    repo_root_from,
     resolve_vendor_asset_source,
     resolve_component_repo_path,
     safe_relative_path,
@@ -156,10 +156,13 @@ def _pipeline_watch_roots(site_root: Path) -> set[Path]:
     return watch_roots
 
 
-def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
+def collect_watch_roots(
+    repo_root: Path | None = None, *, config_path: str | Path | None = None
+) -> list[Path]:
     """Collect every path that should trigger a staged rebuild in watch mode."""
 
-    resolved_repo_root = repo_root_from(repo_root)
+    resolved_config = resolve_pipeline_config(repo_root, config_path=config_path)
+    resolved_repo_root = resolved_config.repo_root
     site_root = resolved_repo_root / "site"
     catalog = ComponentsCatalog.from_yaml_path(site_root / "components.yaml")
     local_overrides = load_components_local_overrides(site_root)
@@ -171,6 +174,8 @@ def collect_watch_roots(repo_root: Path | None = None) -> list[Path]:
     components_local_path = site_root / "components.local.yaml"
     if components_local_path.is_file():
         watch_roots.add(components_local_path.resolve())
+    if resolved_config.config_path is not None:
+        watch_roots.add(resolved_config.config_path.resolve())
     watch_roots.update(_pipeline_watch_roots(site_root))
 
     for source_relative, _ in STAGED_VENDOR_ASSETS:
@@ -211,7 +216,12 @@ def _format_watch_path(path: Path, repo_root: Path) -> str:
 
 
 def watch_and_build(
-    repo_root: Path | None = None, debounce_ms: int = WATCH_DEBOUNCE_MS
+    repo_root: Path | None = None,
+    debounce_ms: int = WATCH_DEBOUNCE_MS,
+    *,
+    config_path: str | Path | None = None,
+    site_title: str | None = None,
+    project_status: ProjectStatus | None = None,
 ) -> None:
     """Continuously rebuild ``site/.stage`` whenever relevant inputs change.
 
@@ -223,12 +233,26 @@ def watch_and_build(
 
     from watchfiles import watch
 
-    resolved_repo_root = repo_root_from(repo_root)
-    results = build(resolved_repo_root, include_preview=False)
+    resolved_config = resolve_pipeline_config(
+        repo_root,
+        config_path=config_path,
+        site_title=site_title,
+        project_status=project_status,
+    )
+    resolved_repo_root = resolved_config.repo_root
+    results = build(
+        resolved_repo_root,
+        include_preview=False,
+        config_path=resolved_config.config_path,
+        site_title=resolved_config.site_title,
+        project_status=resolved_config.project_status,
+    )
     print(f"Built {len(results)} component(s) into site/.stage")
 
     while True:
-        watch_roots = collect_watch_roots(resolved_repo_root)
+        watch_roots = collect_watch_roots(
+            resolved_repo_root, config_path=resolved_config.config_path
+        )
         print("Watching staged-source inputs:")
         for root in watch_roots:
             print(f"  - {_format_watch_path(root, resolved_repo_root)}")
@@ -261,13 +285,21 @@ def watch_and_build(
                 print(f"  - {_format_watch_path(changed_path, resolved_repo_root)}")
 
             try:
-                results = build(resolved_repo_root, include_preview=False)
+                results = build(
+                    resolved_repo_root,
+                    include_preview=False,
+                    config_path=resolved_config.config_path,
+                    site_title=resolved_config.site_title,
+                    project_status=resolved_config.project_status,
+                )
                 print(f"Built {len(results)} component(s) into site/.stage")
             except Exception as exc:
                 print(f"Rebuild failed: {exc}", file=sys.stderr)
 
             try:
-                updated_watch_roots = collect_watch_roots(resolved_repo_root)
+                updated_watch_roots = collect_watch_roots(
+                    resolved_repo_root, config_path=resolved_config.config_path
+                )
             except Exception as exc:
                 print(f"Re-evaluating watch roots failed: {exc}", file=sys.stderr)
                 updated_watch_roots = watch_roots

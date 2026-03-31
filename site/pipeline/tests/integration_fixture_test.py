@@ -132,8 +132,8 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
             self.assert_contains_all(site_unreleased_index, "## Docs")
             self.assert_not_contains_any(site_unreleased_index, "Open staged assets")
             site_unreleased_front_matter = yaml.safe_load(site_unreleased_index.split("---", 2)[1])
-            self.assertEqual("Site", site_unreleased_front_matter["buildishComponent"]["displayName"])
-            self.assertEqual("unreleased-home", site_unreleased_front_matter["buildishComponentPage"]["kind"])
+            self.assertEqual("Site", site_unreleased_front_matter["sitePipelineComponent"]["displayName"])
+            self.assertEqual("unreleased-home", site_unreleased_front_matter["sitePipelineComponentPage"]["kind"])
 
             preview_index = self.read_text(repo_root / "site" / ".preview" / "index.html")
             self.assert_contains_all(preview_index, "Fixture Mammoth Cache for Gradle® and Apache Maven™", "Fixture no-gradle-wrapper-jar", "Site")

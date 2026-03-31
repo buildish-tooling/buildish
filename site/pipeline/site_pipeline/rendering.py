@@ -20,7 +20,6 @@ import html
 import re
 from pathlib import Path
 
-from .constants import SITE_TITLE
 from .models import (
     ComponentBuildResult,
     ComponentLifecycleSettings,
@@ -187,7 +186,7 @@ def _html_page(title: str, body: str) -> str:
 """
 
 
-def build_preview_index(results: list[ComponentBuildResult]) -> str:
+def build_preview_index(results: list[ComponentBuildResult], site_title: str) -> str:
     """Build the lightweight preview index shown outside Hugo."""
 
     items = []
@@ -198,12 +197,12 @@ def build_preview_index(results: list[ComponentBuildResult]) -> str:
             f" — <span class='muted'>{html.escape(status)}</span></li>"
         )
     body = (
-        f"<h1>{SITE_TITLE}</h1>"
+        f"<h1>{html.escape(site_title)}</h1>"
         "<p>This is a lightweight local preview for the staged site contract.</p>"
         "<p><a href='/site/.stage/content/_index.md'>Open staged root markdown</a></p>"
         f"<ul>{''.join(items)}</ul>"
     )
-    return _html_page(SITE_TITLE, body)
+    return _html_page(site_title, body)
 
 
 def build_component_preview(result: ComponentBuildResult) -> str:

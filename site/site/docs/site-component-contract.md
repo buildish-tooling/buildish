@@ -129,7 +129,7 @@ or any other component-specific content where they want.
 ### Landing-page shortcodes
 
 The site provides a small set of site-owned Hugo shortcodes for component pages.
-They read the pipeline-owned `buildishComponent` front matter and avoid
+They read the pipeline-owned `sitePipelineComponent` front matter and avoid
 hard-coding URLs in component-authored Markdown.
 
 - `buildish-component-link`
@@ -190,8 +190,8 @@ Stage outputs are, at minimum:
 
 Each staged component Markdown page also receives pipeline-owned front matter under:
 
-- `buildishComponent` for the component identity, navigation paths, and lifecycle summary
-- `buildishComponentPage` for the staged page kind and active unreleased-version context
+- `sitePipelineComponent` for the component identity, navigation paths, and lifecycle summary
+- `sitePipelineComponentPage` for the staged page kind and active unreleased-version context
 
 ## Local commands
 

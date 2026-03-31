@@ -26,12 +26,12 @@ from pathlib import Path
 from typing import Literal
 
 from .common import first_non_none
+from .config import ProjectStatus, resolve_pipeline_config
 from .constants import DEFAULT_TAG_PATTERN
 from .filesystem import (
     copy_tree_without_symlinks,
     load_component_metadata,
     load_components_local_overrides,
-    read_text_if_exists,
     repo_root_from,
     reset_output_directory,
     resolve_component_repo_path,
@@ -42,17 +42,12 @@ from .filesystem import (
 from .markdown import (
     humanized_stem,
     normalize_markdown_doc,
-    split_paragraphs,
     update_markdown_front_matter,
     with_yaml_front_matter,
 )
 from .models import (
     AliasesDataDocument,
-    BuildishComponentPagePayload,
-    BuildishComponentPaths,
-    BuildishComponentPayload,
     CatalogComponent,
-    BuildishComponentUnreleased,
     DocsFrontMatter,
     LifecycleDataDocument,
     LifecycleDataEntry,
@@ -71,6 +66,11 @@ from .models import (
     ComponentsCatalog,
     ComponentsDataDocument,
     ComponentsDataEntry,
+    SitePipelineComponentPagePayload,
+    SitePipelineComponentPaths,
+    SitePipelineComponentPayload,
+    SitePipelineComponentUnreleased,
+    SitePipelinePayload,
     StagedDocLink,
     StagedComponentRef,
     VersionAssets,
@@ -249,12 +249,12 @@ def _write_unreleased_index(
     )
 
 
-def _buildish_component_payload(
+def _site_pipeline_component_payload(
     result: ComponentBuildResult,
-) -> BuildishComponentPayload:
+) -> SitePipelineComponentPayload:
     """Build the component-context payload injected into staged Markdown pages."""
 
-    return BuildishComponentPayload(
+    return SitePipelineComponentPayload(
         slug=result.slug,
         display_name=result.display_name,
         summary=result.summary or None,
@@ -263,14 +263,14 @@ def _buildish_component_payload(
         repository=result.repository,
         default_branch=result.default_branch,
         navigation_section=result.navigation_section,
-        paths=BuildishComponentPaths(
+        paths=SitePipelineComponentPaths(
             component=result.raw_component_index_path,
             unreleased=result.raw_unreleased_index_path,
             docs=result.raw_docs_root_path,
             assets=result.raw_assets_root_path,
         ),
         unreleased_label=result.unreleased_label,
-        unreleased=BuildishComponentUnreleased(
+        unreleased=SitePipelineComponentUnreleased(
             label=result.unreleased_label,
             path=result.raw_unreleased_index_path
             or public_unreleased_path(result.slug),
@@ -288,7 +288,7 @@ def _buildish_component_payload(
     )
 
 
-def _buildish_component_page_payload(
+def _site_pipeline_component_page_payload(
     result: ComponentBuildResult,
     *,
     kind: Literal[
@@ -296,10 +296,10 @@ def _buildish_component_page_payload(
     ],
     section: Literal["component", "unreleased", "docs"],
     page_path: str | None,
-) -> BuildishComponentPagePayload:
+) -> SitePipelineComponentPagePayload:
     """Build per-page context for staged component pages."""
 
-    return BuildishComponentPagePayload(
+    return SitePipelineComponentPagePayload(
         kind=kind,
         section=section,
         path=page_path,
@@ -320,6 +320,7 @@ def _buildish_component_page_payload(
 
 def _annotate_staged_component_pages(
     result: ComponentBuildResult,
+    site_pipeline: SitePipelinePayload,
     component_root: Path,
     unreleased_root: Path,
     copied_component_pages: list[Path],
@@ -328,7 +329,7 @@ def _annotate_staged_component_pages(
 ) -> None:
     """Inject pipeline-owned component context into all staged Markdown pages."""
 
-    component_payload = _buildish_component_payload(result)
+    component_payload = _site_pipeline_component_payload(result)
     for copied in copied_component_pages:
         staged_page_path = component_root / copied
         if (
@@ -340,8 +341,9 @@ def _annotate_staged_component_pages(
         staged_page_path.write_text(
             update_markdown_front_matter(
                 staged_page_path.read_text(encoding="utf-8"),
-                buildishComponent=component_payload,
-                buildishComponentPage=_buildish_component_page_payload(
+                sitePipeline=site_pipeline,
+                sitePipelineComponent=component_payload,
+                sitePipelineComponentPage=_site_pipeline_component_page_payload(
                     result,
                     kind="component-home"
                     if copied == Path("_index.md")
@@ -357,8 +359,9 @@ def _annotate_staged_component_pages(
     unreleased_index_path.write_text(
         update_markdown_front_matter(
             unreleased_index_path.read_text(encoding="utf-8"),
-            buildishComponent=component_payload,
-            buildishComponentPage=_buildish_component_page_payload(
+            sitePipeline=site_pipeline,
+            sitePipelineComponent=component_payload,
+            sitePipelineComponentPage=_site_pipeline_component_page_payload(
                 result,
                 kind="unreleased-home",
                 section="unreleased",
@@ -381,8 +384,9 @@ def _annotate_staged_component_pages(
         staged_doc_path.write_text(
             update_markdown_front_matter(
                 staged_doc_path.read_text(encoding="utf-8"),
-                buildishComponent=component_payload,
-                buildishComponentPage=_buildish_component_page_payload(
+                sitePipeline=site_pipeline,
+                sitePipelineComponent=component_payload,
+                sitePipelineComponentPage=_site_pipeline_component_page_payload(
                     result,
                     kind="docs-home" if copied == Path("_index.md") else "docs-page",
                     section="docs",
@@ -467,20 +471,33 @@ def _write_component_metadata_files(
 
 
 def _stage_authored_site_content(
-    site_root: Path, stage_root: Path, incubator_disclaimer_paragraphs: list[str]
+    site_root: Path, stage_root: Path, site_pipeline: SitePipelinePayload
 ) -> None:
     """Copy the site's hand-authored content into the staged Hugo tree."""
 
     source_content_root = site_root / "content"
+    copied_site_pages: list[Path] = []
     if source_content_root.is_dir():
-        copy_tree_without_symlinks(source_content_root, stage_root / "content")
+        copied_site_pages = copy_tree_without_symlinks(
+            source_content_root, stage_root / "content"
+        )
 
-    root_index = stage_root / "content" / "_index.md"
-    if root_index.is_file():
-        root_index.write_text(
+    for copied in copied_site_pages:
+        staged_page_path = stage_root / "content" / copied
+        if (
+            copied.suffix.lower() not in {".md", ".markdown"}
+            or not staged_page_path.is_file()
+        ):
+            continue
+        front_matter_updates: dict[str, str | SitePipelinePayload] = {
+            "sitePipeline": site_pipeline,
+        }
+        if copied == Path("_index.md"):
+            front_matter_updates["title"] = site_pipeline.site_title
+        staged_page_path.write_text(
             update_markdown_front_matter(
-                root_index.read_text(encoding="utf-8"),
-                incubator_disclaimer_paragraphs=incubator_disclaimer_paragraphs,
+                staged_page_path.read_text(encoding="utf-8"),
+                **front_matter_updates,
             ),
             encoding="utf-8",
         )
@@ -489,6 +506,7 @@ def _stage_authored_site_content(
 def stage_component(
     repo_root: Path,
     stage_root: Path,
+    site_pipeline: SitePipelinePayload,
     component: CatalogComponent,
     defaults: ComponentCatalogDefaults,
     catalog_index: int,
@@ -652,6 +670,7 @@ def stage_component(
     )
     _annotate_staged_component_pages(
         result,
+        site_pipeline,
         component_root,
         unreleased_root,
         copied_component_pages,
@@ -662,7 +681,12 @@ def stage_component(
 
 
 def build(
-    repo_root: Path | None = None, *, include_preview: bool = True
+    repo_root: Path | None = None,
+    *,
+    include_preview: bool = True,
+    config_path: str | Path | None = None,
+    site_title: str | None = None,
+    project_status: ProjectStatus | None = None,
 ) -> list[ComponentBuildResult]:
     """Build the staged site contract and, optionally, the lightweight preview pages.
 
@@ -671,8 +695,18 @@ def build(
     staged contract and reduces unnecessary file-system churn in ``site/.preview``.
     """
 
-    resolved_repo_root = repo_root_from(repo_root)
+    resolved_config = resolve_pipeline_config(
+        repo_root,
+        config_path=config_path,
+        site_title=site_title,
+        project_status=project_status,
+    )
+    resolved_repo_root = resolved_config.repo_root
     site_root = resolved_repo_root / "site"
+    site_pipeline = SitePipelinePayload(
+        site_title=resolved_config.site_title,
+        project_status=resolved_config.project_status,
+    )
     catalog = ComponentsCatalog.from_yaml_path(site_root / "components.yaml")
     local_overrides = load_components_local_overrides(site_root)
 
@@ -686,6 +720,7 @@ def build(
         stage_component(
             resolved_repo_root,
             stage_root,
+            site_pipeline,
             component,
             catalog.defaults,
             index,
@@ -693,11 +728,7 @@ def build(
         )
         for index, component in enumerate(catalog.components, start=1)
     ]
-    incubator_disclaimer = read_text_if_exists(
-        resolved_repo_root / "DISCLAIMER"
-    ).strip()
-    incubator_disclaimer_paragraphs = split_paragraphs(incubator_disclaimer)
-    _stage_authored_site_content(site_root, stage_root, incubator_disclaimer_paragraphs)
+    _stage_authored_site_content(site_root, stage_root, site_pipeline)
     stage_vendor_assets(site_root, stage_root)
 
     write_yaml_like(
@@ -783,7 +814,8 @@ def build(
 
     if include_preview:
         (preview_root / "index.html").write_text(
-            build_preview_index(results), encoding="utf-8"
+            build_preview_index(results, site_title=site_pipeline.site_title),
+            encoding="utf-8",
         )
         for result in results:
             component_preview = preview_root / "components" / result.slug / "index.html"
@@ -804,11 +836,23 @@ def clean(repo_root: Path | None = None) -> None:
     shutil.rmtree(resolved_repo_root / ".site-preview", ignore_errors=True)
 
 
-def serve(repo_root: Path | None = None, port: int = 8000) -> None:
+def serve(
+    repo_root: Path | None = None,
+    port: int = 8000,
+    *,
+    config_path: str | Path | None = None,
+    site_title: str | None = None,
+    project_status: ProjectStatus | None = None,
+) -> None:
     """Serve the lightweight preview tree with Python's standard HTTP server."""
 
     resolved_repo_root = repo_root_from(repo_root)
-    build(resolved_repo_root)
+    build(
+        resolved_repo_root,
+        config_path=config_path,
+        site_title=site_title,
+        project_status=project_status,
+    )
     handler = functools.partial(
         http.server.SimpleHTTPRequestHandler, directory=str(resolved_repo_root)
     )

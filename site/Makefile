@@ -21,7 +21,8 @@ HUGO ?= hugo
 NVM_DIR ?= $(HOME)/.nvm
 UV ?= uv
 PYTHON ?= python
-SITE_PIPELINE ?= pipeline/main.py
+SITE_PIPELINE ?= -m site_pipeline
+PIPELINE_PYTHONPATH ?= ./pipeline
 PORT ?= 8000
 HUGO_SERVER_BIND ?= 127.0.0.1
 CONTAINER_ENGINE ?= $(shell if command -v podman >/dev/null 2>&1; then printf 'podman'; elif command -v docker >/dev/null 2>&1; then printf 'docker'; fi)
@@ -31,7 +32,7 @@ LOCAL_REGISTRY_TEST_PLATFORMS ?= linux/amd64,linux/arm64
 LOCAL_REGISTRY_TEST_TAG ?= integration-test
 LOCAL_REGISTRY_TEST_ARGS ?=
 UV_RUN := $(UV) run --project ./pipeline --frozen
-HELP_TARGETS := $(MAKEFILE_LIST)
+HELP_TARGETS = $(MAKEFILE_LIST)
 HELP_PUBLIC_COMMON_TARGETS := serve build
 HELP_PUBLIC_CHECK_TARGETS := test integration-test check clean
 HELP_PUBLIC_NATIVE_TARGETS := serve-local build-local
@@ -54,6 +55,8 @@ NODE_MODULES_DIR ?= $(CURDIR)/node_modules
 HOST_CONTAINER_SCRATCH_ROOT ?= $(CURDIR)/build/container
 CONTAINER_SCRATCH_ROOT ?= $(CONTAINER_SITE_ROOT)/build/container
 HOST_ARCH ?= $(shell uname -m)
+include pipeline/Makefile
+
 ifneq ($(filter x86_64 amd64,$(HOST_ARCH)),)
 CONTAINER_PLATFORM ?= linux/amd64
 else ifneq ($(filter aarch64 arm64,$(HOST_ARCH)),)
@@ -305,12 +308,12 @@ vendor-assets: docsy-check ## Stage local vendor assets required by the renderer
 stage: container-stage ## Refresh staged site inputs in the build container.
 
 stage-local: sanity-check ## Refresh staged site inputs with host tools.
-	$(UV_RUN) $(PYTHON) $(SITE_PIPELINE) build
+	$(MAKE) --no-print-directory pipeline-stage-local
 
 stage-watch: container-stage-watch ## Watch sources and refresh staged site inputs in the build container.
 
 stage-watch-local: sanity-check ## Watch sources and refresh staged site inputs with host tools.
-	$(UV_RUN) $(PYTHON) $(SITE_PIPELINE) watch
+	$(MAKE) --no-print-directory pipeline-watch-local
 
 render: container-render ## Render the current staged site in the build container.
 
@@ -389,7 +392,7 @@ serve-local: sanity-check hugo-check docsy-check ## Serve the site with live res
 	@watch_pid=''; \
 	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
-	$(UV_RUN) $(PYTHON) $(SITE_PIPELINE) watch & \
+	$(PIPELINE_LOCAL_RUNTIME) watch & \
 	watch_pid=$$!; \
 	while [ ! -f .stage/manifest.yaml ]; do \
 		if ! kill -0 "$$watch_pid" 2>/dev/null; then \
@@ -409,7 +412,7 @@ container-serve: container-image-ensure ## Serve the staged site with Hugo and a
 	@$(call RUN_MANAGED_CONTAINER,serve,$(CONTAINER_MANAGED_SERVE_RUN),$(CONTAINER_SERVE_SCRIPT))
 
 clean: sanity-check ## Remove generated site output.
-	$(UV_RUN) $(PYTHON) $(SITE_PIPELINE) clean
+	$(MAKE) --no-print-directory pipeline-clean-local
 	rm -rf .public .hugo_build.lock resources
 
 pipeline-format: sanity-check ## Format Python sources under site/pipeline.

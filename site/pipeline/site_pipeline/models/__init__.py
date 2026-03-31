@@ -33,10 +33,11 @@ from .authored import (
 )
 from .base import YamlModel
 from .front_matter import (
-    BuildishComponentPagePayload,
-    BuildishComponentPaths,
-    BuildishComponentPayload,
-    BuildishComponentUnreleased,
+    SitePipelineComponentPagePayload,
+    SitePipelineComponentPaths,
+    SitePipelineComponentPayload,
+    SitePipelineComponentUnreleased,
+    SitePipelinePayload,
     DocsFrontMatter,
 )
 from .staged import (
