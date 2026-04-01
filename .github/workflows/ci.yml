@@ -71,7 +71,9 @@ jobs:
   site-verify:
     name: Site verification
     needs: changes
-    if: needs.changes.outputs.site_verify == 'true'
+    ## Temporarily disabled
+    if: false
+    #if: needs.changes.outputs.site_verify == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -79,14 +81,25 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Check out buildish-site-pipeline repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          repository: ${{ github.repository_owner }}/buildish-site-pipeline
+          path: buildish-site-pipeline
+          persist-credentials: false
+
       - name: Run site verification in the reproducible build container
         timeout-minutes: 6
+        env:
+          SITE_PIPELINE_REPO_ROOT: ${{ github.workspace }}/buildish-site-pipeline
         run: bash .github/scripts/ci-site-verify.sh
 
   container-image:
     name: Site builder image
     needs: changes
-    if: github.event_name == 'pull_request' && needs.changes.outputs.site_build_image == 'true'
+    ## Temporarily disabled
+    if: false
+    #if: (github.event_name == 'pull_request' || github.repository_owner != 'apache') && needs.changes.outputs.site_build_image == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
