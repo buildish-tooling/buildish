@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import signal
@@ -396,6 +397,33 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md",
         )
 
+    def test_make_stage_local_refreshes_consumer_to_latest_snapshot_manifest(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        consumer_pyproject = repo_root / "site" / "pipeline" / "pyproject.toml"
+        snapshot_manifest = (
+            repo_root.parent
+            / "buildish-site-pipeline"
+            / "dist"
+            / "snapshots"
+            / "latest.json"
+        )
+        manifest = json.loads(snapshot_manifest.read_text(encoding="utf-8"))
+        latest_wheel = manifest["wheel"]
+        stale_wheel = "apache_buildish_site_pipeline-0.0.0.dev0+stale-py3-none-any.whl"
+        consumer_pyproject.write_text(
+            consumer_pyproject.read_text(encoding="utf-8").replace(latest_wheel, stale_wheel),
+            encoding="utf-8",
+        )
+
+        result = self.run_make(repo_root / "site", "stage-local", os.environ.copy())
+
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn(latest_wheel, consumer_pyproject.read_text(encoding="utf-8"))
+        self.assert_paths_exist(
+            repo_root / "site" / ".stage" / "manifest.yaml",
+            repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md",
+        )
+
     def test_make_build_local_renders_component_navigation_without_cross_component_sidebar(self) -> None:
         if shutil.which("hugo") is None:
             self.skipTest("hugo is required for render integration coverage")
@@ -611,15 +639,18 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             "Checks and cleanup:",
             "Host-tool workflows:",
             "Less common workflows:",
-            "serve              Serve the site with live restaging in the build container",
-            "build              Stage and render the site in the build container",
+            "serve              Serve the full Hugo site with automatic restaging in the build container; override PORT=<port> if needed.",
+            "build              Build the staged contract and full Hugo site in the build container.",
             "test               Run unit tests.",
+            "integration-test   Run integration tests.",
             "check              Run lint, type checks, tests, and build-local.",
-            "serve-local        Serve the site with live restaging using host tools",
-            "build-local        Stage and render the site with host tools.",
-            "render             Render the current staged site in the build container.",
-            "render-local       Render the current staged site with host tools.",
-            "stage-local        Refresh staged site inputs with host tools.",
+            "clean              Remove generated pipeline and renderer output.",
+            "serve-local        Serve the full Hugo site with automatic restaging using host tools; override PORT=<port> if needed.",
+            "build-local        Build the staged contract and full Hugo site with host tools.",
+            "render             Render the current staged site through Hugo in the build container.",
+            "render-local       Render the current staged site through Hugo with host tools.",
+            "stage-local        Build the staged site contract and lightweight preview with host tools.",
+            "stage-watch-local  Watch sources and rebuild the staged site contract only with host tools.",
             "For advanced/internal targets, run 'make help-all'.",
         )
         self.assert_not_contains_any(result.stdout, "container-serve", "hugo-check", "docsy-check", "vendor-assets", "container-build")

@@ -16,7 +16,10 @@
 
 from __future__ import annotations
 
+import json
 import shutil
+import subprocess
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from textwrap import dedent
@@ -25,7 +28,10 @@ from typing import Any
 import yaml
 
 SOURCE_REPO_ROOT = Path(__file__).resolve().parents[3]
-EXTRACTED_PIPELINE_ROOT = SOURCE_REPO_ROOT / "buildish-site-pipeline"
+EXTRACTED_PIPELINE_SNAPSHOT_ROOT = (
+    SOURCE_REPO_ROOT.parent / "buildish-site-pipeline" / "dist" / "snapshots"
+)
+CONSUMER_PIPELINE_MAIN = SOURCE_REPO_ROOT / "site" / "pipeline" / "main.py"
 PIPELINE_FIXTURE_IGNORE = shutil.ignore_patterns(
     ".venv",
     "__pycache__",
@@ -114,6 +120,43 @@ class TestCaseHelpers:
         for snippet in snippets:
             self.assertNotIn(snippet, text)
 
+    def run_pipeline_command(
+        self, repo_root: Path, *args: str, check: bool = False
+    ) -> subprocess.CompletedProcess[str]:
+        command = [
+            sys.executable,
+            str(CONSUMER_PIPELINE_MAIN),
+            *args,
+            "--repo-root",
+            str(repo_root),
+        ]
+        return subprocess.run(  # noqa: S603 - fixed local interpreter/script invocation
+            command,
+            cwd=SOURCE_REPO_ROOT / "site" / "pipeline",
+            text=True,
+            capture_output=True,
+            check=check,
+        )
+
+    def run_pipeline_build(
+        self, repo_root: Path, *args: str, check: bool = False
+    ) -> subprocess.CompletedProcess[str]:
+        return self.run_pipeline_command(repo_root, "build", *args, check=check)
+
+    def run_pipeline_clean(
+        self, repo_root: Path, *args: str, check: bool = False
+    ) -> subprocess.CompletedProcess[str]:
+        return self.run_pipeline_command(repo_root, "clean", *args, check=check)
+
+    def assert_command_succeeded(self, result: subprocess.CompletedProcess[str]) -> None:
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def assert_command_failed(
+        self, result: subprocess.CompletedProcess[str], expected_message: str
+    ) -> None:
+        self.assertNotEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn(expected_message, result.stdout + result.stderr)
+
 
 def write_fixture_catalog(site_root: Path, components: list[dict[str, object]] | None = None) -> None:
     """Write a components catalog tailored for integration fixtures."""
@@ -148,15 +191,28 @@ def seed_make_fixture_main_repo(repo_root: Path) -> None:
         ignore=PIPELINE_FIXTURE_IGNORE,
     )
     shutil.copytree(
-        EXTRACTED_PIPELINE_ROOT,
-        repo_root / "buildish-site-pipeline",
+        EXTRACTED_PIPELINE_SNAPSHOT_ROOT,
+        repo_root.parent / "buildish-site-pipeline" / "dist" / "snapshots",
         dirs_exist_ok=True,
-        ignore=PIPELINE_FIXTURE_IGNORE,
     )
+    rewrite_snapshot_manifest(repo_root.parent / "buildish-site-pipeline" / "dist" / "snapshots")
     shutil.copy2(SOURCE_REPO_ROOT / "DISCLAIMER", repo_root / "DISCLAIMER")
     for relative in SITE_ROOT_FILES:
         shutil.copy2(SOURCE_REPO_ROOT / "site" / relative, site_root / relative)
     write_fixture_catalog(site_root)
+
+
+def rewrite_snapshot_manifest(snapshot_root: Path) -> None:
+    """Rewrite ``latest.json`` to point at the copied fixture wheel path."""
+
+    manifest_path = snapshot_root / "latest.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    wheel_name = payload["wheel"]
+    wheel_path = (snapshot_root / wheel_name).resolve()
+    payload["wheelPath"] = str(wheel_path)
+    payload["fileUrl"] = wheel_path.as_uri()
+    payload["dependencySpec"] = f"apache-buildish-site-pipeline @ {wheel_path.as_uri()}"
+    manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def seed_mammoth_fixture(

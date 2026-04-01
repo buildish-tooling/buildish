@@ -18,14 +18,30 @@ limitations under the License.
 
 ## Objective
 
-Extract the current site pipeline into a reusable Apache-hosted component that
-Buildish consumes as a normal dependency.
+Extract the current site pipeline into a reusable component in its own sibling
+repository that Buildish consumes as an external dependency.
 
 The pipeline should own generic staging, validation, configuration, and local
 workflow logic. Buildish should keep its own site presentation, content, and
 project-specific integration decisions.
 
 ## Current state
+
+- The repo split is complete for the current local-development model.
+- `buildish-site-pipeline/` now owns the reusable implementation, CLI, docs,
+  and package-internal tests.
+- `buildish/site/pipeline` is now a consumer project that depends on the
+  sibling repository through a locally published wheel snapshot under
+  `../buildish-site-pipeline/dist/snapshots/`.
+- Buildish Make-based workflows automatically refresh the consumer to the
+  latest published sibling snapshot before running `uv`-backed pipeline checks
+  or commands.
+- Buildish-side tests are now limited to consumer-facing behavior and thin
+  integration-contract checks; package-internal model/config/watch-helper
+  coverage lives in `buildish-site-pipeline`.
+- No remaining repo-split TODOs are required for the current 2-step workflow:
+  1. publish a new local snapshot in `buildish-site-pipeline`
+  2. run the desired `make <target>` in Buildish
 
 ## Dependency additions during extraction
 
@@ -34,8 +50,8 @@ project-specific integration decisions.
   `buildish-site-pipeline/` repo currently reuses the same dependency set as the
   in-repo package.
 - Phase 3: no new external dependencies added; `site/pipeline` now depends on
-  `buildish-site-pipeline/` as a local editable `uv` source instead of carrying
-  the implementation package itself.
+  `buildish-site-pipeline/` as a machine-local wheel snapshot `uv` source
+  instead of carrying the implementation package itself.
 
 ### Implemented
 
@@ -73,14 +89,14 @@ project-specific integration decisions.
   tree, and preview HTML links are derived from the resolved workspace output
   paths instead of from hard-coded Buildish defaults.
 
-### Still coupled to Buildish or in-repo execution
+### Intentional current limitations
 
 - The current staged contract is still shaped around the Buildish Hugo/Docsy
   integration, even though the duplicated URL/preview conventions were removed
   from the core.
-- Buildish now consumes the extracted repository through its consumer project,
-  but the temporary bootstrap still uses a local editable path source until the
-  extracted repository is split out and versioned independently.
+- Buildish currently consumes the extracted repository through a machine-local
+  sibling wheel snapshot path. That is the intended local-development workflow
+  for now, even though a published versioned dependency remains a later goal.
 
 ## Target split
 
@@ -194,10 +210,16 @@ Completed:
   them to exercise the extracted repository path
 - updated top-level `site/Makefile` so `make check` also validates the
   extracted repo
+- narrowed `site/pipeline/tests/test_support.py` so Buildish fixtures seed only
+  the sibling wheel-snapshot contract they consume rather than copying the
+  extracted repository source tree
+- added automatic latest-snapshot refresh logic in the Buildish consumer so
+  Make-based workflows update `site/pipeline` to the newest published sibling
+  wheel before invoking `uv`
 
 ### Phase 4: broaden adoption and harden the public contract
 
-Status: in progress.
+Status: complete for the repo-split milestone.
 
 Completed:
 
@@ -210,17 +232,21 @@ Completed:
   overview
 - added a reusable second-consumer fixture and CLI-backed test coverage to
   pressure-test the documented adoption path outside the Buildish workspace
+- moved package-internal metadata/config/watch-helper ownership into
+  `buildish-site-pipeline/tests/test_extracted_pipeline.py`, leaving Buildish
+  focused on consumer-facing behavior and integration coverage
+- removed the remaining Buildish-side dependency on
+  `apache_buildish_site_pipeline.models` so Buildish tests only assert thin
+  consumer-contract behavior via file existence and minimal YAML content checks
 
-Remaining:
+Remaining for this phase:
 
-- stabilize the public contract based on feedback from additional consumers
-  beyond the initial Buildish integration
+- none required for the repo split itself
 
 ## Immediate next steps
 
-1. Split `buildish-site-pipeline/` into its own repository and replace the
-   temporary local editable `uv` source in `site/pipeline/` with a versioned
-   dependency.
+1. No immediate extraction work remains for the current sibling-repo,
+   local-snapshot workflow.
 
 ## Later follow-up tasks
 
@@ -230,7 +256,9 @@ Remaining:
 2. Decide whether to publish a renderer-agnostic multi-platform Site Pipeline
    container image for CI/bootstrap use, while keeping renderer-specific images
    owned by consumers.
-3. Once the extracted repository is public at the ASF, publish wheel snapshots
-   to a hosted location such as GitHub so consumers can stop relying on
-   machine-local file paths.
+3. Once the extracted repository is hosted independently at the ASF, replace
+   the machine-local snapshot dependency in `site/pipeline/` with a published,
+   versioned dependency flow.
+4. If useful before full publishing, publish wheel snapshots to a hosted
+   location so consumers can stop relying on machine-local file paths.
 

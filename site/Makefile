@@ -325,7 +325,7 @@ build: container-build ## Build the staged contract and full Hugo site in the bu
 build-local: stage-local render-local ## Build the staged contract and full Hugo site with host tools.
 
 pipeline-core-check: sanity-check ## Run the extracted pipeline repository checks.
-	$(MAKE) --no-print-directory -C ../buildish-site-pipeline check
+	$(MAKE) --no-print-directory -C ../../buildish-site-pipeline check
 
 container-engine-check: ## Verify Podman or Docker is available for containerized site targets.
 	@engine='$(strip $(CONTAINER_ENGINE))'; \
@@ -391,7 +391,7 @@ container-image-local-registry-test: ## Run the localhost-registry integration t
 
 serve: container-serve ## Serve the full Hugo site with automatic restaging in the build container; override PORT=<port> if needed.
 
-serve-local: sanity-check hugo-check docsy-check ## Serve the full Hugo site with automatic restaging using host tools; override PORT=<port> if needed.
+serve-local: pipeline-refresh-local hugo-check docsy-check ## Serve the full Hugo site with automatic restaging using host tools; override PORT=<port> if needed.
 	@watch_pid=''; \
 	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
@@ -418,19 +418,19 @@ clean: sanity-check ## Remove generated pipeline and renderer output.
 	$(MAKE) --no-print-directory pipeline-clean-local
 	rm -rf .public .hugo_build.lock resources
 
-pipeline-format: sanity-check ## Format Python sources under site/pipeline.
+pipeline-format: pipeline-refresh-local ## Format Python sources under site/pipeline.
 	cd pipeline && $(UV) run --frozen ruff format .
 
-pipeline-lint: sanity-check ## Run Ruff checks for Python sources under site/pipeline.
+pipeline-lint: pipeline-refresh-local ## Run Ruff checks for Python sources under site/pipeline.
 	cd pipeline && $(UV) run --frozen ruff check .
 
-pipeline-typecheck: sanity-check ## Run Mypy checks for Python sources under site/pipeline.
+pipeline-typecheck: pipeline-refresh-local ## Run Mypy checks for Python sources under site/pipeline.
 	cd pipeline && $(UV) run --frozen mypy
 
-test: sanity-check ## Run unit tests.
+test: pipeline-refresh-local ## Run unit tests.
 	$(UV_RUN) $(PYTHON) -m unittest discover -s pipeline/tests -p 'test_*.py' -v
 
-integration-test: sanity-check ## Run integration tests.
+integration-test: pipeline-refresh-local ## Run integration tests.
 	$(UV_RUN) $(PYTHON) -m unittest discover -s pipeline/tests -p 'integration_*_test.py' -v
 
 check: ## Run lint, type checks, tests, and build-local.

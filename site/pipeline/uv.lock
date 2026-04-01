@@ -38,7 +38,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "apache-buildish-site-pipeline", editable = "../../buildish-site-pipeline" }]
+requires-dist = [{ name = "apache-buildish-site-pipeline", path = "../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0.dev20260401092215+g5580fe44a69f-py3-none-any.whl" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -48,14 +48,17 @@ dev = [
 
 [[package]]
 name = "apache-buildish-site-pipeline"
-version = "0.1.0"
-source = { editable = "../../buildish-site-pipeline" }
+version = "0.1.0.dev20260401092215+g5580fe44a69f"
+source = { path = "../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0.dev20260401092215+g5580fe44a69f-py3-none-any.whl" }
 dependencies = [
     { name = "mistletoe" },
     { name = "pydantic" },
     { name = "python-frontmatter" },
     { name = "pyyaml" },
     { name = "watchfiles" },
+]
+wheels = [
+    { filename = "apache_buildish_site_pipeline-0.1.0.dev20260401092215+g5580fe44a69f-py3-none-any.whl", hash = "sha256:6677e809779a5f1973ba68686d2b4f07705c1327ee1833ba6f799b2224647027" },
 ]
 
 [package.metadata]
@@ -65,12 +68,6 @@ requires-dist = [
     { name = "python-frontmatter", specifier = ">=1,<2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "watchfiles", specifier = ">=1.1.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "mypy", specifier = ">=1.19.1" },
-    { name = "ruff", specifier = ">=0.15.8" },
 ]
 
 [[package]]

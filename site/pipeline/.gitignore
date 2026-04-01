@@ -18,3 +18,4 @@ __pycache__/
 /.venv/
 /.mypy_cache/
 /.ruff_cache/
+/.refresh-latest-snapshot.lock

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Integration tests that stage a fixture workspace through the Python API."""
+"""Integration tests that stage a fixture workspace through the CLI."""
 
 from __future__ import annotations
 
@@ -22,8 +22,6 @@ import unittest
 from pathlib import Path
 
 import yaml
-
-import apache_buildish_site_pipeline as site_pipeline
 
 from test_support import (
     TestCaseHelpers,
@@ -106,11 +104,13 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
             self.seed_mammoth_fixture(workspace / "buildish-mammoth-cache")
             self.seed_no_wrapper_fixture(workspace / "buildish-no-gradle-wrapper-jar")
 
-            first_results = site_pipeline.build(repo_root)
-            second_results = site_pipeline.build(repo_root)
+            first_result = self.run_pipeline_build(repo_root)
+            second_result = self.run_pipeline_build(repo_root)
 
-            self.assertEqual(3, len(first_results))
-            self.assertEqual(3, len(second_results))
+            self.assert_command_succeeded(first_result)
+            self.assert_command_succeeded(second_result)
+            self.assertIn("Built 3 component(s)", first_result.stdout)
+            self.assertIn("Built 3 component(s)", second_result.stdout)
 
             self.assert_paths_exist(
                 repo_root
