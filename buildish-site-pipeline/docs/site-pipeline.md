@@ -1,3 +1,7 @@
+---
+weight: 10
+---
+
 <!--
 Copyright 2026 The Apache Software Foundation
 
@@ -145,9 +149,9 @@ The current implementation keeps these guardrails:
 
 ## Read next
 
-- [Site component contract](site-component-contract.md)
-- [Adoption guide](adoption-guide.md)
-- [Workspace examples](examples.md)
+- [Site component contract](../site-component-contract/)
+- [Adoption guide](../adoption-guide/)
+- [Workspace examples](../examples/)
 
 ## Current limitations
 

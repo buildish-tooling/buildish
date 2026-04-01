@@ -1,3 +1,7 @@
+---
+weight: 20
+---
+
 <!--
 Copyright 2026 The Apache Software Foundation
 
@@ -200,6 +204,6 @@ The pipeline enforces these guardrails:
 
 ## Read next
 
-- [Site Pipeline overview](site-pipeline.md)
-- [Adoption guide](adoption-guide.md)
-- [Workspace examples](examples.md)
+- [Site Pipeline overview](../site-pipeline/)
+- [Adoption guide](../adoption-guide/)
+- [Workspace examples](../examples/)

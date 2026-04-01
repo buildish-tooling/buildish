@@ -23,13 +23,3 @@ predictable staged site contract.
 
 Use these docs to understand the split between pipeline-owned staging behavior
 and consumer-owned rendering, navigation, and publishing.
-
-## Read this first
-
-- [Site Pipeline overview](site-pipeline.md) for responsibilities, commands, and
-  runtime boundaries.
-- [Site component contract](site-component-contract.md) for the current input and
-  output contract.
-- [Adoption guide](adoption-guide.md) for wiring a new consumer repository.
-- [Workspace examples](examples.md) for common repository layouts and override
-  patterns.
