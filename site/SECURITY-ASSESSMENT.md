@@ -149,96 +149,34 @@ in the developer's workspace are incidental.
 
 ---
 
-## MEDIUM — World-writable scratch directories on the host
+## ~~MEDIUM~~ — World-writable scratch directories on the host — **fixed**
 
-**File:** `site/Makefile` lines 69–75, 128–130, 132–145 (various `chmod 0777` calls)
+**File:** `site/Makefile` (various `chmod` calls and detection block)
 
-```makefile
-chmod 0777 '$(HOST_CONTAINER_SCRATCH_ROOT)'   # host-side root scratch dir
-chmod 0777 "$$scratch"                         # per-run temp dir inside container
-chmod 0777 .stage .preview .public resources/_gen
-```
+Both issues are now fixed:
 
-Using `0777` makes every scratch and output directory world-writable.  On a
-shared machine (CI agent pool, multi-user workstation) another local user could
-replace files between when they are created and when they are consumed, i.e., a
-local TOCTOU / cache-poisoning attack on npm modules or uv venv artefacts.
-
-**Engine detection fragility — the deeper issue:**
-
-The Makefile detects Podman vs Docker by comparing the basename of
-`CONTAINER_ENGINE` against the literal string `podman`:
+* `chmod 0777` on scratch/per-run temp directories replaced with `chmod 0700`
+  (private to the calling user, sufficient because `--user $(id -u):$(id -g)`
+  already ensures the container process runs as the same UID).
+* `chmod 0777` on output directories (`.stage`, `.preview`, `.public`,
+  `resources/_gen`) replaced with `chmod 0755` (conventional for shared-read
+  directories; world-write was never needed).
+* `umask 000` removed from `CONTAINER_TEST_SCRIPT`,
+  `CONTAINER_INTEGRATION_TEST_SCRIPT`, and `CONTAINER_PREPARE_SITE_ENV`.
+* The Podman detection block replaced with a version-string probe that checks
+  both executable basename and `--version` output, plus an explicit
+  `CONTAINER_IS_PODMAN` override variable:
 
 ```makefile
-CONTAINER_ENGINE_BASENAME := $(notdir $(CONTAINER_ENGINE))
-ifeq ($(CONTAINER_ENGINE_BASENAME),podman)
-CONTAINER_USERNS_FLAGS := --userns=keep-id
-endif
+_container_version    := $(shell $(CONTAINER_ENGINE) --version 2>/dev/null)
+_container_name_match := $(filter podman,$(CONTAINER_ENGINE_BASENAME))
+_container_ver_match  := $(findstring podman,$(_container_version))
+CONTAINER_IS_PODMAN   ?= $(if $(or $(_container_name_match),$(_container_ver_match)),1,)
 ```
 
-`--userns=keep-id` is a Podman-specific flag; passing it to Docker causes an
-error.  The current detection fails if:
-
-* The user has Docker named `podman` (e.g. via `podman-docker` shim in reverse)
-* The user has Podman installed under a non-standard name (e.g. `podman-remote`,
-  `/opt/podman/bin/podman4`)
-* `CONTAINER_ENGINE` is set to a full path like `/usr/bin/podman` — this
-  actually works correctly since `$(notdir ...)` strips the path, but it is
-  worth noting it relies on the final path component.
-
-**Why `0777` was chosen and why it may not be necessary:**
-
-Both Docker and rootless Podman are invoked with `--user $(id -u):$(id -g)`,
-so the container process runs as the same UID/GID as the calling user.
-Scratch directories created on the host (or visible to the container via the
-volume mount) and owned by the calling user are fully accessible to the
-container process at mode `0700` — no world-write permission is needed.
-
-The `umask 000` + `chmod 0777` pattern inside the container scripts appears to
-be a historical carry-over from a time when user-namespace mapping was not yet
-consistent.  With `--userns=keep-id` (Podman) or `--user uid:gid` (Docker) both
-consistently mapping to the host user, the directories simply need to be
-writable by that UID.
-
-**Recommended options:**
-
-1. **Replace `chmod 0777` with `chmod 0700` on scratch dirs (recommended).**
-   Since `--user $(id -u):$(id -g)` is applied uniformly, the container process
-   owns the scratch directories and `0700` is sufficient.  The output directories
-   (`.stage`, `.preview`, `.public`, `resources/_gen`) can use `0755` (readable
-   by group/others, conventional for directories) if that is useful for
-   downstream processes reading them on the host; `0700` works too.  Drop the
-   `umask 000` calls at the same time; they are not needed.
-
-2. **Make the Podman/Docker detection robust with a version-string probe and
-   allow explicit override.**  Instead of matching only the binary basename,
-   also check the `--version` output, and let the user hard-override the flag:
-
-   ```makefile
-   # Auto-detect: check both binary name and --version output for the word "podman".
-   # Override with: make CONTAINER_IS_PODMAN=1  or  make CONTAINER_IS_PODMAN=0
-   _container_version := $(shell $(CONTAINER_ENGINE) --version 2>/dev/null)
-   _container_name_match := $(filter podman,$(CONTAINER_ENGINE_BASENAME))
-   _container_ver_match  := $(findstring podman,$(_container_version))
-   CONTAINER_IS_PODMAN ?= $(if $(or $(_container_name_match),$(_container_ver_match)),1,)
-
-   CONTAINER_MOUNT_LABEL  :=
-   CONTAINER_USERNS_FLAGS :=
-   ifneq ($(CONTAINER_IS_PODMAN),)
-   CONTAINER_MOUNT_LABEL  := :Z
-   CONTAINER_USERNS_FLAGS := --userns=keep-id
-   endif
-   ```
-
-   This correctly handles: full-path Podman binaries, the `podman-docker` shim
-   (which prints `podman` in `--version`), and Docker named `docker` (whose
-   `--version` output contains `Docker` not `podman`).  It also gives operators
-   a clean escape hatch (`CONTAINER_IS_PODMAN=0` or `=1`) without editing the
-   Makefile.
-
-   Note: the `$(shell ...)` call runs at Make parse time on every invocation.
-   If startup latency is a concern, the result can be cached via a stamp file or
-   the probe can be moved into a recipe.
+This correctly handles renamed/wrapped Podman binaries and the `podman-docker`
+shim (whose `--version` still contains the word `podman`), while never
+accidentally applying `--userns=keep-id` to Docker or other runtimes.
 
 ---
 

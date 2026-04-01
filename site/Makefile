@@ -67,10 +67,17 @@ ifneq ($(strip $(CONTAINER_PLATFORM)),)
 CONTAINER_PLATFORM_FLAG := --platform $(CONTAINER_PLATFORM)
 endif
 CONTAINER_ENGINE_BASENAME := $(notdir $(CONTAINER_ENGINE))
-CONTAINER_MOUNT_LABEL :=
+# Detect Podman by both executable basename and --version output so renamed or
+# wrapped binaries are handled correctly.  Override when auto-detection does not
+# match your setup: make CONTAINER_IS_PODMAN=1  or  make CONTAINER_IS_PODMAN=0
+_container_version    := $(shell $(CONTAINER_ENGINE) --version 2>/dev/null)
+_container_name_match := $(filter podman,$(CONTAINER_ENGINE_BASENAME))
+_container_ver_match  := $(findstring podman,$(_container_version))
+CONTAINER_IS_PODMAN   ?= $(if $(or $(_container_name_match),$(_container_ver_match)),1,)
+CONTAINER_MOUNT_LABEL  :=
 CONTAINER_USERNS_FLAGS :=
-ifeq ($(CONTAINER_ENGINE_BASENAME),podman)
-CONTAINER_MOUNT_LABEL := :Z
+ifneq ($(CONTAINER_IS_PODMAN),)
+CONTAINER_MOUNT_LABEL  := :Z
 CONTAINER_USERNS_FLAGS := --userns=keep-id
 endif
 
@@ -127,22 +134,21 @@ CONTAINER_MANAGED_SERVE_RUN = \
 
 PREPARE_CONTAINER_SCRATCH = \
 	mkdir -p '$(HOST_CONTAINER_SCRATCH_ROOT)'; \
-	chmod 0777 '$(HOST_CONTAINER_SCRATCH_ROOT)'
+	chmod 0700 '$(HOST_CONTAINER_SCRATCH_ROOT)'
 
 PREPARE_CONTAINER_STAGE_OUTPUTS = \
 	rm -rf .stage .preview; \
 	mkdir -p .stage .preview; \
-	chmod 0777 .stage .preview
+	chmod 0755 .stage .preview
 
 PREPARE_CONTAINER_SERVE_OUTPUTS = \
 	rm -rf .stage .preview .public resources/_gen; \
 	mkdir -p .stage .preview .public resources/_gen; \
-	chmod 0777 .stage .preview .public resources/_gen
+	chmod 0755 .stage .preview .public resources/_gen
 
 CONTAINER_TEST_SCRIPT = \
-	umask 000; \
 	scratch="$$(mktemp -d "$(CONTAINER_SCRATCH_ROOT)/test.XXXXXX")"; \
-	chmod 0777 "$$scratch"; \
+	chmod 0700 "$$scratch"; \
 	mkdir -p "$$scratch/uv-cache"; \
 	trap "rm -rf \"$$scratch\"" EXIT; \
 	export UV_CACHE_DIR="$$scratch/uv-cache"; \
@@ -150,9 +156,8 @@ CONTAINER_TEST_SCRIPT = \
 	make test
 
 CONTAINER_INTEGRATION_TEST_SCRIPT = \
-	umask 000; \
 	scratch="$$(mktemp -d "$(CONTAINER_SCRATCH_ROOT)/integration.XXXXXX")"; \
-	chmod 0777 "$$scratch"; \
+	chmod 0700 "$$scratch"; \
 	mkdir -p "$$scratch/uv-cache"; \
 	trap "rm -rf \"$$scratch\"" EXIT; \
 	export UV_CACHE_DIR="$$scratch/uv-cache"; \
@@ -161,9 +166,8 @@ CONTAINER_INTEGRATION_TEST_SCRIPT = \
 	make integration-test
 
 CONTAINER_PREPARE_SITE_ENV = \
-	umask 000; \
 	scratch="$$(mktemp -d "$(CONTAINER_SCRATCH_ROOT)/run.XXXXXX")"; \
-	chmod 0777 "$$scratch"; \
+	chmod 0700 "$$scratch"; \
 	node_root="$$scratch/node-work"; \
 	tool_bin="$$scratch/tool-bin"; \
 	printf "==> [container] using scratch directory %s\\n" "$$scratch"; \
