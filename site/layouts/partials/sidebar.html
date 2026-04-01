@@ -85,7 +85,7 @@ limitations under the License.
     "skipRootSection" $skipRootSection
 -}}
 {{ if $cacheSidebar -}}
-  {{ $mid := printf "m-%s" (.RelPermalink | anchorize) }}
+  {{ $mid := printf "m-%s" (.RelPermalink | anchorize | safeJS) }}
   <script>
     $(function() {
     $("#td-section-nav a").removeClass("active");
