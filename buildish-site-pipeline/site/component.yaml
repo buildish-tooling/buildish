@@ -14,21 +14,11 @@
 # limitations under the License.
 
 schemaVersion: 1
-defaults:
-  metadataFile: site/component.yaml
-  pagesRoot: site/pages
-  docsRoot: site/docs
-  assetsRoot: site/assets
-  developmentLabel: Development
-  tagPattern: ^v[0-9]+\.[0-9]+\.[0-9]+$
-  navigationSection: components
-components:
-  - slug: mammoth-cache
-    localDir: buildish-mammoth-cache
-  - slug: no-gradle-wrapper-jar
-    localDir: buildish-no-gradle-wrapper-jar
-  - slug: site-pipeline
-    localDir: buildish/buildish-site-pipeline
-  - slug: site
-    localDir: buildish/site
-    weight: 100
+component:
+  slug: site-pipeline
+  displayName: Site Pipeline
+  repository: https://github.com/apache/buildish
+content:
+  docsRoot: docs
+navigation:
+  section: components
