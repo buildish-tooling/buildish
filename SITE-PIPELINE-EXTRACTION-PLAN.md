@@ -230,4 +230,7 @@ Remaining:
 2. Decide whether to publish a renderer-agnostic multi-platform Site Pipeline
    container image for CI/bootstrap use, while keeping renderer-specific images
    owned by consumers.
+3. Once the extracted repository is public at the ASF, publish wheel snapshots
+   to a hosted location such as GitHub so consumers can stop relying on
+   machine-local file paths.
 
