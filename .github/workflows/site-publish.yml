@@ -42,6 +42,10 @@ jobs:
           persist-credentials: false
 
       - name: Build Apache Site
+        # TODO: Once this workflow can also check out the private component and
+        # buildish-site-pipeline repositories, set
+        # SITE_PIPELINE_ARGS=--missing-components fail here so production site
+        # publishing fails hard on missing components.
         run: make -C site build
 
       - name: Copy .asf.yaml
