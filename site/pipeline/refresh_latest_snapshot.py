@@ -36,6 +36,40 @@ ACTIVE_CONSUMER_ROOT_ENV = "BUILDISH_SITE_PIPELINE_CONSUMER_ROOT"
 ACTIVE_VENV_PATH_ENV = "BUILDISH_SITE_PIPELINE_VENV"
 ACTIVE_ENV_READY_ENV = "BUILDISH_SITE_PIPELINE_ENV_READY"
 
+# Variables passed through verbatim from the caller's environment.
+# Intentionally minimal: CI secrets that happen to be in the environment must
+# not be inherited by the site-pipeline process or its children.
+_ENV_PASSTHROUGH_EXACT: frozenset[str] = frozenset({
+    "HOME",
+    "LANG",
+    "PATH",
+    "SHELL",
+    "TERM",
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    # TLS certificate overrides (needed in corporate / proxied environments).
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "REQUESTS_CA_BUNDLE",
+    "CURL_CA_BUNDLE",
+    # Network proxy — both conventional casings.
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "no_proxy",
+})
+# Variable name prefixes whose values are passed through verbatim.
+_ENV_PASSTHROUGH_PREFIXES: tuple[str, ...] = (
+    "BUILDISH_",  # state variables set and consumed by this script
+    "LC_",        # locale category overrides
+    "PYTHON",     # Python runtime settings (PYTHONPATH, PYTHONDONTWRITEBYTECODE, …)
+    "UV_",        # uv configuration (UV_CACHE_DIR, UV_INDEX_URL, …)
+    "XDG_",       # XDG base directory spec used by uv and other tools
+)
+
 
 @dataclass(frozen=True)
 class SnapshotRefreshResult:
@@ -338,7 +372,7 @@ def _sync_consumer_environment_if_needed(
     if not _consumer_environment_needs_sync(consumer_root, venv_path):
         return False
 
-    env = os.environ.copy()
+    env = _filtered_environment()
     env["UV_PROJECT_ENVIRONMENT"] = str(venv_path)
     subprocess.run(  # noqa: S603 - fixed local tool invocation
         [uv_executable, "sync", "--project", str(consumer_root), "--frozen"],
@@ -390,8 +424,22 @@ def _active_consumer_environment_matches(consumer_root: Path, venv_path: Path) -
     return Path(active_consumer_root).resolve() == consumer_root and Path(active_venv_path).resolve() == venv_path
 
 
+def _filtered_environment() -> dict[str, str]:
+    """Return a minimal copy of the caller environment needed by the pipeline.
+
+    Builds from an explicit allowlist rather than ``os.environ.copy()`` so that
+    CI secrets that happen to be present in the runner environment are not
+    inherited by the site-pipeline process or any subprocess it spawns.
+    """
+    result: dict[str, str] = {}
+    for key, value in os.environ.items():
+        if key in _ENV_PASSTHROUGH_EXACT or key.startswith(_ENV_PASSTHROUGH_PREFIXES):
+            result[key] = value
+    return result
+
+
 def _managed_environment_vars(venv_path: Path, consumer_root: Path) -> dict[str, str]:
-    env = os.environ.copy()
+    env = _filtered_environment()
     venv_bin = str(_venv_bin_dir(venv_path))
     path_entries = env.get("PATH", "").split(":") if env.get("PATH") else []
     if not path_entries or path_entries[0] != venv_bin:

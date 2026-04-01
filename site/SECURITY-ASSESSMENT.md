@@ -134,25 +134,31 @@ accidentally applying `--userns=keep-id` to Docker or other runtimes.
 
 ---
 
-## MEDIUM — Full CI environment propagated to exec'd pipeline process
+## ~~MEDIUM~~ — Full CI environment propagated to exec'd pipeline process — **fixed**
 
-**File:** `site/pipeline/refresh_latest_snapshot.py` lines 131, 393–403
+**File:** `site/pipeline/refresh_latest_snapshot.py`
 
-```python
-os.execvpe(command[0], list(command), env)   # env = os.environ.copy() + additions
-```
+`_managed_environment_vars` and `_sync_consumer_environment_if_needed` both
+previously started from `os.environ.copy()`, which would pass every variable
+in the caller's environment (including CI secrets) through to `site-pipeline`
+and every subprocess it spawned.
 
-The managed environment includes every variable inherited from the caller, not
-just those required by the pipeline.  In CI contexts this means any secrets
-present in the runner environment (e.g. tokens set by earlier steps or the
-organisation's secret injection mechanism) are transparently passed through to
-the `site-pipeline` process and everything it spawns.
+Both call sites now use a new `_filtered_environment()` helper that builds from
+an explicit allowlist instead.  Variables are included only if their name is in
+`_ENV_PASSTHROUGH_EXACT` (an exact-match `frozenset`) or starts with one of the
+prefixes in `_ENV_PASSTHROUGH_PREFIXES`:
 
-**Recommended fix:** Build the environment from a minimal explicit allowlist
-(PATH, HOME, UV\_\*, VIRTUAL\_ENV, BUILDISH\_\*, plus any other variables the
-pipeline genuinely needs) instead of starting from `os.environ.copy()`.  This
-is a defence-in-depth measure; it does not prevent a compromised dependency
-from calling `os.environ` itself, but it limits accidental leakage.
+| Exact names | Prefix groups |
+|---|---|
+| `HOME`, `LANG`, `PATH`, `SHELL`, `TERM` | `BUILDISH_` — state variables set by this script |
+| `TMPDIR`, `TEMP`, `TMP` | `LC_` — locale category overrides |
+| `SSL_CERT_FILE`, `SSL_CERT_DIR`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE` | `PYTHON` — Python runtime settings |
+| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `http_proxy`, `https_proxy`, `no_proxy` | `UV_` — uv configuration |
+| | `XDG_` — XDG base directory spec |
+
+This is a defence-in-depth measure.  A compromised dependency could still call
+`os.environ` directly, but accidental leakage of CI tokens injected by the
+runner or a prior workflow step is now prevented.
 
 ---
 
