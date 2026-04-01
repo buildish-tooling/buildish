@@ -253,9 +253,9 @@ Remaining for this phase:
 1. Trial the extracted package with an external consumer or a richer
    non-Buildish integration to validate the contract before publishing a stable
    versioned release.
-2. Decide whether to publish a renderer-agnostic multi-platform Site Pipeline
-   container image for CI/bootstrap use, while keeping renderer-specific images
-   owned by consumers.
+2. Finish publishing and pinning the renderer-agnostic multi-platform Site
+   Pipeline container image flow, while keeping renderer-specific images owned
+   by consumers.
 3. Once the extracted repository is hosted independently at the ASF, replace
    the machine-local snapshot dependency in `site/pipeline/` with a published,
    versioned dependency flow.

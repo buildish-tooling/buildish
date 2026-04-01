@@ -16,7 +16,9 @@ limitations under the License.
 
 # Apache Buildish site builder image
 
-This directory contains the reusable container image definition for Apache Buildish site workflows.
+This directory contains the Buildish-specific derived container image definition for Apache Buildish site workflows.
+
+The generic `site-pipeline` runtime image now lives in the extracted `buildish-site-pipeline` repository. The image defined here layers Hugo, Node, Go, and the current Buildish-specific render/serve expectations on top of that generic base image.
 
 It is intentionally separated from `site/` so local tooling and future CI can rebuild or publish the image independently from normal site-content changes.
 
@@ -28,6 +30,7 @@ Use `build-image.sh` for the actual builder-image automation.
 
 - Default platforms: `linux/amd64,linux/arm64`
 - Default engine selection: `podman`, then `docker`
+- Optional generic base image override via `SITE_PIPELINE_BASE_IMAGE=<ref>` or `--site-pipeline-base-image <ref>`
 - Publishing is opt-in via `--push`
 
 Examples:

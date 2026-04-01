@@ -143,6 +143,23 @@ jobs:
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@5c8a8a642e79153f5d047b10ec1cba1d1cc65699 # v3.35.1
 
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@71321a20a9ded102f6e9ce5718a2fcec2c4f70d8 # v0.5.2
+        with:
+          advanced-security: false
+
   required_checks:
     name: Required Checks
     if: ${{ always() }}
@@ -152,6 +169,7 @@ jobs:
       - site-verify
       - site-build-image
       - codeql
+      - zizmor
     runs-on: ubuntu-latest
     steps:
       - name: Assert all required jobs succeeded or were intentionally skipped
@@ -161,13 +179,15 @@ jobs:
           SITE_VERIFY_RESULT: ${{ needs.site-verify.result }}
           SITE_BUILD_IMAGE_RESULT: ${{ needs.site-build-image.result }}
           CODEQL_RESULT: ${{ needs.codeql.result }}
+          ZIZMOR_RESULT: ${{ needs.zizmor.result }}
         run: |
           for result in \
             "$CHANGES_RESULT" \
             "$RAT_RESULT" \
             "$SITE_VERIFY_RESULT" \
             "$SITE_BUILD_IMAGE_RESULT" \
-            "$CODEQL_RESULT"; do
+            "$CODEQL_RESULT" \
+            "$ZIZMOR_RESULT"; do
             case "$result" in
               success|skipped) ;;
               *)

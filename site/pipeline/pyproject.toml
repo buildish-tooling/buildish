@@ -34,7 +34,7 @@ select = ["F", "B", "UP", "S"]
 
 [tool.mypy]
 python_version = "3.13"
-files = ["main.py"]
+files = ["refresh_latest_snapshot.py"]
 disable_error_code = ["import-untyped"]
 warn_redundant_casts = true
 warn_unreachable = true

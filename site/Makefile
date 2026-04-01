@@ -31,7 +31,6 @@ CONTAINER_HOME ?= $(CONTAINER_SITE_ROOT)/.container-home
 LOCAL_REGISTRY_TEST_PLATFORMS ?= linux/amd64,linux/arm64
 LOCAL_REGISTRY_TEST_TAG ?= integration-test
 LOCAL_REGISTRY_TEST_ARGS ?=
-UV_RUN := $(UV) run --project ./pipeline --frozen
 HELP_TARGETS = $(MAKEFILE_LIST)
 HELP_PUBLIC_COMMON_TARGETS := serve build
 HELP_PUBLIC_CHECK_TARGETS := test integration-test check clean
@@ -433,11 +432,11 @@ container-image-local-registry-test: container-engine-check ## Run the localhost
 
 serve: container-serve ## Serve the full Hugo site with automatic restaging in the build container; override PORT=<port> if needed.
 
-serve-local: pipeline-refresh-local hugo-check docsy-check ## Serve the full Hugo site with automatic restaging using host tools; override PORT=<port> if needed.
+serve-local: sanity-check hugo-check docsy-check ## Serve the full Hugo site with automatic restaging using host tools; override PORT=<port> if needed.
 	@watch_pid=''; \
 	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
-	$(UV_RUN) $(SITE_PIPELINE) watch --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS) & \
+	$(call RUN_PIPELINE_MANAGED_COMMAND,$(SITE_PIPELINE) watch --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS)) & \
 	watch_pid=$$!; \
 	while [ ! -f .stage/manifest.yaml ]; do \
 		if ! kill -0 "$$watch_pid" 2>/dev/null; then \
@@ -460,20 +459,20 @@ clean: sanity-check ## Remove generated pipeline and renderer output.
 	$(MAKE) --no-print-directory pipeline-clean-local
 	rm -rf .public .hugo_build.lock resources
 
-pipeline-format: pipeline-refresh-local ## Format Python sources under site/pipeline.
-	cd pipeline && $(UV) run --frozen ruff format .
+pipeline-format: sanity-check ## Format Python sources under site/pipeline.
+	@$(call RUN_PIPELINE_MANAGED_COMMAND,ruff format $(PIPELINE_CONSUMER_ROOT))
 
-pipeline-lint: pipeline-refresh-local ## Run Ruff checks for Python sources under site/pipeline.
-	cd pipeline && $(UV) run --frozen ruff check .
+pipeline-lint: sanity-check ## Run Ruff checks for Python sources under site/pipeline.
+	@$(call RUN_PIPELINE_MANAGED_COMMAND,ruff check $(PIPELINE_CONSUMER_ROOT))
 
-pipeline-typecheck: pipeline-refresh-local ## Run Mypy checks for Python sources under site/pipeline.
-	cd pipeline && $(UV) run --frozen mypy
+pipeline-typecheck: sanity-check ## Run Mypy checks for Python sources under site/pipeline.
+	@$(call RUN_PIPELINE_MANAGED_COMMAND,mypy --config-file $(PIPELINE_CONSUMER_ROOT)/pyproject.toml $(PIPELINE_CONSUMER_ROOT)/refresh_latest_snapshot.py)
 
-test: pipeline-refresh-local ## Run unit tests.
-	$(UV_RUN) $(PYTHON) -m unittest discover -s pipeline/tests -p 'test_*.py' -v
+test: sanity-check ## Run unit tests.
+	@$(call RUN_PIPELINE_MANAGED_COMMAND,python -m unittest discover -s pipeline/tests -p 'test_*.py' -v)
 
-integration-test: pipeline-refresh-local ## Run integration tests.
-	$(UV_RUN) $(PYTHON) -m unittest discover -s pipeline/tests -p 'integration_*_test.py' -v
+integration-test: sanity-check ## Run integration tests.
+	@$(call RUN_PIPELINE_MANAGED_COMMAND,python -m unittest discover -s pipeline/tests -p 'integration_*_test.py' -v)
 
 check: ## Run lint, type checks, tests, and build-local.
 	$(MAKE) clean

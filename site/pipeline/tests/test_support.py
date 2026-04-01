@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -31,7 +32,9 @@ SOURCE_REPO_ROOT = Path(__file__).resolve().parents[3]
 EXTRACTED_PIPELINE_SNAPSHOT_ROOT = (
     SOURCE_REPO_ROOT.parent / "buildish-site-pipeline" / "dist" / "snapshots"
 )
-CONSUMER_PIPELINE_MAIN = SOURCE_REPO_ROOT / "site" / "pipeline" / "main.py"
+CONSUMER_PIPELINE_ROOT = SOURCE_REPO_ROOT / "site" / "pipeline"
+CONSUMER_PIPELINE_REFRESH = CONSUMER_PIPELINE_ROOT / "refresh_latest_snapshot.py"
+CONSUMER_PIPELINE_VENV = CONSUMER_PIPELINE_ROOT / ".venv"
 PIPELINE_FIXTURE_IGNORE = shutil.ignore_patterns(
     ".venv",
     "__pycache__",
@@ -125,17 +128,28 @@ class TestCaseHelpers:
     ) -> subprocess.CompletedProcess[str]:
         command = [
             sys.executable,
-            str(CONSUMER_PIPELINE_MAIN),
+            str(CONSUMER_PIPELINE_REFRESH),
+            "--consumer-root",
+            str(CONSUMER_PIPELINE_ROOT),
+            "--lock",
+            "--sync",
+            "--venv-path",
+            str(CONSUMER_PIPELINE_VENV),
+            "--",
+            "site-pipeline",
             *args,
             "--repo-root",
             str(repo_root),
         ]
+        env = os.environ.copy()
+        env["UV_PROJECT_ENVIRONMENT"] = str(CONSUMER_PIPELINE_VENV)
         return subprocess.run(  # noqa: S603 - fixed local interpreter/script invocation
             command,
-            cwd=SOURCE_REPO_ROOT / "site" / "pipeline",
+            cwd=CONSUMER_PIPELINE_ROOT,
             text=True,
             capture_output=True,
             check=check,
+            env=env,
         )
 
     def run_pipeline_build(

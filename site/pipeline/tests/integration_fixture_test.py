@@ -172,7 +172,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 components_data["components"]["no-gradle-wrapper-jar"]["localDir"],
             )
             self.assertEqual(
-                "Site", components_data["components"]["site"]["displayName"]
+                "Website", components_data["components"]["site"]["displayName"]
             )
             self.assertEqual(
                 "/components/site/",
@@ -217,7 +217,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 site_development_index.split("---", 2)[1]
             )
             self.assertEqual(
-                "Site",
+                "Website",
                 site_development_front_matter["sitePipelineComponent"]["displayName"],
             )
             self.assertEqual(
@@ -232,7 +232,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 preview_index,
                 "Fixture Mammoth Cache for Gradle® and Apache Maven™",
                 "Fixture no-gradle-wrapper-jar",
-                "Site",
+                "Website",
             )
         finally:
             shutil.rmtree(FIXTURE_BUILD_ROOT, ignore_errors=True)

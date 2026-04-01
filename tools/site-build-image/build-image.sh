@@ -21,6 +21,7 @@ CONTAINERFILE_DEFAULT="$SCRIPT_DIR/Containerfile"
 BUILD_CONTEXT_DEFAULT="$SCRIPT_DIR"
 PLATFORMS="linux/amd64,linux/arm64"
 ENGINE="${CONTAINER_ENGINE:-}"
+SITE_PIPELINE_BASE_IMAGE="${SITE_PIPELINE_BASE_IMAGE:-}"
 IMAGE_REF=""
 PUSH_IMAGE=false
 ALLOW_INSECURE_LOCALHOST_REGISTRY=false
@@ -69,6 +70,8 @@ Options:
   --image <ref>         Fully-qualified image reference to build.
   --engine <name>       Container engine to use: podman or docker.
   --platforms <list>    Comma-separated platforms. Default: linux/amd64,linux/arm64
+  --site-pipeline-base-image <ref>
+                        Optional base image reference for the generic site-pipeline runtime.
   --push                Push/publish the multi-platform image after building.
   --allow-insecure-localhost-registry
                         Allow insecure publishing only to localhost/loopback registries.
@@ -80,6 +83,7 @@ Options:
 Examples:
   ./build-image.sh --image ghcr.io/example/buildish-site-build:latest --dry-run
   ./build-image.sh --engine podman --image ghcr.io/example/buildish-site-build:latest
+  SITE_PIPELINE_BASE_IMAGE=localhost/buildish-site-pipeline:local ./build-image.sh --engine podman --image ghcr.io/example/buildish-site-build:latest
   ./build-image.sh --engine podman --image localhost:5000/buildish-site-build:test --push --allow-insecure-localhost-registry
   ./build-image.sh --engine docker --image ghcr.io/example/buildish-site-build:latest --push
 EOF
@@ -215,7 +219,12 @@ validate_podman_platform_support() {
 
 build_with_podman() {
   local platform
-  local -a platforms
+  local -a platforms podman_build_args
+
+  podman_build_args=()
+  if [[ -n "$SITE_PIPELINE_BASE_IMAGE" ]]; then
+    podman_build_args+=(--build-arg "SITE_PIPELINE_BASE_IMAGE=$SITE_PIPELINE_BASE_IMAGE")
+  fi
 
   if ! $DRY_RUN; then
     if ! $SKIP_PLATFORM_PREREQ_CHECK; then
@@ -230,7 +239,7 @@ build_with_podman() {
   for platform in "${platforms[@]}"; do
     platform="${platform//[[:space:]]/}"
     [[ -n "$platform" ]] || continue
-    run_cmd podman build --rm --platform "$platform" --manifest "$IMAGE_REF" -f "$CONTAINERFILE_DEFAULT" "$BUILD_CONTEXT_DEFAULT"
+    run_cmd podman build --rm --platform "$platform" --manifest "$IMAGE_REF" "${podman_build_args[@]}" -f "$CONTAINERFILE_DEFAULT" "$BUILD_CONTEXT_DEFAULT"
   done
 
   if $PUSH_IMAGE; then
@@ -254,6 +263,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --platforms)
       PLATFORMS="${2:?Missing value for --platforms}"
+      shift 2
+      ;;
+    --site-pipeline-base-image)
+      SITE_PIPELINE_BASE_IMAGE="${2:?Missing value for --site-pipeline-base-image}"
       shift 2
       ;;
     --push)
@@ -314,6 +327,9 @@ case "$ENGINE" in
     fi
     run_cmd docker buildx version
     docker_cmd=(docker buildx build --platform "$PLATFORMS" --rm --tag "$IMAGE_REF" -f "$CONTAINERFILE_DEFAULT")
+    if [[ -n "$SITE_PIPELINE_BASE_IMAGE" ]]; then
+      docker_cmd+=(--build-arg "SITE_PIPELINE_BASE_IMAGE=$SITE_PIPELINE_BASE_IMAGE")
+    fi
     if $PUSH_IMAGE; then
       docker_cmd+=(--push)
     fi

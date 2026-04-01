@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -52,6 +53,7 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        (consumer_root / "uv.lock").write_text("version = 1\n", encoding="utf-8")
 
     def write_manifest(
         self, snapshot_root: Path, wheel_name: str, *, wheel_path: Path | None = None
@@ -154,6 +156,136 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
                     manifest_path=manifest_path,
                     lock=False,
                 )
+
+    def test_prepare_consumer_environment_syncs_managed_venv_when_needed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            consumer_root = workspace / "buildish" / "site" / "pipeline"
+            snapshot_root = workspace / "buildish-site-pipeline" / "dist" / "snapshots"
+            wheel_name = "apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
+            wheel_path = snapshot_root / wheel_name
+            wheel_path.parent.mkdir(parents=True, exist_ok=True)
+            wheel_path.write_bytes(b"fixture wheel")
+            manifest_path = self.write_manifest(snapshot_root, wheel_name)
+            self.write_fixture_consumer(consumer_root)
+            venv_path = consumer_root / ".venv"
+
+            with patch("refresh_latest_snapshot.subprocess.run") as run_mock:
+                result = refresh_latest_snapshot.prepare_consumer_environment(
+                    consumer_root,
+                    manifest_path=manifest_path,
+                    lock=True,
+                    sync=True,
+                    venv_path=venv_path,
+                )
+
+            self.assertTrue(result.snapshot.changed)
+            self.assertTrue(result.synced)
+            self.assertEqual(venv_path.resolve(), result.venv_path)
+            self.assertTrue(
+                (venv_path / ".buildish-site-pipeline-sync-stamp").exists()
+            )
+            self.assertEqual(2, run_mock.call_count)
+            self.assertEqual(
+                ["uv", "lock", "--project", str(consumer_root)],
+                run_mock.call_args_list[0].args[0],
+            )
+            self.assertEqual(
+                ["uv", "sync", "--project", str(consumer_root), "--frozen"],
+                run_mock.call_args_list[1].args[0],
+            )
+            self.assertEqual(str(venv_path.resolve()), run_mock.call_args_list[1].kwargs["env"]["UV_PROJECT_ENVIRONMENT"])
+
+    def test_prepare_consumer_environment_skips_sync_when_stamp_is_current(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            consumer_root = workspace / "buildish" / "site" / "pipeline"
+            snapshot_root = workspace / "buildish-site-pipeline" / "dist" / "snapshots"
+            wheel_name = "apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
+            wheel_path = snapshot_root / wheel_name
+            wheel_path.parent.mkdir(parents=True, exist_ok=True)
+            wheel_path.write_bytes(b"fixture wheel")
+            manifest_path = self.write_manifest(snapshot_root, wheel_name)
+            self.write_fixture_consumer(
+                consumer_root,
+                source_entry=(
+                    'apache-buildish-site-pipeline = { path = '
+                    '"../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl" }'
+                ),
+            )
+            venv_path = consumer_root / ".venv"
+            bin_dir = venv_path / "bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            (bin_dir / "python").write_text("", encoding="utf-8")
+            (bin_dir / "site-pipeline").write_text("", encoding="utf-8")
+            stamp_path = venv_path / ".buildish-site-pipeline-sync-stamp"
+            stamp_path.write_text("synced\n", encoding="utf-8")
+            future = stamp_path.stat().st_mtime + 5
+            os.utime(stamp_path, (future, future))
+
+            with patch("refresh_latest_snapshot.subprocess.run") as run_mock:
+                result = refresh_latest_snapshot.prepare_consumer_environment(
+                    consumer_root,
+                    manifest_path=manifest_path,
+                    lock=True,
+                    sync=True,
+                    venv_path=venv_path,
+                )
+
+            self.assertFalse(result.snapshot.changed)
+            self.assertFalse(result.synced)
+            run_mock.assert_not_called()
+
+    def test_run_consumer_command_execs_using_managed_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            consumer_root = workspace / "buildish" / "site" / "pipeline"
+            snapshot_root = workspace / "buildish-site-pipeline" / "dist" / "snapshots"
+            wheel_name = "apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
+            wheel_path = snapshot_root / wheel_name
+            wheel_path.parent.mkdir(parents=True, exist_ok=True)
+            wheel_path.write_bytes(b"fixture wheel")
+            manifest_path = self.write_manifest(snapshot_root, wheel_name)
+            self.write_fixture_consumer(
+                consumer_root,
+                source_entry=(
+                    'apache-buildish-site-pipeline = { path = '
+                    '"../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl" }'
+                ),
+            )
+            venv_path = consumer_root / ".venv"
+            bin_dir = venv_path / "bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            (bin_dir / "python").write_text("", encoding="utf-8")
+            (bin_dir / "site-pipeline").write_text("", encoding="utf-8")
+            stamp_path = venv_path / ".buildish-site-pipeline-sync-stamp"
+            stamp_path.write_text("synced\n", encoding="utf-8")
+            future = stamp_path.stat().st_mtime + 5
+            os.utime(stamp_path, (future, future))
+
+            with (
+                patch("refresh_latest_snapshot.subprocess.run") as run_mock,
+                patch("refresh_latest_snapshot.os.execvpe", side_effect=RuntimeError("exec-called")) as exec_mock,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "exec-called"):
+                    refresh_latest_snapshot.run_consumer_command(
+                        consumer_root,
+                        ["site-pipeline", "build", "--repo-root", "/tmp/workspace/buildish"],
+                        manifest_path=manifest_path,
+                        lock=True,
+                        sync=True,
+                        venv_path=venv_path,
+                    )
+
+            run_mock.assert_not_called()
+            exec_args = exec_mock.call_args.args
+            self.assertEqual("site-pipeline", exec_args[0])
+            self.assertEqual(
+                ["site-pipeline", "build", "--repo-root", "/tmp/workspace/buildish"],
+                exec_args[1],
+            )
+            self.assertTrue(exec_args[2]["PATH"].startswith(f"{bin_dir}:"))
+            self.assertEqual(str(venv_path.resolve()), exec_args[2]["VIRTUAL_ENV"])
 
 
 if __name__ == "__main__":
