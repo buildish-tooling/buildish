@@ -66,86 +66,40 @@ required beyond keeping the SHA in sync with tags via Renovate/Dependabot.
 
 ---
 
-## MEDIUM — Entire workspace parent directory mounted into build container
+## ~~MEDIUM~~ — Entire workspace parent directory mounted into build container — **fixed**
 
-**File:** `site/Makefile` lines 83–85
+**File:** `site/Makefile`
+
+The single `$(WORKSPACE_ROOT)` bind mount has been replaced with explicit
+per-repo mounts.  The main `buildish` repo is mounted read-write (build outputs
+are written back into it); each component repo is mounted read-only.  The
+component directory list is derived from `components.yaml` at Makefile parse
+time — no manual maintenance required as components are added or removed.
+`localDir` entries that contain a `/` (pointing inside the main repo) are
+filtered out automatically since they are already covered by the main-repo
+mount.  A `$(error ...)` guard stops the build immediately if the YAML parse
+fails.
 
 ```makefile
+_component_local_dirs := $(shell python3 -c "\
+import yaml; \
+data = yaml.safe_load(open('$(CURDIR)/components.yaml')); \
+dirs = [c['localDir'].split('/')[0] for c in data['components'] \
+        if '/' not in c.get('localDir', '')]; \
+print(' '.join(dirs))" 2>/dev/null)
+$(if $(_component_local_dirs),,$(error Could not parse component dirs from $(CURDIR)/components.yaml))
+CONTAINER_COMPONENT_MOUNTS = $(foreach d,$(_component_local_dirs),\
+    -v $(WORKSPACE_ROOT)/$(d):/workspace/$(d):ro$(CONTAINER_MOUNT_LABEL))
 CONTAINER_WORKSPACE_FLAGS = \
-    -v $(WORKSPACE_ROOT):/workspace$(CONTAINER_MOUNT_LABEL) \
+    -v $(REPO_ROOT):/workspace/$(REPO_NAME)$(CONTAINER_MOUNT_LABEL) \
+    $(CONTAINER_COMPONENT_MOUNTS) \
     -w $(CONTAINER_SITE_ROOT)
 ```
 
-`WORKSPACE_ROOT` is the *parent* of the repository root, so every sibling
-repository checked out alongside `buildish` is also mounted inside the
-container.  Any code executing inside the container (the site-pipeline binary,
-Hugo) can read and potentially write all of those sibling repositories.
-
-`npm ci --ignore-scripts` (see **GOOD** section below) significantly mitigates
-the npm risk.  The site-pipeline binary is installed from a hash-locked wheel,
-which limits that surface.  Hugo is fetched from the container image.  The
-residual risk is the transitive dependency graph of those tools writing to or
-exfiltrating sibling repos that happen to be present in the workspace.
-
-**Context:** The broad mount exists because the build genuinely requires the
-main `buildish` repo and three specific sibling repos enumerated in
-`site/components.yaml`: `buildish-mammoth-cache`, `buildish-no-gradle-wrapper-jar`,
-and `buildish-site-pipeline`.  Any additional repos that happen to sit adjacent
-in the developer's workspace are incidental.
-
-**Options (from least to most invasive):**
-
-1. **Document and rely on existing controls (lowest effort).**  The primary
-   mitigations already in place — SHA-pinned container images, hash-locked npm
-   and Python dependencies, `--ignore-scripts` — make it very hard for build
-   tooling to act maliciously even when it can see sibling repos.  Add a comment
-   in the Makefile documenting the scope of the mount and the rationale.
-
-2. **Mount explicit per-repo bind mounts derived from `components.yaml`
-   (recommended).**  Replace the single `$(WORKSPACE_ROOT)` bind mount with
-   individual mounts: read-write for `buildish` (build outputs are written back
-   into it), and `:ro` (read-only) for each component repo.  Derive the list
-   from `components.yaml` at Makefile parse time so it never goes out of sync,
-   filtering out entries with a `/` in `localDir` (those point inside the main
-   repo and are already covered by its mount):
-
-   ```makefile
-   _component_local_dirs := $(shell python3 -c "\
-   import yaml, sys; \
-   data = yaml.safe_load(open('$(CURDIR)/components.yaml')); \
-   dirs = [c['localDir'].split('/')[0] for c in data['components'] \
-           if '/' not in c.get('localDir','')]; \
-   print(' '.join(dirs))")
-   $(if $(_component_local_dirs),,$(error Failed to parse components.yaml))
-   CONTAINER_COMPONENT_MOUNTS = $(foreach d,$(_component_local_dirs),\
-       -v $(WORKSPACE_ROOT)/$(d):/workspace/$(d):ro$(CONTAINER_MOUNT_LABEL))
-   CONTAINER_WORKSPACE_FLAGS = \
-       -v $(REPO_ROOT):/workspace/$(REPO_NAME)$(CONTAINER_MOUNT_LABEL) \
-       $(CONTAINER_COMPONENT_MOUNTS) \
-       -w $(CONTAINER_SITE_ROOT)
-   ```
-
-   Only the declared component repos (plus the main repo) are exposed; any other
-   repo in the workspace is invisible to the container.  Component repos are
-   read-only so build tooling cannot accidentally corrupt them.  Scales to any
-   number of components without manual maintenance.
-
-   > **Note — why not "mount workspace read-only + main repo read-write on top":**
-   > That pattern (`-v $(WORKSPACE_ROOT):/workspace:ro:Z -v $(REPO_ROOT):/workspace/$(REPO_NAME):Z`)
-   > looks attractive at first but is unreliable.  The `:Z` SELinux relabeling
-   > flag operates on the host source directory; applying it to two overlapping
-   > paths (parent read-only, child read-write) produces conflicting relabeling
-   > operations that are not guaranteed to be stable across Podman versions.
-   > Even without SELinux, the read-only propagation behaviour of overlapping
-   > bind mounts has known edge cases.  Explicit, non-overlapping per-repo
-   > mounts avoid the problem entirely.
-
-3. **Add `--cap-drop=ALL --security-opt=no-new-privileges` to container runs.**
-   Even with the broad mount, removing all Linux capabilities and preventing
-   privilege escalation limits what a compromised process inside the container
-   could do with the visible filesystem.  This is complementary to option 2, not
-   a substitute.  Note: some tools may require specific capabilities; test
-   carefully.
+Any sibling repo that is not listed in `components.yaml` is invisible to the
+container.  The `:Z` SELinux label (applied on Podman via `CONTAINER_MOUNT_LABEL`)
+is applied once per distinct host source path; there are no overlapping mounts
+that would cause conflicting relabeling operations.
 
 ---
 

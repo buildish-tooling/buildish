@@ -87,8 +87,22 @@ CONTAINER_CACHE_ENV = \
 	-e npm_config_cache=$(CONTAINER_HOME)/.cache/npm \
 	-e UV_CACHE_DIR=$(CONTAINER_HOME)/.cache/uv
 
+# Derive component sibling-repo directories from components.yaml at parse time.
+# localDir entries that contain a '/' point inside the main repo and are already
+# covered by the main-repo mount; they are excluded here.
+# If parsing fails the build stops immediately with a clear error.
+_component_local_dirs := $(shell python3 -c "\
+import yaml; \
+data = yaml.safe_load(open('$(CURDIR)/components.yaml')); \
+dirs = [c['localDir'].split('/')[0] for c in data['components'] \
+        if '/' not in c.get('localDir', '')]; \
+print(' '.join(dirs))" 2>/dev/null)
+$(if $(_component_local_dirs),,$(error Could not parse component dirs from $(CURDIR)/components.yaml))
+CONTAINER_COMPONENT_MOUNTS = $(foreach d,$(_component_local_dirs),\
+	-v $(WORKSPACE_ROOT)/$(d):/workspace/$(d):ro$(CONTAINER_MOUNT_LABEL))
 CONTAINER_WORKSPACE_FLAGS = \
-	-v $(WORKSPACE_ROOT):/workspace$(CONTAINER_MOUNT_LABEL) \
+	-v $(REPO_ROOT):/workspace/$(REPO_NAME)$(CONTAINER_MOUNT_LABEL) \
+	$(CONTAINER_COMPONENT_MOUNTS) \
 	-w $(CONTAINER_SITE_ROOT)
 
 CONTAINER_RUN_BASE = \
