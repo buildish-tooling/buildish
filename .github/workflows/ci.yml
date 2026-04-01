@@ -83,16 +83,127 @@ jobs:
         timeout-minutes: 6
         run: bash .github/scripts/ci-site-verify.sh
 
-  site-build-image:
+  container-image:
     name: Site builder image
     needs: changes
-    if: needs.changes.outputs.site_build_image == 'true'
+    if: github.event_name == 'pull_request' && needs.changes.outputs.site_build_image == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PLATFORMS: linux/amd64,linux/arm64
+      LOCAL_REGISTRY_HOST: 127.0.0.1
+      LOCAL_REGISTRY_PORT: '5000'
+      LOCAL_REGISTRY_REPOSITORY: buildish-site-build-pr
+      LOCAL_SITE_PIPELINE_REGISTRY_REPOSITORY: buildish-site-pipeline-pr
+      LOCAL_REGISTRY_TAG: pr-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out buildish-site-pipeline repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          repository: apache/buildish-site-pipeline
+          path: buildish-site-pipeline
+          persist-credentials: false
+
+      - name: Set image references for local registry
+        run: |
+          echo "IMAGE_REF=${LOCAL_REGISTRY_HOST}:${LOCAL_REGISTRY_PORT}/${LOCAL_REGISTRY_REPOSITORY}:${LOCAL_REGISTRY_TAG}" >> "$GITHUB_ENV"
+          echo "SITE_PIPELINE_BASE_IMAGE=${LOCAL_REGISTRY_HOST}:${LOCAL_REGISTRY_PORT}/${LOCAL_SITE_PIPELINE_REGISTRY_REPOSITORY}:${LOCAL_REGISTRY_TAG}" >> "$GITHUB_ENV"
+
+      - name: Start ephemeral local registry
+        run: |
+          REGISTRY_IMAGE="$(awk 'toupper($1) == "FROM" { print $2; exit }' tools/site-build-image/Containerfile-local-registry)"
+          docker run -d --rm \
+            --name buildish-site-ci-registry \
+            -p ${LOCAL_REGISTRY_HOST}:${LOCAL_REGISTRY_PORT}:5000 \
+            "$REGISTRY_IMAGE"
+
+      - name: Wait for local registry
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -fsS "http://${LOCAL_REGISTRY_HOST}:${LOCAL_REGISTRY_PORT}/v2/" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Local registry did not become ready" >&2
+          exit 1
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        with:
+          driver-opts: |
+            network=host
+          buildkitd-config-inline: |
+            [registry."127.0.0.1:5000"]
+              http = true
+              insecure = true
+
+      - name: Build site-pipeline base image into local registry
+        working-directory: buildish-site-pipeline
+        run: tools/site-pipeline-image/build-image.sh --engine docker --image "$SITE_PIPELINE_BASE_IMAGE" --platforms "$PLATFORMS" --push
+
+      - name: Build site builder image into local registry
+        run: tools/site-build-image/build-image.sh --engine docker --image "$IMAGE_REF" --site-pipeline-base-image "$SITE_PIPELINE_BASE_IMAGE" --platforms "$PLATFORMS" --push
+
+      - name: Verify multi-platform image in local registry
+        run: |
+          MANIFEST_JSON="$(curl -fsS \
+            -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json' \
+            "http://${LOCAL_REGISTRY_HOST}:${LOCAL_REGISTRY_PORT}/v2/${LOCAL_REGISTRY_REPOSITORY}/manifests/${LOCAL_REGISTRY_TAG}")"
+          MANIFEST_JSON="$MANIFEST_JSON" python3 - "$PLATFORMS" <<'PY'
+          import json
+          import os
+          import sys
+
+          expected = set()
+          for item in sys.argv[1].split(','):
+              item = item.strip()
+              os_name, arch = item.split('/', 1)
+              expected.add((os_name, arch))
+
+          payload = json.loads(os.environ['MANIFEST_JSON'])
+          media_type = payload.get('mediaType', '')
+          if media_type not in {
+              'application/vnd.oci.image.index.v1+json',
+              'application/vnd.docker.distribution.manifest.list.v2+json',
+          }:
+              raise SystemExit(f'Unexpected manifest media type: {media_type}')
+
+          found = {
+              (entry.get('platform', {}).get('os'), entry.get('platform', {}).get('architecture'))
+              for entry in payload.get('manifests', [])
+          }
+          missing = expected - found
+          if missing:
+              raise SystemExit(f'Missing expected platforms: {sorted(missing)}; found {sorted(found)}')
+
+          print('Verified manifest platforms:', ', '.join(f'{os_name}/{arch}' for os_name, arch in sorted(found)))
+          PY
+
+      - name: Stop ephemeral local registry
+        if: ${{ always() }}
+        run: docker rm -f buildish-site-ci-registry || true
+
+  container-publish:
+    name: Site builder image publish
+    needs: changes
+    if: github.repository_owner == 'apache' && needs.changes.outputs.site_build_image == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     env:
       IMAGE_REF: ghcr.io/${{ github.repository_owner }}/buildish-site-build:latest
+      SITE_PIPELINE_BASE_IMAGE: ghcr.io/apache/buildish-site-pipeline:latest
       PLATFORMS: linux/amd64,linux/arm64
     steps:
       - name: Check out repository
@@ -106,19 +217,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
-      - name: Build multi-platform image without publishing
-        run: tools/site-build-image/build-image.sh --engine docker --image "$IMAGE_REF" --platforms "$PLATFORMS"
-
       - name: Log in to GHCR
-        if: github.repository_owner == 'apache' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
 
       - name: Publish multi-platform image to GHCR
-        if: github.repository_owner == 'apache' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        run: tools/site-build-image/build-image.sh --engine docker --image "$IMAGE_REF" --platforms "$PLATFORMS" --push
+        run: tools/site-build-image/build-image.sh --engine docker --image "$IMAGE_REF" --site-pipeline-base-image "$SITE_PIPELINE_BASE_IMAGE" --platforms "$PLATFORMS" --push
 
   codeql:
     name: CodeQL
@@ -167,7 +273,8 @@ jobs:
       - changes
       - rat
       - site-verify
-      - site-build-image
+      - container-image
+      - container-publish
       - codeql
       - zizmor
     runs-on: ubuntu-latest
@@ -177,7 +284,8 @@ jobs:
           CHANGES_RESULT: ${{ needs.changes.result }}
           RAT_RESULT: ${{ needs.rat.result }}
           SITE_VERIFY_RESULT: ${{ needs.site-verify.result }}
-          SITE_BUILD_IMAGE_RESULT: ${{ needs.site-build-image.result }}
+          CONTAINER_IMAGE_RESULT: ${{ needs.container-image.result }}
+          CONTAINER_PUBLISH_RESULT: ${{ needs.container-publish.result }}
           CODEQL_RESULT: ${{ needs.codeql.result }}
           ZIZMOR_RESULT: ${{ needs.zizmor.result }}
         run: |
@@ -185,7 +293,8 @@ jobs:
             "$CHANGES_RESULT" \
             "$RAT_RESULT" \
             "$SITE_VERIFY_RESULT" \
-            "$SITE_BUILD_IMAGE_RESULT" \
+            "$CONTAINER_IMAGE_RESULT" \
+            "$CONTAINER_PUBLISH_RESULT" \
             "$CODEQL_RESULT" \
             "$ZIZMOR_RESULT"; do
             case "$result" in
