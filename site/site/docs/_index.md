@@ -1,6 +1,6 @@
 ---
 title: Apache Buildish Site Documentation
-description: This section documents the Apache Buildish website itself, the current component metadata contract, the current implementation, and the broader long-term site infrastructure proposal.
+description: Buildish-specific notes for using Site Pipeline with the Apache Buildish web site.
 ---
 
 <!--
@@ -19,165 +19,72 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-The site uses Hugo + Docsy for rendering, with the Python staging pipeline implemented under
-`site/pipeline/apache_buildish_site_pipeline/` and exposed through the installable
-`site-pipeline` CLI.
+Buildish consumes the reusable `site-pipeline` staging package from the sibling
+`buildish-site-pipeline` repository and then renders the staged contract with
+Hugo + Docsy.
+
+This page keeps only Buildish-specific consumer notes. Canonical generic
+pipeline documentation lives under the dedicated `site-pipeline` component.
+
+## Buildish-owned concerns
+
+Buildish owns the parts that are specific to this consumer site:
+
+- Hugo + Docsy as the renderer and theme stack
+- `site/Makefile` as the main developer entrypoint
+- the Buildish-derived builder image layered on top of the generic
+  `site-pipeline` base image
+- renderer-specific navigation, shortcodes, styling, and publication behavior
+- final search, indexing, and publishing policy for the public Buildish site
 
 ## Common workflows
 
 From `site/`:
 
-- `make serve` — preview the site with live restaging in the build container
-- `make build` — stage and render a fresh static site in the build container
-
-## Checks and cleanup
-
-From `site/`:
-
-- `make test` — run unit tests
-- `make integration-test` — run integration tests
+- `make serve` / `make serve-local` — live restaging plus Hugo preview
+- `make build` / `make build-local` — fresh staged and rendered site output
+- `make render` / `make render-local` — rerun Hugo against the current stage root
+- `make stage` / `make stage-local` — refresh only `site/.stage/` and `site/.preview/`
 - `make check` — run clean, tests, and `build-local`
-- `make clean` — remove generated site output
 
-## Host-tool workflows
+Host-tool workflows expect `uv`, Hugo extended, and Node via `nvm` using
+`.nvmrc`.
 
-From `site/`:
+## Containerized Buildish workflow
 
-- `make serve-local` — preview the site with live restaging using host tools
-- `make build-local` — stage and render a fresh static site using host tools
+Buildish keeps a pinned consumer-specific build image so contributors can work
+without installing the full local toolchain.
 
-Host-tool workflows expect:
+- the generic `site-pipeline` base image lives in the sibling repository
+- Buildish layers its own renderer tooling on top in `../tools/site-build-image/`
+- `site/Makefile` remains the main entrypoint for both containerized and native
+  workflows
 
-- `uv`
-- Hugo extended
-- Node available via `nvm` using `.nvmrc`
-
-The Node.js files in `site/` support the Hugo + Docsy render path, while the Python staging package, Python tests, and
-`uv` project files now live under `site/pipeline/`.
-
-`make serve` and `make serve-local` both keep the configured stage root up to
-date while Hugo runs, including changes in component docs and assets that live
-outside `site/`. In the default Buildish workspace, that stage root is
-`site/.stage/`.
-
-If you want to inspect a static build without running Hugo in watch mode, first run
-`make build` (containerized default) or `make build-local` (native), then serve `site/.public/`
-over a tiny local HTTP server. From `site/`:
-
-- `python3 -m http.server --directory .public 8080`
-- `docker run --rm --init -p 127.0.0.1:8080:8080 -v "$PWD/.public:/www:ro" docker.io/library/busybox:1.36.1 httpd -f -p 8080 -h /www`
-- open `http://127.0.0.1:8080/`
-
-If you prefer Podman, replace `docker` with `podman` in the same command.
-
-The watch loop intentionally watches only staged-source inputs and rebuilds only
-the configured stage root. It does **not** regenerate the configured preview
-root on every change. In the default Buildish workspace, those paths are
-`site/.stage/` and `site/.preview/`. That keeps the live Hugo workflow focused
-on the staged contract and reduces external file churn seen by IDEs.
-The full implementation is documented in [`site/site/docs/site-pipeline.md`](site/docs/site-pipeline.md).
-
-## Less common workflows
-
-These are useful when you want direct control over staging versus rendering:
-
-- `make render` — rerun Hugo in the build container using the current `site/.stage/`
-- `make render-local` — rerun Hugo with host tools using the current `site/.stage/`
-- `make stage-local` — refresh `site/.stage/` and `site/.preview/` without running Hugo
-- `make stage-watch-local` — watch sources and refresh `site/.stage/` without running Hugo
-
-Containerized staging-only variants also exist as `make stage` and `make stage-watch`, but most
-developers will usually want `make serve` or `make build` instead.
-
-Known local-dev behavior:
-
-- changes to `site/components.yaml` can take a short while to appear in the running Hugo server
-- newly added components usually show up correctly after the watcher restages content
-- removed component routes can linger briefly in an already-running `make serve` session even after they disappear from
-  the staged catalog
-
-Treat that last case as an accepted development-only inconvenience. A fresh `make build` or a restarted
-`make serve` reflects the current catalog cleanly.
-
-## Component contract
-
-The implemented catalog and component metadata contract is documented in
-[`../docs/site-component-contract.md`](site/docs/site-component-contract.md).
-
-That document describes:
-
-- `site/components.yaml` defaults and per-component overrides
-- the preferred `site/component.yaml` structure
-- precedence rules between catalog values and component metadata
-- staging outputs and safety constraints
-
-## Containerized workflow
-
-The repository includes a pinned build container, so developers can build the site without installing the full local
-toolchain.
-
-The reusable builder-image definition lives in `../tools/site-build-image/`, while `site/Makefile` remains the main
-entrypoint for local site workflows.
-
-From `site/`:
-
-- `make serve`
-- `make build`
-- `make render`
-- `make stage`
-- `make stage-watch`
-- `make container-image`
-- `make container-check-fast`
-- `make container-test`
-- `make container-integration-test`
-
-Defaults:
-
-- `CONTAINER_ENGINE=<auto-detected: podman, then docker>`
-- `CONTAINER_IMAGE=localhost/buildish-site-build:local`
-- `CONTAINER_PLATFORM=<derived from the local host architecture>`
-
-You can override the engine if needed, for example:
-
-- `make CONTAINER_ENGINE=podman stage`
-- `make CONTAINER_ENGINE=docker serve`
-- `make CONTAINER_ENGINE=docker build`
-
-`make serve`, `make build`, and `make render` are the main containerized entrypoints.
-They reuse the local builder image when available and build it on demand when missing. The
-host-native entrypoints remain available as `make serve-local`, `make build-local`,
-`make render-local`, `make stage-local`, and `make stage-watch-local`.
-
-The containerized flow:
-
-- bind-mounts the parent workspace into `/workspace`, with this repository available at `/workspace/<repo-name>/`
-- uses that mount in read/write mode, not read-only, because the container writes generated outputs and caches back into
-  this repository
-- can only stage/serve components whose `localDir` resolves within that parent workspace; in practice that means
-  sibling repositories next to the main repo (for example `../buildish-mammoth-cache`)
-- if your component repositories live somewhere else, prefer the native `make stage-local`, `make stage-watch-local`,
-  or `make serve-local` workflow instead
-- writes generated outputs back into the working tree
-- keeps tool caches under `site/.container-home/`
-- installs Node dependencies with `npm ci --ignore-scripts`
-
-The builder `Containerfile` pins multi-architecture index digests. The
-`site/Makefile` then passes an explicit `--platform` value derived from the host
-architecture so Podman/Docker select the intended child manifest instead of
-guessing from local cache state.
-
-This split also makes it straightforward for future CI to rebuild or publish the builder image only when the
-builder-image inputs change.
-
-The site verification workflow also uses this containerized path, so CI exercises
-the same staged-site and Hugo build flow with pinned tooling.
-
-## Produced outputs
-
-Builds write to these default output paths:
+The main generated paths remain:
 
 - `site/.stage/`
 - `site/.preview/`
 - `site/.public/`
 
-Git ignores these outputs.
+## Canonical Site Pipeline docs
+
+For pipeline behavior, workspace semantics, and the reusable component contract,
+use the `site-pipeline` docs:
+
+- [Site Pipeline docs index](/components/site-pipeline/development/docs/)
+- [Site Pipeline overview](/components/site-pipeline/development/docs/site-pipeline/)
+- [Site component contract](/components/site-pipeline/development/docs/site-component-contract/)
+- [Consumer workspace and CI model](/components/site-pipeline/development/docs/workspace-and-ci-model/)
+- [Design principles and future evolution](/components/site-pipeline/development/docs/design-principles/)
+- [Adoption guide](/components/site-pipeline/development/docs/adoption-guide/)
+- [Workspace examples](/components/site-pipeline/development/docs/examples/)
+
+## Buildish-specific notes
+
+The interactive workflow intentionally keeps Hugo focused on staged sources.
+`make serve` and `make serve-local` keep `site/.stage/` current while Hugo runs
+without regenerating every derived output on each change.
+
+The current development-only limitations are consumer-facing rather than
+pipeline-contract issues. For example, route removals can linger briefly in an
+already-running Hugo session until the server is restarted.

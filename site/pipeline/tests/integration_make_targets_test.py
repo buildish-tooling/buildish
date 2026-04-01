@@ -21,6 +21,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import time
 import unittest
 from pathlib import Path
@@ -125,6 +126,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
 
     def seed_fake_tools(self, site_root: Path, include_engine: bool = False, include_hugo: bool = False, include_native_docsy: bool = False) -> Path:
         bin_dir = site_root / "build" / "test-bin"
+        extracted_pipeline_main = SOURCE_REPO_ROOT.parent / "buildish-site-pipeline" / "main.py"
         self.write_executable(
             bin_dir / "node",
             text_block(
@@ -158,6 +160,25 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 printf '// fake asset\n' > "$root/mermaid/dist/mermaid.min.js"
                 printf '// fake asset\n' > "$root/lunr/lunr.min.js"
                 echo 'fake npm ci completed'
+                """
+            ),
+        )
+        self.write_executable(
+            bin_dir / "site-pipeline",
+            text_block(
+                f"""
+                #!/usr/bin/env python3
+                import os
+                import sys
+
+                os.execv(
+                    {sys.executable!r},
+                    [
+                        {sys.executable!r},
+                        {str(extracted_pipeline_main)!r},
+                        *sys.argv[1:],
+                    ],
+                )
                 """
             ),
         )
@@ -590,6 +611,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
+        shutil.rmtree(repo_root.parent / "buildish-site-pipeline" / "dist" / "snapshots")
         result = self.run_make(repo_root / "site", "stage", env)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assert_paths_exist(
@@ -747,6 +769,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
+        shutil.rmtree(repo_root.parent / "buildish-site-pipeline" / "dist" / "snapshots")
         source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
         staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md"
         process = self.start_make(repo_root / "site", "serve", env)

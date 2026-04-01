@@ -16,14 +16,18 @@ limitations under the License.
 
 # Buildish Site
 
-Buildish Site provides the shared website, component contract, and publishing pipeline for Apache Buildish.
+Buildish Site provides the shared website and Buildish-specific site
+infrastructure for Apache Buildish.
 
-Use these pages for the stable, component-level overview. The development docs cover implementation details, pipeline behavior, and authoring conventions for the current branch.
+Use the local docs for Buildish-specific rendering, container, and workflow
+notes:
 
-## What you'll find here
+- [Buildish Site docs](/components/site/development/docs/)
 
-- the component contract used by participating Buildish repositories,
-- the shared site pipeline, preview flow, and generated metadata model,
-- infrastructure notes for staging, publishing, and local development.
+For the canonical reusable pipeline docs, use the dedicated `site-pipeline`
+component:
 
-{{< buildish-component-link kind="docs" label="Site-Pipeline Docs" appearance="primary" >}}
+- [Site Pipeline docs](/components/site-pipeline/development/docs/)
+- [Site Pipeline overview](/components/site-pipeline/development/docs/site-pipeline/)
+- [Site component contract](/components/site-pipeline/development/docs/site-component-contract/)
+- [Consumer workspace and CI model](/components/site-pipeline/development/docs/workspace-and-ci-model/)

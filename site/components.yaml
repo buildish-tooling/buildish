@@ -25,10 +25,13 @@ defaults:
 components:
   - slug: mammoth-cache
     localDir: buildish-mammoth-cache
+    weight: 100
   - slug: no-gradle-wrapper-jar
     localDir: buildish-no-gradle-wrapper-jar
+    weight: 200
   - slug: site-pipeline
-    localDir: buildish/buildish-site-pipeline
+    localDir: buildish-site-pipeline
+    weight: 300
   - slug: site
     localDir: buildish/site
-    weight: 100
+    weight: 1000

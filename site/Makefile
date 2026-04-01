@@ -26,6 +26,7 @@ PORT ?= 8000
 HUGO_SERVER_BIND ?= 127.0.0.1
 CONTAINER_ENGINE ?= $(shell if command -v podman >/dev/null 2>&1; then printf 'podman'; elif command -v docker >/dev/null 2>&1; then printf 'docker'; fi)
 CONTAINER_IMAGE ?= localhost/buildish-site-build:local
+SITE_PIPELINE_CONTAINER_IMAGE ?= localhost/buildish-site-pipeline:local
 CONTAINER_HOME ?= $(CONTAINER_SITE_ROOT)/.container-home
 LOCAL_REGISTRY_TEST_PLATFORMS ?= linux/amd64,linux/arm64
 LOCAL_REGISTRY_TEST_TAG ?= integration-test
@@ -48,6 +49,7 @@ DOCSY_ENV = \
 REPO_ROOT := $(abspath $(CURDIR)/..)
 WORKSPACE_ROOT := $(abspath $(REPO_ROOT)/..)
 REPO_NAME := $(notdir $(REPO_ROOT))
+SITE_PIPELINE_REPO_ROOT ?= $(WORKSPACE_ROOT)/buildish-site-pipeline
 CONTAINER_SITE_ROOT ?= /workspace/$(REPO_NAME)/site
 CONTAINER_BUILD_DIR ?= $(REPO_ROOT)/tools/site-build-image
 NODE_MODULES_DIR ?= $(CURDIR)/node_modules
@@ -182,20 +184,32 @@ CONTAINER_PREPARE_SITE_ENV = \
 
 CONTAINER_STAGE_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
-	printf "==> [container-stage] running make stage-local\\n"; \
-	make stage-local; \
+	printf "==> [container-stage] running site-pipeline build\\n"; \
+	$(SITE_PIPELINE) build --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS); \
 	printf "==> [container-stage] staged site contract completed\\n"
 
 CONTAINER_STAGE_WATCH_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
-	printf "==> [container-stage-watch] running make stage-watch-local\\n"; \
-	make stage-watch-local; \
+	printf "==> [container-stage-watch] running site-pipeline watch\\n"; \
+	$(SITE_PIPELINE) watch --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS); \
 	printf "==> [container-stage-watch] stage watch exited\\n"
 
 CONTAINER_SERVE_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
-	printf "==> [container-serve] running make serve-local on %s:%s\\n" "0.0.0.0" "$(PORT)"; \
-	make serve-local HUGO_SERVER_BIND=0.0.0.0 PORT=$(PORT); \
+	watch_pid=''; \
+	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
+	trap cleanup EXIT INT TERM; \
+	printf "==> [container-serve] running site-pipeline watch on %s:%s\\n" "0.0.0.0" "$(PORT)"; \
+	$(SITE_PIPELINE) watch --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS) & \
+	watch_pid=$$!; \
+	while [ ! -f .stage/manifest.yaml ]; do \
+		if ! kill -0 "$$watch_pid" 2>/dev/null; then \
+			wait "$$watch_pid"; \
+			exit $$?; \
+		fi; \
+		sleep 0.1; \
+	done; \
+	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --bind 0.0.0.0 --port $(PORT) --poll 700ms --disableFastRender --noBuildLock --renderToMemory; \
 	printf "==> [container-serve] serve exited\\n"
 
 CONTAINER_RENDER_SCRIPT = \
@@ -206,8 +220,9 @@ CONTAINER_RENDER_SCRIPT = \
 
 CONTAINER_BUILD_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
-	printf "==> [container-build] running make build-local\\n"; \
-	make build-local; \
+	printf "==> [container-build] running site-pipeline build and make render-local\\n"; \
+	$(SITE_PIPELINE) build --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS); \
+	make render-local; \
 	printf "==> [container-build] site render completed\\n"
 
 define RUN_MANAGED_CONTAINER
@@ -238,6 +253,8 @@ endef
 	container-render \
 	container-check-fast \
 	container-image \
+		site-pipeline-container-image \
+		site-pipeline-container-image-ensure \
 	container-image-ensure \
 	container-image-local-registry-test \
 	container-integration-test \
@@ -335,17 +352,36 @@ container-engine-check: ## Verify Podman or Docker is available for containerize
 	fi; \
 	command -v "$$engine" >/dev/null 2>&1 || { echo "Error: $$engine is not available on PATH."; exit 1; }
 
-container-image-ensure: container-engine-check ## Build the site builder image if it is missing locally.
+site-pipeline-container-image-ensure: container-engine-check ## Build the generic site-pipeline base image if it is missing locally.
+	@if $(CONTAINER_ENGINE) image inspect $(SITE_PIPELINE_CONTAINER_IMAGE) >/dev/null 2>&1; then \
+		printf '==> [site-pipeline-image] using existing image %s via %s\n' '$(SITE_PIPELINE_CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
+	else \
+		$(MAKE) site-pipeline-container-image; \
+	fi
+
+site-pipeline-container-image: container-engine-check ## Build the generic site-pipeline base image from the extracted repo checkout.
+	@if [ ! -d '$(SITE_PIPELINE_REPO_ROOT)' ]; then \
+		echo "Error: expected extracted pipeline checkout at $(SITE_PIPELINE_REPO_ROOT)."; \
+		exit 1; \
+	fi
+	$(MAKE) --no-print-directory -C $(SITE_PIPELINE_REPO_ROOT) \
+		container-image \
+		CONTAINER_ENGINE=$(CONTAINER_ENGINE_BASENAME) \
+		CONTAINER_IMAGE=$(SITE_PIPELINE_CONTAINER_IMAGE) \
+		CONTAINER_IMAGE_PLATFORMS=$(CONTAINER_PLATFORM)
+
+container-image-ensure: site-pipeline-container-image-ensure ## Build the site builder image if it is missing locally.
 	@if $(CONTAINER_ENGINE) image inspect $(CONTAINER_IMAGE) >/dev/null 2>&1; then \
 		printf '==> [container-image] using existing image %s via %s\n' '$(CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
 	else \
 		$(MAKE) container-image; \
 	fi
 
-container-image: container-engine-check ## Build the container image used for reproducible site builds.
+container-image: site-pipeline-container-image-ensure ## Build the Buildish-derived container image used for reproducible site builds.
 	$(CONTAINER_ENGINE) build \
 		$(CONTAINER_PLATFORM_FLAG) \
 		-t $(CONTAINER_IMAGE) \
+		--build-arg SITE_PIPELINE_BASE_IMAGE=$(SITE_PIPELINE_CONTAINER_IMAGE) \
 		-f $(CONTAINER_BUILD_DIR)/Containerfile \
 		$(CONTAINER_BUILD_DIR)
 
@@ -386,8 +422,14 @@ container-build: container-image-ensure ## Build the staged site and Hugo output
 	@printf '==> [container-build] starting containerized site render\n'
 	@$(CONTAINER_RUN) bash -c '$(CONTAINER_BUILD_SCRIPT)'
 
-container-image-local-registry-test: ## Run the localhost-registry integration test for the builder image.
-	$(CONTAINER_BUILD_DIR)/test-local-registry.sh --platforms '$(LOCAL_REGISTRY_TEST_PLATFORMS)' --tag '$(LOCAL_REGISTRY_TEST_TAG)' $(LOCAL_REGISTRY_TEST_ARGS)
+container-image-local-registry-test: container-engine-check ## Run the localhost-registry integration test for the builder image.
+	$(MAKE) --no-print-directory -C $(SITE_PIPELINE_REPO_ROOT) \
+		container-image \
+		CONTAINER_ENGINE=$(CONTAINER_ENGINE_BASENAME) \
+		CONTAINER_IMAGE=$(SITE_PIPELINE_CONTAINER_IMAGE) \
+		CONTAINER_IMAGE_PLATFORMS=$(LOCAL_REGISTRY_TEST_PLATFORMS)
+	SITE_PIPELINE_BASE_IMAGE=$(SITE_PIPELINE_CONTAINER_IMAGE) \
+		$(CONTAINER_BUILD_DIR)/test-local-registry.sh --platforms '$(LOCAL_REGISTRY_TEST_PLATFORMS)' --tag '$(LOCAL_REGISTRY_TEST_TAG)' $(LOCAL_REGISTRY_TEST_ARGS)
 
 serve: container-serve ## Serve the full Hugo site with automatic restaging in the build container; override PORT=<port> if needed.
 
