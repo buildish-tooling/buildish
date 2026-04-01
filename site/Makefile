@@ -305,24 +305,24 @@ vendor-assets: docsy-check ## Stage local vendor assets required by the renderer
 	@cp $(NODE_MODULES_DIR)/mermaid/dist/mermaid.min.js .stage/static/js/vendor/mermaid.min.js
 	@cp $(NODE_MODULES_DIR)/lunr/lunr.min.js .stage/static/js/vendor/lunr.min.js
 
-stage: container-stage ## Refresh staged site inputs in the build container.
+stage: container-stage ## Build the staged site contract and lightweight preview in the build container.
 
-stage-local: sanity-check ## Refresh staged site inputs with host tools.
+stage-local: sanity-check ## Build the staged site contract and lightweight preview with host tools.
 	$(MAKE) --no-print-directory pipeline-stage-local
 
-stage-watch: container-stage-watch ## Watch sources and refresh staged site inputs in the build container.
+stage-watch: container-stage-watch ## Watch sources and rebuild the staged site contract only in the build container.
 
-stage-watch-local: sanity-check ## Watch sources and refresh staged site inputs with host tools.
+stage-watch-local: sanity-check ## Watch sources and rebuild the staged site contract only with host tools.
 	$(MAKE) --no-print-directory pipeline-watch-local
 
-render: container-render ## Render the current staged site in the build container.
+render: container-render ## Render the current staged site through Hugo in the build container.
 
-render-local: hugo-check docsy-check vendor-assets ## Render the current staged site with host tools.
+render-local: hugo-check docsy-check vendor-assets ## Render the current staged site through Hugo with host tools.
 	@$(DOCSY_ENV); $(HUGO) --source . --config hugo.yaml --cleanDestinationDir
 
-build: container-build ## Stage and render the site in the build container.
+build: container-build ## Build the staged contract and full Hugo site in the build container.
 
-build-local: stage-local render-local ## Stage and render the site with host tools.
+build-local: stage-local render-local ## Build the staged contract and full Hugo site with host tools.
 
 pipeline-core-check: sanity-check ## Run the extracted pipeline repository checks.
 	$(MAKE) --no-print-directory -C ../buildish-site-pipeline check
@@ -389,9 +389,9 @@ container-build: container-image-ensure ## Build the staged site and Hugo output
 container-image-local-registry-test: ## Run the localhost-registry integration test for the builder image.
 	$(CONTAINER_BUILD_DIR)/test-local-registry.sh --platforms '$(LOCAL_REGISTRY_TEST_PLATFORMS)' --tag '$(LOCAL_REGISTRY_TEST_TAG)' $(LOCAL_REGISTRY_TEST_ARGS)
 
-serve: container-serve ## Serve the site with live restaging in the build container; override PORT=<port> if needed.
+serve: container-serve ## Serve the full Hugo site with automatic restaging in the build container; override PORT=<port> if needed.
 
-serve-local: sanity-check hugo-check docsy-check ## Serve the site with live restaging using host tools; override PORT=<port> if needed.
+serve-local: sanity-check hugo-check docsy-check ## Serve the full Hugo site with automatic restaging using host tools; override PORT=<port> if needed.
 	@watch_pid=''; \
 	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
@@ -414,7 +414,7 @@ container-serve: container-image-ensure ## Serve the staged site with Hugo and a
 	@printf '==> [container-serve] starting containerized site server on http://127.0.0.1:%s/\n' '$(PORT)'
 	@$(call RUN_MANAGED_CONTAINER,serve,$(CONTAINER_MANAGED_SERVE_RUN),$(CONTAINER_SERVE_SCRIPT))
 
-clean: sanity-check ## Remove generated site output.
+clean: sanity-check ## Remove generated pipeline and renderer output.
 	$(MAKE) --no-print-directory pipeline-clean-local
 	rm -rf .public .hugo_build.lock resources
 
