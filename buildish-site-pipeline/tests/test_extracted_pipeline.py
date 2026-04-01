@@ -31,6 +31,12 @@ from tests.test_support import dump_yaml, text_block, write_files
 
 
 class ExtractedSitePipelineTest(unittest.TestCase):
+    def test_parse_args_accepts_preview_command(self) -> None:
+        args = site_pipeline.parse_args(["preview", "--port", "9000"])
+
+        self.assertEqual("preview", args.command)
+        self.assertEqual(9000, args.port)
+
     def test_load_component_metadata_returns_typed_models(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "mammoth-cache"

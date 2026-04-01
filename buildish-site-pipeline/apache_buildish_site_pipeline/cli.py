@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import argparse
 
-from .builder import build, clean, serve
+from .builder import build, clean, preview
 from .constants import WATCH_DEBOUNCE_MS
 from .watching import watch_and_build
 
@@ -56,17 +56,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
 
     parser = argparse.ArgumentParser(
-        description="Site pipeline helper", parents=[common]
+        description=(
+            "Site pipeline helper for staged content generation and a deliberately "
+            "minimal preview; consumers still need their own real renderer."
+        ),
+        parents=[common],
     )
     subparsers = parser.add_subparsers(dest="command")
 
     build_parser = subparsers.add_parser("build", parents=[common])
     clean_parser = subparsers.add_parser("clean", parents=[common])
-    serve_parser = subparsers.add_parser("serve", parents=[common])
+    preview_parser = subparsers.add_parser(
+        "preview",
+        parents=[common],
+        help="Serve the deliberately barebones preview tree, not a real rendered site",
+        description=(
+            "Build and serve the deliberately barebones preview tree with Python's "
+            "standard HTTP server. This is far away from a real rendered website and "
+            "exists only as a lightweight staging/debug convenience."
+        ),
+    )
     watch_parser = subparsers.add_parser("watch", parents=[common])
 
-    serve_parser.add_argument(
-        "--port", type=int, default=8000, help="Port for the local preview server"
+    preview_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port for the deliberately barebones preview server",
     )
     watch_parser.add_argument(
         "--debounce-ms",
@@ -76,7 +92,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     build_parser.set_defaults(command="build")
     clean_parser.set_defaults(command="clean")
-    serve_parser.set_defaults(command="serve")
+    preview_parser.set_defaults(command="preview")
     watch_parser.set_defaults(command="watch")
     args = parser.parse_args(argv)
     if args.command is None:
@@ -126,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
             project_status=args.project_status,
         )
         return 0
-    serve(
+    preview(
         repo_root=args.repo_root,
         port=args.port,
         config_path=args.config,

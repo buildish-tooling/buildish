@@ -38,7 +38,7 @@ environment-specific runtime choices.
 - staging of component pages, versioned docs, and assets,
 - generated metadata under the stage root,
 - safety checks for path boundaries and protected outputs, and
-- `build`, `watch`, `serve`, and `clean` CLI workflows.
+- `build`, `watch`, `preview`, and `clean` CLI workflows.
 
 ### Consumer-owned behavior
 
@@ -98,7 +98,9 @@ component repositories directly.
 
 - `site-pipeline build` stages the current workspace and writes preview output.
 - `site-pipeline watch` rebuilds the stage root when relevant inputs change.
-- `site-pipeline serve` serves the lightweight preview output.
+- `site-pipeline preview` serves a deliberately barebones preview output. It is
+  far away from a real rendered website and exists only as a lightweight
+  staging/debug convenience.
 - `site-pipeline clean` removes pipeline-managed outputs.
 
 Watch mode intentionally rebuilds the stage root without rewriting the preview

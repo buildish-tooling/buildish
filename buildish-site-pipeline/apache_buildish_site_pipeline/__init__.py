@@ -21,7 +21,7 @@ filesystem, watch-mode, and build orchestration logic more easily.
 
 from __future__ import annotations
 
-from .builder import build, clean, serve, stage_component
+from .builder import build, clean, preview, stage_component
 from .cli import main, parse_args
 from .constants import WATCH_DEBOUNCE_MS
 from .markdown import extract_title_and_summary, normalize_markdown_doc
@@ -39,7 +39,7 @@ __all__ = [
     "main",
     "normalize_markdown_doc",
     "parse_args",
-    "serve",
+    "preview",
     "stage_component",
     "watch_and_build",
 ]

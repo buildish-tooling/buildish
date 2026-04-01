@@ -51,6 +51,9 @@ inputs, and emits metadata that a downstream renderer can consume.
 4. Run `site-pipeline build --repo-root <consumer-repo>`.
 5. Point the downstream renderer at the staged outputs under `site/.stage/`.
 
+`site-pipeline preview` is also available for a deliberately barebones preview,
+but it is far away from a real rendered website.
+
 ## Documentation
 
 - [Site Pipeline overview](docs/site-pipeline.md)

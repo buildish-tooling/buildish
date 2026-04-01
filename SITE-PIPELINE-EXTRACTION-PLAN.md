@@ -218,7 +218,16 @@ Remaining:
 
 ## Immediate next steps
 
+1. Split `buildish-site-pipeline/` into its own repository and replace the
+   temporary local editable `uv` source in `site/pipeline/` with a versioned
+   dependency.
+
+## Later follow-up tasks
+
 1. Trial the extracted package with an external consumer or a richer
-   non-Buildish integration to validate the contract before publishing a
+   non-Buildish integration to validate the contract before publishing a stable
    versioned release.
+2. Decide whether to publish a renderer-agnostic multi-platform Site Pipeline
+   container image for CI/bootstrap use, while keeping renderer-specific images
+   owned by consumers.
 

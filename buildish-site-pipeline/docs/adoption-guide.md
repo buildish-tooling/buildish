@@ -110,7 +110,8 @@ Typical local workflows use:
 
 - `site-pipeline build` for a full staged refresh,
 - `site-pipeline watch` for interactive restaging, and
-- `site-pipeline serve` for the lightweight preview server.
+- `site-pipeline preview` for a deliberately barebones preview server. It is not
+  a substitute for the consumer's real renderer.
 
 In CI, run the pipeline before the site renderer so the published build always
 consumes staged content from the contract boundary.

@@ -884,7 +884,7 @@ def clean(
     shutil.rmtree(resolved_paths.repo_root / ".site-preview", ignore_errors=True)
 
 
-def serve(
+def preview(
     repo_root: str | Path | None = None,
     port: int = 8000,
     *,
@@ -896,7 +896,7 @@ def serve(
     site_title: str | None = None,
     project_status: ProjectStatus | None = None,
 ) -> None:
-    """Serve the lightweight preview tree with Python's standard HTTP server."""
+    """Serve the deliberately barebones preview tree with Python's HTTP server."""
 
     resolved_repo_root = repo_root_from(repo_root)
     build(
@@ -923,5 +923,8 @@ def serve(
         preview_relative = resolved_workspace.preview_path.relative_to(
             resolved_workspace.repo_root
         ).as_posix()
-        print(f"Serving local preview at http://127.0.0.1:{port}/{preview_relative}/")
+        print(
+            "Serving deliberately barebones preview at "
+            f"http://127.0.0.1:{port}/{preview_relative}/"
+        )
         httpd.serve_forever()
