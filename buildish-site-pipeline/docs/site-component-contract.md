@@ -16,37 +16,28 @@ limitations under the License.
 
 # Site component contract
 
-This document describes the implemented input contract for the site pipeline.
-For the broader long-term design, see [`site-infra.md`](site-infra.md).
+This document defines the current contract between a consumer site workspace and
+the component repositories that participate in staging.
 
 ## Workspace model
 
-- the main repository is expected at `./buildish`
-- participating components are normally sibling checkouts such as `./buildish-mammoth-cache`
-- missing component repositories are allowed during local builds and CI; they are skipped cleanly
-- the main repository owns the component catalog, defaulting to `site/components.yaml`
-- repo-authored site content defaults to `site/content`
-- pipeline-managed outputs default to `site/.stage` and `site/.preview`
-- all configured workspace paths must remain inside the main repository root
+- the consumer repository owns the catalog, pipeline config, and top-level site
+  content,
+- component repositories are discovered from the catalog and may live anywhere
+  reachable from the workspace root,
+- missing component repositories are allowed during local builds and CI and are
+  skipped cleanly, and
+- pipeline-managed outputs default to `site/.stage` and `site/.preview`.
 
-## Main repository catalog
+All configured consumer-workspace paths must remain inside the repo root. The
+default `localDir` lookup for catalog components is relative to the workspace
+parent, which supports sibling checkouts such as `../component-a` from the site
+repository's point of view. Optional `site/components.local.yaml` overrides are
+resolved relative to the consumer repo root.
 
-The main repository owns the component catalog. By default it lives at
-`site/components.yaml`.
+## Consumer-owned catalog
 
-The effective catalog path may be overridden by `workspace.catalogPath` in
-`site/site-pipeline.yaml` or by the CLI `--catalog` flag. The resolved path must
-stay within the main repository root.
-
-The repo-authored site content root may be overridden by
-`workspace.authoredSiteContentPath` in `site/site-pipeline.yaml` or by the CLI
-`--authored-site-content` flag. The stage and preview output roots may be
-overridden by `workspace.stagePath` / `workspace.previewPath` or by the CLI
-`--stage-path` / `--preview-path` flags.
-
-The implementation rejects workspace configurations where these roots would
-escape the repository boundary, overlap each other, or overlap protected
-pipeline/source roots.
+By default, the component catalog lives at `site/components.yaml`.
 
 Supported top-level fields:
 
@@ -67,13 +58,27 @@ Supported `defaults` fields:
 Each `components[]` entry supports:
 
 - required: `slug`, `localDir`
-- optional: `displayName`, `repository`, `defaultBranch`, `weight`
-- optional overrides: `metadataFile`, `pagesRoot`, `docsRoot`, `assetsRoot`
-- optional publication/navigation hints: `developmentLabel`, `tagPattern`, `navigationSection`
+- optional identity fields: `displayName`, `repository`, `defaultBranch`, `weight`
+- optional path overrides: `metadataFile`, `pagesRoot`, `docsRoot`, `assetsRoot`
+- optional publication hints: `developmentLabel`, `tagPattern`, `navigationSection`
+
+The effective catalog path may be overridden by `workspace.catalogPath` in
+`site/site-pipeline.yaml` or by the CLI `--catalog` flag. The authored site
+content root, stage root, and preview root can likewise be overridden through
+config or CLI flags.
+
+## Optional local checkout overrides
+
+Developers can keep committed catalog metadata stable while binding a component
+slug to a different local checkout in `site/components.local.yaml`.
+
+That override file is workspace-local only. It should not redefine published
+component identity or site metadata; it only changes where the current checkout
+is found.
 
 ## Component metadata file
 
-When present, the aggregator reads `site/component.yaml` from the component.
+When present, the pipeline reads `site/component.yaml` from the component.
 
 Preferred structure:
 
@@ -96,85 +101,56 @@ Preferred structure:
 - `navigation`
   - `section`
 
-The implementation also accepts a few legacy/top-level fallbacks for content
-and navigation fields, but new metadata should prefer the nested structure above.
+The implementation still accepts a few legacy top-level fallbacks for content
+and navigation fields, but new metadata should prefer the nested structure.
 
 ## Precedence rules
 
-The implementation resolves values in this order:
+The pipeline resolves values in this order:
 
-1. per-component overrides in the configured catalog
-2. component metadata in `site/component.yaml`
-3. catalog defaults from the configured catalog
-4. built-in defaults in the aggregator
+1. per-component overrides in the catalog,
+2. component metadata in `site/component.yaml`,
+3. catalog defaults, and
+4. built-in defaults.
 
-In practice, that means the central catalog controls inventory and local discovery,
-while the component metadata controls content-local structure.
+In practice, the consumer catalog controls inventory and checkout discovery,
+while component metadata controls content-local structure and lifecycle hints.
 
 ## Content inputs
 
-For each available component repository, it stages:
+For each available component repository, the pipeline stages:
 
-- the configured component pages tree, defaulting to `site/pages`
-- the configured docs tree, defaulting to `site/docs`
-- the configured asset tree, defaulting to `site/assets`
+- the configured component pages tree, defaulting to `site/pages`,
+- the configured docs tree, defaulting to `site/docs`, and
+- the configured asset tree, defaulting to `site/assets`.
 
 `pagesRoot` is the non-versioned component content tree. It stages directly into
-`content/components/<slug>/...`, and `pagesRoot/_index.md` is the authored
-component landing page at `/components/<slug>/`.
+`content/components/<slug>/...`, and `pagesRoot/_index.md` becomes the authored
+component landing page.
 
-The component pages tree is mandatory for available component repositories and
-must include `_index.md`.
+The component pages tree is mandatory for available repositories and must
+include `_index.md`.
 
-`docsRoot` is the version-specific documentation tree. In the current
-implementation, the working-tree copy stages to
+`docsRoot` is the versioned documentation tree. The current working-tree copy is
+staged as the development docs set beneath
 `content/components/<slug>/development/docs/...`.
-
-The docs tree should include a site-oriented `_index.md` landing page for that
-versioned docs section.
 
 Because `pagesRoot` stages directly into `content/components/<slug>/...`, the
 top-level names `development/`, `releases/`, and `lifecycle.yaml` are reserved
 for pipeline-owned output.
 
 If the docs tree is missing, development docs staging is skipped for that
-component.
+component. If the assets tree is missing, static asset staging is skipped.
 
-The renderer does not inject a mandatory component-home hero, CTA button row, or
-release-card shell. Component authors own the landing-page body in
-`pagesRoot/_index.md` and can place links to development docs, releases, source,
-or any other component-specific content where they want.
-
-### Landing-page shortcodes
-
-The site provides a small set of site-owned Hugo shortcodes for component pages.
-They read the pipeline-owned `sitePipelineComponent` front matter and avoid
-hard-coding URLs in component-authored Markdown.
-
-- `buildish-component-link`
-  - supported `kind` values: `overview`, `component`, `docs`, `development`, `source`
-  - optional `label`
-  - optional `appearance`: `link`, `primary`, `secondary`, `outline-primary`, `outline-secondary`
-  - optional `optional="true"` to suppress output when a target is unavailable
-- `buildish-component-releases`
-  - renders the current latest-stable and release-line summary from component metadata
-  - emits a `release-lines` anchor for landing-page links
-  - optional `heading`
-  - optional `optional="true"`
-
-Example landing-page usage:
-
-```go-template
-{{</* buildish-component-link kind="docs" label="Read development docs" appearance="primary" */>}}
-{{</* buildish-component-link kind="source" appearance="outline-secondary" */>}}
-{{</* buildish-component-releases heading="Current release lines" optional="true" */>}}
-```
+The pipeline does not impose a required hero, CTA row, or release-card shell on
+component landing pages. Component authors own the landing-page body and can add
+consumer-specific links or helpers as needed.
 
 ## Lifecycle inputs
 
-Lightweight lifecycle metadata in `site/component.yaml`:
+Lifecycle metadata in `site/component.yaml` supports:
 
-- `latestStable`: exact version tag such as `v1.3.5`
+- `latestStable`: an exact version tag such as `v1.3.5`
 - `releaseLines[]`
   - `line`
   - `latest`
@@ -184,48 +160,46 @@ Lightweight lifecycle metadata in `site/component.yaml`:
 Only exact-version tags matching the configured `tagPattern` are accepted for
 `latestStable` and `releaseLines[].latest`.
 
-## Safety constraints
-
-The aggregator enforces these guardrails:
-
-- configured paths must stay within the approved repository root
-- path traversal outside the allowed repo tree is rejected
-- symlinks are not followed when copying docs or assets
-- hidden files and directories are skipped during staged tree copies
-
 ## Staged outputs
 
-Stage outputs are, at minimum, written beneath the configured
-`workspace.stagePath` root (default `site/.stage`):
+At minimum, the configured `workspace.stagePath` contains:
 
-- `workspace.stagePath/content/components/<slug>/_index.md`
-- `workspace.stagePath/content/components/<slug>/...` for any additional authored component pages
-- `workspace.stagePath/content/components/<slug>/development/docs/...`
-- `workspace.stagePath/content/components/<slug>/development/version.yaml`
-- `workspace.stagePath/content/components/<slug>/lifecycle.yaml`
-- `workspace.stagePath/data/components.yaml`
-- `workspace.stagePath/data/lifecycle.yaml`
-- `workspace.stagePath/data/aliases.yaml`
-- `workspace.stagePath/static/components/<slug>/development/assets/...` when assets exist
+- `content/components/<slug>/_index.md`
+- `content/components/<slug>/...` for additional component pages
+- `content/components/<slug>/development/docs/...`
+- `content/components/<slug>/development/version.yaml`
+- `content/components/<slug>/lifecycle.yaml`
+- `data/components.yaml`
+- `data/lifecycle.yaml`
+- `data/aliases.yaml`
+- `static/components/<slug>/development/assets/...` when assets exist
+- `manifest.yaml`
 
-Each staged component Markdown page also receives pipeline-owned front matter under:
+Each staged component Markdown page also receives pipeline-owned front matter
+under:
 
-- `sitePipelineComponent` for the component identity, navigation paths, and lifecycle summary
-- `sitePipelineComponentPage` for the staged page kind and active development-version context
+- `sitePipelineComponent` for component identity, derived paths, and lifecycle
+  summary
+- `sitePipelineComponentPage` for page kind and active development-version
+  context
 
-Public component/docs/release paths in that staged metadata are derived from the
-staged content tree itself. The lightweight preview HTML derives its local links
-from the resolved `workspace.stagePath` / `workspace.previewPath` outputs rather
-than from a second hard-coded Buildish preview/route table.
+Consumer-specific renderer helpers are not part of this contract. A consumer may
+choose to expose shortcodes, partials, or templates that read the staged front
+matter, but those integration details belong to that consumer's rendering layer.
 
-## Local commands
+## Safety constraints
 
-From `site/`:
+The pipeline enforces these guardrails:
 
-- `make test` validates the Python staging logic
-- `make build` stages content and renders the Hugo site
-- `make stage-watch` re-stages on source changes
-- `make serve` runs the watcher and Hugo together
+- configured paths must stay within approved workspace roots,
+- path traversal outside the allowed workspace is rejected,
+- symlinks are not followed when copying docs or assets,
+- hidden files and directories are skipped during staged tree copies, and
+- authored inputs cannot overlap pipeline-managed outputs or protected workspace
+  files.
 
-The CI workflow mirrors the containerized build path so the staged-site contract and
-the renderer are both exercised in a reproducible environment.
+## Read next
+
+- [Site Pipeline overview](site-pipeline.md)
+- [Adoption guide](adoption-guide.md)
+- [Workspace examples](examples.md)

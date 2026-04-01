@@ -138,10 +138,10 @@ def _component_watch_roots(
 def _local_pipeline_source_root(project_root: Path, repo_root: Path) -> Path | None:
     """Return a local dependency source root for the pipeline package if configured.
 
-    The Buildish consumer project can point at a local checkout of the extracted
-    pipeline repository via ``tool.uv.sources``. When present, watch mode should
-    rebuild after changes in that source tree instead of assuming the package
-    lives directly beneath ``site/pipeline/``.
+    A consumer project can point at a local checkout of the extracted pipeline
+    repository via ``tool.uv.sources``. When present, watch mode should rebuild
+    after changes in that source tree instead of assuming the package lives
+    directly beneath ``site/pipeline/``.
     """
 
     pyproject_path = project_root / "pyproject.toml"

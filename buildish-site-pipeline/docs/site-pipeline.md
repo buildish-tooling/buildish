@@ -14,250 +14,142 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Apache Buildish site infrastructure
+# Site Pipeline overview
 
-This document describes the implementation under `site/`.
+Site Pipeline is a staging layer for multi-repository documentation sites. It
+reads a consumer-owned component catalog, collects each component's pages,
+docs, assets, and metadata, and writes a predictable site contract beneath the
+configured stage root.
 
-The broader target architecture and future publication/release goals remain in
-[`site-infra.md`](site-infra.md). The implementation is still
-**development-first and development-only** in practice for versioned docs; stable,
-non-versioned component landing pages come from authored `site/pages/_index.md`
-content, while version-specific docs come from `site/docs/`.
+The pipeline is intentionally separate from the final site renderer. It owns
+staging and validation; the consumer owns theming, navigation, publishing, and
+environment-specific runtime choices.
 
-## What the implementation provides
+## Responsibility split
 
-The code under `site/` provides:
+### Pipeline-owned behavior
 
-- catalog-driven aggregation from a repo-owned catalog, defaulting to `site/components.yaml`,
-- per-component metadata loading from each component's `site/component.yaml`,
-- authored component landing pages and version-independent component pages from each component's `site/pages/`,
-- version-specific docs from each component's `site/docs/`, staged today as development docs,
-- normalized staged content and metadata under the configured stage root,
-  defaulting to `site/.stage/`,
-- local Hugo + Docsy rendering from that staged tree,
-- watch-based restaging for interactive local development,
-- an optional lightweight Python preview under the configured preview root,
-  defaulting to `site/.preview/`, and
-- containerized local/CI workflows with pinned tooling.
+- component discovery from a catalog, defaulting to `site/components.yaml`,
+- component metadata loading from `site/component.yaml`,
+- staging of component pages, versioned docs, and assets,
+- generated metadata under the stage root,
+- safety checks for path boundaries and protected outputs, and
+- `build`, `watch`, `serve`, and `clean` CLI workflows.
 
-The component metadata contract is documented separately in
-[`site-component-contract.md`](site-component-contract.md).
+### Consumer-owned behavior
 
-## Pipeline configuration
+- the repository layout used to host the site workspace,
+- top-level authored site content, defaulting to `site/content`,
+- renderer integration, templates, shortcodes, navigation, and branding, and
+- publishing, release, and CI policy.
 
-The staging CLI now supports both command-line overrides and an optional
-workspace-owned configuration file at `site/site-pipeline.yaml`.
+Consumer-specific helpers are outside the core pipeline contract. For example, a
+consumer site may add convenience shortcodes for component pages, but those are
+owned by that renderer layer rather than by the staging package.
+
+## Configuration model
+
+The CLI supports command-line overrides plus an optional consumer-owned
+configuration file at `site/site-pipeline.yaml`.
 
 Current supported settings include:
 
-- `workspace.catalogPath` for the component catalog, defaulting to `site/components.yaml`
-- `workspace.authoredSiteContentPath` for repo-authored site content,
-  defaulting to `site/content`
-- `workspace.stagePath` for staged pipeline output, defaulting to `site/.stage`
-- `workspace.previewPath` for Python preview output, defaulting to `site/.preview`
-- `site.siteTitle`
-- `site.projectStatus` with allowed values `incubating`, `graduated`, or `retired`
+- `workspace.catalogPath`, defaulting to `site/components.yaml`,
+- `workspace.authoredSiteContentPath`, defaulting to `site/content`,
+- `workspace.stagePath`, defaulting to `site/.stage`,
+- `workspace.previewPath`, defaulting to `site/.preview`,
+- `site.siteTitle`, and
+- `site.projectStatus` with allowed values `incubating`, `graduated`, or `retired`.
 
 Precedence is:
 
-1. command-line arguments
-2. `site/site-pipeline.yaml`
-3. pipeline defaults
+1. command-line arguments,
+2. `site/site-pipeline.yaml`,
+3. pipeline defaults.
 
 `--config`, `--catalog`, `--authored-site-content`, `--stage-path`, and
-`--preview-path` are resolved relative to the repository root and are rejected
-if they escape that boundary. The pipeline also rejects overlapping workspace
-paths so authored inputs and generated outputs cannot clobber protected site
-source roots.
+`--preview-path` are resolved relative to the repo root and rejected if they
+escape that boundary. The pipeline also rejects overlapping workspace roots so
+authored inputs and generated outputs cannot clobber protected site sources.
 
 ## Architecture overview
 
-The implementation is split into an aggregation layer and a rendering layer.
-
 ```mermaid
 flowchart LR
-    A[site/components.yaml] --> P[Python staging pipeline]
-    B[component site/component.yaml] --> P
-    C[component site/pages, site/docs, and site/assets] --> P
-    D[authored site content and shared assets] --> P
-    P --> S[stagePath default site/.stage]
-    P --> V[previewPath default site/.preview]
-    S --> H[Hugo + Docsy]
-    H --> U[site/.public]
+    A[component catalog] --> P[site-pipeline]
+    B[component metadata] --> P
+    C[component pages docs and assets] --> P
+    D[consumer site content] --> P
+    P --> S[stage root]
+    P --> V[preview root]
+    S --> R[consumer renderer]
+    R --> U[published site]
 ```
 
-### Aggregation layer
+The pipeline's job ends at the staged contract. A renderer such as Hugo can then
+consume staged `content`, `data`, and `static` trees without reading arbitrary
+component repositories directly.
 
-The Python pipeline under `site/pipeline/apache_buildish_site_pipeline/` is responsible for:
+## Runtime commands
 
-- reading the catalog and component metadata,
-- copying approved non-versioned pages, versioned docs, and static assets into a normalized tree,
-- normalizing Markdown titles, summaries, and front matter,
-- generating YAML data consumed by templates,
-- writing a manifest describing the staged contract.
+- `site-pipeline build` stages the current workspace and writes preview output.
+- `site-pipeline watch` rebuilds the stage root when relevant inputs change.
+- `site-pipeline serve` serves the lightweight preview output.
+- `site-pipeline clean` removes pipeline-managed outputs.
 
-For component landing pages, the Hugo layer now renders the authored
-`site/pages/_index.md` body directly instead of wrapping it in a fixed Buildish
-hero/actions shell.
-
-The rendering layer also provides a small set of site-owned shortcodes under
-`site/layouts/shortcodes/` so component landing pages can link to pipeline-owned
-component metadata without hard-coding URLs.
-
-The core pipeline now derives public component/docs/release URLs from the
-staged content tree itself instead of maintaining a second hard-coded route
-table. The lightweight preview HTML likewise derives its links from the
-resolved `workspace.stagePath` / `workspace.previewPath` outputs, so custom
-workspace roots do not require Buildish-specific preview assumptions in the
-Python package.
-
-### Rendering layer
-
-Hugo consumes the staged contract via `site/hugo.yaml`:
-
-- `contentDir: .stage/content`
-- `dataDir: .stage/data`
-- `staticDir: [.stage/static, static]`
-- `publishDir: .public`
-
-This keeps the public renderer fed from one Buildish-owned staged contract
-instead of reading arbitrary component repositories directly.
-
-## Important directories
-
-- `site/.stage/` — default canonical staged input for Hugo
-- `site/.preview/` — default lightweight Python preview output written by full builds
-- `site/.public/` — Hugo-rendered site output
-- `site/resources/` — Hugo-generated resources
-- `site/pipeline/` — Python staging package, tests, and `uv` metadata
-
-Generated directories are ignored by Git and should usually be excluded in IDEs.
-
-## Local workflows
-
-From `site/`:
-
-- `make serve` — run the staging watcher plus `hugo server` in a container
-- `make build` — stage plus full Hugo render in a container
-- `make render` — render the current staged site in a container
-
-The above workflows run in a container by default. There are non-containerized
-pendants for the main render workflows that run natively on the host (`-local` suffix).
-
-Native host workflows remain available as `make serve-local`, `make build-local`,
-and `make render-local`. Advanced containerized staging targets remain available as
-`make stage` and `make stage-watch`.
-
-If you want to inspect the static `site/.public/` output without running Hugo in
-watch mode, run `make build`, then serve it locally, for example with
-`python3 -m http.server --directory .public 8080` from `site/`.
-
-## How `serve` works
-
-`make serve` starts two long-lived processes in a container:
-
-1. the Python watcher, which rebuilds the configured stage root when relevant
-   inputs change
-2. `hugo server`, which serves from the staged Hugo input tree
-
-```mermaid
-sequenceDiagram
-    participant Dev as Developer
-    participant Watch as Python watcher
-    participant Stage as site/.stage
-    participant Hugo as hugo server
-    Dev->>Watch: edit site content / component docs / metadata
-    Watch->>Watch: collect relevant changes
-    Watch->>Stage: rebuild staged contract
-    Hugo->>Stage: poll/read staged content
-    Hugo-->>Dev: serve updated page
-```
-
-### Why watch mode only rebuilds the stage root
-
-Watch mode intentionally calls the Python build with preview generation disabled.
-That means repeated restaging during `make stage-watch` and `make serve`
-rewrites the configured stage root only and leaves the configured preview root
-untouched. In the default Buildish workspace, those are `site/.stage/` and
-`site/.preview/`.
-
-This is intentional for two reasons:
-
-- Hugo serves from the stage root, not from the preview root
-- rewriting the preview root on every save adds unnecessary external file churn
-
-The lightweight preview tree is still generated by full `build` runs and by the
-standalone Python preview server path.
-
-### Why watch mode uses narrow watch roots
-
-The watcher does **not** subscribe to all of `site/pipeline/` recursively.
-Instead it watches a curated subset:
-
-- `site/pipeline/main.py`
-- `site/pipeline/pyproject.toml`
-- `site/pipeline/uv.lock`
-- `site/pipeline/apache_buildish_site_pipeline/`
-
-This avoids recursively watching tool-managed directories such as:
-
-- `site/pipeline/.venv/`
-- `site/pipeline/.idea/`
-
-That reduction matters because IDEs and Python file watchers otherwise compete
-over a much larger tree than the watcher actually needs.
-
-### Why Hugo is configured with polling during serve
-
-`make serve` runs `hugo server` with `--poll 700ms`. The staged tree is
-rewritten by a separate Python process, so the implementation uses Hugo
-polling as the compatibility-oriented way to notice those external restaging
-updates reliably during development.
+Watch mode intentionally rebuilds the stage root without rewriting the preview
+root on every change. That keeps interactive development responsive and avoids
+unnecessary file-system churn for downstream renderers.
 
 ## Inputs and outputs
 
 ### Inputs
 
-- the component catalog in the main repository, defaulting to `site/components.yaml`
-- `site/component.yaml` in each participating component
-- optional `site/site-pipeline.yaml` in the main repository for pipeline/site defaults,
-  including `workspace.catalogPath`, `workspace.authoredSiteContentPath`,
-  `workspace.stagePath`, and `workspace.previewPath`
-- `site/pages/` in each participating component for non-versioned component pages
-- `site/docs/` in each participating component for version-specific docs
-- optional `site/assets/` in each participating component
-- authored site content under the configured `workspace.authoredSiteContentPath`,
-  defaulting to `site/content/`
+- the consumer-owned component catalog,
+- optional `site/site-pipeline.yaml` defaults,
+- `site/component.yaml` in participating components,
+- `site/pages/` for non-versioned component pages,
+- `site/docs/` for versioned documentation,
+- optional `site/assets/` for static files, and
+- consumer-authored site content under the configured authored site root.
 
 ### Outputs
 
-- `workspace.stagePath/content/components/<slug>/_index.md` and any additional authored component pages
-- `workspace.stagePath/content/components/<slug>/development/docs/...`
-- `workspace.stagePath/content/components/<slug>/development/version.yaml`
-- `workspace.stagePath/content/components/<slug>/development/_index.md`
-- `workspace.stagePath/data/components.yaml`
-- `workspace.stagePath/data/lifecycle.yaml`
-- `workspace.stagePath/data/aliases.yaml`
-- `workspace.stagePath/static/components/<slug>/development/assets/...`
-- `workspace.stagePath/manifest.yaml`
-- `workspace.previewPath/` for the lightweight Python preview output
-- `site/.public/` for the Hugo-rendered site
+At minimum, the stage root contains:
+
+- `content/components/<slug>/_index.md` and additional component pages,
+- `content/components/<slug>/development/docs/...`,
+- `content/components/<slug>/development/version.yaml`,
+- `content/components/<slug>/lifecycle.yaml`,
+- `data/components.yaml`,
+- `data/lifecycle.yaml`,
+- `data/aliases.yaml`,
+- `static/components/<slug>/development/assets/...` when assets exist, and
+- `manifest.yaml`.
+
+The preview root contains the lightweight Python preview output. The staged tree
+remains the single source of truth for derived component, docs, and lifecycle
+paths.
 
 ## Security and safety baseline
 
-The implementation keeps the main safety guardrails from the broader
-proposal:
+The current implementation keeps these guardrails:
 
-- no arbitrary code execution from staged content,
-- no path traversal outside approved repository roots,
-- no overlap between configured authored inputs, generated outputs, and
-  protected site source roots,
-- no symlink-following during staged content copying,
-- reserved pipeline-owned component paths such as `development/`, `releases/`, and `lifecycle.yaml` cannot be shadowed by authored `site/pages/` content,
-- no remote fetching during normal local builds,
-- no custom renderer logic contributed from component repositories.
+- no arbitrary renderer logic from component repositories,
+- no path traversal outside approved workspace roots,
+- no overlap between authored inputs and generated outputs,
+- no symlink-following while copying docs or assets,
+- no component-authored shadowing of reserved pipeline-owned paths such as
+  `development/`, `releases/`, and `lifecycle.yaml`, and
+- no network fetching during normal builds.
 
-## Known development-only limitations
+## Read next
+
+- [Site component contract](site-component-contract.md)
+- [Adoption guide](adoption-guide.md)
+- [Workspace examples](examples.md)
+
+## Current limitations
 
 - route removals can linger briefly in an already-running `make serve`
   session until Hugo is restarted

@@ -197,13 +197,28 @@ Completed:
 
 ### Phase 4: broaden adoption and harden the public contract
 
-- publish migration and integration guidance for other adopters
-- add reusable examples for common Apache site setups
-- stabilize the public contract based on consumer feedback
+Status: in progress.
+
+Completed:
+
+- rewrote the extracted repository README and docs around the generic
+  consumer-versus-pipeline boundary
+- published migration and integration guidance for adopters in the extracted
+  repo docs
+- added reusable workspace examples for common multi-repository site setups
+- tightened the extracted component landing page toward a more product-style
+  overview
+- added a reusable second-consumer fixture and CLI-backed test coverage to
+  pressure-test the documented adoption path outside the Buildish workspace
+
+Remaining:
+
+- stabilize the public contract based on feedback from additional consumers
+  beyond the initial Buildish integration
 
 ## Immediate next steps
 
-1. Rewrite the extracted repository docs and examples so they describe the
-   generic cross-repository contract instead of Buildish-internal paths and
-   workflow assumptions.
+1. Trial the extracted package with an external consumer or a richer
+   non-Buildish integration to validate the contract before publishing a
+   versioned release.
 

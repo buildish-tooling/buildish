@@ -16,25 +16,27 @@ limitations under the License.
 
 # Site Pipeline
 
-The Site Pipeline is the reusable staging component that assembles component-owned
-pages, docs, assets, and metadata into a normalized site tree for rendering.
+Assemble component-owned docs into a predictable site contract.
 
-It separates the cross-repository content contract from the consumer's site theme,
-templates, and publishing workflow.
+The Site Pipeline discovers component content, validates the workspace contract,
+and stages normalized pages, docs, assets, and metadata for a downstream site
+renderer.
+
+It gives a consumer site one place to aggregate cross-repository content without
+pulling renderer logic, branding, or publishing policy into every component.
 
 {{< buildish-component-link kind="docs" label="Read docs" appearance="primary" >}}
 
 {{< buildish-component-link kind="source" label="Browse source" appearance="outline-secondary" >}}
 
-## What it provides
+## Why teams use it
 
-- catalog-driven discovery of participating components,
-- validation for component metadata and workspace paths,
-- staging for component landing pages, versioned docs, and static assets,
-- generated metadata for navigation, lifecycle, and preview links, and
-- build, clean, and watch workflows for local development and CI.
+- one staging contract for component pages, docs, assets, and lifecycle data,
+- safety checks for workspace paths and protected outputs,
+- generated metadata for navigation, release lines, and preview links, and
+- local build, clean, watch, and preview workflows.
 
-## Component contract
+## What you integrate
 
 Participating repositories provide the content inputs the pipeline knows how to
 stage:
@@ -45,14 +47,18 @@ stage:
 - optional `site/assets/` content for static files that should be published with
   the docs.
 
-The consumer repository keeps ownership of the rendered site experience, such as
-theme integration, shared layouts, publishing, and environment-specific runtime
-choices.
+The consumer repository keeps ownership of the rendered site experience:
 
-## Next steps
+- theme integration,
+- shared layouts and helper shortcodes,
+- navigation and branding,
+- publishing, and
+- environment-specific runtime choices.
 
-Start with the docs for the current contract, configuration model, and staging
-behavior. If you are integrating or modifying the pipeline, the source repository
-contains the implementation, tests, and extracted component content.
+## Learn more
+
+Start with the docs for the current contract, configuration model, and adoption
+patterns. If you are integrating or modifying the pipeline, the source
+repository contains the implementation, tests, and extracted component content.
 
 {{< buildish-component-releases heading="Current release lines" optional="true" >}}
