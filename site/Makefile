@@ -74,11 +74,13 @@ _container_version    := $(shell $(CONTAINER_ENGINE) --version 2>/dev/null)
 _container_name_match := $(filter podman,$(CONTAINER_ENGINE_BASENAME))
 _container_ver_match  := $(findstring podman,$(_container_version))
 CONTAINER_IS_PODMAN   ?= $(if $(or $(_container_name_match),$(_container_ver_match)),1,)
-CONTAINER_MOUNT_LABEL  :=
-CONTAINER_USERNS_FLAGS :=
+CONTAINER_MOUNT_LABEL     :=
+CONTAINER_RO_MOUNT_OPTIONS := :ro
+CONTAINER_USERNS_FLAGS    :=
 ifneq ($(CONTAINER_IS_PODMAN),)
-CONTAINER_MOUNT_LABEL  := :Z
-CONTAINER_USERNS_FLAGS := --userns=keep-id
+CONTAINER_MOUNT_LABEL     := :Z
+CONTAINER_RO_MOUNT_OPTIONS := :ro,Z
+CONTAINER_USERNS_FLAGS    := --userns=keep-id
 endif
 
 CONTAINER_CACHE_ENV = \
@@ -91,15 +93,14 @@ CONTAINER_CACHE_ENV = \
 # localDir entries that contain a '/' point inside the main repo and are already
 # covered by the main-repo mount; they are excluded here.
 # If parsing fails the build stops immediately with a clear error.
-_component_local_dirs := $(shell python3 -c "\
-import yaml; \
+_component_local_dirs := $(shell python3 -c "import yaml; \
 data = yaml.safe_load(open('$(CURDIR)/components.yaml')); \
 dirs = [c['localDir'].split('/')[0] for c in data['components'] \
         if '/' not in c.get('localDir', '')]; \
 print(' '.join(dirs))" 2>/dev/null)
 $(if $(_component_local_dirs),,$(error Could not parse component dirs from $(CURDIR)/components.yaml))
 CONTAINER_COMPONENT_MOUNTS = $(foreach d,$(_component_local_dirs),\
-	-v $(WORKSPACE_ROOT)/$(d):/workspace/$(d):ro$(CONTAINER_MOUNT_LABEL))
+	-v $(WORKSPACE_ROOT)/$(d):/workspace/$(d)$(CONTAINER_RO_MOUNT_OPTIONS))
 CONTAINER_WORKSPACE_FLAGS = \
 	-v $(REPO_ROOT):/workspace/$(REPO_NAME)$(CONTAINER_MOUNT_LABEL) \
 	$(CONTAINER_COMPONENT_MOUNTS) \
