@@ -226,7 +226,7 @@ CONTAINER_SERVE_SCRIPT = \
 	trap cleanup EXIT INT TERM; \
 	events_file="$$(mktemp .watch-events.XXXXXX.jsonl)"; \
 	printf "==> [container-serve] running site-pipeline watch on %s:%s\n" "0.0.0.0" "$(PORT)"; \
-	$(SITE_PIPELINE) watch --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_READY_ARGS) $(SITE_PIPELINE_ARGS) >"$$events_file" & \
+	$(SITE_PIPELINE) watch --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_READY_ARGS) --unstable-events-output "$$events_file" $(SITE_PIPELINE_ARGS) & \
 	watch_pid=$$!; \
 	$(WAIT_FOR_WATCH_READY) --events-file "$$events_file" --pid "$$watch_pid" --timeout $(WATCH_READY_TIMEOUT_SECONDS); \
 	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --bind 0.0.0.0 --port $(PORT) --poll 700ms --disableFastRender --noBuildLock --renderToMemory; \
@@ -466,7 +466,7 @@ serve-local: sanity-check hugo-check docsy-check ## Serve the full Hugo site wit
 	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; if [ -n "$$events_file" ]; then rm -f "$$events_file"; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
 	events_file="$$(mktemp .watch-events.XXXXXX.jsonl)"; \
-	$(MAKE) --silent --no-print-directory pipeline-watch-local SITE_PIPELINE_ARGS="$(SITE_PIPELINE_READY_ARGS) $(SITE_PIPELINE_ARGS)" >"$$events_file" & \
+	$(MAKE) --silent --no-print-directory pipeline-watch-local SITE_PIPELINE_ARGS="$(SITE_PIPELINE_READY_ARGS) --unstable-events-output $$events_file $(SITE_PIPELINE_ARGS)" & \
 	watch_pid=$$!; \
 	$(WAIT_FOR_WATCH_READY) --events-file "$$events_file" --pid "$$watch_pid" --timeout $(WATCH_READY_TIMEOUT_SECONDS); \
 	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --bind $(HUGO_SERVER_BIND) --port $(PORT) --disableFastRender --noBuildLock --renderToMemory
