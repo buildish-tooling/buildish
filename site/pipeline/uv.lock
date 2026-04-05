@@ -38,7 +38,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "apache-buildish-site-pipeline", path = "../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0.dev20260401092215+g5580fe44a69f-py3-none-any.whl" }]
+requires-dist = [{ name = "apache-buildish-site-pipeline", path = "../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0-py3-none-any.whl" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -48,8 +48,8 @@ dev = [
 
 [[package]]
 name = "apache-buildish-site-pipeline"
-version = "0.1.0.dev20260401092215+g5580fe44a69f"
-source = { path = "../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0.dev20260401092215+g5580fe44a69f-py3-none-any.whl" }
+version = "0.1.0"
+source = { path = "../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0-py3-none-any.whl" }
 dependencies = [
     { name = "mistletoe" },
     { name = "pydantic" },
@@ -58,7 +58,7 @@ dependencies = [
     { name = "watchfiles" },
 ]
 wheels = [
-    { filename = "apache_buildish_site_pipeline-0.1.0.dev20260401092215+g5580fe44a69f-py3-none-any.whl", hash = "sha256:6677e809779a5f1973ba68686d2b4f07705c1327ee1833ba6f799b2224647027" },
+    { filename = "apache_buildish_site_pipeline-0.1.0-py3-none-any.whl", hash = "sha256:b42cd7413c0c40543da58adba6b3a9fc9a5e858e03a0aa7cc21a4d133de928c2" },
 ]
 
 [package.metadata]

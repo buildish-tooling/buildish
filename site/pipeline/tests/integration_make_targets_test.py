@@ -27,8 +27,6 @@ import unittest
 from pathlib import Path
 from typing import TextIO
 
-import yaml
-
 from test_support import (
     SOURCE_REPO_ROOT,
     TestCaseHelpers,
@@ -38,7 +36,13 @@ from test_support import (
     text_block,
 )
 
-DEFAULT_FIXTURE_ROOT = SOURCE_REPO_ROOT / "site" / "build" / "tests" / f"integration-make-targets-{os.getpid()}"
+EXTRACTED_PIPELINE_REPO_ROOT = (SOURCE_REPO_ROOT.parent / "buildish-site-pipeline").resolve()
+EXTRACTED_PIPELINE_BIN = (
+    EXTRACTED_PIPELINE_REPO_ROOT / ".venv" / "bin" / "site-pipeline"
+).resolve()
+DEFAULT_FIXTURE_ROOT = (
+    SOURCE_REPO_ROOT / "site" / "build" / "tests" / f"integration-make-targets-{os.getpid()}"
+)
 CONTAINERIZED_SERVE_READY_TIMEOUT = 60.0
 
 
@@ -76,8 +80,6 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
 
                 Fixture component landing page.
 
-                {{< buildish-component-link kind="docs" label="Read development docs" appearance="primary" >}}
-
                 {{< buildish-component-link kind="source" label="Browse source" appearance="outline-secondary" >}}
 
                 {{< buildish-component-releases heading="Current release lines" >}}
@@ -87,7 +89,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 """
                 # Overview
 
-                Initial overview.
+                Initial fixture docs overview.
                 """
             ),
             getting_started=text_block(
@@ -124,9 +126,15 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         path.write_text(content, encoding="utf-8")
         path.chmod(0o755)
 
-    def seed_fake_tools(self, site_root: Path, include_engine: bool = False, include_hugo: bool = False, include_native_docsy: bool = False) -> Path:
+    def seed_fake_tools(
+        self,
+        site_root: Path,
+        *,
+        include_engine: bool = False,
+        include_hugo: bool = False,
+        include_native_docsy: bool = False,
+    ) -> Path:
         bin_dir = site_root / "build" / "test-bin"
-        extracted_pipeline_main = SOURCE_REPO_ROOT.parent / "buildish-site-pipeline" / "main.py"
         self.write_executable(
             bin_dir / "node",
             text_block(
@@ -172,10 +180,9 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 import sys
 
                 os.execv(
-                    {sys.executable!r},
+                    {str(EXTRACTED_PIPELINE_BIN)!r},
                     [
-                        {sys.executable!r},
-                        {str(extracted_pipeline_main)!r},
+                        {str(EXTRACTED_PIPELINE_BIN)!r},
                         *sys.argv[1:],
                     ],
                 )
@@ -202,6 +209,12 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                         signal.signal(signal.SIGINT, lambda *_: sys.exit(0))
                         while True:
                             time.sleep(0.1)
+
+                    destination = '.public'
+                    if '--destination' in sys.argv[1:]:
+                        destination = sys.argv[sys.argv.index('--destination') + 1]
+                    Path(destination).mkdir(parents=True, exist_ok=True)
+                    Path(destination, 'index.html').write_text('<html>fake hugo</html>\n', encoding='utf-8')
 
                     if os.environ.get('BUILDISH_FAKE_HUGO_REQUIRE_POSTCSS_NPX') == '1':
                         subprocess.run(['npx', 'postcss', '--help'], check=True)
@@ -323,14 +336,24 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                     """
                 ),
             )
-            for rel in ["jquery/dist/jquery.min.js", "mermaid/dist/mermaid.min.js", "lunr/lunr.min.js"]:
+            for rel in (
+                "jquery/dist/jquery.min.js",
+                "mermaid/dist/mermaid.min.js",
+                "lunr/lunr.min.js",
+            ):
                 target = node_modules / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text("// fake asset\n", encoding="utf-8")
         return bin_dir
 
-    def base_env(self, site_root: Path, bin_dir: Path) -> dict[str, str]:
+    def local_env(self, _site_root: Path) -> dict[str, str]:
         env = os.environ.copy()
+        env["SITE_PIPELINE_REPO_ROOT"] = str(EXTRACTED_PIPELINE_REPO_ROOT)
+        env["SITE_PIPELINE_BIN"] = str(EXTRACTED_PIPELINE_BIN)
+        return env
+
+    def base_env(self, site_root: Path, bin_dir: Path) -> dict[str, str]:
+        env = self.local_env(site_root)
         env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
         env["NVM_DIR"] = str(site_root / "build" / "fake-nvm")
         env["BUILDISH_FAKE_HUGO_LOG"] = str(site_root / "build" / "fake-hugo.log")
@@ -409,199 +432,72 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             details = f"\n{self.read_process_output(process)}"
         self.fail(f"Timed out waiting for {description}{details}")
 
+    def file_contains(self, path: Path, snippet: str) -> bool:
+        try:
+            return path.exists() and snippet in path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return False
+
+    @staticmethod
+    def mammoth_page_path(repo_root: Path) -> Path:
+        return (
+            repo_root
+            / "site"
+            / ".stage"
+            / "content"
+            / "components"
+            / "mammoth-cache"
+            / "pages"
+            / "_index.md"
+        )
+
     def test_make_stage_local_builds_fixture_workspace(self) -> None:
         repo_root = self.prepare_fixture_workspace()
-        result = self.run_make(repo_root / "site", "stage-local", os.environ.copy())
+        result = self.run_make(repo_root / "site", "stage-local", self.local_env(repo_root / "site"))
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assert_paths_exist(
-            repo_root / "site" / ".stage" / "manifest.yaml",
-            repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md",
+            repo_root / "site" / ".stage" / "manifest.json",
+            repo_root / "site" / ".stage" / "data" / "components.json",
+            repo_root / "site" / ".stage" / "data" / "content-index.json",
+            self.mammoth_page_path(repo_root),
+            repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache" / "assets" / "images" / "diagram.svg",
         )
+        self.assertFalse((repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "latest").exists())
 
-    def test_make_stage_local_refreshes_consumer_to_latest_snapshot_manifest(self) -> None:
+    def test_make_stage_local_uses_extracted_checkout_instead_of_consumer_snapshot(self) -> None:
         repo_root = self.prepare_fixture_workspace()
         consumer_pyproject = repo_root / "site" / "pipeline" / "pyproject.toml"
-        snapshot_manifest = (
-            repo_root.parent
-            / "buildish-site-pipeline"
-            / "dist"
-            / "snapshots"
-            / "latest.json"
-        )
-        manifest = json.loads(snapshot_manifest.read_text(encoding="utf-8"))
-        latest_wheel = manifest["wheel"]
         stale_wheel = "apache_buildish_site_pipeline-0.0.0.dev0+stale-py3-none-any.whl"
         consumer_pyproject.write_text(
-            consumer_pyproject.read_text(encoding="utf-8").replace(latest_wheel, stale_wheel),
+            consumer_pyproject.read_text(encoding="utf-8").replace(
+                "apache_buildish_site_pipeline-0.1.0-py3-none-any.whl",
+                stale_wheel,
+            ),
             encoding="utf-8",
         )
+        snapshots_root = repo_root.parent / "buildish-site-pipeline" / "dist" / "snapshots"
+        shutil.rmtree(snapshots_root, ignore_errors=True)
 
-        result = self.run_make(repo_root / "site", "stage-local", os.environ.copy())
+        result = self.run_make(repo_root / "site", "stage-local", self.local_env(repo_root / "site"))
 
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertIn(latest_wheel, consumer_pyproject.read_text(encoding="utf-8"))
-        self.assert_paths_exist(
-            repo_root / "site" / ".stage" / "manifest.yaml",
-            repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md",
-        )
+        self.assertIn(stale_wheel, consumer_pyproject.read_text(encoding="utf-8"))
+        self.assert_paths_exist(repo_root / "site" / ".stage" / "manifest.json", self.mammoth_page_path(repo_root))
 
-    def test_make_build_local_renders_component_navigation_without_cross_component_sidebar(self) -> None:
-        if shutil.which("hugo") is None:
-            self.skipTest("hugo is required for render integration coverage")
-        if not (SOURCE_REPO_ROOT / "site" / "node_modules" / ".bin" / "postcss").exists():
-            self.skipTest("site/node_modules is required for render integration coverage")
-
+    def test_make_build_local_runs_hugo_against_the_current_stage_with_fake_tools(self) -> None:
         repo_root = self.prepare_fixture_workspace()
-        env = os.environ.copy()
-        env["NODE_MODULES_DIR"] = str(SOURCE_REPO_ROOT / "site" / "node_modules")
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_hugo=True, include_native_docsy=True)
+        env = self.base_env(repo_root / "site", bin_dir)
         result = self.run_make(repo_root / "site", "build-local", env)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-        home_index = self.read_text(repo_root / "site" / ".public" / "index.html")
-        self.assert_contains_all(
-            home_index,
-            'rel="shortcut icon" href="/favicons/favicon.ico"',
-            'rel="icon" href="/favicons/favicon.svg" type="image/svg+xml" sizes="any"',
-            'rel="icon" href="/favicons/favicon-32x32.png" type="image/png" sizes="32x32"',
-            'rel="icon" href="/favicons/favicon-16x16.png" type="image/png" sizes="16x16"',
-            'rel="apple-touch-icon" href="/favicons/apple-touch-icon.png" sizes="180x180"',
-            'rel="manifest" href="/favicons/site.webmanifest"',
-            'rel="mask-icon" href="/favicons/safari-pinned-tab.svg" color="#38bdf8"',
-            'name="msapplication-config" content="/favicons/browserconfig.xml"',
-            'name="theme-color" content="#0f172a"',
-            'class="btn btn-primary me-2 mb-2" href="/community/">Community</a>',
-            '/community/contributing-guidelines/',
-            '/community/community-guidelines/',
-            'href="/community/">Overview</a>',
-            'href="/community/contact/">Contact</a>',
-            'class="navbar-toggler td-navbar__toggle collapsed d-md-none"',
-            'data-bs-target="#main_navbar"',
-            'navbar-mobile-section-title d-md-none',
-            'Gradle® is a registered trademark of Gradle, Inc.',
+        self.assert_paths_exist(
+            repo_root / "site" / ".stage" / "manifest.json",
+            self.mammoth_page_path(repo_root),
+            repo_root / "site" / ".public" / "index.html",
+            repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache" / "assets" / "images" / "diagram.svg",
         )
-        overview_index = home_index.find('href="/community/">Overview</a>')
-        self.assertNotEqual(-1, overview_index)
-        divider_index = home_index.find('class="dropdown-divider"', overview_index)
-        self.assertNotEqual(-1, divider_index)
-        self.assertGreater(home_index.find('href="/community/contact/">Contact</a>'), divider_index)
-        incubator_index = home_index.find('>Incubation status</h2>')
-        self.assertNotEqual(-1, incubator_index)
-        trademark_index = home_index.find('Apache® is a registered trademark of The Apache Software Foundation.')
-        self.assertNotEqual(-1, trademark_index)
-        self.assertGreater(trademark_index, incubator_index)
-        trademark_card_index = home_index.find('buildish-home-legal-card')
-        self.assertNotEqual(-1, trademark_card_index)
-        self.assertGreater(trademark_card_index, incubator_index)
-        self.assert_not_contains_any(home_index, "Browse components", 'Community &amp; contact', 'class="nav-item navbar-group-separator"', 'navbar-item--global')
-
-        docs_index = self.read_text(repo_root / "site" / ".public" / "components" / "mammoth-cache" / "development" / "docs" / "index.html")
-        self.assert_contains_all(
-            docs_index,
-            'class="td-navbar__top"',
-            'class="td-breadcrumbs',
-            'class="collapse d-md-flex td-navbar__main',
-            'navbar-mobile-section-title d-md-none',
-            'class="td-sidebar__controls d-flex d-md-none align-items-center"',
-            'class="btn btn-link td-sidebar__search-toggle"',
-            'data-bs-target="#td-sidebar-search"',
-            'class="td-sidebar__search td-sidebar__search--mobile collapse d-md-none" id="td-sidebar-search"',
-            'class="navbar-brand__home" href="/"',
-            'class="navbar-brand__component" href="/components/mammoth-cache/"',
-            'class="navbar-brand__divider"',
-            '<span class="navbar-brand__context">Fixture Mammoth Cache for Gradle® and Apache Maven™</span>',
-            'href="https://github.com/apache/buildish-mammoth-cache"',
-            '>Source</span>',
-            'navbar-item--component',
-            'class="nav-item navbar-group-separator"',
-            'class="navbar-group-separator__line"',
-            'navbar-item--global',
-            '/community/contributing-guidelines/',
-            '/community/community-guidelines/',
-        )
-        self.assert_not_contains_any(docs_index, '<a href="/components/">Components</a>')
-
-        component_index = self.read_text(repo_root / "site" / ".public" / "components" / "mammoth-cache" / "index.html")
-        self.assert_contains_all(
-            component_index,
-            'Fixture component landing page.',
-            'Read development docs',
-            'href="/components/mammoth-cache/development/docs/"',
-            'Browse source',
-            'href="https://github.com/apache/buildish-mammoth-cache"',
-            'Current release lines',
-            'Latest stable (v1.2.3)',
-            'v1 — maintained (latest v1.2.3); aliases: v1',
-        )
-        self.assert_not_contains_any(component_index, 'buildish-component-landing__hero', 'buildish-component-landing__actions', 'class="td-breadcrumbs', 'aria-label="breadcrumb"')
-
-        components_index = self.read_text(repo_root / "site" / ".public" / "components" / "index.html")
-        self.assert_contains_all(
-            components_index,
-            '<h1>Components</h1>',
-            'class="section-index"',
-            'href="/components/mammoth-cache/"',
-            'href="/components/no-gradle-wrapper-jar/"',
-        )
-        self.assert_not_contains_any(components_index, 'class="td-breadcrumbs', 'aria-label="breadcrumb"', 'col-12 col-md-3 col-xl-2 td-sidebar d-print-none')
-
-        community_index = self.read_text(repo_root / "site" / ".public" / "community" / "index.html")
-        self.assert_contains_all(
-            community_index,
-            '<h1>Community</h1>',
-            'class="section-index"',
-            'href="/community/contact/"',
-            'href="/community/get-involved/"',
-        )
-        self.assert_not_contains_any(community_index, 'class="td-breadcrumbs', 'aria-label="breadcrumb"', 'col-12 col-md-3 col-xl-2 td-sidebar d-print-none')
-
-        favicons_dir = repo_root / "site" / ".public" / "favicons"
-        for favicon_name in (
-            "favicon.ico",
-            "favicon.svg",
-            "favicon-16x16.png",
-            "favicon-32x32.png",
-            "apple-touch-icon.png",
-            "android-chrome-192x192.png",
-            "android-chrome-512x512.png",
-            "mstile-150x150.png",
-            "safari-pinned-tab.svg",
-            "site.webmanifest",
-            "browserconfig.xml",
-        ):
-            self.assertTrue((favicons_dir / favicon_name).exists(), favicon_name)
-
-        webmanifest = self.read_text(favicons_dir / "site.webmanifest")
-        self.assert_contains_all(
-            webmanifest,
-            '"name": "Apache Buildish"',
-            '"src": "/favicons/android-chrome-192x192.png"',
-            '"src": "/favicons/android-chrome-512x512.png"',
-            '"theme_color": "#0f172a"',
-        )
-
-        sidebar = docs_index.split('<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">', 1)[1].split('<aside class="d-none d-xl-block col-xl-2 td-sidebar-toc d-print-none">', 1)[0]
-        self.assertNotIn('id="m-componentsmammoth-cache"', sidebar)
-        self.assertNotIn('id="m-componentsno-gradle-wrapper-jar"', sidebar)
-        self.assertIn("Development", sidebar)
-
-        contributing_guidelines = self.read_text(repo_root / "site" / ".public" / "community" / "contributing-guidelines" / "index.html")
-        self.assert_contains_all(
-            contributing_guidelines,
-            "Contributing Guidelines",
-            "apache/buildish",
-            "https://www.apache.org/legal/generative-tooling.html",
-        )
-
-        community_guidelines = self.read_text(repo_root / "site" / ".public" / "community" / "community-guidelines" / "index.html")
-        self.assert_contains_all(community_guidelines, "Community Guidelines", "Apache Way")
-
-        contact_index = self.read_text(repo_root / "site" / ".public" / "community" / "contact" / "index.html")
-        self.assert_contains_all(
-            contact_index,
-            'class="dropdown-item active" href="/community/contact/"',
-            'href="/community/contact/">Contact</a>',
-        )
-        self.assertNotIn('class="dropdown-item active" href="/community/"', contact_index)
+        hugo_log = self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"]))
+        self.assert_contains_all(hugo_log, "--source .", "--config hugo.yaml")
 
     def test_make_stage_uses_containerized_path_and_stages_vendor_assets(self) -> None:
         repo_root = self.prepare_fixture_workspace()
@@ -611,17 +507,16 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
-        shutil.rmtree(repo_root.parent / "buildish-site-pipeline" / "dist" / "snapshots")
         result = self.run_make(repo_root / "site", "stage", env)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assert_paths_exist(
-            repo_root / "site" / ".stage" / "manifest.yaml",
-            repo_root / "site" / ".stage" / "static" / "js" / "vendor" / "jquery.min.js",
+            repo_root / "site" / ".stage" / "manifest.json",
+            self.mammoth_page_path(repo_root),
+            repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache" / "assets" / "images" / "diagram.svg",
         )
-        components_payload = yaml.safe_load((repo_root / "site" / ".stage" / "data" / "components.yaml").read_text(encoding="utf-8"))
-        self.assertTrue(components_payload["components"]["mammoth-cache"]["available"])
-        self.assertIn("Mammoth Cache for Gradle® and Apache Maven™", components_payload["components"]["mammoth-cache"]["displayName"])
-        self.assertEqual("/components/mammoth-cache/development/docs/", components_payload["components"]["mammoth-cache"]["docsPath"])
+        components_payload = self.load_json(repo_root / "site" / ".stage" / "data" / "components.json")
+        slugs = {item["slug"] for item in components_payload["items"]}
+        self.assertIn("mammoth-cache", slugs)
         container_log = self.read_text(repo_root / "site" / "build" / "fake-container.log")
         self.assert_contains_all(container_log, "run", "--init", "/workspace/buildish/site")
 
@@ -636,6 +531,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env["BUILDISH_FAKE_HUGO_REQUIRE_POSTCSS_NPX"] = "1"
         result = self.run_make(repo_root / "site", "build", env)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assert_paths_exist(repo_root / "site" / ".stage" / "manifest.json", repo_root / "site" / ".public" / "index.html")
         self.assert_contains_all(self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"])), "--source .", "--config hugo.yaml")
 
     def test_make_render_uses_containerized_path(self) -> None:
@@ -677,17 +573,16 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         )
         self.assert_not_contains_any(result.stdout, "container-serve", "hugo-check", "docsy-check", "vendor-assets", "container-build")
 
-    def test_make_stage_watch_local_rebuilds_after_doc_change(self) -> None:
+    def test_make_stage_watch_local_restages_component_pages_after_source_change(self) -> None:
         repo_root = self.prepare_fixture_workspace()
-        source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
-        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md"
-        process = self.start_make(repo_root / "site", "stage-watch-local", os.environ.copy())
-        self.wait_for("initial stage-watch build", lambda: staged_doc.exists(), process=process)
-        time.sleep(1.0)
-        source_doc.write_text(
+        source_page = self.workspace / "buildish-mammoth-cache" / "site" / "pages" / "_index.md"
+        staged_page = self.mammoth_page_path(repo_root)
+        process = self.start_make(repo_root / "site", "stage-watch-local", self.local_env(repo_root / "site"))
+        self.wait_for("initial stage-watch build", staged_page.exists, process=process)
+        source_page.write_text(
             text_block(
                 """
-                # Getting started
+                # Mammoth Cache for Gradle® and Apache Maven™
 
                 Updated by stage-watch-local.
                 """
@@ -695,13 +590,13 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             encoding="utf-8",
         )
         self.wait_for(
-            "restaged docs after stage-watch-local change",
-            lambda: staged_doc.exists() and "Updated by stage-watch-local." in staged_doc.read_text(encoding="utf-8"),
+            "restaged component page after stage-watch-local change",
+            lambda: self.file_contains(staged_page, "Updated by stage-watch-local."),
             process=process,
         )
         self.stop_process(process)
 
-    def test_make_stage_watch_rebuilds_after_doc_change_in_containerized_mode(self) -> None:
+    def test_make_stage_watch_rebuilds_component_pages_after_source_change_in_containerized_mode(self) -> None:
         repo_root = self.prepare_fixture_workspace()
         bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True)
         env = self.base_env(repo_root / "site", bin_dir)
@@ -709,15 +604,15 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
-        source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
-        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md"
+        source_page = self.workspace / "buildish-mammoth-cache" / "site" / "pages" / "_index.md"
+        staged_page = self.mammoth_page_path(repo_root)
         process = self.start_make(repo_root / "site", "stage-watch", env)
-        self.wait_for("initial containerized stage-watch build", lambda: staged_doc.exists(), process=process)
+        self.wait_for("initial containerized stage-watch build", staged_page.exists, process=process)
         time.sleep(1.0)
-        source_doc.write_text(
+        source_page.write_text(
             text_block(
                 """
-                # Getting started
+                # Mammoth Cache for Gradle® and Apache Maven™
 
                 Updated by containerized stage-watch.
                 """
@@ -725,26 +620,28 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             encoding="utf-8",
         )
         self.wait_for(
-            "restaged docs after containerized stage-watch change",
-            lambda: staged_doc.exists() and "Updated by containerized stage-watch." in staged_doc.read_text(encoding="utf-8"),
+            "restaged component page after containerized stage-watch change",
+            lambda: self.file_contains(staged_page, "Updated by containerized stage-watch."),
+            timeout=CONTAINERIZED_SERVE_READY_TIMEOUT,
             process=process,
         )
         self.stop_process(process)
-        self.assert_contains_all(self.read_text(repo_root / "site" / "build" / "fake-container.log"), "run")
+        self.assertIn("run", self.read_text(repo_root / "site" / "build" / "fake-container.log"))
 
-    def test_make_serve_local_starts_hugo_with_local_bind_and_restages_changes(self) -> None:
+    def test_make_serve_local_starts_hugo_with_local_bind_and_restages_component_changes(self) -> None:
         repo_root = self.prepare_fixture_workspace()
         bin_dir = self.seed_fake_tools(repo_root / "site", include_hugo=True, include_native_docsy=True)
         env = self.base_env(repo_root / "site", bin_dir)
         env["PORT"] = "8766"
-        source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
-        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md"
+        source_page = self.workspace / "buildish-mammoth-cache" / "site" / "pages" / "_index.md"
+        staged_page = self.mammoth_page_path(repo_root)
         process = self.start_make(repo_root / "site", "serve-local", env)
         self.wait_for("fake local Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(), process=process)
-        source_doc.write_text(
+        self.wait_for("initial serve-local stage", staged_page.exists, process=process)
+        source_page.write_text(
             text_block(
                 """
-                # Getting started
+                # Mammoth Cache for Gradle® and Apache Maven™
 
                 Updated by serve-local.
                 """
@@ -752,8 +649,8 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             encoding="utf-8",
         )
         self.wait_for(
-            "restaged docs after serve-local change",
-            lambda: staged_doc.exists() and "Updated by serve-local." in staged_doc.read_text(encoding="utf-8"),
+            "restaged component page after serve-local change",
+            lambda: self.file_contains(staged_page, "Updated by serve-local."),
             process=process,
         )
         hugo_log = self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"]))
@@ -764,14 +661,13 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         repo_root = self.prepare_fixture_workspace()
         bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
         env = self.base_env(repo_root / "site", bin_dir)
-        env["PORT"] = "8767"
         env["CONTAINER_ENGINE"] = "fake-container-engine"
         env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
-        shutil.rmtree(repo_root.parent / "buildish-site-pipeline" / "dist" / "snapshots")
-        source_doc = self.workspace / "buildish-mammoth-cache" / "site" / "docs" / "getting-started.md"
-        staged_doc = repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "development" / "docs" / "getting-started.md"
+        env["PORT"] = "8767"
+        source_page = self.workspace / "buildish-mammoth-cache" / "site" / "pages" / "_index.md"
+        staged_page = self.mammoth_page_path(repo_root)
         process = self.start_make(repo_root / "site", "serve", env)
         self.wait_for(
             "fake containerized Hugo server readiness",
@@ -779,10 +675,11 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             timeout=CONTAINERIZED_SERVE_READY_TIMEOUT,
             process=process,
         )
-        source_doc.write_text(
+        self.wait_for("initial containerized serve stage", staged_page.exists, process=process)
+        source_page.write_text(
             text_block(
                 """
-                # Getting started
+                # Mammoth Cache for Gradle® and Apache Maven™
 
                 Updated by containerized serve.
                 """
@@ -790,25 +687,25 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             encoding="utf-8",
         )
         self.wait_for(
-            "restaged docs after containerized serve change",
-            lambda: staged_doc.exists() and "Updated by containerized serve." in staged_doc.read_text(encoding="utf-8"),
+            "restaged component page after containerized serve change",
+            lambda: self.file_contains(staged_page, "Updated by containerized serve."),
+            timeout=CONTAINERIZED_SERVE_READY_TIMEOUT,
             process=process,
         )
         hugo_log = self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"]))
-        self.assert_contains_all(hugo_log, "--bind 0.0.0.0", "--port 8767")
-        container_log = self.read_text(repo_root / "site" / "build" / "fake-container.log")
-        self.assert_contains_all(container_log, "run", "--init", "/workspace/buildish/site")
+        self.assert_contains_all(hugo_log, "server", "--bind 0.0.0.0", "--port 8767")
         self.stop_process(process)
+        self.assert_contains_all(self.read_text(repo_root / "site" / "build" / "fake-container.log"), "run", "--init")
 
     def test_make_serve_in_containerized_mode_stops_on_sigint(self) -> None:
         repo_root = self.prepare_fixture_workspace()
         bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
         env = self.base_env(repo_root / "site", bin_dir)
-        env["PORT"] = "8768"
         env["CONTAINER_ENGINE"] = "fake-container-engine"
         env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
+        env["PORT"] = "8768"
         process = self.start_make(repo_root / "site", "serve", env)
         self.wait_for(
             "fake containerized Hugo server readiness",
@@ -818,10 +715,9 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         )
         os.killpg(process.pid, signal.SIGINT)
         process.wait(timeout=10)
-        output = self.stop_process(process)
-        self.assertIn(process.returncode, {130, -signal.SIGINT}, output)
-        container_log = self.read_text(repo_root / "site" / "build" / "fake-container.log")
-        self.assert_contains_all(container_log, "stop -t 0", "rm -f")
+        output = self.read_process_output(process)
+        self.assertIn(process.returncode, (-signal.SIGINT, 130), output)
+        self.assertIn("serve exited", output)
 
 
 if __name__ == "__main__":

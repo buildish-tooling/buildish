@@ -49,6 +49,7 @@ REPO_ROOT := $(abspath $(CURDIR)/..)
 WORKSPACE_ROOT := $(abspath $(REPO_ROOT)/..)
 REPO_NAME := $(notdir $(REPO_ROOT))
 SITE_PIPELINE_REPO_ROOT ?= $(WORKSPACE_ROOT)/buildish-site-pipeline
+SITE_PIPELINE_CATALOG ?= $(REPO_ROOT)/site/components.yaml
 CONTAINER_SITE_ROOT ?= /workspace/$(REPO_NAME)/site
 CONTAINER_BUILD_DIR ?= $(REPO_ROOT)/tools/site-build-image
 NODE_MODULES_DIR ?= $(CURDIR)/node_modules
@@ -152,14 +153,12 @@ PREPARE_CONTAINER_SCRATCH = \
 	chmod 0700 '$(HOST_CONTAINER_SCRATCH_ROOT)'
 
 PREPARE_CONTAINER_STAGE_OUTPUTS = \
-	rm -rf .stage .preview; \
-	mkdir -p .stage .preview; \
-	chmod 0755 .stage .preview
+	rm -rf .stage .preview
 
 PREPARE_CONTAINER_SERVE_OUTPUTS = \
 	rm -rf .stage .preview .public resources/_gen; \
-	mkdir -p .stage .preview .public resources/_gen; \
-	chmod 0755 .stage .preview .public resources/_gen
+	mkdir -p .public resources/_gen; \
+	chmod 0755 .public resources/_gen
 
 CONTAINER_TEST_SCRIPT = \
 	scratch="$$(mktemp -d "$(CONTAINER_SCRATCH_ROOT)/test.XXXXXX")"; \
@@ -203,13 +202,13 @@ CONTAINER_PREPARE_SITE_ENV = \
 CONTAINER_STAGE_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-stage] running site-pipeline build\\n"; \
-	$(SITE_PIPELINE) build --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS); \
+	$(SITE_PIPELINE) build --workspace-root $(WORKSPACE_ROOT) --catalog $(SITE_PIPELINE_CATALOG) $(SITE_PIPELINE_ARGS); \
 	printf "==> [container-stage] staged site contract completed\\n"
 
 CONTAINER_STAGE_WATCH_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-stage-watch] running site-pipeline watch\\n"; \
-	$(SITE_PIPELINE) watch --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS); \
+	$(SITE_PIPELINE) watch --workspace-root $(WORKSPACE_ROOT) --catalog $(SITE_PIPELINE_CATALOG) $(SITE_PIPELINE_ARGS); \
 	printf "==> [container-stage-watch] stage watch exited\\n"
 
 CONTAINER_SERVE_SCRIPT = \
@@ -218,9 +217,9 @@ CONTAINER_SERVE_SCRIPT = \
 	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
 	printf "==> [container-serve] running site-pipeline watch on %s:%s\\n" "0.0.0.0" "$(PORT)"; \
-	$(SITE_PIPELINE) watch --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS) & \
+	$(SITE_PIPELINE) watch --workspace-root $(WORKSPACE_ROOT) --catalog $(SITE_PIPELINE_CATALOG) $(SITE_PIPELINE_ARGS) & \
 	watch_pid=$$!; \
-	while [ ! -f .stage/manifest.yaml ]; do \
+	while [ ! -f .stage/manifest.json ]; do \
 		if ! kill -0 "$$watch_pid" 2>/dev/null; then \
 			wait "$$watch_pid"; \
 			exit $$?; \
@@ -239,7 +238,7 @@ CONTAINER_RENDER_SCRIPT = \
 CONTAINER_BUILD_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-build] running site-pipeline build and make render-local\\n"; \
-	$(SITE_PIPELINE) build --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS); \
+	$(SITE_PIPELINE) build --workspace-root $(WORKSPACE_ROOT) --catalog $(SITE_PIPELINE_CATALOG) $(SITE_PIPELINE_ARGS); \
 	make render-local; \
 	printf "==> [container-build] site render completed\\n"
 
@@ -455,9 +454,9 @@ serve-local: sanity-check hugo-check docsy-check ## Serve the full Hugo site wit
 	@watch_pid=''; \
 	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
-	$(call RUN_PIPELINE_MANAGED_COMMAND,$(SITE_PIPELINE) watch --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS)) & \
+	$(MAKE) --no-print-directory pipeline-watch-local & \
 	watch_pid=$$!; \
-	while [ ! -f .stage/manifest.yaml ]; do \
+	while [ ! -f .stage/manifest.json ]; do \
 		if ! kill -0 "$$watch_pid" 2>/dev/null; then \
 			wait "$$watch_pid"; \
 			exit $$?; \

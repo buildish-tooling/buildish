@@ -58,6 +58,19 @@ FIXTURE_COMPONENTS = [
     {"slug": "no-gradle-wrapper-jar", "localDir": "buildish-no-gradle-wrapper-jar", "weight": 5},
     {"slug": "site", "localDir": "buildish/site", "weight": 100},
 ]
+
+
+def normalize_fixture_component(component: Mapping[str, object]) -> dict[str, object]:
+    """Return one fixture catalog entry with an explicit component mount path."""
+
+    normalized = dict(component)
+    publication = dict(normalized.get("publication", {}))
+    slug = normalized.get("slug")
+    if isinstance(slug, str) and slug and "mountPath" not in publication:
+        publication["mountPath"] = f"/components/{slug}/"
+    if publication:
+        normalized["publication"] = publication
+    return normalized
 SITE_ROOT_FILES = (
     "Makefile",
     "go.mod",
@@ -111,6 +124,9 @@ class TestCaseHelpers:
     def load_yaml(self, path: Path) -> Any:
         return yaml.safe_load(self.read_text(path))
 
+    def load_json(self, path: Path) -> Any:
+        return json.loads(self.read_text(path))
+
     def assert_paths_exist(self, *paths: Path) -> None:
         for path in paths:
             self.assertTrue(path.exists(), f"Expected path to exist: {path}")
@@ -138,9 +154,11 @@ class TestCaseHelpers:
             "--",
             "site-pipeline",
             *args,
-            "--repo-root",
-            str(repo_root),
+            "--workspace-root",
+            str(repo_root.parent),
         ]
+        if "--catalog" not in args:
+            command.extend(["--catalog", str(repo_root / "site" / "components.yaml")])
         env = os.environ.copy()
         env["UV_PROJECT_ENVIRONMENT"] = str(CONSUMER_PIPELINE_VENV)
         return subprocess.run(  # noqa: S603 - fixed local interpreter/script invocation
@@ -176,7 +194,8 @@ def write_fixture_catalog(site_root: Path, components: list[dict[str, object]] |
     """Write a components catalog tailored for integration fixtures."""
 
     catalog = yaml.safe_load((SOURCE_REPO_ROOT / "site" / "components.yaml").read_text(encoding="utf-8"))
-    catalog["components"] = FIXTURE_COMPONENTS if components is None else components
+    selected_components = FIXTURE_COMPONENTS if components is None else components
+    catalog["components"] = [normalize_fixture_component(component) for component in selected_components]
     dump_yaml(site_root / "components.yaml", catalog)
 
 
@@ -246,13 +265,9 @@ def seed_mammoth_fixture(
             "component": {
                 "slug": "mammoth-cache",
                 "displayName": "Fixture Mammoth Cache for Gradle® and Apache Maven™",
-                "repository": "https://github.com/apache/buildish-mammoth-cache",
-                "defaultBranch": "main",
             },
-            "lifecycle": {
-                "latestStable": "v1.2.3",
-                "releaseLines": [{"line": "v1", "latest": "v1.2.3", "status": "maintained", "aliases": ["v1"]}],
-            },
+            "content": {"docsRoot": "site/docs"},
+            "lifecycle": {"latestStable": "v1.2.3"},
         },
     )
     write_files(

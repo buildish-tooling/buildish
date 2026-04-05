@@ -18,6 +18,9 @@ PIPELINE_REPO_ROOT ?= ..
 PIPELINE_CONSUMER_ROOT ?= $(CURDIR)/pipeline
 PIPELINE_VENV ?= $(PIPELINE_CONSUMER_ROOT)/.venv
 PIPELINE_REFRESH_SCRIPT ?= pipeline/refresh_latest_snapshot.py
+SITE_PIPELINE_BIN ?= $(SITE_PIPELINE_REPO_ROOT)/.venv/bin/site-pipeline
+SITE_PIPELINE_CATALOG ?= $(CURDIR)/components.yaml
+SITE_STAGE_ROOT ?= $(CURDIR)/.stage
 
 define RUN_PIPELINE_MANAGED_COMMAND
 python_cmd='$(PYTHON)'; \
@@ -36,12 +39,41 @@ endef
 pipeline-refresh-local: sanity-check ## Refresh the consumer to the latest sibling snapshot wheel.
 	@$(call RUN_PIPELINE_MANAGED_COMMAND)
 
-pipeline-stage-local: sanity-check ## Refresh staged site inputs with host tools.
-	@$(call RUN_PIPELINE_MANAGED_COMMAND,$(SITE_PIPELINE) build --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS))
+pipeline-stage-local: sanity-check ## Build staged site inputs with the sibling site-pipeline checkout.
+	@if [ ! -x '$(SITE_PIPELINE_BIN)' ]; then \
+		echo "Error: expected site-pipeline executable at $(SITE_PIPELINE_BIN)."; \
+		echo "Hint: prepare the sibling buildish-site-pipeline checkout and its .venv first."; \
+		exit 1; \
+	fi
+	@if [ ! -f '$(SITE_PIPELINE_CATALOG)' ]; then \
+		echo "Error: expected Buildish catalog at $(SITE_PIPELINE_CATALOG)."; \
+		exit 1; \
+	fi
+	@if [ -e '$(SITE_STAGE_ROOT)' ]; then \
+		rm -rf '$(SITE_STAGE_ROOT)'; \
+	fi
+	PYTHONPATH='$(SITE_PIPELINE_REPO_ROOT)/src' '$(SITE_PIPELINE_BIN)' build \
+		--workspace-root '$(WORKSPACE_ROOT)' \
+		--catalog '$(SITE_PIPELINE_CATALOG)' \
+		$(SITE_PIPELINE_ARGS)
 
-pipeline-watch-local: sanity-check ## Watch sources and refresh staged site inputs with host tools.
-	@$(call RUN_PIPELINE_MANAGED_COMMAND,$(SITE_PIPELINE) watch --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS))
+pipeline-watch-local: sanity-check ## Watch sources and refresh staged site inputs with the sibling site-pipeline checkout.
+	@if [ ! -x '$(SITE_PIPELINE_BIN)' ]; then \
+		echo "Error: expected site-pipeline executable at $(SITE_PIPELINE_BIN)."; \
+		echo "Hint: prepare the sibling buildish-site-pipeline checkout and its .venv first."; \
+		exit 1; \
+	fi
+	@if [ ! -f '$(SITE_PIPELINE_CATALOG)' ]; then \
+		echo "Error: expected Buildish catalog at $(SITE_PIPELINE_CATALOG)."; \
+		exit 1; \
+	fi
+	@if [ -e '$(SITE_STAGE_ROOT)' ]; then \
+		rm -rf '$(SITE_STAGE_ROOT)'; \
+	fi
+	PYTHONPATH='$(SITE_PIPELINE_REPO_ROOT)/src' '$(SITE_PIPELINE_BIN)' watch \
+		--workspace-root '$(WORKSPACE_ROOT)' \
+		--catalog '$(SITE_PIPELINE_CATALOG)' \
+		$(SITE_PIPELINE_ARGS)
 
 pipeline-clean-local: sanity-check ## Remove staged site-pipeline output with host tools.
-	@$(call RUN_PIPELINE_MANAGED_COMMAND,$(SITE_PIPELINE) clean --repo-root $(PIPELINE_REPO_ROOT) $(SITE_PIPELINE_ARGS))
-
+	rm -rf '$(SITE_STAGE_ROOT)'

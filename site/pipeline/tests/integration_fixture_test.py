@@ -108,132 +108,77 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
             second_result = self.run_pipeline_build(repo_root)
 
             self.assert_command_succeeded(first_result)
-            self.assert_command_succeeded(second_result)
-            self.assertIn("Built 3 component(s)", first_result.stdout)
-            self.assertIn("Built 3 component(s)", second_result.stdout)
+            self.assertIn("build clean: succeeded=yes", first_result.stdout)
+            self.assertEqual(3, second_result.returncode, second_result.stdout + second_result.stderr)
+            self.assertIn(
+                "Stage root must be absent or empty",
+                second_result.stdout + second_result.stderr,
+            )
+
+            stage_root = repo_root / "site" / ".stage"
+            data_root = stage_root / "data"
+            mammoth_component_root = stage_root / "content" / "components" / "mammoth-cache"
+            no_wrapper_component_root = stage_root / "content" / "components" / "no-gradle-wrapper-jar"
+            site_component_root = stage_root / "content" / "components" / "site"
 
             self.assert_paths_exist(
-                repo_root
-                / "site"
-                / ".stage"
-                / "content"
-                / "components"
-                / "mammoth-cache"
-                / "development"
-                / "docs"
-                / "getting-started.md",
-                repo_root
-                / "site"
-                / ".stage"
-                / "content"
-                / "components"
-                / "mammoth-cache"
-                / "_index.md",
-                repo_root
-                / "site"
-                / ".stage"
-                / "static"
-                / "components"
-                / "mammoth-cache"
-                / "development"
-                / "assets"
-                / "images"
-                / "diagram.svg",
-                repo_root
-                / "site"
-                / ".stage"
-                / "content"
-                / "components"
-                / "no-gradle-wrapper-jar"
-                / "development"
-                / "docs"
-                / "_index.md",
-                repo_root
-                / "site"
-                / ".stage"
-                / "content"
-                / "components"
-                / "site"
-                / "development"
-                / "docs"
-                / "_index.md",
-                repo_root / "site" / ".preview" / "index.html",
+                stage_root / "manifest.json",
+                data_root / "components.json",
+                data_root / "content-index.json",
+                data_root / "routes.json",
+                mammoth_component_root / "pages" / "_index.md",
+                no_wrapper_component_root / "pages" / "_index.md",
+                site_component_root / "pages" / "_index.md",
+                stage_root / "static" / "components" / "mammoth-cache" / "assets" / "images" / "diagram.svg",
             )
+            self.assertFalse((repo_root / "site" / ".preview").exists())
+            self.assertFalse((repo_root / "site" / ".public").exists())
+            self.assertFalse((mammoth_component_root / "latest").exists())
+            self.assertFalse((site_component_root / "latest").exists())
 
-            components_data = self.load_yaml(
-                repo_root / "site" / ".stage" / "data" / "components.yaml"
+            manifest = self.load_json(stage_root / "manifest.json")
+            self.assertEqual(1, manifest["schemaVersion"])
+
+            component_items = self.load_json(data_root / "components.json")["items"]
+            components = {item["slug"]: item for item in component_items}
+            self.assertEqual(
+                {"mammoth-cache", "no-gradle-wrapper-jar", "site"},
+                set(components),
             )
             self.assertEqual(
-                "Fixture Mammoth Cache for Gradle® and Apache Maven™",
-                components_data["components"]["mammoth-cache"]["displayName"],
+                "/components/mammoth-cache/",
+                components["mammoth-cache"]["publication"]["paths"]["component"],
             )
             self.assertEqual(
-                "buildish-no-gradle-wrapper-jar",
-                components_data["components"]["no-gradle-wrapper-jar"]["localDir"],
-            )
-            self.assertEqual(
-                "Website", components_data["components"]["site"]["displayName"]
+                "/components/mammoth-cache/latest/",
+                components["mammoth-cache"]["publication"]["paths"]["docs"],
             )
             self.assertEqual(
                 "/components/site/",
-                components_data["components"]["site"]["componentPath"],
+                components["site"]["publication"]["paths"]["component"],
             )
             self.assertEqual(
-                "/components/site/development/docs/",
-                components_data["components"]["site"]["docsPath"],
-            )
-            self.assertEqual(0, components_data["components"]["site"]["assetCount"])
-            self.assertEqual(
-                "Fixture component landing page.",
-                components_data["components"]["mammoth-cache"]["summary"],
+                "/components/site/latest/",
+                components["site"]["publication"]["paths"]["docs"],
             )
 
-            lifecycle_data = self.load_yaml(
-                repo_root / "site" / ".stage" / "data" / "lifecycle.yaml"
-            )
-            self.assertEqual(
-                "v1.2.3", lifecycle_data["components"]["mammoth-cache"]["latestStable"]
-            )
-            self.assertEqual(
-                "maintained",
-                lifecycle_data["components"]["mammoth-cache"]["releaseLines"][0][
-                    "status"
-                ],
-            )
-
-            site_development_index = self.read_text(
-                repo_root
-                / "site"
-                / ".stage"
-                / "content"
-                / "components"
-                / "site"
-                / "development"
-                / "_index.md"
-            )
-            self.assert_contains_all(site_development_index, "## Docs")
-            self.assert_not_contains_any(site_development_index, "Open staged assets")
-            site_development_front_matter = yaml.safe_load(
-                site_development_index.split("---", 2)[1]
-            )
-            self.assertEqual(
-                "Website",
-                site_development_front_matter["sitePipelineComponent"]["displayName"],
-            )
-            self.assertEqual(
-                "development-home",
-                site_development_front_matter["sitePipelineComponentPage"]["kind"],
+            content_index = self.load_json(data_root / "content-index.json")["items"]
+            content_paths = {
+                (item["componentSlug"], item["pageKind"], item["path"])
+                for item in content_index
+            }
+            self.assertTrue(
+                {
+                    ("mammoth-cache", "component-page", "/components/mammoth-cache/_index"),
+                    ("no-gradle-wrapper-jar", "component-page", "/components/no-gradle-wrapper-jar/_index"),
+                    ("site", "component-page", "/components/site/_index"),
+                }.issubset(content_paths)
             )
 
-            preview_index = self.read_text(
-                repo_root / "site" / ".preview" / "index.html"
-            )
-            self.assert_contains_all(
-                preview_index,
-                "Fixture Mammoth Cache for Gradle® and Apache Maven™",
-                "Fixture no-gradle-wrapper-jar",
-                "Website",
-            )
+            mammoth_page = self.read_text(mammoth_component_root / "pages" / "_index.md")
+            site_page = self.read_text(site_component_root / "pages" / "_index.md")
+            self.assertIn("Fixture component landing page.", mammoth_page)
+            self.assertIn("# Buildish Site", site_page)
         finally:
             shutil.rmtree(FIXTURE_BUILD_ROOT, ignore_errors=True)
 
