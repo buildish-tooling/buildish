@@ -45,6 +45,15 @@ while [ "$#" -gt 0 ]; do
       ;;
     postcss)
       shift
+      local_postcss=''
+      if [ -n "${NODE_MODULES_DIR:-}" ] && [ -x "${NODE_MODULES_DIR}/.bin/postcss" ]; then
+        local_postcss="${NODE_MODULES_DIR}/.bin/postcss"
+      elif [ -x "$PWD/node_modules/.bin/postcss" ]; then
+        local_postcss="$PWD/node_modules/.bin/postcss"
+      fi
+      if [ -n "$local_postcss" ]; then
+        exec "$local_postcss" "$@"
+      fi
       exec postcss "$@"
       ;;
     *)

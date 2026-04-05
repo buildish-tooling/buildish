@@ -75,7 +75,7 @@ CONTAINER_ENGINE_BASENAME := $(notdir $(CONTAINER_ENGINE))
 # Detect Podman by both executable basename and --version output so renamed or
 # wrapped binaries are handled correctly.  Override when auto-detection does not
 # match your setup: make CONTAINER_IS_PODMAN=1  or  make CONTAINER_IS_PODMAN=0
-_container_version    := $(shell $(CONTAINER_ENGINE) --version 2>/dev/null)
+_container_version    := $(if $(strip $(CONTAINER_ENGINE)),$(shell $(CONTAINER_ENGINE) --version 2>/dev/null))
 _container_name_match := $(filter podman,$(CONTAINER_ENGINE_BASENAME))
 _container_ver_match  := $(findstring podman,$(_container_version))
 CONTAINER_IS_PODMAN   ?= $(if $(or $(_container_name_match),$(_container_ver_match)),1,)
@@ -200,7 +200,7 @@ CONTAINER_PREPARE_SITE_ENV = \
 	npm ci --ignore-scripts --prefix "$$node_root"; \
 	cp scripts/container-npx "$$tool_bin/npx"; \
 	chmod 755 "$$tool_bin/npx"; \
-	export PATH="$$tool_bin:$$PATH"; \
+	export PATH="$$tool_bin:$$node_root/node_modules/.bin:$$PATH"; \
 	export NODE_PATH="$$node_root/node_modules"; \
 	export NODE_MODULES_DIR="$$node_root/node_modules"
 
@@ -476,7 +476,7 @@ serve-local: sanity-check hugo-check docsy-check ## Serve the full Hugo site wit
 		fi; \
 		sleep 0.1; \
 	done; \
-	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --bind $(HUGO_SERVER_BIND) --port $(PORT) --poll 700ms --disableFastRender --noBuildLock --renderToMemory
+	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --bind $(HUGO_SERVER_BIND) --port $(PORT) --disableFastRender --noBuildLock --renderToMemory
 
 container-serve: container-image-ensure ## Serve the staged site with Hugo and automatic restaging inside the build container.
 	@printf '==> [container-serve] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'

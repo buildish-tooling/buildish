@@ -17,6 +17,8 @@
 /.stage/
 /.preview/
 /.public/
+/.config/
+/.npm/
 /.hugo_build.lock
 /.container-home/
 /resources/
