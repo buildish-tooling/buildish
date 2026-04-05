@@ -22,6 +22,9 @@ NVM_DIR ?= $(HOME)/.nvm
 UV ?= uv
 PYTHON ?= python
 SITE_PIPELINE ?= site-pipeline
+WATCH_READY_TIMEOUT_SECONDS ?= 20
+WAIT_FOR_WATCH_READY ?= scripts/wait_for_watch_ready.py
+SITE_PIPELINE_READY_ARGS ?= --unstable-events jsonl
 PORT ?= 8000
 HUGO_SERVER_BIND ?= 127.0.0.1
 CONTAINER_ENGINE ?= $(shell if command -v podman >/dev/null 2>&1; then printf 'podman'; elif command -v docker >/dev/null 2>&1; then printf 'docker'; fi)
@@ -218,21 +221,16 @@ CONTAINER_STAGE_WATCH_SCRIPT = \
 
 CONTAINER_SERVE_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
-	watch_pid=''; \
-	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
+	watch_pid=''; events_file=''; \
+	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; if [ -n "$$events_file" ]; then rm -f "$$events_file"; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
-	printf "==> [container-serve] running site-pipeline watch on %s:%s\\n" "0.0.0.0" "$(PORT)"; \
-	$(SITE_PIPELINE) watch --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS) & \
+	events_file="$$(mktemp .watch-events.XXXXXX.jsonl)"; \
+	printf "==> [container-serve] running site-pipeline watch on %s:%s\n" "0.0.0.0" "$(PORT)"; \
+	$(SITE_PIPELINE) watch --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_READY_ARGS) $(SITE_PIPELINE_ARGS) >"$$events_file" & \
 	watch_pid=$$!; \
-	while [ ! -f .stage/manifest.json ]; do \
-		if ! kill -0 "$$watch_pid" 2>/dev/null; then \
-			wait "$$watch_pid"; \
-			exit $$?; \
-		fi; \
-		sleep 0.1; \
-	done; \
+	$(WAIT_FOR_WATCH_READY) --events-file "$$events_file" --pid "$$watch_pid" --timeout $(WATCH_READY_TIMEOUT_SECONDS); \
 	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --bind 0.0.0.0 --port $(PORT) --poll 700ms --disableFastRender --noBuildLock --renderToMemory; \
-	printf "==> [container-serve] serve exited\\n"
+	printf "==> [container-serve] serve exited\n"
 
 CONTAINER_RENDER_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
@@ -464,18 +462,13 @@ container-image-local-registry-test: container-engine-check ## Run the localhost
 serve: container-serve ## Serve the full Hugo site with automatic restaging in the build container; override PORT=<port> if needed.
 
 serve-local: sanity-check hugo-check docsy-check ## Serve the full Hugo site with automatic restaging using host tools; override PORT=<port> if needed.
-	@watch_pid=''; \
-	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
+	@watch_pid=''; events_file=''; \
+	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; if [ -n "$$events_file" ]; then rm -f "$$events_file"; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
-	$(MAKE) --no-print-directory pipeline-watch-local & \
+	events_file="$$(mktemp .watch-events.XXXXXX.jsonl)"; \
+	$(MAKE) --silent --no-print-directory pipeline-watch-local SITE_PIPELINE_ARGS="$(SITE_PIPELINE_READY_ARGS) $(SITE_PIPELINE_ARGS)" >"$$events_file" & \
 	watch_pid=$$!; \
-	while [ ! -f .stage/manifest.json ]; do \
-		if ! kill -0 "$$watch_pid" 2>/dev/null; then \
-			wait "$$watch_pid"; \
-			exit $$?; \
-		fi; \
-		sleep 0.1; \
-	done; \
+	$(WAIT_FOR_WATCH_READY) --events-file "$$events_file" --pid "$$watch_pid" --timeout $(WATCH_READY_TIMEOUT_SECONDS); \
 	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --bind $(HUGO_SERVER_BIND) --port $(PORT) --disableFastRender --noBuildLock --renderToMemory
 
 container-serve: container-image-ensure ## Serve the staged site with Hugo and automatic restaging inside the build container.
