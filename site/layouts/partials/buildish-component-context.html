@@ -14,18 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 {{- $component := .Params.sitePipelineComponent -}}
+{{- if not $component -}}
+  {{- with index .Params "pipeline" }}{{ with index . "component" }}{{ $component = . }}{{ end }}{{ end -}}
+{{- end -}}
 {{- $page := .Params.sitePipelineComponentPage -}}
+{{- if not $page -}}
+  {{- with index .Params "pipeline" }}{{ with index . "page" }}{{ $page = . }}{{ end }}{{ end -}}
+{{- end -}}
 {{- $context := dict "enabled" false -}}
 {{- if $component -}}
   {{- $paths := dict -}}
   {{- with index $component "paths" }}{{ $paths = . }}{{ end -}}
+  {{- if eq (len $paths) 0 -}}
+    {{- with index $component "publication" }}{{ with index . "paths" }}{{ $paths = . }}{{ end }}{{ end -}}
+  {{- end -}}
   {{- $componentPath := "" -}}
   {{- with index $paths "component" }}{{ $componentPath = . }}{{ end -}}
   {{- $docsPath := "" -}}
   {{- with index $paths "docs" }}{{ $docsPath = . }}{{ end -}}
   {{- $repositoryPath := "" -}}
   {{- with index $component "repository" }}{{ $repositoryPath = . }}{{ end -}}
-  {{- $developmentLabel := "Development" -}}
+  {{- $developmentLabel := "Docs" -}}
   {{- with index $component "developmentLabel" }}{{ $developmentLabel = . }}{{ end -}}
 
   {{- $releaseLines := slice -}}
@@ -68,7 +77,8 @@ limitations under the License.
 
   {{- $isComponentLanding := false -}}
   {{- with $page -}}
-    {{- $isComponentLanding = eq (index . "kind") "component-home" -}}
+    {{- $kind := index . "kind" -}}
+    {{- $isComponentLanding = or (eq $kind "component-home") (eq $kind "component-page") -}}
   {{- end -}}
 
   {{- $brandLabel := .Site.Title -}}

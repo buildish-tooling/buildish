@@ -13,12 +13,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
-{{- $component := .Page.Params.sitePipelineComponent -}}
+{{- $componentContext := partial "buildish-component-context.html" .Page -}}
+{{- $component := index $componentContext "component" -}}
 {{- if not $component -}}
   {{- errorf "%q shortcode requires sitePipelineComponent context on %s" .Name .Page.RelPermalink -}}
 {{- end -}}
 {{- $paths := dict -}}
 {{- with index $component "paths" }}{{ $paths = . }}{{ end -}}
+{{- if eq (len $paths) 0 -}}
+  {{- with index $component "publication" }}{{ with index . "paths" }}{{ $paths = . }}{{ end }}{{ end -}}
+{{- end -}}
 {{- $kind := "docs" -}}
 {{- with .Get "kind" }}{{ $kind = lower (printf "%v" .) }}{{ end -}}
 {{- $appearance := "link" -}}
@@ -42,7 +46,7 @@ limitations under the License.
     {{- with index . "label" }}{{ $label = . }}{{ end -}}
   {{- end -}}
 {{- else if eq $kind "source" -}}
-  {{- with index $component "repository" }}{{ $href = . }}{{ end -}}
+  {{- with index $componentContext "repositoryPath" }}{{ $href = . }}{{ end -}}
   {{- $label = "Source repository" -}}
   {{- $external = true -}}
 {{- else -}}
@@ -65,6 +69,9 @@ limitations under the License.
   {{- $class = "btn btn-outline-secondary me-2 mb-2" -}}
 {{- else -}}
   {{- errorf "%q shortcode on %s does not support appearance %q" .Name .Page.RelPermalink $appearance -}}
+{{- end -}}
+{{- if and (eq $kind "source") (not $href) -}}
+  {{- $optional = true -}}
 {{- end -}}
 {{- if not $href -}}
   {{- if not $optional -}}

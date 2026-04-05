@@ -13,7 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
-{{- $component := .Page.Params.sitePipelineComponent -}}
+{{- $componentContext := partial "buildish-component-context.html" .Page -}}
+{{- $component := index $componentContext "component" -}}
 {{- if not $component -}}
   {{- errorf "%q shortcode requires sitePipelineComponent context on %s" .Name .Page.RelPermalink -}}
 {{- end -}}

@@ -217,7 +217,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                     Path(destination, 'index.html').write_text('<html>fake hugo</html>\n', encoding='utf-8')
 
                     if os.environ.get('BUILDISH_FAKE_HUGO_REQUIRE_POSTCSS_NPX') == '1':
-                        subprocess.run(['npx', 'postcss', '--help'], check=True)
+                        subprocess.run(['npx', '--no-install', '--', 'postcss', '--help'], check=True)
                     """
                 ),
             )

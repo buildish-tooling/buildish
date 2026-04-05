@@ -16,11 +16,30 @@
 
 set -eu
 
-real_npx="$(command -v npx || true)"
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+path_without_wrapper_dir=''
+old_ifs="$IFS"
+IFS=:
+for path_entry in $PATH; do
+  if [ "$path_entry" = "$script_dir" ]; then
+    continue
+  fi
+  if [ -n "$path_without_wrapper_dir" ]; then
+    path_without_wrapper_dir="${path_without_wrapper_dir}:$path_entry"
+  else
+    path_without_wrapper_dir="$path_entry"
+  fi
+done
+IFS="$old_ifs"
+
+real_npx=''
+if [ -n "$path_without_wrapper_dir" ]; then
+  real_npx="$(PATH="$path_without_wrapper_dir" command -v npx || true)"
+fi
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --no-install|-y|--yes)
+    --no-install|-y|--yes|--)
       shift
       continue
       ;;
@@ -38,5 +57,6 @@ if [ -n "$real_npx" ]; then
   exec "$real_npx" "$@"
 fi
 
-printf 'Error: npx fallback is unavailable and postcss was not requested.\n' >&2
+printf 'Error: npx fallback is unavailable and postcss was not requested.
+' >&2
 exit 127

@@ -50,7 +50,11 @@ WORKSPACE_ROOT := $(abspath $(REPO_ROOT)/..)
 REPO_NAME := $(notdir $(REPO_ROOT))
 SITE_PIPELINE_REPO_ROOT ?= $(WORKSPACE_ROOT)/buildish-site-pipeline
 SITE_PIPELINE_CATALOG ?= $(REPO_ROOT)/site/components.yaml
-CONTAINER_SITE_ROOT ?= /workspace/$(REPO_NAME)/site
+CONTAINER_WORKSPACE_ROOT ?= /workspace
+CONTAINER_SITE_ROOT ?= $(CONTAINER_WORKSPACE_ROOT)/$(REPO_NAME)/site
+CONTAINER_SITE_PIPELINE_CATALOG ?= $(CONTAINER_SITE_ROOT)/components.yaml
+CONTAINER_SITE_PIPELINE_WORKSPACE_ARG ?= $(if $(filter podman docker,$(CONTAINER_ENGINE_BASENAME)),$(CONTAINER_WORKSPACE_ROOT),$(WORKSPACE_ROOT))
+CONTAINER_SITE_PIPELINE_CATALOG_ARG ?= $(if $(filter podman docker,$(CONTAINER_ENGINE_BASENAME)),$(CONTAINER_SITE_PIPELINE_CATALOG),$(SITE_PIPELINE_CATALOG))
 CONTAINER_BUILD_DIR ?= $(REPO_ROOT)/tools/site-build-image
 NODE_MODULES_DIR ?= $(CURDIR)/node_modules
 HOST_CONTAINER_SCRATCH_ROOT ?= $(CURDIR)/build/container
@@ -180,6 +184,7 @@ CONTAINER_INTEGRATION_TEST_SCRIPT = \
 	make integration-test
 
 CONTAINER_PREPARE_SITE_ENV = \
+	set -euo pipefail; \
 	scratch="$$(mktemp -d "$(CONTAINER_SCRATCH_ROOT)/run.XXXXXX")"; \
 	chmod 0700 "$$scratch"; \
 	node_root="$$scratch/node-work"; \
@@ -202,13 +207,13 @@ CONTAINER_PREPARE_SITE_ENV = \
 CONTAINER_STAGE_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-stage] running site-pipeline build\\n"; \
-	$(SITE_PIPELINE) build --workspace-root $(WORKSPACE_ROOT) --catalog $(SITE_PIPELINE_CATALOG) $(SITE_PIPELINE_ARGS); \
+	$(SITE_PIPELINE) build --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
 	printf "==> [container-stage] staged site contract completed\\n"
 
 CONTAINER_STAGE_WATCH_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-stage-watch] running site-pipeline watch\\n"; \
-	$(SITE_PIPELINE) watch --workspace-root $(WORKSPACE_ROOT) --catalog $(SITE_PIPELINE_CATALOG) $(SITE_PIPELINE_ARGS); \
+	$(SITE_PIPELINE) watch --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
 	printf "==> [container-stage-watch] stage watch exited\\n"
 
 CONTAINER_SERVE_SCRIPT = \
@@ -217,7 +222,7 @@ CONTAINER_SERVE_SCRIPT = \
 	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
 	printf "==> [container-serve] running site-pipeline watch on %s:%s\\n" "0.0.0.0" "$(PORT)"; \
-	$(SITE_PIPELINE) watch --workspace-root $(WORKSPACE_ROOT) --catalog $(SITE_PIPELINE_CATALOG) $(SITE_PIPELINE_ARGS) & \
+	$(SITE_PIPELINE) watch --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS) & \
 	watch_pid=$$!; \
 	while [ ! -f .stage/manifest.json ]; do \
 		if ! kill -0 "$$watch_pid" 2>/dev/null; then \
@@ -238,7 +243,7 @@ CONTAINER_RENDER_SCRIPT = \
 CONTAINER_BUILD_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-build] running site-pipeline build and make render-local\\n"; \
-	$(SITE_PIPELINE) build --workspace-root $(WORKSPACE_ROOT) --catalog $(SITE_PIPELINE_CATALOG) $(SITE_PIPELINE_ARGS); \
+	$(SITE_PIPELINE) build --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
 	make render-local; \
 	printf "==> [container-build] site render completed\\n"
 
@@ -370,9 +375,12 @@ container-engine-check: ## Verify Podman or Docker is available for containerize
 	command -v "$$engine" >/dev/null 2>&1 || { echo "Error: $$engine is not available on PATH."; exit 1; }
 
 site-pipeline-container-image-ensure: container-engine-check ## Build the generic site-pipeline base image if it is missing locally.
-	@if $(CONTAINER_ENGINE) image inspect $(SITE_PIPELINE_CONTAINER_IMAGE) >/dev/null 2>&1; then \
+	@if $(CONTAINER_ENGINE) image inspect $(SITE_PIPELINE_CONTAINER_IMAGE) >/dev/null 2>&1 \
+		&& { [ '$(CONTAINER_ENGINE_BASENAME)' != 'podman' ] && [ '$(CONTAINER_ENGINE_BASENAME)' != 'docker' ] \
+			|| $(CONTAINER_ENGINE) run --rm $(CONTAINER_PLATFORM_FLAG) --entrypoint /bin/bash $(SITE_PIPELINE_CONTAINER_IMAGE) -c 'site-pipeline build --help | grep -q -- --workspace-root' >/dev/null 2>&1; }; then \
 		printf '==> [site-pipeline-image] using existing image %s via %s\n' '$(SITE_PIPELINE_CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
 	else \
+		printf '==> [site-pipeline-image] rebuilding image %s via %s to match the current CLI\n' '$(SITE_PIPELINE_CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
 		$(MAKE) site-pipeline-container-image; \
 	fi
 
@@ -388,9 +396,12 @@ site-pipeline-container-image: container-engine-check ## Build the generic site-
 		CONTAINER_IMAGE_PLATFORMS=$(CONTAINER_PLATFORM)
 
 container-image-ensure: site-pipeline-container-image-ensure ## Build the site builder image if it is missing locally.
-	@if $(CONTAINER_ENGINE) image inspect $(CONTAINER_IMAGE) >/dev/null 2>&1; then \
+	@if $(CONTAINER_ENGINE) image inspect $(CONTAINER_IMAGE) >/dev/null 2>&1 \
+		&& { [ '$(CONTAINER_ENGINE_BASENAME)' != 'podman' ] && [ '$(CONTAINER_ENGINE_BASENAME)' != 'docker' ] \
+			|| $(CONTAINER_ENGINE) run --rm $(CONTAINER_PLATFORM_FLAG) --entrypoint /bin/bash $(CONTAINER_IMAGE) -c 'site-pipeline build --help | grep -q -- --workspace-root' >/dev/null 2>&1; }; then \
 		printf '==> [container-image] using existing image %s via %s\n' '$(CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
 	else \
+		printf '==> [container-image] rebuilding image %s via %s to match the current CLI\n' '$(CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
 		$(MAKE) container-image; \
 	fi
 
@@ -436,6 +447,8 @@ container-render: container-image-ensure ## Render the staged site through Hugo 
 container-build: container-image-ensure ## Build the staged site and Hugo output inside the build container.
 	@printf '==> [container-build] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
 	@$(PREPARE_CONTAINER_SCRATCH)
+	@$(PREPARE_CONTAINER_STAGE_OUTPUTS)
+	@rm -f .hugo_build.lock
 	@printf '==> [container-build] starting containerized site render\n'
 	@$(CONTAINER_RUN) bash -c '$(CONTAINER_BUILD_SCRIPT)'
 
