@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../../../buildish-site-pipeline/schemas/site-pipeline-component-v1.schema.json
 #
 # Copyright 2026 The Apache Software Foundation
 #
@@ -17,8 +18,5 @@ schemaVersion: 1
 component:
   slug: site
   displayName: Website
-  repository: https://github.com/apache/buildish
 content:
   assetsRoot: null
-navigation:
-  section: components

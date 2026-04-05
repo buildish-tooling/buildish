@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../../buildish-site-pipeline/schemas/site-pipeline-catalog-v1.schema.json
 #
 # Copyright 2026 The Apache Software Foundation
 #
@@ -19,19 +20,32 @@ defaults:
   pagesRoot: site/pages
   docsRoot: site/docs
   assetsRoot: site/assets
-  developmentLabel: Development
-  tagPattern: ^v[0-9]+\.[0-9]+\.[0-9]+$
-  navigationSection: components
+  publication:
+    origin: docs
+site:
+  pagesRoot: buildish/site/content
+origins:
+  docs:
+    baseUrl: https://buildish.apache.org/
+    canonical: true
 components:
   - slug: mammoth-cache
     localDir: buildish-mammoth-cache
     weight: 100
+    publication:
+      mountPath: /components/mammoth-cache/
   - slug: no-gradle-wrapper-jar
     localDir: buildish-no-gradle-wrapper-jar
     weight: 200
+    publication:
+      mountPath: /components/no-gradle-wrapper-jar/
   - slug: site-pipeline
     localDir: buildish-site-pipeline
     weight: 300
+    publication:
+      mountPath: /components/site-pipeline/
   - slug: site
     localDir: buildish/site
     weight: 1000
+    publication:
+      mountPath: /components/site/
