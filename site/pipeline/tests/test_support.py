@@ -158,7 +158,7 @@ class TestCaseHelpers:
             str(repo_root.parent),
         ]
         if "--catalog" not in args:
-            command.extend(["--catalog", str(repo_root / "site" / "components.yaml")])
+            command.extend(["--catalog", str(repo_root / "site" / "catalog.yaml")])
         env = os.environ.copy()
         env["UV_PROJECT_ENVIRONMENT"] = str(CONSUMER_PIPELINE_VENV)
         return subprocess.run(  # noqa: S603 - fixed local interpreter/script invocation
@@ -193,10 +193,10 @@ class TestCaseHelpers:
 def write_fixture_catalog(site_root: Path, components: list[dict[str, object]] | None = None) -> None:
     """Write a components catalog tailored for integration fixtures."""
 
-    catalog = yaml.safe_load((SOURCE_REPO_ROOT / "site" / "components.yaml").read_text(encoding="utf-8"))
+    catalog = yaml.safe_load((SOURCE_REPO_ROOT / "site" / "catalog.yaml").read_text(encoding="utf-8"))
     selected_components = FIXTURE_COMPONENTS if components is None else components
     catalog["components"] = [normalize_fixture_component(component) for component in selected_components]
-    dump_yaml(site_root / "components.yaml", catalog)
+    dump_yaml(site_root / "catalog.yaml", catalog)
 
 
 def seed_api_fixture_main_repo(repo_root: Path) -> None:

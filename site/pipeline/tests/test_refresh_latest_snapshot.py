@@ -270,7 +270,7 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "exec-called"):
                     refresh_latest_snapshot.run_consumer_command(
                         consumer_root,
-                        ["site-pipeline", "build", "--workspace-root", "/tmp/workspace", "--catalog", "/tmp/workspace/buildish/site/components.yaml"],
+                        ["site-pipeline", "build", "--workspace-root", "/tmp/workspace", "--catalog", "/tmp/workspace/buildish/site/catalog.yaml"],
                         manifest_path=manifest_path,
                         lock=True,
                         sync=True,
@@ -281,7 +281,7 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
             exec_args = exec_mock.call_args.args
             self.assertEqual("site-pipeline", exec_args[0])
             self.assertEqual(
-                ["site-pipeline", "build", "--workspace-root", "/tmp/workspace", "--catalog", "/tmp/workspace/buildish/site/components.yaml"],
+                ["site-pipeline", "build", "--workspace-root", "/tmp/workspace", "--catalog", "/tmp/workspace/buildish/site/catalog.yaml"],
                 exec_args[1],
             )
             self.assertTrue(exec_args[2]["PATH"].startswith(f"{bin_dir}:"))

@@ -15,7 +15,7 @@
 
 schemaVersion: 1
 workspace:
-  catalogPath: site/components.yaml
+  catalogPath: site/catalog.yaml
   authoredSiteContentPath: site/content
   stagePath: site/.stage
   previewPath: site/.preview

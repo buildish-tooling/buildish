@@ -73,7 +73,7 @@ required beyond keeping the SHA in sync with tags via Renovate/Dependabot.
 The single `$(WORKSPACE_ROOT)` bind mount has been replaced with explicit
 per-repo mounts.  The main `buildish` repo is mounted read-write (build outputs
 are written back into it); each component repo is mounted read-only.  The
-component directory list is derived from `components.yaml` at Makefile parse
+component directory list is derived from `catalog.yaml` at Makefile parse
 time — no manual maintenance required as components are added or removed.
 `localDir` entries that contain a `/` (pointing inside the main repo) are
 filtered out automatically since they are already covered by the main-repo
@@ -83,11 +83,11 @@ fails.
 ```makefile
 _component_local_dirs := $(shell python3 -c "\
 import yaml; \
-data = yaml.safe_load(open('$(CURDIR)/components.yaml')); \
+data = yaml.safe_load(open('$(CURDIR)/catalog.yaml')); \
 dirs = [c['localDir'].split('/')[0] for c in data['components'] \
         if '/' not in c.get('localDir', '')]; \
 print(' '.join(dirs))" 2>/dev/null)
-$(if $(_component_local_dirs),,$(error Could not parse component dirs from $(CURDIR)/components.yaml))
+$(if $(_component_local_dirs),,$(error Could not parse component dirs from $(CURDIR)/catalog.yaml))
 CONTAINER_COMPONENT_MOUNTS = $(foreach d,$(_component_local_dirs),\
     -v $(WORKSPACE_ROOT)/$(d):/workspace/$(d):ro$(CONTAINER_MOUNT_LABEL))
 CONTAINER_WORKSPACE_FLAGS = \
@@ -96,7 +96,7 @@ CONTAINER_WORKSPACE_FLAGS = \
     -w $(CONTAINER_SITE_ROOT)
 ```
 
-Any sibling repo that is not listed in `components.yaml` is invisible to the
+Any sibling repo that is not listed in `catalog.yaml` is invisible to the
 container.  The `:Z` SELinux label (applied on Podman via `CONTAINER_MOUNT_LABEL`)
 is applied once per distinct host source path; there are no overlapping mounts
 that would cause conflicting relabeling operations.

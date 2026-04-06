@@ -52,10 +52,10 @@ REPO_ROOT := $(abspath $(CURDIR)/..)
 WORKSPACE_ROOT := $(abspath $(REPO_ROOT)/..)
 REPO_NAME := $(notdir $(REPO_ROOT))
 SITE_PIPELINE_REPO_ROOT ?= $(WORKSPACE_ROOT)/buildish-site-pipeline
-SITE_PIPELINE_CATALOG ?= $(REPO_ROOT)/site/components.yaml
+SITE_PIPELINE_CATALOG ?= $(REPO_ROOT)/site/catalog.yaml
 CONTAINER_WORKSPACE_ROOT ?= /workspace
 CONTAINER_SITE_ROOT ?= $(CONTAINER_WORKSPACE_ROOT)/$(REPO_NAME)/site
-CONTAINER_SITE_PIPELINE_CATALOG ?= $(CONTAINER_SITE_ROOT)/components.yaml
+CONTAINER_SITE_PIPELINE_CATALOG ?= $(CONTAINER_SITE_ROOT)/catalog.yaml
 CONTAINER_SITE_PIPELINE_WORKSPACE_ARG ?= $(if $(filter podman docker,$(CONTAINER_ENGINE_BASENAME)),$(CONTAINER_WORKSPACE_ROOT),$(WORKSPACE_ROOT))
 CONTAINER_SITE_PIPELINE_CATALOG_ARG ?= $(if $(filter podman docker,$(CONTAINER_ENGINE_BASENAME)),$(CONTAINER_SITE_PIPELINE_CATALOG),$(SITE_PIPELINE_CATALOG))
 CONTAINER_BUILD_DIR ?= $(REPO_ROOT)/tools/site-build-image
@@ -97,16 +97,16 @@ CONTAINER_CACHE_ENV = \
 	-e npm_config_cache=$(CONTAINER_HOME)/.cache/npm \
 	-e UV_CACHE_DIR=$(CONTAINER_HOME)/.cache/uv
 
-# Derive component sibling-repo directories from components.yaml at parse time.
+# Derive component sibling-repo directories from catalog.yaml at parse time.
 # localDir entries that contain a '/' point inside the main repo and are already
 # covered by the main-repo mount; they are excluded here.
 # If parsing fails the build stops immediately with a clear error.
 _component_local_dirs := $(shell python3 -c "import yaml; \
-data = yaml.safe_load(open('$(CURDIR)/components.yaml')); \
+data = yaml.safe_load(open('$(CURDIR)/catalog.yaml')); \
 dirs = [c['localDir'].split('/')[0] for c in data['components'] \
         if '/' not in c.get('localDir', '')]; \
 print(' '.join(dirs))" 2>/dev/null)
-$(if $(_component_local_dirs),,$(error Could not parse component dirs from $(CURDIR)/components.yaml))
+$(if $(_component_local_dirs),,$(error Could not parse component dirs from $(CURDIR)/catalog.yaml))
 CONTAINER_COMPONENT_MOUNTS = $(foreach d,$(_component_local_dirs),\
 	-v $(WORKSPACE_ROOT)/$(d):/workspace/$(d)$(CONTAINER_RO_MOUNT_OPTIONS))
 CONTAINER_WORKSPACE_FLAGS = \

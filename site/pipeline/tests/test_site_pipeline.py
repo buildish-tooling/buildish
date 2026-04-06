@@ -172,7 +172,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             repo_root = self.prepare_fixture_workspace(workspace)
-            default_catalog = repo_root / "site" / "components.yaml"
+            default_catalog = repo_root / "site" / "catalog.yaml"
             custom_catalog = repo_root / "site" / "catalogs" / "consumer.yaml"
             custom_catalog.parent.mkdir(parents=True, exist_ok=True)
             default_catalog.rename(custom_catalog)
@@ -191,7 +191,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             repo_root = self.prepare_fixture_workspace(workspace)
-            catalog_path = repo_root / "site" / "components.yaml"
+            catalog_path = repo_root / "site" / "catalog.yaml"
             catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
             catalog.setdefault("site", {})["vendorAssets"] = [
                 {"source": "buildish/site/node_modules/jquery/dist"},
@@ -231,7 +231,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
             repo_root = self.prepare_fixture_workspace(workspace)
-            catalog_path = repo_root / "site" / "components.yaml"
+            catalog_path = repo_root / "site" / "catalog.yaml"
             catalog_path.unlink()
 
             result = self.run_pipeline_build(repo_root)
