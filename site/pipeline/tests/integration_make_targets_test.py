@@ -202,6 +202,11 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                         handle.write(' '.join(sys.argv[1:]) + '\n')
 
                     if 'server' in sys.argv[1:]:
+                        if os.environ.get('BUILDISH_FAKE_HUGO_TOUCH_GENERATED_RESOURCES_ON_SERVER_START') == '1':
+                            generated_root = Path('resources/_gen/assets/scss')
+                            generated_root.mkdir(parents=True, exist_ok=True)
+                            Path(generated_root, 'main.scss_fake.content').write_text('generated\n', encoding='utf-8')
+                            Path(generated_root, 'main.scss_fake.json').write_text('{}\n', encoding='utf-8')
                         Path(os.environ['BUILDISH_FAKE_HUGO_READY']).write_text('ready\n', encoding='utf-8')
                         signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
                         signal.signal(signal.SIGINT, lambda *_: sys.exit(0))
@@ -630,11 +635,16 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         bin_dir = self.seed_fake_tools(repo_root / "site", include_hugo=True, include_native_docsy=True)
         env = self.base_env(repo_root / "site", bin_dir)
         env["PORT"] = "8766"
+        env["BUILDISH_FAKE_HUGO_TOUCH_GENERATED_RESOURCES_ON_SERVER_START"] = "1"
         source_page = self.workspace / "buildish-mammoth-cache" / "site" / "pages" / "_index.md"
         staged_page = self.mammoth_page_path(repo_root)
+        generated_resource = repo_root / "site" / "resources" / "_gen" / "assets" / "scss" / "main.scss_fake.content"
         process = self.start_make(repo_root / "site", "serve-local", env)
         self.wait_for("fake local Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(), process=process)
         self.wait_for("initial serve-local stage", staged_page.exists, process=process)
+        self.wait_for("fake generated resources", generated_resource.exists, process=process)
+        time.sleep(0.5)
+        self.assertNotIn("watch cycle 2", self.read_process_output(process), self.read_process_output(process))
         source_page.write_text(
             text_block(
                 """
