@@ -38,9 +38,9 @@ limitations under the License.
     {{ $isActive := eq .p1 .p2 -}}
     <li class="breadcrumb-item{{ if $isActive }} active{{ end }}"{{ if $isActive }} aria-current="page"{{ end }}>
       {{ if $isActive -}}
-        {{ .p1.LinkTitle -}}
+        {{ partial "buildish-resolved-title.html" (dict "page" .p1 "preferLinkTitle" true) -}}
       {{ else -}}
-        <a href="{{ .p1.RelPermalink }}">{{ .p1.LinkTitle }}</a>
+        <a href="{{ .p1.RelPermalink }}">{{ partial "buildish-resolved-title.html" (dict "page" .p1 "preferLinkTitle" true) }}</a>
       {{- end }}
     </li>
   {{ end -}}

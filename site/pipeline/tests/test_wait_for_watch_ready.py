@@ -30,17 +30,22 @@ SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "wait_for_watch_
 
 class WaitForWatchReadyTest(unittest.TestCase):
     def run_helper(self, events_file: Path, pid: int, timeout: float = 1.0) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
+        return subprocess.run(  # noqa: S603 - fixed local script invocation owned by this test
             [sys.executable, str(SCRIPT_PATH), "--events-file", str(events_file), "--pid", str(pid), "--timeout", str(timeout)],
             text=True,
             capture_output=True,
             check=False,
         )
 
+    def spawn_sleeping_python(self, seconds: float) -> subprocess.Popen[str]:
+        return subprocess.Popen(  # noqa: S603 - fixed local Python test helper with an absolute interpreter path
+            [sys.executable, "-c", f"import time; time.sleep({seconds!r})"]
+        )
+
     def test_succeeds_after_ready_event(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             events_file = Path(temp_dir) / "events.jsonl"
-            process = subprocess.Popen(["sleep", "5"])
+            process = self.spawn_sleeping_python(5.0)
             writer = threading.Thread(target=lambda: (time.sleep(0.1), events_file.write_text(json.dumps({"event": "ready"}) + "\n", encoding="utf-8")))
             writer.start()
             try:
@@ -54,7 +59,7 @@ class WaitForWatchReadyTest(unittest.TestCase):
     def test_ignores_malformed_lines_before_ready(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             events_file = Path(temp_dir) / "events.jsonl"
-            process = subprocess.Popen(["sleep", "5"])
+            process = self.spawn_sleeping_python(5.0)
 
             def _write_events() -> None:
                 time.sleep(0.1)
@@ -75,7 +80,7 @@ class WaitForWatchReadyTest(unittest.TestCase):
     def test_fails_when_watch_exits_before_ready(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             events_file = Path(temp_dir) / "events.jsonl"
-            process = subprocess.Popen(["sleep", "0.1"])
+            process = self.spawn_sleeping_python(0.1)
             try:
                 result = self.run_helper(events_file, process.pid, timeout=1.0)
             finally:
@@ -86,7 +91,7 @@ class WaitForWatchReadyTest(unittest.TestCase):
     def test_fails_immediately_for_unusable_cycle_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             events_file = Path(temp_dir) / "events.jsonl"
-            process = subprocess.Popen(["sleep", "5"])
+            process = self.spawn_sleeping_python(5.0)
             events_file.write_text(json.dumps({"event": "cycle-failed", "stageUsable": False}) + "\n", encoding="utf-8")
             try:
                 result = self.run_helper(events_file, process.pid, timeout=1.0)

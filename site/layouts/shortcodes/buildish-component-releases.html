@@ -22,19 +22,44 @@ limitations under the License.
 {{- with .Get "optional" }}{{ $optional = in (slice true "true" "True" "TRUE" 1 "1") . }}{{ end -}}
 {{- $heading := "" -}}
 {{- with .Get "heading" }}{{ $heading = printf "%v" . }}{{ end -}}
-{{- $items := slice -}}
-{{- with index $component "latestStable" -}}
-  {{- with index . "version" -}}
-    {{- $items = $items | append (printf "Latest stable (%s)" .) -}}
+{{- /* Collect release data.
+     New pipeline: latestStable is a plain version string and releaseLines live inside
+       pipeline.component.artifacts[N].latestStable / .releaseLines.
+       New field names: "key" (was "line") and "supportStatus" (was "status").
+     Old pipeline: latestStable was an object with a "version" sub-key and releaseLines
+       were direct fields on the component object.  Both are handled for compatibility.
+*/ -}}
+{{- $latestStableVersion := "" -}}
+{{- $releaseLines := slice -}}
+{{- with index $component "artifacts" -}}
+  {{- range $artifact := . -}}
+    {{- if not $latestStableVersion -}}
+      {{- with index $artifact "latestStable" }}{{ $latestStableVersion = printf "%v" . }}{{ end -}}
+    {{- end -}}
+    {{- if eq (len $releaseLines) 0 -}}
+      {{- with index $artifact "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
+    {{- end -}}
   {{- end -}}
 {{- end -}}
-{{- with index $component "releaseLines" -}}
-  {{- range $releaseLine := . -}}
-    {{- $item := printf "%s — %s" (index $releaseLine "line") (index $releaseLine "status") -}}
-    {{- with index $releaseLine "latest" }}{{ $item = printf "%s (latest %s)" $item . }}{{ end -}}
-    {{- with index $releaseLine "aliases" }}{{ if gt (len .) 0 }}{{ $item = printf "%s; aliases: %s" $item (delimit . ", ") }}{{ end }}{{ end -}}
-    {{- $items = $items | append $item -}}
-  {{- end -}}
+{{- if not $latestStableVersion -}}
+  {{- with index $component "latestStable" }}{{ with index . "version" }}{{ $latestStableVersion = . }}{{ end }}{{ end -}}
+{{- end -}}
+{{- if eq (len $releaseLines) 0 -}}
+  {{- with index $component "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
+{{- end -}}
+{{- $items := slice -}}
+{{- with $latestStableVersion -}}
+  {{- $items = $items | append (printf "Latest stable (%s)" .) -}}
+{{- end -}}
+{{- range $releaseLine := $releaseLines -}}
+  {{- $lineKey := index $releaseLine "key" -}}
+  {{- if not $lineKey }}{{ $lineKey = index $releaseLine "line" }}{{ end -}}
+  {{- $lineStatus := index $releaseLine "supportStatus" -}}
+  {{- if not $lineStatus }}{{ $lineStatus = index $releaseLine "status" }}{{ end -}}
+  {{- $item := printf "%s — %s" $lineKey $lineStatus -}}
+  {{- with index $releaseLine "latest" }}{{ $item = printf "%s (latest %s)" $item . }}{{ end -}}
+  {{- with index $releaseLine "aliases" }}{{ if gt (len .) 0 }}{{ $item = printf "%s; aliases: %s" $item (delimit . ", ") }}{{ end }}{{ end -}}
+  {{- $items = $items | append $item -}}
 {{- end -}}
 {{- if eq (len $items) 0 -}}
   {{- if not $optional -}}

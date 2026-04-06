@@ -41,10 +41,16 @@ limitations under the License.
   {{- with index $paths "docs" }}{{ $href = . }}{{ end -}}
   {{- $label = printf "%s docs" $developmentLabel -}}
 {{- else if eq $kind "development" -}}
+  {{- /* Old pipeline: component.development.{path,label} sub-object.
+       New pipeline: path is in publication.paths.development; label defaults to $developmentLabel. */ -}}
   {{- with index $component "development" -}}
     {{- with index . "path" }}{{ $href = . }}{{ end -}}
     {{- with index . "label" }}{{ $label = . }}{{ end -}}
   {{- end -}}
+  {{- if not $href -}}
+    {{- with index $component "publication" }}{{ with index . "paths" }}{{ with index . "development" }}{{ $href = . }}{{ end }}{{ end }}{{ end -}}
+  {{- end -}}
+  {{- if not $label }}{{ $label = $developmentLabel }}{{ end -}}
 {{- else if eq $kind "source" -}}
   {{- with index $componentContext "repositoryPath" }}{{ $href = . }}{{ end -}}
   {{- $label = "Source repository" -}}

@@ -21,8 +21,6 @@ import shutil
 import unittest
 from pathlib import Path
 
-import yaml
-
 from test_support import (
     TestCaseHelpers,
     seed_api_fixture_main_repo,

@@ -30,7 +30,8 @@ limitations under the License.
         <ul>
             {{ range $pages -}}
                 {{ $manualLink := cond (isset .Params "manuallink") .Params.manualLink ( cond (isset .Params "manuallinkrelref") (relref . .Params.manualLinkRelref) .RelPermalink) }}
-                <li><a href="{{ $manualLink }}"{{ with .Params.manualLinkTitle }} title="{{ . }}"{{ end }}{{ with .Params.manualLinkTarget }} target="{{ . }}"{{ if eq . "_blank" }} rel="noopener"{{ end }}{{ end }}>{{- .LinkTitle -}}</a></li>
+                {{ $resolvedTitle := partial "buildish-resolved-title.html" (dict "page" . "preferLinkTitle" true) -}}
+                <li><a href="{{ $manualLink }}"{{ with .Params.manualLinkTitle }} title="{{ . }}"{{ end }}{{ with .Params.manualLinkTarget }} target="{{ . }}"{{ if eq . "_blank" }} rel="noopener"{{ end }}{{ end }}>{{- $resolvedTitle -}}</a></li>
             {{ end -}}
         </ul>
     {{ else -}}
@@ -38,11 +39,13 @@ limitations under the License.
     <hr class="panel-line">
         {{ range $pages -}}
             {{ $manualLink := cond (isset .Params "manuallink") .Params.manualLink ( cond (isset .Params "manuallinkrelref") (relref . .Params.manualLinkRelref) .RelPermalink) -}}
+            {{ $resolvedTitle := partial "buildish-resolved-title.html" (dict "page" . "preferLinkTitle" true) -}}
+            {{ $resolvedDescription := partial "buildish-resolved-description.html" (dict "page" .) -}}
             <div class="entry">
                 <h5>
-                    <a href="{{ $manualLink }}"{{ with .Params.manualLinkTitle }} title="{{ . }}"{{ end }}{{ with .Params.manualLinkTarget }} target="{{ . }}"{{ if eq . "_blank" }} rel="noopener"{{ end }}{{ end }}>{{- .LinkTitle -}}</a>
+                    <a href="{{ $manualLink }}"{{ with .Params.manualLinkTitle }} title="{{ . }}"{{ end }}{{ with .Params.manualLinkTarget }} target="{{ . }}"{{ if eq . "_blank" }} rel="noopener"{{ end }}{{ end }}>{{- $resolvedTitle -}}</a>
                 </h5>
-                <p>{{ .Description | markdownify -}}</p>
+                <p>{{ $resolvedDescription | markdownify -}}</p>
             </div>
         {{ end -}}
     {{ end -}}

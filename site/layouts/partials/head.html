@@ -31,17 +31,15 @@ limitations under the License.
 {{ end -}}
 
 {{ partialCached "favicons.html" . }}
-<title>{{- if .IsHome -}}{{ .Site.Title }}{{ else -}}{{ with .Title }}{{ . }} | {{ end -}}{{ .Site.Title }}{{ end -}}</title>
-<meta name="description" content="{{ partial "page-description.html" . }}">
+<title>{{- if .IsHome -}}{{ .Site.Title }}{{ else -}}{{ partial "buildish-resolved-title.html" (dict "page" .) }} | {{ .Site.Title }}{{ end -}}</title>
+<meta name="description" content="{{ partial "buildish-resolved-description.html" (dict "page" .) }}">
 {{ with $redirectTarget -}}
 <meta http-equiv="refresh" content="0; url={{ . }}">
 <link rel="canonical" href="{{ . | safeURL }}">
 {{ else -}}
 <link rel="canonical" href="{{ .Permalink | safeURL }}">
 {{ end -}}
-{{ template "_internal/opengraph.html" . -}}
-{{ template "_internal/schema.html" . -}}
-{{ template "_internal/twitter_cards.html" . -}}
+{{ partial "buildish-embedded-metadata.html" . -}}
 <script>
   document.documentElement.setAttribute('data-bs-theme', 'dark');
 </script>

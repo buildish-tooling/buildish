@@ -32,15 +32,47 @@ limitations under the License.
   {{- with index $paths "component" }}{{ $componentPath = . }}{{ end -}}
   {{- $docsPath := "" -}}
   {{- with index $paths "docs" }}{{ $docsPath = . }}{{ end -}}
+  {{- /* Repository URL: try legacy field first, then the consumer slug→URL map. */ -}}
   {{- $repositoryPath := "" -}}
   {{- with index $component "repository" }}{{ $repositoryPath = . }}{{ end -}}
-  {{- $developmentLabel := "Docs" -}}
+  {{- if not $repositoryPath -}}
+    {{- $slug := index $component "slug" -}}
+    {{- with $slug -}}
+      {{- with index hugo.Data "component_repos" -}}
+        {{- with index . $slug }}{{ $repositoryPath = . }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* Development label: old pipeline injected this; new pipeline does not. Default "Development". */ -}}
+  {{- $developmentLabel := "Development" -}}
   {{- with index $component "developmentLabel" }}{{ $developmentLabel = . }}{{ end -}}
 
+  {{- /* Collect release data.
+       New pipeline: release lines and latest-stable version live inside
+         pipeline.component.artifacts[N].releaseLines / .latestStable
+       The latestStable value is now a plain version string (not an object).
+       Old pipeline: releaseLines and latestStable were direct fields on the
+         component object; kept as fallback for backward compatibility.
+  */ -}}
   {{- $releaseLines := slice -}}
-  {{- with index $component "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
-  {{- $latestStable := dict -}}
-  {{- with index $component "latestStable" }}{{ $latestStable = . }}{{ end -}}
+  {{- $latestStableVersion := "" -}}
+  {{- with index $component "artifacts" -}}
+    {{- range $artifact := . -}}
+      {{- if not $latestStableVersion -}}
+        {{- with index $artifact "latestStable" }}{{ $latestStableVersion = printf "%v" . }}{{ end -}}
+      {{- end -}}
+      {{- if eq (len $releaseLines) 0 -}}
+        {{- with index $artifact "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- /* Backward-compatible fallback for old pipeline output. */ -}}
+  {{- if not $latestStableVersion -}}
+    {{- with index $component "latestStable" }}{{ with index . "version" }}{{ $latestStableVersion = . }}{{ end }}{{ end -}}
+  {{- end -}}
+  {{- if eq (len $releaseLines) 0 -}}
+    {{- with index $component "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
+  {{- end -}}
 
   {{- $docsItems := slice -}}
   {{- if $componentPath -}}
@@ -55,22 +87,28 @@ limitations under the License.
     {{- $releaseAnchor = printf "%s#release-lines" $componentPath -}}
   {{- end -}}
   {{- $releaseItems := slice -}}
-  {{- with index $latestStable "version" -}}
-    {{- $href := $releaseAnchor -}}
-    {{- with index $latestStable "path" }}{{ $href = . }}{{ end -}}
-    {{- if $href -}}
-      {{- $releaseItems = $releaseItems | append (dict "label" (printf "Latest stable (%s)" .) "href" $href "kind" "latest") -}}
+  {{- /* Latest-stable entry: new pipeline gives a plain string; no dedicated path yet, so
+       always fall back to the component landing anchor. */ -}}
+  {{- with $latestStableVersion -}}
+    {{- if $releaseAnchor -}}
+      {{- $releaseItems = $releaseItems | append (dict "label" (printf "Latest stable (%s)" .) "href" $releaseAnchor "kind" "latest") -}}
     {{- end -}}
   {{- end -}}
+  {{- /* Release lines: new field names are "key" (was "line") and "supportStatus" (was "status").
+       Both are checked so old and new pipeline output work without changes to the template. */ -}}
   {{- range $releaseLine := $releaseLines -}}
+    {{- $lineKey := index $releaseLine "key" -}}
+    {{- if not $lineKey }}{{ $lineKey = index $releaseLine "line" }}{{ end -}}
+    {{- $lineStatus := index $releaseLine "supportStatus" -}}
+    {{- if not $lineStatus }}{{ $lineStatus = index $releaseLine "status" }}{{ end -}}
     {{- $href := $releaseAnchor -}}
     {{- with index $releaseLine "path" }}{{ $href = . }}{{ end -}}
     {{- if $href -}}
       {{- $releaseItems = $releaseItems | append (dict
-        "label" (printf "%s — %s" (index $releaseLine "line") (index $releaseLine "status"))
+        "label" (printf "%s — %s" $lineKey $lineStatus)
         "href" $href
         "kind" "line"
-        "status" (index $releaseLine "status")
+        "status" $lineStatus
         "version" (index $releaseLine "latest")) -}}
     {{- end -}}
   {{- end -}}
@@ -78,11 +116,21 @@ limitations under the License.
   {{- $isComponentLanding := false -}}
   {{- with $page -}}
     {{- $kind := index . "kind" -}}
-    {{- $isComponentLanding = or (eq $kind "component-home") (eq $kind "component-page") -}}
+    {{- /* The new pipeline currently uses `component-page` both for the true
+         component landing page (`/components/<slug>/`) and for nested component
+         docs such as `/components/<slug>/how-to/...`. Only the true component
+         root should opt into the landing-page layout that hides the left docs
+         sidebar. */ -}}
+    {{- $componentLandingPath := "" -}}
+    {{- with $componentPath }}{{ $componentLandingPath = printf "%s_index" . }}{{ end -}}
+    {{- $isComponentLanding = or (eq $kind "component-home") (and (eq $kind "component-page") (eq (index . "path") $componentLandingPath)) -}}
   {{- end -}}
 
+  {{- /* displayName: fall back to slug when the pipeline has not (yet) populated it. */ -}}
+  {{- $displayName := index $component "displayName" -}}
+  {{- if not $displayName }}{{ $displayName = index $component "slug" }}{{ end -}}
   {{- $brandLabel := .Site.Title -}}
-  {{- with index $component "displayName" -}}
+  {{- with $displayName -}}
     {{- $brandLabel = printf "%s — %s" $.Site.Title . -}}
   {{- end -}}
 
@@ -98,7 +146,7 @@ limitations under the License.
     "releaseItems" $releaseItems
     "brandLabel" $brandLabel
     "isComponentLanding" $isComponentLanding
-    "hasReleaseContent" (or (gt (len $releaseItems) 0) (gt (len $releaseLines) 0))
+    "hasReleaseContent" (or (gt (len $releaseItems) 0) (or (gt (len $releaseLines) 0) $latestStableVersion))
   -}}
 {{- end -}}
 {{- return $context -}}

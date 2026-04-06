@@ -15,6 +15,8 @@
 title: Components
 description: Browsable component sections staged from the local catalog.
 type: docs
+cascade:
+  - type: docs
 buildish_landing_page: true
 ---
 

@@ -16,12 +16,10 @@
 
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import signal
 import subprocess
-import sys
 import time
 import unittest
 from pathlib import Path
@@ -447,7 +445,6 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             / "content"
             / "components"
             / "mammoth-cache"
-            / "pages"
             / "_index.md"
         )
 

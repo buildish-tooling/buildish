@@ -102,7 +102,16 @@ limitations under the License.
           <li><a class="dropdown-item{{ if and $componentsPage (eq $p.RelPermalink $componentsPage.RelPermalink) }} active{{ end }}" href="{{ with $componentsPage }}{{ .RelPermalink }}{{ else }}{{ "/components/" | relURL }}{{ end }}">All components</a></li>
           {{ if gt (len $componentSections) 0 }}<li><hr class="dropdown-divider"></li>{{ end }}
           {{ range $componentSections }}
-          <li><a class="dropdown-item{{ if or (eq $p.RelPermalink .RelPermalink) ($p.IsDescendant .) }} active{{ end }}" href="{{ .RelPermalink }}">{{ .Title }}</a></li>
+          {{- /* The pipeline does not inject a top-level title: field, so .Title is empty.
+               Read displayName from the pipeline front matter and fall back to the slug,
+               then to Hugo's derived title as a last resort. */ -}}
+          {{- $sectionTitle := .Title -}}
+          {{- with index .Params "pipeline" -}}
+            {{- with index . "component" -}}
+              {{- with index . "displayName" }}{{ $sectionTitle = . }}{{ else }}{{ with index . "slug" }}{{ $sectionTitle = . }}{{ end }}{{ end -}}
+            {{- end -}}
+          {{- end -}}
+          <li><a class="dropdown-item{{ if or (eq $p.RelPermalink .RelPermalink) ($p.IsDescendant .) }} active{{ end }}" href="{{ .RelPermalink }}">{{ $sectionTitle }}</a></li>
           {{ end }}
           {{ else }}
           {{ range $child := $menu.Children }}

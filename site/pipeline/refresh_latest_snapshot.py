@@ -21,6 +21,7 @@ import fcntl
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from collections.abc import Sequence
@@ -162,7 +163,7 @@ def run_consumer_command(
 
     if _active_consumer_environment_matches(consumer_root, resolved_venv_path):
         env = _managed_environment_vars(resolved_venv_path, consumer_root)
-        os.execvpe(command[0], list(command), env)
+        _exec_managed_command(command, env)
 
     with _consumer_environment_lock(consumer_root, exclusive=True) as handle:
         _refresh_consumer_snapshot_locked(
@@ -182,8 +183,8 @@ def run_consumer_command(
         os.set_inheritable(handle.fileno(), True)
 
         env = _managed_environment_vars(resolved_venv_path, consumer_root)
-        os.execvpe(command[0], list(command), env)
-    raise AssertionError("os.execvpe returned unexpectedly")
+        _exec_managed_command(command, env)
+    raise AssertionError("_exec_managed_command returned unexpectedly")
 
 
 def _refresh_consumer_snapshot_locked(
@@ -412,6 +413,20 @@ def _venv_bin_dir(venv_path: Path) -> Path:
 
 def _sync_stamp_path(venv_path: Path) -> Path:
     return venv_path / ".buildish-site-pipeline-sync-stamp"
+
+
+def _exec_managed_command(command: Sequence[str], env: dict[str, str]) -> None:
+    """Resolve ``command`` within the managed environment and replace the process.
+
+    Resolve the executable against the curated managed ``PATH`` first so the final
+    exec call does not depend on the caller's ambient shell lookup behavior.
+    """
+
+    resolved_executable = shutil.which(command[0], path=env.get("PATH"))
+    if resolved_executable is None:
+        raise FileNotFoundError(f"Command not found in managed PATH: {command[0]}")
+    os.execve(resolved_executable, list(command), env)  # noqa: S606 - resolved absolute executable path within the managed allowlisted environment
+    raise AssertionError("os.execve returned unexpectedly")
 
 
 def _active_consumer_environment_matches(consumer_root: Path, venv_path: Path) -> bool:

@@ -1,0 +1,54 @@
+{{/*
+Copyright 2026 The Apache Software Foundation
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{- $page := .page -}}
+{{- $preferLinkTitle := false -}}
+{{- if isset . "preferLinkTitle" -}}{{- $preferLinkTitle = .preferLinkTitle -}}{{- end -}}
+{{- $componentContext := partial "buildish-component-context.html" $page -}}
+{{- $pipelinePage := dict -}}
+{{- with index $componentContext "page" }}{{ $pipelinePage = . }}{{ end -}}
+{{- $pipelineComponent := dict -}}
+{{- with index $componentContext "component" }}{{ $pipelineComponent = . }}{{ end -}}
+{{- $derivedTitle := "" -}}
+{{- with index $pipelinePage "derivedTitle" }}{{ $derivedTitle = . }}{{ end -}}
+{{- $componentDisplayName := "" -}}
+{{- with index $pipelineComponent "displayName" }}{{ $componentDisplayName = . }}{{ end -}}
+{{- if not $componentDisplayName -}}
+  {{- with index $pipelineComponent "slug" }}{{ $componentDisplayName = humanize . }}{{ end -}}
+{{- end -}}
+
+{{- /*
+     Metadata surfaces should prefer authored values, but staged pages may only
+     have pipeline-derived or slug-based labels until the pipeline emits title.
+*/ -}}
+{{- $resolvedTitle := "" -}}
+{{- if $preferLinkTitle -}}
+  {{- $resolvedTitle = $page.LinkTitle -}}
+  {{- if not $resolvedTitle }}{{ $resolvedTitle = $page.Title }}{{ end -}}
+  {{- if not $resolvedTitle }}{{ $resolvedTitle = $derivedTitle }}{{ end -}}
+{{- else -}}
+  {{- $resolvedTitle = $page.Title -}}
+  {{- if not $resolvedTitle }}{{ $resolvedTitle = $derivedTitle }}{{ end -}}
+  {{- if not $resolvedTitle }}{{ $resolvedTitle = $page.LinkTitle }}{{ end -}}
+{{- end -}}
+{{- if not $resolvedTitle }}{{ $resolvedTitle = $componentDisplayName }}{{ end -}}
+{{- if not $resolvedTitle -}}
+  {{- with path.Base (replaceRE "/$" "" $page.RelPermalink) -}}
+    {{- $resolvedTitle = humanize . -}}
+  {{- end -}}
+{{- end -}}
+{{- $resolvedTitle = plainify $resolvedTitle -}}
+{{- $resolvedTitle = htmlUnescape $resolvedTitle -}}
+{{- trim $resolvedTitle "\n\r\t " -}}

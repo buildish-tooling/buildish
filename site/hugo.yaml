@@ -17,12 +17,8 @@ baseURL: https://buildish.apache.org/
 title: Apache Buildish (Incubating)
 languageCode: en-us
 enableRobotsTXT: true
-contentDir: .stage/content
-dataDir: .stage/data
-staticDir:
-  - .stage/static
-  - static
 publishDir: .public
+
 disableKinds:
   - taxonomy
   - term
@@ -97,6 +93,45 @@ module:
       disable: false
     - path: github.com/google/docsy/dependencies
       disable: false
+  mounts:
+    # These mounts assemble Hugo's virtual filesystem from two sources:
+    # 1. consumer-authored site roots in this repository, and
+    # 2. pipeline-generated staged roots under `.stage/`.
+    #
+    # `source` is the real directory on disk. `target` is the Hugo root where
+    # that directory should appear (`content`, `data`, `static`, ...).
+    #
+    # Entries where `source == target` are intentional. Once we switch from
+    # Hugo's implicit default roots to explicit mounts, every local root we still
+    # want Hugo to see must be mounted again explicitly.
+    # Consumer-authored content such as section roots and cascades. This must be
+    # mounted alongside staged content so local docs section metadata keeps
+    # applying to pipeline-generated pages under the same tree.
+    - source: content
+      target: content
+    # Pipeline-assembled staged content is the primary content tree.
+    - source: .stage/content
+      target: content
+    # Pipeline data files (components.json, routes.json, etc.).
+    - source: .stage/data
+      target: data
+    # Consumer-owned data files (component_repos.json, etc.) stay visible in
+    # `site.Data` alongside the pipeline data.  This explicit `data -> data`
+    # mount keeps the local data root present after opting into explicit mounts.
+    - source: data
+      target: data
+    # Pipeline-assembled static assets (component asset trees, etc.).
+    - source: .stage/static
+      target: static
+    # Authored site-level static assets (favicons, fonts, …).
+    - source: static
+      target: static
+    # Local layout overrides and custom partials / shortcodes.
+    - source: layouts
+      target: layouts
+    # SCSS / JS / image assets processed by Hugo Pipes.
+    - source: assets
+      target: assets
 
 privacy:
   googleAnalytics:
