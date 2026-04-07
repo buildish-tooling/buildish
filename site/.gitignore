@@ -27,3 +27,6 @@
 
 # Local overrides
 /components.local.yaml
+
+# 'make serve-local'
+/.watch-events.*.jsonl
