@@ -35,6 +35,20 @@ class RenderExpectation(NamedTuple):
 
 DEFAULT_EXPECTATIONS = (
     RenderExpectation(
+        relative_path="components/site-pipeline/index.html",
+        required_snippets=(
+            '<body class="td-section buildish-docs-landing-page buildish-component-landing-page">',
+        ),
+        forbidden_patterns=(r'<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">',),
+    ),
+    RenderExpectation(
+        relative_path="components/site-pipeline/how-to/integrate-with-hugo/index.html",
+        required_snippets=(
+            '<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">',
+        ),
+        forbidden_patterns=(r'buildish-component-landing-page',),
+    ),
+    RenderExpectation(
         relative_path="components/site-pipeline/architecture/build-architecture/index.html",
         required_snippets=(
             '<meta property="og:title" content="Recommended staging-engine implementation architecture">',

@@ -32,6 +32,18 @@ class VerifyRenderedFallbacksTest(unittest.TestCase):
     def test_default_checks_accept_expected_resolved_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             public_root = Path(temp_dir)
+            component_root_page = public_root / "components" / "site-pipeline" / "index.html"
+            component_root_page.parent.mkdir(parents=True, exist_ok=True)
+            component_root_page.write_text(
+                '<body class="td-section buildish-docs-landing-page buildish-component-landing-page"></body>\n',
+                encoding="utf-8",
+            )
+            nested_docs_page = public_root / "components" / "site-pipeline" / "how-to" / "integrate-with-hugo" / "index.html"
+            nested_docs_page.parent.mkdir(parents=True, exist_ok=True)
+            nested_docs_page.write_text(
+                '<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none"></aside>\n',
+                encoding="utf-8",
+            )
             metadata_page = public_root / "components" / "site-pipeline" / "architecture" / "build-architecture" / "index.html"
             metadata_page.parent.mkdir(parents=True, exist_ok=True)
             metadata_page.write_text(
@@ -64,6 +76,30 @@ class VerifyRenderedFallbacksTest(unittest.TestCase):
             )
 
             self.assertEqual([], check_rendered_site(public_root))
+
+    def test_reports_component_root_with_docs_sidebar(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            public_root = Path(temp_dir)
+            component_root_page = public_root / "components" / "site-pipeline" / "index.html"
+            component_root_page.parent.mkdir(parents=True, exist_ok=True)
+            component_root_page.write_text(
+                '<body class="td-section"></body>\n<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none"></aside>\n',
+                encoding="utf-8",
+            )
+            errors = check_rendered_file(
+                public_root,
+                RenderExpectation(
+                    relative_path="components/site-pipeline/index.html",
+                    required_snippets=(
+                        '<body class="td-section buildish-docs-landing-page buildish-component-landing-page">',
+                    ),
+                    forbidden_patterns=(r'<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">',),
+                ),
+            )
+
+            self.assertEqual(2, len(errors))
+            self.assertIn('buildish-component-landing-page', errors[0])
+            self.assertIn('td-sidebar d-print-none', errors[1])
 
     def test_reports_blank_listing_entries(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

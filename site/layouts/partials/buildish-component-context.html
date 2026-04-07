@@ -122,8 +122,14 @@ limitations under the License.
          root should opt into the landing-page layout that hides the left docs
          sidebar. */ -}}
     {{- $componentLandingPath := "" -}}
-    {{- with $componentPath }}{{ $componentLandingPath = printf "%s_index" . }}{{ end -}}
-    {{- $isComponentLanding = or (eq $kind "component-home") (and (eq $kind "component-page") (eq (index . "path") $componentLandingPath)) -}}
+    {{- $componentLandingIndexPath := "" -}}
+    {{- with $componentPath -}}
+      {{- $componentLandingPath = strings.TrimSuffix "/" . -}}
+      {{- $componentLandingIndexPath = printf "%s/_index" $componentLandingPath -}}
+    {{- end -}}
+    {{- $pagePath := index . "path" -}}
+    {{- $normalizedPagePath := strings.TrimSuffix "/" $pagePath -}}
+    {{- $isComponentLanding = or (eq $kind "component-home") (and (eq $kind "component-page") (or (eq $normalizedPagePath $componentLandingPath) (eq $normalizedPagePath $componentLandingIndexPath))) -}}
   {{- end -}}
 
   {{- /* displayName: fall back to slug when the pipeline has not (yet) populated it. */ -}}
