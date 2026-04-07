@@ -49,3 +49,7 @@ components:
     weight: 1000
     publication:
       mountPath: /components/site/
+validation:
+  linkChecks:
+    enabled: true
+    mode: directory

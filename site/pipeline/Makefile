@@ -57,6 +57,24 @@ pipeline-stage-local: sanity-check ## Build staged site inputs with the sibling 
 		--catalog '$(SITE_PIPELINE_CATALOG)' \
 		$(SITE_PIPELINE_ARGS)
 
+pipeline-site-check-local: sanity-check ## Run site checks with the sibling site-pipeline checkout.
+	@if [ ! -x '$(SITE_PIPELINE_BIN)' ]; then \
+		echo "Error: expected site-pipeline executable at $(SITE_PIPELINE_BIN)."; \
+		echo "Hint: prepare the sibling buildish-site-pipeline checkout and its .venv first."; \
+		exit 1; \
+	fi
+	@if [ ! -f '$(SITE_PIPELINE_CATALOG)' ]; then \
+		echo "Error: expected Buildish catalog at $(SITE_PIPELINE_CATALOG)."; \
+		exit 1; \
+	fi
+	@if [ -e '$(SITE_STAGE_ROOT)' ]; then \
+		rm -rf '$(SITE_STAGE_ROOT)'; \
+	fi
+	PYTHONPATH='$(SITE_PIPELINE_REPO_ROOT)/src' '$(SITE_PIPELINE_BIN)' check --report-format text --report-output - \
+		--workspace-root '$(WORKSPACE_ROOT)' \
+		--catalog '$(SITE_PIPELINE_CATALOG)' \
+		$(SITE_PIPELINE_ARGS)
+
 pipeline-watch-local: sanity-check ## Watch sources and refresh staged site inputs with the sibling site-pipeline checkout.
 	@if [ ! -x '$(SITE_PIPELINE_BIN)' ]; then \
 		echo "Error: expected site-pipeline executable at $(SITE_PIPELINE_BIN)."; \

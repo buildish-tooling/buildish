@@ -213,6 +213,12 @@ CONTAINER_STAGE_SCRIPT = \
 	$(SITE_PIPELINE) build --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
 	printf "==> [container-stage] staged site contract completed\\n"
 
+CONTAINER_SITE_CHECK_SCRIPT = \
+	$(CONTAINER_PREPARE_SITE_ENV); \
+	printf "==> [container-stage] running site-pipeline check\\n"; \
+	$(SITE_PIPELINE) check --report-format text --report-output - --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
+	printf "==> [container-stage] site check completed\\n"
+
 CONTAINER_STAGE_WATCH_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-stage-watch] running site-pipeline watch\\n"; \
@@ -297,6 +303,8 @@ endef
 	serve \
 	build-local \
 	serve-local \
+	site-check \
+	site-check-local \
 	stage \
 	stage-local \
 	stage-watch \
@@ -341,6 +349,11 @@ vendor-assets: docsy-check ## Stage local vendor assets required by the renderer
 	@cp $(NODE_MODULES_DIR)/jquery/dist/jquery.min.js .stage/static/js/vendor/jquery.min.js
 	@cp $(NODE_MODULES_DIR)/mermaid/dist/mermaid.min.js .stage/static/js/vendor/mermaid.min.js
 	@cp $(NODE_MODULES_DIR)/lunr/lunr.min.js .stage/static/js/vendor/lunr.min.js
+
+site-check: container-site-check ## Build the staged site contract and lightweight preview in the build container.
+
+site-check-local: sanity-check ## Build the staged site contract and lightweight preview with host tools.
+	$(MAKE) --no-print-directory pipeline-site-check-local
 
 stage: container-stage ## Build the staged site contract and lightweight preview in the build container.
 
@@ -420,6 +433,13 @@ container-integration-test: container-image ## Run the fixture integration test 
 	@$(CONTAINER_RUN) bash -c '$(CONTAINER_INTEGRATION_TEST_SCRIPT)'
 
 container-check-fast: container-test container-integration-test ## Run the fast containerized verification path for interactive use.
+
+container-site-check: container-image-ensure ## Run the site-pipeline check inside the build container.
+	@printf '==> [container-stage] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
+	@$(PREPARE_CONTAINER_SCRATCH)
+	@$(PREPARE_CONTAINER_STAGE_OUTPUTS)
+	@printf '==> [container-stage] starting containerized site checks\n'
+	@$(CONTAINER_RUN) bash -c '$(CONTAINER_SITE_CHECK_SCRIPT)'
 
 container-stage: container-image-ensure ## Build the staged site contract and lightweight Python preview inside the build container.
 	@printf '==> [container-stage] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
