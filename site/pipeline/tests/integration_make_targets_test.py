@@ -249,8 +249,10 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                         name = args[-1]
                         pidfile = state_dir / f'{name}.pid'
                         if pidfile.exists():
+                            stop_signal_name = os.environ.get('BUILDISH_FAKE_CONTAINER_STOP_SIGNAL', 'SIGTERM')
+                            stop_signal = getattr(signal, stop_signal_name)
                             try:
-                                os.killpg(int(pidfile.read_text(encoding='utf-8')), signal.SIGTERM)
+                                os.killpg(int(pidfile.read_text(encoding='utf-8')), stop_signal)
                             except ProcessLookupError:
                                 pass
                         sys.exit(0)
@@ -365,6 +367,12 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env["BUILDISH_FAKE_CONTAINER_STATE_DIR"] = str(site_root / "build" / "fake-container-state")
         env["BUILDISH_FAKE_CONTAINER_CWD"] = str(site_root)
         return env
+
+    def build_watch_event_files(self, site_root: Path) -> list[Path]:
+        return sorted((site_root / "build").glob(".watch-events.*.jsonl"))
+
+    def root_watch_event_files(self, site_root: Path) -> list[Path]:
+        return sorted(site_root.glob(".watch-events.*.jsonl"))
 
     def run_make(self, site_root: Path, target: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
         return subprocess.run(  # noqa: S603,S607
@@ -501,13 +509,27 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         hugo_log = self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"]))
         self.assert_contains_all(hugo_log, "--source .", "--config hugo.yaml")
 
+    def test_repo_root_make_build_local_delegates_to_site_makefile(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_hugo=True, include_native_docsy=True)
+        env = self.base_env(repo_root / "site", bin_dir)
+
+        result = self.run_make(repo_root, "build-local", env)
+
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assert_paths_exist(
+            repo_root / "site" / ".stage" / "manifest.json",
+            self.mammoth_page_path(repo_root),
+            repo_root / "site" / ".public" / "index.html",
+        )
+        self.assert_contains_all(self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"])), "--source .", "--config hugo.yaml")
+
     def test_make_stage_uses_containerized_path_and_stages_vendor_assets(self) -> None:
         repo_root = self.prepare_fixture_workspace()
         bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True)
         env = self.base_env(repo_root / "site", bin_dir)
         env["CONTAINER_ENGINE"] = "fake-container-engine"
         env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
-        env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
         result = self.run_make(repo_root / "site", "stage", env)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
@@ -520,7 +542,13 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         slugs = {item["slug"] for item in components_payload["items"]}
         self.assertIn("mammoth-cache", slugs)
         container_log = self.read_text(repo_root / "site" / "build" / "fake-container.log")
-        self.assert_contains_all(container_log, "run", "--init", "/workspace/buildish/site")
+        self.assert_contains_all(
+            container_log,
+            "run",
+            "--init",
+            "/workspace/buildish/site",
+            "HOME=/workspace/buildish/site/build/.container-home",
+        )
 
     def test_make_build_uses_containerized_path_and_exposes_postcss_to_hugo_via_npx(self) -> None:
         repo_root = self.prepare_fixture_workspace()
@@ -574,6 +602,25 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             "For advanced/internal targets, run 'make help-all'.",
         )
         self.assert_not_contains_any(result.stdout, "container-serve", "hugo-check", "docsy-check", "vendor-assets", "container-build")
+
+    def test_repo_root_make_help_curates_repo_entrypoints(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+
+        result = self.run_make(repo_root, "help", os.environ.copy())
+
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assert_contains_all(
+            result.stdout,
+            "Repository maintenance:",
+            "Local site workflows:",
+            "Site-specific help:",
+            "rat-check          Run Apache RAT against tracked files in this repository (requires Java 21+).",
+            "check              Run the non-container site check gate from the repository root.",
+            "build-local        Build the staged contract and full Hugo site with host tools.",
+            "serve-local        Serve the full Hugo site with automatic restaging using host tools.",
+            "site-help          Show curated site-specific Make targets from site/Makefile.",
+        )
+        self.assert_not_contains_any(result.stdout, "container-build", "pipeline-lint", "vendor-assets")
 
     def test_make_stage_watch_local_restages_component_pages_after_source_change(self) -> None:
         repo_root = self.prepare_fixture_workspace()
@@ -632,6 +679,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
 
     def test_make_serve_local_starts_hugo_with_local_bind_and_restages_component_changes(self) -> None:
         repo_root = self.prepare_fixture_workspace()
+        site_root = repo_root / "site"
         bin_dir = self.seed_fake_tools(repo_root / "site", include_hugo=True, include_native_docsy=True)
         env = self.base_env(repo_root / "site", bin_dir)
         env["PORT"] = "8766"
@@ -639,10 +687,16 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         source_page = self.workspace / "buildish-mammoth-cache" / "site" / "pages" / "_index.md"
         staged_page = self.mammoth_page_path(repo_root)
         generated_resource = repo_root / "site" / "resources" / "_gen" / "assets" / "scss" / "main.scss_fake.content"
-        process = self.start_make(repo_root / "site", "serve-local", env)
+        process = self.start_make(site_root, "serve-local", env)
         self.wait_for("fake local Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(), process=process)
         self.wait_for("initial serve-local stage", staged_page.exists, process=process)
         self.wait_for("fake generated resources", generated_resource.exists, process=process)
+        self.wait_for(
+            "serve-local watch event file under build/",
+            lambda: bool(self.build_watch_event_files(site_root)),
+            process=process,
+        )
+        self.assertEqual([], self.root_watch_event_files(site_root))
         time.sleep(0.5)
         self.assertNotIn("watch cycle 2", self.read_process_output(process), self.read_process_output(process))
         source_page.write_text(
@@ -663,9 +717,12 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         hugo_log = self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"]))
         self.assert_contains_all(hugo_log, "server", "--bind 127.0.0.1", "--port 8766")
         self.stop_process(process)
+        self.assertEqual([], self.build_watch_event_files(site_root))
+        self.assertEqual([], self.root_watch_event_files(site_root))
 
     def test_make_serve_starts_hugo_in_containerized_mode_with_public_bind(self) -> None:
         repo_root = self.prepare_fixture_workspace()
+        site_root = repo_root / "site"
         bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
         env = self.base_env(repo_root / "site", bin_dir)
         env["CONTAINER_ENGINE"] = "fake-container-engine"
@@ -675,7 +732,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env["PORT"] = "8767"
         source_page = self.workspace / "buildish-mammoth-cache" / "site" / "pages" / "_index.md"
         staged_page = self.mammoth_page_path(repo_root)
-        process = self.start_make(repo_root / "site", "serve", env)
+        process = self.start_make(site_root, "serve", env)
         self.wait_for(
             "fake containerized Hugo server readiness",
             lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(),
@@ -683,6 +740,13 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             process=process,
         )
         self.wait_for("initial containerized serve stage", staged_page.exists, process=process)
+        self.wait_for(
+            "containerized serve watch event file under build/",
+            lambda: bool(self.build_watch_event_files(site_root)),
+            timeout=CONTAINERIZED_SERVE_READY_TIMEOUT,
+            process=process,
+        )
+        self.assertEqual([], self.root_watch_event_files(site_root))
         source_page.write_text(
             text_block(
                 """
@@ -702,10 +766,13 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         hugo_log = self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"]))
         self.assert_contains_all(hugo_log, "server", "--bind 0.0.0.0", "--port 8767")
         self.stop_process(process)
+        self.assertEqual([], self.build_watch_event_files(site_root))
+        self.assertEqual([], self.root_watch_event_files(site_root))
         self.assert_contains_all(self.read_text(repo_root / "site" / "build" / "fake-container.log"), "run", "--init")
 
     def test_make_serve_in_containerized_mode_stops_on_sigint(self) -> None:
         repo_root = self.prepare_fixture_workspace()
+        site_root = repo_root / "site"
         bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
         env = self.base_env(repo_root / "site", bin_dir)
         env["CONTAINER_ENGINE"] = "fake-container-engine"
@@ -713,18 +780,54 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
         env["PORT"] = "8768"
-        process = self.start_make(repo_root / "site", "serve", env)
+        process = self.start_make(site_root, "serve", env)
         self.wait_for(
             "fake containerized Hugo server readiness",
             lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(),
             timeout=CONTAINERIZED_SERVE_READY_TIMEOUT,
             process=process,
         )
+        self.wait_for(
+            "containerized serve watch event file under build/",
+            lambda: bool(self.build_watch_event_files(site_root)),
+            timeout=CONTAINERIZED_SERVE_READY_TIMEOUT,
+            process=process,
+        )
+        self.assertEqual([], self.root_watch_event_files(site_root))
         os.killpg(process.pid, signal.SIGINT)
         process.wait(timeout=10)
         output = self.read_process_output(process)
         self.assertIn(process.returncode, (-signal.SIGINT, 130), output)
         self.assertIn("serve exited", output)
+        self.assertEqual([], self.build_watch_event_files(site_root))
+        self.assertEqual([], self.root_watch_event_files(site_root))
+
+    def test_make_serve_host_cleanup_removes_watch_events_when_container_stop_skips_traps(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        site_root = repo_root / "site"
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
+        env = self.base_env(repo_root / "site", bin_dir)
+        env["CONTAINER_ENGINE"] = "fake-container-engine"
+        env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
+        env["BUILDISH_FAKE_CONTAINER_STOP_SIGNAL"] = "SIGKILL"
+        env["PORT"] = "8769"
+        process = self.start_make(site_root, "serve", env)
+        self.wait_for(
+            "fake containerized Hugo server readiness",
+            lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(),
+            timeout=CONTAINERIZED_SERVE_READY_TIMEOUT,
+            process=process,
+        )
+        self.wait_for(
+            "containerized serve watch event file under build/",
+            lambda: bool(self.build_watch_event_files(site_root)),
+            timeout=CONTAINERIZED_SERVE_READY_TIMEOUT,
+            process=process,
+        )
+        self.stop_process(process)
+        self.assertEqual([], self.build_watch_event_files(site_root))
+        self.assertEqual([], self.root_watch_event_files(site_root))
 
 
 if __name__ == "__main__":

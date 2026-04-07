@@ -215,7 +215,8 @@ def seed_make_fixture_main_repo(repo_root: Path) -> None:
 
     site_root = repo_root / "site"
     site_root.mkdir(parents=True, exist_ok=True)
-    for relative in ("assets", "content", "layouts", "scripts", "site", "static"):
+    shutil.copy2(SOURCE_REPO_ROOT / "Makefile", repo_root / "Makefile")
+    for relative in ("assets", "content", "layouts", "make", "scripts", "site", "static"):
         shutil.copytree(SOURCE_REPO_ROOT / "site" / relative, site_root / relative, dirs_exist_ok=True)
     shutil.copytree(
         SOURCE_REPO_ROOT / "site" / "pipeline",

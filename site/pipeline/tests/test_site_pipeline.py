@@ -89,7 +89,6 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             / "content"
             / "components"
             / "mammoth-cache"
-            / "pages"
             / "_index.md"
         )
 
@@ -183,7 +182,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
             custom_stage_root = custom_catalog.parent / ".stage"
             self.assert_paths_exist(
                 custom_stage_root / "manifest.json",
-                custom_stage_root / "content" / "components" / "mammoth-cache" / "pages" / "_index.md",
+                custom_stage_root / "content" / "components" / "mammoth-cache" / "_index.md",
             )
             self.assertFalse((repo_root / "site" / ".stage").exists())
 

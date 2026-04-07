@@ -42,5 +42,5 @@ warn_unused_ignores = true
 no_implicit_optional = true
 
 [tool.uv.sources]
-apache-buildish-site-pipeline = { path = "../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0-py3-none-any.whl" }
+apache-buildish-site-pipeline = { path = "../../../buildish-site-pipeline/dist/snapshots/20260407-validation-fix/apache_buildish_site_pipeline-0.1.0-py3-none-any.whl" }
 

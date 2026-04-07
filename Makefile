@@ -16,11 +16,69 @@
 .DEFAULT_GOAL := help
 
 HELP_TARGETS := $(MAKEFILE_LIST)
+SITE_MAKE := $(MAKE) --no-print-directory -C site
 
-.PHONY: help rat-check
+.PHONY: \
+	build-local \
+	check \
+	clean \
+	help \
+	help-all \
+	rat-check \
+	render-local \
+	serve-local \
+	site-help \
+	site-help-all \
+	stage-local \
+	stage-watch-local
 
-help: ## Show available Make targets.
-	@awk 'BEGIN {FS = ":.*## "; printf "Available targets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(HELP_TARGETS)
+help: ## Show curated repository Make targets.
+	@printf "Available targets:\n"; \
+	printf "\nRepository maintenance:\n"; \
+	printf "  %-18s %s\n" "help" "Show curated repository Make targets."; \
+	printf "  %-18s %s\n" "help-all" "Show all repository-root Make targets."; \
+	printf "  %-18s %s\n" "rat-check" "Run Apache RAT against tracked files in this repository (requires Java 21+)."; \
+	printf "  %-18s %s\n" "check" "Run the non-container site check gate from the repository root."; \
+	printf "  %-18s %s\n" "clean" "Remove generated site output with host tools."; \
+	printf "\nLocal site workflows:\n"; \
+	printf "  %-18s %s\n" "stage-local" "Build the staged site contract with host tools."; \
+	printf "  %-18s %s\n" "stage-watch-local" "Watch sources and rebuild the staged site contract with host tools."; \
+	printf "  %-18s %s\n" "render-local" "Render the current staged site through Hugo with host tools."; \
+	printf "  %-18s %s\n" "build-local" "Build the staged contract and full Hugo site with host tools."; \
+	printf "  %-18s %s\n" "serve-local" "Serve the full Hugo site with automatic restaging using host tools."; \
+	printf "\nSite-specific help:\n"; \
+	printf "  %-18s %s\n" "site-help" "Show curated site-specific Make targets from site/Makefile."; \
+	printf "  %-18s %s\n" "site-help-all" "Show all site-specific and internal Make targets from site/Makefile."
+
+help-all: ## Show all repository-root Make targets.
+	@awk 'BEGIN {FS = ":.*## "; printf "Available targets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(HELP_TARGETS)
 
 rat-check: ## Run Apache RAT against tracked files in this repository (requires Java 21+).
 	sh tools/rat/rat-check.sh
+
+check: ## Run the non-container site check gate from the repository root.
+	$(SITE_MAKE) check
+
+clean: ## Remove generated site output with host tools.
+	$(SITE_MAKE) clean
+
+stage-local: ## Build the staged site contract with host tools.
+	$(SITE_MAKE) stage-local
+
+stage-watch-local: ## Watch sources and rebuild the staged site contract with host tools.
+	$(SITE_MAKE) stage-watch-local
+
+render-local: ## Render the current staged site through Hugo with host tools.
+	$(SITE_MAKE) render-local
+
+build-local: ## Build the staged contract and full Hugo site with host tools.
+	$(SITE_MAKE) build-local
+
+serve-local: ## Serve the full Hugo site with automatic restaging using host tools.
+	$(SITE_MAKE) serve-local
+
+site-help: ## Show curated site-specific Make targets from site/Makefile.
+	$(SITE_MAKE) help
+
+site-help-all: ## Show all site-specific and internal Make targets from site/Makefile.
+	$(SITE_MAKE) help-all

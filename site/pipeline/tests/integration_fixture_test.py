@@ -124,9 +124,9 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 data_root / "components.json",
                 data_root / "content-index.json",
                 data_root / "routes.json",
-                mammoth_component_root / "pages" / "_index.md",
-                no_wrapper_component_root / "pages" / "_index.md",
-                site_component_root / "pages" / "_index.md",
+                mammoth_component_root / "_index.md",
+                no_wrapper_component_root / "_index.md",
+                site_component_root / "_index.md",
                 stage_root / "static" / "components" / "mammoth-cache" / "assets" / "images" / "diagram.svg",
             )
             self.assertFalse((repo_root / "site" / ".preview").exists())
@@ -148,7 +148,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 components["mammoth-cache"]["publication"]["paths"]["component"],
             )
             self.assertEqual(
-                "/components/mammoth-cache/latest/",
+                "/components/mammoth-cache/development/",
                 components["mammoth-cache"]["publication"]["paths"]["docs"],
             )
             self.assertEqual(
@@ -156,7 +156,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 components["site"]["publication"]["paths"]["component"],
             )
             self.assertEqual(
-                "/components/site/latest/",
+                "/components/site/development/",
                 components["site"]["publication"]["paths"]["docs"],
             )
 
@@ -167,14 +167,14 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
             }
             self.assertTrue(
                 {
-                    ("mammoth-cache", "component-page", "/components/mammoth-cache/_index"),
-                    ("no-gradle-wrapper-jar", "component-page", "/components/no-gradle-wrapper-jar/_index"),
-                    ("site", "component-page", "/components/site/_index"),
+                    ("mammoth-cache", "component-page", "/components/mammoth-cache"),
+                    ("no-gradle-wrapper-jar", "component-page", "/components/no-gradle-wrapper-jar"),
+                    ("site", "component-page", "/components/site"),
                 }.issubset(content_paths)
             )
 
-            mammoth_page = self.read_text(mammoth_component_root / "pages" / "_index.md")
-            site_page = self.read_text(site_component_root / "pages" / "_index.md")
+            mammoth_page = self.read_text(mammoth_component_root / "_index.md")
+            site_page = self.read_text(site_component_root / "_index.md")
             self.assertIn("Fixture component landing page.", mammoth_page)
             self.assertIn("# Buildish Site", site_page)
         finally:
