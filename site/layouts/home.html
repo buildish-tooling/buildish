@@ -36,22 +36,12 @@ limitations under the License.
   <div class="section-index">
     <div class="row">
       {{ range $componentSections }}
-      {{- /* The pipeline does not inject a top-level title:/description: into the front
-           matter, so .Title and .Description are empty. Read displayName (falling back to
-           slug) from the pipeline params, and use .Summary (auto-derived from content)
-           when no explicit description is present. */ -}}
-      {{- $cardTitle := .Title -}}
-      {{- $cardDesc  := .Description -}}
-      {{- with index .Params "pipeline" -}}
-        {{- with index . "component" -}}
-          {{- with index . "displayName" }}{{ $cardTitle = . }}{{ else }}{{ with index . "slug" }}{{ $cardTitle = . }}{{ end }}{{ end -}}
-        {{- end -}}
-      {{- end -}}
-      {{- if not $cardDesc }}{{ $cardDesc = .Summary | plainify | strings.TrimSpace }}{{ end -}}
+      {{- $cardTitle := partial "buildish-resolved-title.html" (dict "page" . "preferLinkTitle" true) -}}
+      {{- $cardDesc := partial "buildish-resolved-description.html" (dict "page" .) -}}
       <div class="col-12 col-md-6">
         <div class="entry">
           <h5><a href="{{ .RelPermalink }}">{{ $cardTitle }}</a></h5>
-          {{ with $cardDesc }}<p>{{ . }}</p>{{ end }}
+          {{ with $cardDesc }}<p>{{ . | markdownify }}</p>{{ end }}
         </div>
       </div>
       {{ end }}
