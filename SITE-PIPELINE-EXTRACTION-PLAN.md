@@ -59,25 +59,14 @@ project-specific integration decisions.
   - `sitePipeline`
   - `sitePipelineComponent`
   - `sitePipelineComponentPage`
-- The pipeline supports configuration from both CLI arguments and
-  `site/site-pipeline.yaml`.
-- Configuration precedence is:
-  1. CLI arguments
-  2. configuration file
-  3. built-in defaults
-- `siteTitle`, `projectStatus`, and the workspace paths below are
-  configuration-driven:
-  - `workspace.catalogPath`
-  - `workspace.authoredSiteContentPath`
-  - `workspace.stagePath`
-  - `workspace.previewPath`
+- The extracted pipeline now loads authored workspace inputs from
+  `site/catalog.yaml` by default, with CLI arguments able to override the
+  catalog path when needed.
+- Buildish-specific presentation metadata such as the homepage project status
+  now lives in the Buildish site layer rather than in pipeline runtime config.
 - Workspace paths are resolved relative to the repository root and validated so
   authored inputs and generated outputs cannot overlap protected source roots or
   escape the repository boundary.
-- `projectStatus` is restricted to:
-  - `incubating`
-  - `graduated`
-  - `retired`
 - The builder no longer depends on repository `DISCLAIMER` content.
 - `site/Makefile` delegates pipeline-local targets to `site/pipeline/Makefile`.
 - The implementation package/module is now `apache_buildish_site_pipeline`.
@@ -261,4 +250,3 @@ Remaining for this phase:
    versioned dependency flow.
 4. If useful before full publishing, publish wheel snapshots to a hosted
    location so consumers can stop relying on machine-local file paths.
-

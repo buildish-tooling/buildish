@@ -48,8 +48,7 @@ limitations under the License.
     </div>
   </div>
   {{ end }}
-  {{ with .Params.sitePipeline }}
-  {{ if eq .projectStatus "incubating" }}
+  {{/* incubator-start */}}
   <hr class="my-5">
   <div class="buildish-incubator-disclaimer d-flex flex-column flex-md-row gap-3 align-items-start">
     <a class="buildish-incubator-disclaimer__logo" href="https://incubator.apache.org/" target="_blank" rel="noopener" aria-label="Apache Incubator">
@@ -62,14 +61,7 @@ limitations under the License.
       <p>Incubation is required of all newly accepted projects until a further review indicates that the project has established the needed community, governance, and decision-making processes.</p>
     </div>
   </div>
-  {{ else if eq .projectStatus "retired" }}
-  <hr class="my-5">
-  <div class="buildish-home-legal-card">
-    <h2>Project status</h2>
-    <p class="mb-0">This project has been retired and is no longer under active development.</p>
-  </div>
-  {{ end }}
-  {{ end }}
+  {{/* incubator-end */}}
   {{ with .Params.trademark_attribution }}
   <div class="buildish-home-legal-card mt-3">
     <p class="mb-0 small">{{ . | markdownify }}</p>
