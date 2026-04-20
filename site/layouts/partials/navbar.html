@@ -17,7 +17,7 @@ limitations under the License.
 {{ $baseURL := urls.Parse .Site.BaseURL -}}
 {{ $componentsPage := .Site.GetPage "/components" -}}
 {{ $componentSections := slice -}}
-{{ with $componentsPage }}{{ $componentSections = (where .Pages "Kind" "section").ByWeight }}{{ end -}}
+{{ with $componentsPage }}{{ $componentSections = partial "buildish-ordered-component-pages.html" (dict "page" . "pages" (where .Pages "Kind" "section")) }}{{ end -}}
 {{ $componentContext := partial "buildish-component-context.html" . -}}
 {{ $componentMode := index $componentContext "enabled" -}}
 {{ $componentPage := dict -}}

@@ -15,13 +15,22 @@ limitations under the License.
 */}}
 <div class="section-index">
     {{ $page := .Page -}}
-    {{ $pages := (where .Site.Pages "Section" .Section).ByWeight -}}
-    {{ $pages = (where $pages "Type" "!=" "search") }}
-    {{ $pages = (where $pages ".Params.hide_summary" "!=" true) -}}
-    {{ $pages = (where $pages ".Parent" "!=" nil) -}}
-    {{ $pages = (where $pages ".Parent.File" "!=" nil) -}}
-    {{ if $page.File -}}
-        {{ $pages = (where $pages "Parent.File.UniqueID" "==" $page.File.UniqueID) -}}
+    {{ $isComponentsLanding := and (eq $page.Section "components") (eq $page.RelPermalink ("/components/" | relURL)) -}}
+    {{ $pages := slice -}}
+    {{ if $isComponentsLanding -}}
+        {{ $pages = where $page.Pages "Kind" "section" -}}
+        {{ $pages = (where $pages "Type" "!=" "search") -}}
+        {{ $pages = (where $pages ".Params.hide_summary" "!=" true) -}}
+        {{ $pages = partial "buildish-ordered-component-pages.html" (dict "page" $page "pages" $pages) -}}
+    {{ else -}}
+        {{ $pages = (where .Site.Pages "Section" .Section).ByWeight -}}
+        {{ $pages = (where $pages "Type" "!=" "search") -}}
+        {{ $pages = (where $pages ".Params.hide_summary" "!=" true) -}}
+        {{ $pages = (where $pages ".Parent" "!=" nil) -}}
+        {{ $pages = (where $pages ".Parent.File" "!=" nil) -}}
+        {{ if $page.File -}}
+            {{ $pages = (where $pages "Parent.File.UniqueID" "==" $page.File.UniqueID) -}}
+        {{ end -}}
     {{ end -}}
     {{ if or $page.Params.no_list (eq (len $pages) 0) -}}
     {{/* If no_list is true or we don't have subpages we don't show a list of subpages */}}

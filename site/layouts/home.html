@@ -16,7 +16,7 @@ limitations under the License.
 {{ define "main" }}
 {{ $componentsPage := .Site.GetPage "/components" }}
 {{ $componentSections := slice }}
-{{ with $componentsPage }}{{ $componentSections = (where .Pages "Kind" "section").ByWeight }}{{ end }}
+{{ with $componentsPage }}{{ $componentSections = partial "buildish-ordered-component-pages.html" (dict "page" . "pages" (where .Pages "Kind" "section")) }}{{ end }}
 <div class="td-content">
   <div class="buildish-home-hero">
     <div class="buildish-home-hero__logo" aria-hidden="true">{{ partial "apache-buildish-pipeline-icon.html" (dict "gradientId" "buildish-home-panel") }}</div>
