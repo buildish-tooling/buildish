@@ -14,6 +14,7 @@
 # limitations under the License.
 
 ARG SITE_PIPELINE_BASE_IMAGE=localhost/buildish-site-pipeline:local
+
 FROM ${SITE_PIPELINE_BASE_IMAGE}
 
 ARG NODE_VERSION=24.13.0
@@ -26,32 +27,41 @@ ARG HUGO_VERSION=0.159.1
 ARG HUGO_SHA256_AMD64=cded0ffbc7540c5cee330c2ad24d678a0d4a693e9c590cc05c1d1d5556a21aa4
 ARG HUGO_SHA256_ARM64=210c5e22631fa6a6bad3b6c623f8997a70d2ac306d61ca326d5f31753165779d
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl git make xz-utils \
-    && rm -rf /var/lib/apt/lists/*
+USER root
 
 RUN set -eux; \
+    : "Install base OS packages required by the derived site builder."; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends curl git make xz-utils; \
+    rm -rf /var/lib/apt/lists/*; \
+    : "Resolve architecture-specific download targets and checksums."; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
       amd64) node_arch='x64'; node_sha="$NODE_SHA256_AMD64"; go_arch='amd64'; go_sha="$GO_SHA256_AMD64"; hugo_arch='amd64'; hugo_sha="$HUGO_SHA256_AMD64" ;; \
       arm64) node_arch='arm64'; node_sha="$NODE_SHA256_ARM64"; go_arch='arm64'; go_sha="$GO_SHA256_ARM64"; hugo_arch='arm64'; hugo_sha="$HUGO_SHA256_ARM64" ;; \
       *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
     esac; \
+    : "Install Node.js."; \
     curl -fsSLo /tmp/node.tar.xz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
     echo "${node_sha}  /tmp/node.tar.xz" | sha256sum -c -; \
     tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1; \
     rm -f /tmp/node.tar.xz; \
+    : "Install Go."; \
     curl -fsSLo /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-${go_arch}.tar.gz"; \
     echo "${go_sha}  /tmp/go.tar.gz" | sha256sum -c -; \
     tar -xzf /tmp/go.tar.gz -C /usr/local; \
     ln -sf /usr/local/go/bin/go /usr/local/bin/go; \
     ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt; \
     rm -f /tmp/go.tar.gz; \
+    : "Install Hugo."; \
     curl -fsSLo /tmp/hugo.tar.gz "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-${hugo_arch}.tar.gz"; \
     echo "${hugo_sha}  /tmp/hugo.tar.gz" | sha256sum -c -; \
     tar -xzf /tmp/hugo.tar.gz -C /usr/local/bin hugo; \
     rm -f /tmp/hugo.tar.gz; \
+    : "Verify the derived site builder toolchain."; \
     node --version; npm --version; go version; hugo version; uv --version
+
+USER site-pipeline
 
 ENTRYPOINT []
 CMD ["bash"]

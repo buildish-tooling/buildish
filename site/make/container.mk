@@ -156,19 +156,32 @@ CONTAINER_PREPARE_SITE_ENV = \
 	set -euo pipefail; \
 	scratch="$$(mktemp -d "$(CONTAINER_SCRATCH_ROOT)/run.XXXXXX")"; \
 	chmod 0700 "$$scratch"; \
-	node_root="$$scratch/node-work"; \
-	tool_bin="$$scratch/tool-bin"; \
+	node_root="$(CONTAINER_HOME)/node-work"; \
+	tool_bin="$(CONTAINER_HOME)/tool-bin"; \
+	node_inputs_hash_file="$$node_root/.buildish-node-inputs.sha256"; \
+	current_node_inputs_hash="$$(cat package.json package-lock.json | sha256sum)"; \
 	printf "==> [container] using scratch directory %s\\n" "$$scratch"; \
-	mkdir -p "$$scratch/uv-cache" "$$scratch/npm-cache" "$$node_root" "$$tool_bin"; \
+	mkdir -p "$$scratch/uv-cache" "$$node_root" "$$tool_bin" "$(CONTAINER_HOME)/.cache/npm"; \
 	trap "printf \"==> [container] cleaning scratch directory %s\\n\" \"$$scratch\"; rm -rf \"$$scratch\"" EXIT; \
 	export UV_CACHE_DIR="$$scratch/uv-cache"; \
 	export UV_PROJECT_ENVIRONMENT="$$scratch/uv-venv"; \
-	export npm_config_cache="$$scratch/npm-cache"; \
-	printf "==> [container] installing Node dependencies into %s\\n" "$$node_root"; \
-	cp package.json package-lock.json "$$node_root"/; \
-	npm ci --ignore-scripts --prefix "$$node_root"; \
-	cp scripts/container-npx "$$tool_bin/npx"; \
-	chmod 755 "$$tool_bin/npx"; \
+	export npm_config_cache="$(CONTAINER_HOME)/.cache/npm"; \
+	if [ ! -f "$$tool_bin/npx" ] || ! cmp -s scripts/container-npx "$$tool_bin/npx"; then \
+		cp scripts/container-npx "$$tool_bin/npx"; \
+		chmod 755 "$$tool_bin/npx"; \
+	fi; \
+	if [ -f "$$node_inputs_hash_file" ] && [ "$$(cat "$$node_inputs_hash_file")" = "$$current_node_inputs_hash" ] \
+		&& [ -x "$$node_root/node_modules/.bin/postcss" ] \
+		&& [ -f "$$node_root/node_modules/jquery/dist/jquery.min.js" ] \
+		&& [ -f "$$node_root/node_modules/mermaid/dist/mermaid.min.js" ] \
+		&& [ -f "$$node_root/node_modules/lunr/lunr.min.js" ]; then \
+		printf "==> [container] reusing cached Node dependencies from %s\\n" "$$node_root"; \
+	else \
+		printf "==> [container] syncing Node dependencies into %s\\n" "$$node_root"; \
+		cp package.json package-lock.json "$$node_root"/; \
+		npm ci --ignore-scripts --prefix "$$node_root"; \
+		printf "%s\\n" "$$current_node_inputs_hash" > "$$node_inputs_hash_file"; \
+	fi; \
 	export PATH="$$tool_bin:$$node_root/node_modules/.bin:$$PATH"; \
 	export NODE_PATH="$$node_root/node_modules"; \
 	export NODE_MODULES_DIR="$$node_root/node_modules"

@@ -148,6 +148,11 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 r"""
                 #!/usr/bin/env sh
                 set -eu
+                args="$*"
+                if [ -n "${BUILDISH_FAKE_NPM_LOG:-}" ]; then
+                  mkdir -p "$(dirname "$BUILDISH_FAKE_NPM_LOG")"
+                  printf '%s\n' "$args" >> "$BUILDISH_FAKE_NPM_LOG"
+                fi
                 prefix=.
                 while [ "$#" -gt 0 ]; do
                   if [ "$1" = "--prefix" ]; then
@@ -303,13 +308,19 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                     if command is None:
                         sys.exit(1)
 
+                    def translate_container_path(path_value: str) -> str:
+                        for container_root, host_root in volume_map.items():
+                            if path_value == container_root or path_value.startswith(container_root + '/'):
+                                suffix = path_value[len(container_root) :].lstrip('/')
+                                return str(Path(host_root) / suffix)
+                        return path_value
+
                     cwd = os.environ.get('BUILDISH_FAKE_CONTAINER_CWD', os.getcwd())
                     if workdir is not None:
-                        for container_root, host_root in volume_map.items():
-                            if workdir == container_root or workdir.startswith(container_root + '/'):
-                                suffix = workdir[len(container_root) :].lstrip('/')
-                                cwd = str(Path(host_root) / suffix)
-                                break
+                        cwd = translate_container_path(workdir)
+
+                    for key, value in list(env.items()):
+                        env[key] = translate_container_path(value)
 
                     proc = subprocess.Popen(command, cwd=cwd, env=env, start_new_session=True)
                     if name is not None:
@@ -363,6 +374,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env["NVM_DIR"] = str(site_root / "build" / "fake-nvm")
         env["BUILDISH_FAKE_HUGO_LOG"] = str(site_root / "build" / "fake-hugo.log")
         env["BUILDISH_FAKE_HUGO_READY"] = str(site_root / "build" / "fake-hugo.ready")
+        env["BUILDISH_FAKE_NPM_LOG"] = str(site_root / "build" / "fake-npm.log")
         env["BUILDISH_FAKE_CONTAINER_LOG"] = str(site_root / "build" / "fake-container.log")
         env["BUILDISH_FAKE_CONTAINER_STATE_DIR"] = str(site_root / "build" / "fake-container-state")
         env["BUILDISH_FAKE_CONTAINER_CWD"] = str(site_root)
@@ -524,12 +536,31 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         )
         self.assert_contains_all(self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"])), "--source .", "--config hugo.yaml")
 
+    def test_repo_root_make_build_delegates_to_site_makefile(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
+        env = self.base_env(repo_root / "site", bin_dir)
+        env["CONTAINER_ENGINE"] = "fake-container-engine"
+        env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
+        env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
+
+        result = self.run_make(repo_root, "build", env)
+
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assert_paths_exist(
+            repo_root / "site" / ".stage" / "manifest.json",
+            repo_root / "site" / ".public" / "index.html",
+        )
+        self.assert_contains_all(self.read_text(repo_root / "site" / "build" / "fake-container.log"), "run", "--init")
+
     def test_make_stage_uses_containerized_path_and_stages_vendor_assets(self) -> None:
         repo_root = self.prepare_fixture_workspace()
         bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True)
         env = self.base_env(repo_root / "site", bin_dir)
         env["CONTAINER_ENGINE"] = "fake-container-engine"
         env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
         result = self.run_make(repo_root / "site", "stage", env)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
@@ -547,7 +578,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             "run",
             "--init",
             "/workspace/buildish/site",
-            "HOME=/workspace/buildish/site/build/.container-home",
+            f"HOME={env['CONTAINER_HOME']}",
         )
 
     def test_make_build_uses_containerized_path_and_exposes_postcss_to_hugo_via_npx(self) -> None:
@@ -563,6 +594,46 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assert_paths_exist(repo_root / "site" / ".stage" / "manifest.json", repo_root / "site" / ".public" / "index.html")
         self.assert_contains_all(self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"])), "--source .", "--config hugo.yaml")
+
+    def test_make_build_reuses_cached_container_node_dependencies_when_inputs_are_unchanged(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
+        env = self.base_env(repo_root / "site", bin_dir)
+        env["CONTAINER_ENGINE"] = "fake-container-engine"
+        env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
+        env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
+
+        first_result = self.run_make(repo_root / "site", "build", env)
+        second_result = self.run_make(repo_root / "site", "build", env)
+
+        self.assertEqual(0, first_result.returncode, first_result.stdout + first_result.stderr)
+        self.assertEqual(0, second_result.returncode, second_result.stdout + second_result.stderr)
+        npm_invocations = Path(env["BUILDISH_FAKE_NPM_LOG"]).read_text(encoding="utf-8").splitlines()
+        self.assertEqual(1, len(npm_invocations), npm_invocations)
+        self.assertIn("reusing cached Node dependencies", second_result.stdout)
+
+    def test_make_build_reinstalls_cached_container_node_dependencies_after_lockfile_change(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
+        env = self.base_env(repo_root / "site", bin_dir)
+        env["CONTAINER_ENGINE"] = "fake-container-engine"
+        env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
+        env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
+
+        first_result = self.run_make(repo_root / "site", "build", env)
+        self.assertEqual(0, first_result.returncode, first_result.stdout + first_result.stderr)
+
+        package_lock = repo_root / "site" / "package-lock.json"
+        package_lock.write_text(package_lock.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+        second_result = self.run_make(repo_root / "site", "build", env)
+
+        self.assertEqual(0, second_result.returncode, second_result.stdout + second_result.stderr)
+        npm_invocations = Path(env["BUILDISH_FAKE_NPM_LOG"]).read_text(encoding="utf-8").splitlines()
+        self.assertEqual(2, len(npm_invocations), npm_invocations)
+        self.assertIn("syncing Node dependencies", second_result.stdout)
 
     def test_make_render_uses_containerized_path(self) -> None:
         repo_root = self.prepare_fixture_workspace()
@@ -612,11 +683,14 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         self.assert_contains_all(
             result.stdout,
             "Repository maintenance:",
+            "Containerized site workflows:",
             "Local site workflows:",
             "Site-specific help:",
             "rat-check          Run Apache RAT against tracked files in this repository (requires Java 21+).",
             "check              Run the non-container site check gate from the repository root.",
             "build-local        Build the staged contract and full Hugo site with host tools.",
+            "build              Build the staged contract and full Hugo site in the containerized site environment.",
+            "serve              Serve the full Hugo site with automatic restaging in the containerized site environment.",
             "serve-local        Serve the full Hugo site with automatic restaging using host tools.",
             "site-help          Show curated site-specific Make targets from site/Makefile.",
         )
@@ -770,6 +844,29 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         self.assertEqual([], self.root_watch_event_files(site_root))
         self.assert_contains_all(self.read_text(repo_root / "site" / "build" / "fake-container.log"), "run", "--init")
 
+    def test_repo_root_make_serve_delegates_to_site_makefile(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
+        env = self.base_env(repo_root / "site", bin_dir)
+        env["CONTAINER_ENGINE"] = "fake-container-engine"
+        env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
+        env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
+        env["PORT"] = "8770"
+        staged_page = self.mammoth_page_path(repo_root)
+
+        process = self.start_make(repo_root, "serve", env)
+
+        self.wait_for(
+            "repo-root delegated serve readiness",
+            lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(),
+            timeout=CONTAINERIZED_SERVE_READY_TIMEOUT,
+            process=process,
+        )
+        self.wait_for("repo-root delegated serve stage", staged_page.exists, process=process)
+        self.stop_process(process)
+        self.assert_contains_all(self.read_text(repo_root / "site" / "build" / "fake-container.log"), "run", "--init")
+
     def test_make_serve_in_containerized_mode_stops_on_sigint(self) -> None:
         repo_root = self.prepare_fixture_workspace()
         site_root = repo_root / "site"
@@ -809,6 +906,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         env = self.base_env(repo_root / "site", bin_dir)
         env["CONTAINER_ENGINE"] = "fake-container-engine"
         env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
         env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
         env["BUILDISH_FAKE_CONTAINER_STOP_SIGNAL"] = "SIGKILL"
         env["PORT"] = "8769"

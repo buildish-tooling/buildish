@@ -19,6 +19,7 @@ HELP_TARGETS := $(MAKEFILE_LIST)
 SITE_MAKE := $(MAKE) --no-print-directory -C site
 
 .PHONY: \
+	build \
 	build-local \
 	check \
 	clean \
@@ -26,6 +27,7 @@ SITE_MAKE := $(MAKE) --no-print-directory -C site
 	help-all \
 	rat-check \
 	render-local \
+	serve \
 	serve-local \
 	site-help \
 	site-help-all \
@@ -40,6 +42,9 @@ help: ## Show curated repository Make targets.
 	printf "  %-18s %s\n" "rat-check" "Run Apache RAT against tracked files in this repository (requires Java 21+)."; \
 	printf "  %-18s %s\n" "check" "Run the non-container site check gate from the repository root."; \
 	printf "  %-18s %s\n" "clean" "Remove generated site output with host tools."; \
+	printf "\nContainerized site workflows:\n"; \
+	printf "  %-18s %s\n" "build" "Build the staged contract and full Hugo site in the containerized site environment."; \
+	printf "  %-18s %s\n" "serve" "Serve the full Hugo site with automatic restaging in the containerized site environment."; \
 	printf "\nLocal site workflows:\n"; \
 	printf "  %-18s %s\n" "stage-local" "Build the staged site contract with host tools."; \
 	printf "  %-18s %s\n" "stage-watch-local" "Watch sources and rebuild the staged site contract with host tools."; \
@@ -62,6 +67,9 @@ check: ## Run the non-container site check gate from the repository root.
 clean: ## Remove generated site output with host tools.
 	$(SITE_MAKE) clean
 
+build: ## Build the staged contract and full Hugo site in the containerized site environment.
+	$(SITE_MAKE) build
+
 stage-local: ## Build the staged site contract with host tools.
 	$(SITE_MAKE) stage-local
 
@@ -73,6 +81,9 @@ render-local: ## Render the current staged site through Hugo with host tools.
 
 build-local: ## Build the staged contract and full Hugo site with host tools.
 	$(SITE_MAKE) build-local
+
+serve: ## Serve the full Hugo site with automatic restaging in the containerized site environment.
+	$(SITE_MAKE) serve
 
 serve-local: ## Serve the full Hugo site with automatic restaging using host tools.
 	$(SITE_MAKE) serve-local
