@@ -33,6 +33,7 @@ SITE_PIPELINE_LOCAL_BASE_ARGS = \
 	--workspace-root '$(WORKSPACE_ROOT)' \
 	--catalog '$(SITE_PIPELINE_CATALOG)' \
 	$(SITE_PIPELINE_ARGS)
+SITE_PIPELINE_LOCAL_EXEC = PYTHONPATH='$(SITE_PIPELINE_REPO_ROOT)/src' '$(SITE_PIPELINE_BIN)'
 
 define RUN_PIPELINE_MANAGED_COMMAND
 python_cmd='$(PYTHON)'; \
@@ -58,15 +59,21 @@ if [ ! -f '$(SITE_PIPELINE_CATALOG)' ]; then \
 fi
 endef
 
+define RUN_SITE_PIPELINE_LOCAL_READONLY_COMMAND
+	$(call REQUIRE_SITE_PIPELINE_LOCAL); \
+	$(SITE_PIPELINE_LOCAL_EXEC) $(1) $(2) $(SITE_PIPELINE_LOCAL_BASE_ARGS)
+endef
+
 define RUN_SITE_PIPELINE_LOCAL_COMMAND
-$(call REQUIRE_SITE_PIPELINE_LOCAL); \
-rm -rf '$(SITE_STAGE_ROOT)'; \
-PYTHONPATH='$(SITE_PIPELINE_REPO_ROOT)/src' '$(SITE_PIPELINE_BIN)' $(1) $(2) $(SITE_PIPELINE_LOCAL_BASE_ARGS)
+	$(call REQUIRE_SITE_PIPELINE_LOCAL); \
+	rm -rf '$(SITE_STAGE_ROOT)'; \
+	$(SITE_PIPELINE_LOCAL_EXEC) $(1) $(2) $(SITE_PIPELINE_LOCAL_BASE_ARGS)
 endef
 
 .PHONY: \
 	integration-test \
 	pipeline-clean-local \
+	pipeline-component-source-roots-local \
 	pipeline-format \
 	pipeline-lint \
 	pipeline-refresh-local \
@@ -87,6 +94,9 @@ pipeline-site-check-local: sanity-check ## Run site checks with the sibling site
 
 pipeline-watch-local: sanity-check ## Watch sources and refresh staged site inputs with the sibling site-pipeline checkout.
 	@$(call RUN_SITE_PIPELINE_LOCAL_COMMAND,watch,)
+
+pipeline-component-source-roots-local: sanity-check ## Emit effective component source-root locators with the sibling site-pipeline checkout.
+	@$(call RUN_SITE_PIPELINE_LOCAL_READONLY_COMMAND,component-source-roots,)
 
 pipeline-clean-local: sanity-check ## Remove staged site-pipeline output with host tools.
 	rm -rf '$(SITE_STAGE_ROOT)'

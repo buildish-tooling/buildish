@@ -272,6 +272,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
 
                     env = os.environ.copy()
                     i = 1
+                    image = None
                     command = None
                     workdir = None
                     volume_map = {}
@@ -303,11 +304,15 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                         if arg == '--rm' or arg == '--init' or arg.startswith('--userns='):
                             i += 1
                             continue
+                        image = arg
                         command = args[i + 1 :]
                         break
 
                     if command is None:
                         sys.exit(1)
+
+                    if image is not None and 'buildish-site-pipeline' in image:
+                        command = ['site-pipeline', *command]
 
                     def translate_container_path(path_value: str) -> str:
                         for container_root, host_root in volume_map.items():
@@ -487,6 +492,31 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         )
         self.assertFalse((repo_root / "site" / ".stage" / "content" / "components" / "mammoth-cache" / "latest").exists())
 
+    def test_make_pipeline_component_source_roots_local_emits_effective_roots(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        stage_marker = repo_root / "site" / ".stage" / "keep.txt"
+        stage_marker.parent.mkdir(parents=True, exist_ok=True)
+        stage_marker.write_text("keep\n", encoding="utf-8")
+
+        result = self.run_make(
+            repo_root / "site",
+            "pipeline-component-source-roots-local",
+            self.local_env(repo_root / "site"),
+        )
+
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(
+            [
+                "buildish-mammoth-cache",
+                "buildish-no-gradle-wrapper-jar",
+                "buildish/site",
+            ],
+            result.stdout.splitlines(),
+            result.stdout + result.stderr,
+        )
+        self.assertEqual("", result.stderr)
+        self.assertTrue(stage_marker.exists())
+
     def test_make_stage_local_uses_extracted_checkout_instead_of_consumer_snapshot(self) -> None:
         repo_root = self.prepare_fixture_workspace()
         consumer_pyproject = repo_root / "site" / "pipeline" / "pyproject.toml"
@@ -649,37 +679,44 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         self.assert_contains_all(self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"])), "--source .", "--config hugo.yaml")
         self.assert_contains_all(self.read_text(repo_root / "site" / "build" / "fake-container.log"), "run", "--init")
 
-    def test_make_serve_reports_host_side_catalog_parser_failures(self) -> None:
+    def test_make_stage_uses_component_source_roots_for_container_mounts(self) -> None:
         repo_root = self.prepare_fixture_workspace()
-        bin_dir = self.seed_fake_tools(repo_root / "site")
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True)
         self.write_executable(
             bin_dir / "python3",
             text_block(
                 f"""
                 #!/usr/bin/env sh
-                exec {sys.executable} -S "$@"
+                if [ "${{1:-}}" = "-c" ]; then
+                  echo "unexpected direct host python3 -c invocation" >&2
+                  exit 97
+                fi
+                exec {sys.executable} "$@"
                 """
             ),
         )
         env = self.base_env(repo_root / "site", bin_dir)
+        env["CONTAINER_ENGINE"] = "fake-container-engine"
+        env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
+        env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
 
-        result = self.run_make(repo_root / "site", "serve", env)
+        result = self.run_make(repo_root / "site", "stage", env)
 
-        self.assertNotEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        container_log = self.read_text(repo_root / "site" / "build" / "fake-container.log")
         self.assert_contains_all(
-            result.stdout + result.stderr,
-            "host-side catalog parsing for containerized Make targets requires PyYAML",
-            "Install python3-yaml and retry.",
-            "Could not derive component dirs from",
-            "see the error above.",
+            container_log,
+            "localhost/buildish-site-pipeline:local component-source-roots",
+            f"{repo_root.parent / 'buildish-mammoth-cache'}:/workspace/buildish-mammoth-cache:ro",
+            f"{repo_root.parent / 'buildish-no-gradle-wrapper-jar'}:/workspace/buildish-no-gradle-wrapper-jar:ro",
         )
-        self.assertEqual(
-            1,
-            (result.stdout + result.stderr).count(
-                "host-side catalog parsing for containerized Make targets requires PyYAML"
-            ),
-            result.stdout + result.stderr,
+        self.assertNotIn(
+            f"{repo_root / 'site'}:/workspace/buildish/site:ro",
+            container_log,
+            container_log,
         )
+        self.assertNotIn("unexpected direct host python3 -c invocation", result.stdout + result.stderr)
 
     def test_make_help_curates_public_targets(self) -> None:
         repo_root = self.prepare_fixture_workspace()

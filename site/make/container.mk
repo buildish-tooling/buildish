@@ -63,64 +63,58 @@ CONTAINER_CACHE_ENV = \
 	-e npm_config_cache=$(CONTAINER_HOME)/.cache/npm \
 	-e UV_CACHE_DIR=$(CONTAINER_HOME)/.cache/uv
 
-# Derive component sibling-repo directories from catalog.yaml at parse time.
-# localDir entries that contain a '/' point inside the main repo and are already
-# covered by the main-repo mount; they are excluded here. Parsing happens on the
-# host before the container starts, so surface host-side dependency failures.
-CONTAINER_COMPONENT_DIRS_SCRIPT ?= $(CURDIR)/scripts/catalog_component_local_dirs.py
-CONTAINER_COMPONENT_DIRS_PYTHON ?= python3
-_component_local_dirs_cmd = $(CONTAINER_COMPONENT_DIRS_PYTHON) "$(CONTAINER_COMPONENT_DIRS_SCRIPT)" --make "$(CURDIR)/catalog.yaml"
-_component_local_dirs_raw := $(strip $(shell $(_component_local_dirs_cmd)))
-_component_local_dirs_parse_ok := $(filter __BUILDISH_COMPONENT_DIRS_OK__,$(firstword $(_component_local_dirs_raw)))
-_component_local_dirs := $(wordlist 2,$(words $(_component_local_dirs_raw)),$(_component_local_dirs_raw))
-$(if $(_component_local_dirs_parse_ok),,$(error Could not derive component dirs from $(CURDIR)/catalog.yaml; see the error above.))
-CONTAINER_COMPONENT_MOUNTS = $(foreach d,$(_component_local_dirs),\
-	-v $(WORKSPACE_ROOT)/$(d):/workspace/$(d)$(CONTAINER_RO_MOUNT_OPTIONS))
-CONTAINER_WORKSPACE_FLAGS = \
-	-v $(REPO_ROOT):/workspace/$(REPO_NAME)$(CONTAINER_MOUNT_LABEL) \
-	$(CONTAINER_COMPONENT_MOUNTS) \
-	-w $(CONTAINER_SITE_ROOT)
+# Resolve effective component source roots through the stable site-pipeline CLI
+# at runtime so containerized targets do not depend on host-side YAML parsing.
+CONTAINER_COMPONENT_SOURCE_ROOTS_RUN = \
+	'$(CONTAINER_ENGINE)' run --rm \
+	$(CONTAINER_PLATFORM_FLAG) \
+	$(CONTAINER_USERNS_FLAGS) \
+	--user $$(id -u):$$(id -g) \
+	-v '$(REPO_ROOT):$(CONTAINER_WORKSPACE_ROOT)/$(REPO_NAME)$(CONTAINER_MOUNT_LABEL)' \
+	-w '$(CONTAINER_SITE_ROOT)' \
+	'$(SITE_PIPELINE_CONTAINER_IMAGE)' \
+	component-source-roots --workspace-root '$(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG)' --catalog '$(CONTAINER_SITE_PIPELINE_CATALOG_ARG)' $(SITE_PIPELINE_ARGS)
+
+define RESOLVE_CONTAINER_COMPONENT_MOUNTS
+	component_mounts=(); \
+	component_source_roots="$$( $(CONTAINER_COMPONENT_SOURCE_ROOTS_RUN) )"; \
+	while IFS= read -r locator; do \
+		[ -n "$$locator" ] || continue; \
+		if [[ "$$locator" = /* ]]; then \
+			host_path="$$locator"; \
+			container_path="$$locator"; \
+		else \
+			case "$$locator" in \
+				'$(REPO_NAME)'|'$(REPO_NAME)'/*) continue ;; \
+			esac; \
+			host_path='$(WORKSPACE_ROOT)'/"$$locator"; \
+			container_path='$(CONTAINER_WORKSPACE_ROOT)'/"$$locator"; \
+		fi; \
+		if [ ! -e "$$host_path" ]; then \
+			printf "Error: component source root '%s' resolved to missing host path %s\n" "$$locator" "$$host_path" >&2; \
+			exit 1; \
+		fi; \
+		component_mounts+=("-v" "$$host_path:$$container_path$(CONTAINER_RO_MOUNT_OPTIONS)"); \
+	done <<< "$$component_source_roots"; \
+	container_workspace_args=(-v '$(REPO_ROOT):$(CONTAINER_WORKSPACE_ROOT)/$(REPO_NAME)$(CONTAINER_MOUNT_LABEL)' "$${component_mounts[@]}" -w '$(CONTAINER_SITE_ROOT)')
+endef
 
 CONTAINER_RUN_BASE = \
-	$(CONTAINER_ENGINE) run --rm \
+	'$(CONTAINER_ENGINE)' run --rm \
 	--init \
 	$(CONTAINER_PLATFORM_FLAG) \
 	$(CONTAINER_USERNS_FLAGS) \
 	--user $$(id -u):$$(id -g) \
-	$(CONTAINER_CACHE_ENV) \
-	$(CONTAINER_WORKSPACE_FLAGS)
+	$(CONTAINER_CACHE_ENV)
 
-CONTAINER_RUN = \
-	$(CONTAINER_RUN_BASE) \
-	$(CONTAINER_IMAGE)
-
-CONTAINER_MANAGED_RUN = \
-	$(CONTAINER_ENGINE) run --rm \
+CONTAINER_MANAGED_RUN_BASE = \
+	'$(CONTAINER_ENGINE)' run --rm \
 	--name "$$container_name" \
 	--init \
 	$(CONTAINER_PLATFORM_FLAG) \
 	$(CONTAINER_USERNS_FLAGS) \
 	--user $$(id -u):$$(id -g) \
-	$(CONTAINER_CACHE_ENV) \
-	$(CONTAINER_WORKSPACE_FLAGS) \
-	$(CONTAINER_IMAGE)
-
-CONTAINER_SERVE_RUN = \
-	$(CONTAINER_RUN_BASE) \
-	-p 127.0.0.1:$(PORT):$(PORT) \
-	$(CONTAINER_IMAGE)
-
-CONTAINER_MANAGED_SERVE_RUN = \
-	$(CONTAINER_ENGINE) run --rm \
-	--name "$$container_name" \
-	--init \
-	$(CONTAINER_PLATFORM_FLAG) \
-	$(CONTAINER_USERNS_FLAGS) \
-	--user $$(id -u):$$(id -g) \
-	$(CONTAINER_CACHE_ENV) \
-	$(CONTAINER_WORKSPACE_FLAGS) \
-	-p 127.0.0.1:$(PORT):$(PORT) \
-	$(CONTAINER_IMAGE)
+	$(CONTAINER_CACHE_ENV)
 
 PREPARE_CONTAINER_SCRATCH = \
 	mkdir -p '$(HOST_CONTAINER_SCRATCH_ROOT)'; \
@@ -243,13 +237,18 @@ define RUN_MANAGED_CONTAINER
 			$(CONTAINER_ENGINE) stop -t 0 "$$container_name" >/dev/null 2>&1 || true; \
 			wait "$$run_pid" 2>/dev/null || true; \
 		fi; \
-		$(CONTAINER_ENGINE) rm -f "$$container_name" >/dev/null 2>&1 || true; \
-		exit $$status; \
-	}; \
-	trap managed_container_cleanup EXIT INT TERM; \
-	$(2) bash -c '$(3)' & \
-	run_pid=$$!; \
-	wait "$$run_pid" \
+			$(CONTAINER_ENGINE) rm -f "$$container_name" >/dev/null 2>&1 || true; \
+			exit $$status; \
+		}; \
+		trap managed_container_cleanup EXIT INT TERM; \
+		$(RESOLVE_CONTAINER_COMPONENT_MOUNTS); \
+		$(CONTAINER_MANAGED_RUN_BASE) \
+			"$${container_workspace_args[@]}" \
+			$(2) \
+			'$(CONTAINER_IMAGE)' \
+			bash -c '$(3)' & \
+		run_pid=$$!; \
+		wait "$$run_pid" \
 )
 endef
 
@@ -281,7 +280,7 @@ container-engine-check: ## Verify Podman or Docker is available for containerize
 site-pipeline-container-image-ensure: container-engine-check ## Build the generic site-pipeline base image if it is missing locally.
 	@if $(CONTAINER_ENGINE) image inspect $(SITE_PIPELINE_CONTAINER_IMAGE) >/dev/null 2>&1 \
 		&& { [ '$(CONTAINER_ENGINE_BASENAME)' != 'podman' ] && [ '$(CONTAINER_ENGINE_BASENAME)' != 'docker' ] \
-			|| $(CONTAINER_ENGINE) run --rm $(CONTAINER_PLATFORM_FLAG) --entrypoint /bin/bash $(SITE_PIPELINE_CONTAINER_IMAGE) -c 'site-pipeline build --help | grep -q -- --workspace-root' >/dev/null 2>&1; }; then \
+			|| $(CONTAINER_ENGINE) run --rm $(CONTAINER_PLATFORM_FLAG) --entrypoint /bin/bash $(SITE_PIPELINE_CONTAINER_IMAGE) -c 'site-pipeline build --help | grep -q -- --workspace-root && site-pipeline component-source-roots --help >/dev/null' >/dev/null 2>&1; }; then \
 		printf '==> [site-pipeline-image] using existing image %s via %s\n' '$(SITE_PIPELINE_CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
 	else \
 		printf '==> [site-pipeline-image] rebuilding image %s via %s to match the current CLI\n' '$(SITE_PIPELINE_CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
@@ -302,7 +301,7 @@ site-pipeline-container-image: container-engine-check ## Build the generic site-
 container-image-ensure: site-pipeline-container-image-ensure ## Build the site builder image if it is missing locally.
 	@if $(CONTAINER_ENGINE) image inspect $(CONTAINER_IMAGE) >/dev/null 2>&1 \
 		&& { [ '$(CONTAINER_ENGINE_BASENAME)' != 'podman' ] && [ '$(CONTAINER_ENGINE_BASENAME)' != 'docker' ] \
-			|| $(CONTAINER_ENGINE) run --rm $(CONTAINER_PLATFORM_FLAG) --entrypoint /bin/bash $(CONTAINER_IMAGE) -c 'site-pipeline build --help | grep -q -- --workspace-root' >/dev/null 2>&1; }; then \
+			|| $(CONTAINER_ENGINE) run --rm $(CONTAINER_PLATFORM_FLAG) --entrypoint /bin/bash $(CONTAINER_IMAGE) -c 'site-pipeline build --help | grep -q -- --workspace-root && site-pipeline component-source-roots --help >/dev/null' >/dev/null 2>&1; }; then \
 		printf '==> [container-image] using existing image %s via %s\n' '$(CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
 	else \
 		printf '==> [container-image] rebuilding image %s via %s to match the current CLI\n' '$(CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
@@ -319,11 +318,19 @@ container-image: site-pipeline-container-image-ensure ## Build the Buildish-deri
 
 container-test: container-image ## Run the site unit tests inside the build container.
 	@$(PREPARE_CONTAINER_SCRATCH)
-	@$(CONTAINER_RUN) bash -c '$(CONTAINER_TEST_SCRIPT)'
+	@$(RESOLVE_CONTAINER_COMPONENT_MOUNTS); \
+	$(CONTAINER_RUN_BASE) \
+		"$${container_workspace_args[@]}" \
+		'$(CONTAINER_IMAGE)' \
+		bash -c '$(CONTAINER_TEST_SCRIPT)'
 
 container-integration-test: container-image ## Run the fixture integration test inside the build container.
 	@$(PREPARE_CONTAINER_SCRATCH)
-	@$(CONTAINER_RUN) bash -c '$(CONTAINER_INTEGRATION_TEST_SCRIPT)'
+	@$(RESOLVE_CONTAINER_COMPONENT_MOUNTS); \
+	$(CONTAINER_RUN_BASE) \
+		"$${container_workspace_args[@]}" \
+		'$(CONTAINER_IMAGE)' \
+		bash -c '$(CONTAINER_INTEGRATION_TEST_SCRIPT)'
 
 container-check-fast: container-test container-integration-test ## Run the fast containerized verification path for interactive use.
 
@@ -332,28 +339,40 @@ container-site-check: container-image-ensure ## Run the site-pipeline check insi
 	@$(PREPARE_CONTAINER_SCRATCH)
 	@$(PREPARE_CONTAINER_STAGE_OUTPUTS)
 	@printf '==> [container-stage] starting containerized site checks\n'
-	@$(CONTAINER_RUN) bash -c '$(CONTAINER_SITE_CHECK_SCRIPT)'
+	@$(RESOLVE_CONTAINER_COMPONENT_MOUNTS); \
+	$(CONTAINER_RUN_BASE) \
+		"$${container_workspace_args[@]}" \
+		'$(CONTAINER_IMAGE)' \
+		bash -c '$(CONTAINER_SITE_CHECK_SCRIPT)'
 
 container-stage: container-image-ensure ## Build the staged site contract and lightweight Python preview inside the build container.
 	@printf '==> [container-stage] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
 	@$(PREPARE_CONTAINER_SCRATCH)
 	@$(PREPARE_CONTAINER_STAGE_OUTPUTS)
 	@printf '==> [container-stage] starting containerized site staging\n'
-	@$(CONTAINER_RUN) bash -c '$(CONTAINER_STAGE_SCRIPT)'
+	@$(RESOLVE_CONTAINER_COMPONENT_MOUNTS); \
+	$(CONTAINER_RUN_BASE) \
+		"$${container_workspace_args[@]}" \
+		'$(CONTAINER_IMAGE)' \
+		bash -c '$(CONTAINER_STAGE_SCRIPT)'
 
 container-stage-watch: container-image-ensure ## Watch site inputs and rebuild the staged site contract inside the build container.
 	@printf '==> [container-stage-watch] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
 	@$(PREPARE_CONTAINER_SCRATCH)
 	@$(PREPARE_CONTAINER_STAGE_OUTPUTS)
 	@printf '==> [container-stage-watch] starting containerized site watch\n'
-	@$(call RUN_MANAGED_CONTAINER,stage-watch,$(CONTAINER_MANAGED_RUN),$(CONTAINER_STAGE_WATCH_SCRIPT))
+	@$(call RUN_MANAGED_CONTAINER,stage-watch,,$(CONTAINER_STAGE_WATCH_SCRIPT))
 
 container-render: container-image-ensure ## Render the staged site through Hugo inside the build container.
 	@printf '==> [container-render] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
 	@$(PREPARE_CONTAINER_SCRATCH)
 	@rm -f .hugo_build.lock
 	@printf '==> [container-render] starting containerized site render\n'
-	@$(CONTAINER_RUN) bash -c '$(CONTAINER_RENDER_SCRIPT)'
+	@$(RESOLVE_CONTAINER_COMPONENT_MOUNTS); \
+	$(CONTAINER_RUN_BASE) \
+		"$${container_workspace_args[@]}" \
+		'$(CONTAINER_IMAGE)' \
+		bash -c '$(CONTAINER_RENDER_SCRIPT)'
 
 container-build: container-image-ensure ## Build the staged site and Hugo output inside the build container.
 	@printf '==> [container-build] preparing host scratch root %s\n' '$(HOST_CONTAINER_SCRATCH_ROOT)'
@@ -361,7 +380,11 @@ container-build: container-image-ensure ## Build the staged site and Hugo output
 	@$(PREPARE_CONTAINER_STAGE_OUTPUTS)
 	@rm -f .hugo_build.lock
 	@printf '==> [container-build] starting containerized site render\n'
-	@$(CONTAINER_RUN) bash -c '$(CONTAINER_BUILD_SCRIPT)'
+	@$(RESOLVE_CONTAINER_COMPONENT_MOUNTS); \
+	$(CONTAINER_RUN_BASE) \
+		"$${container_workspace_args[@]}" \
+		'$(CONTAINER_IMAGE)' \
+		bash -c '$(CONTAINER_BUILD_SCRIPT)'
 
 container-image-local-registry-test: container-engine-check ## Run the localhost-registry integration test for the builder image.
 	$(MAKE) --no-print-directory -C $(SITE_PIPELINE_REPO_ROOT) \
@@ -382,4 +405,4 @@ container-serve: container-image-ensure ## Serve the staged site with Hugo and a
 	@printf '==> [container-serve] starting containerized site server on http://127.0.0.1:%s/\n' '$(PORT)'
 	@host_container_serve_cleanup() { status=$$?; find '$(WATCH_EVENTS_ROOT)' -maxdepth 1 -type f -name '.watch-events.*.jsonl' -delete; exit $$status; }; \
 	trap host_container_serve_cleanup EXIT INT TERM; \
-	$(call RUN_MANAGED_CONTAINER,serve,$(CONTAINER_MANAGED_SERVE_RUN),$(CONTAINER_SERVE_SCRIPT))
+	$(call RUN_MANAGED_CONTAINER,serve,-p 127.0.0.1:$(PORT):$(PORT),$(CONTAINER_SERVE_SCRIPT))
