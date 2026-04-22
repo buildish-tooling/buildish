@@ -65,14 +65,15 @@ CONTAINER_CACHE_ENV = \
 
 # Derive component sibling-repo directories from catalog.yaml at parse time.
 # localDir entries that contain a '/' point inside the main repo and are already
-# covered by the main-repo mount; they are excluded here.
-# If parsing fails the build stops immediately with a clear error.
-_component_local_dirs := $(shell python3 -c "import yaml; \
-data = yaml.safe_load(open('$(CURDIR)/catalog.yaml')); \
-dirs = [c['localDir'].split('/')[0] for c in data['components'] \
-	        if '/' not in c.get('localDir', '')]; \
-print(' '.join(dirs))" 2>/dev/null)
-$(if $(_component_local_dirs),,$(error Could not parse component dirs from $(CURDIR)/catalog.yaml))
+# covered by the main-repo mount; they are excluded here. Parsing happens on the
+# host before the container starts, so surface host-side dependency failures.
+CONTAINER_COMPONENT_DIRS_SCRIPT ?= $(CURDIR)/scripts/catalog_component_local_dirs.py
+CONTAINER_COMPONENT_DIRS_PYTHON ?= python3
+_component_local_dirs_cmd = $(CONTAINER_COMPONENT_DIRS_PYTHON) "$(CONTAINER_COMPONENT_DIRS_SCRIPT)" --make "$(CURDIR)/catalog.yaml"
+_component_local_dirs_raw := $(strip $(shell $(_component_local_dirs_cmd)))
+_component_local_dirs_parse_ok := $(filter __BUILDISH_COMPONENT_DIRS_OK__,$(firstword $(_component_local_dirs_raw)))
+_component_local_dirs := $(wordlist 2,$(words $(_component_local_dirs_raw)),$(_component_local_dirs_raw))
+$(if $(_component_local_dirs_parse_ok),,$(error Could not derive component dirs from $(CURDIR)/catalog.yaml; see the error above.))
 CONTAINER_COMPONENT_MOUNTS = $(foreach d,$(_component_local_dirs),\
 	-v $(WORKSPACE_ROOT)/$(d):/workspace/$(d)$(CONTAINER_RO_MOUNT_OPTIONS))
 CONTAINER_WORKSPACE_FLAGS = \

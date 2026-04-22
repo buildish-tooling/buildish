@@ -24,6 +24,7 @@
 /resources/
 /node_modules/
 /build/
+__pycache__/
 
 # Local overrides
 /components.local.yaml

@@ -20,6 +20,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import time
 import unittest
 from pathlib import Path
@@ -647,6 +648,38 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assert_contains_all(self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"])), "--source .", "--config hugo.yaml")
         self.assert_contains_all(self.read_text(repo_root / "site" / "build" / "fake-container.log"), "run", "--init")
+
+    def test_make_serve_reports_host_side_catalog_parser_failures(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        bin_dir = self.seed_fake_tools(repo_root / "site")
+        self.write_executable(
+            bin_dir / "python3",
+            text_block(
+                f"""
+                #!/usr/bin/env sh
+                exec {sys.executable} -S "$@"
+                """
+            ),
+        )
+        env = self.base_env(repo_root / "site", bin_dir)
+
+        result = self.run_make(repo_root / "site", "serve", env)
+
+        self.assertNotEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assert_contains_all(
+            result.stdout + result.stderr,
+            "host-side catalog parsing for containerized Make targets requires PyYAML",
+            "Install python3-yaml and retry.",
+            "Could not derive component dirs from",
+            "see the error above.",
+        )
+        self.assertEqual(
+            1,
+            (result.stdout + result.stderr).count(
+                "host-side catalog parsing for containerized Make targets requires PyYAML"
+            ),
+            result.stdout + result.stderr,
+        )
 
     def test_make_help_curates_public_targets(self) -> None:
         repo_root = self.prepare_fixture_workspace()
