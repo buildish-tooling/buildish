@@ -38,6 +38,17 @@
     "ignorePaths": []
   },
 
+  customManagers: [
+    {
+      customType: "regex",
+      fileMatch: ["^\\.github/workflows/.+\\.ya?ml$"],
+      matchStrings: [
+        "BUILDISH_RELEASE_TOOLING_REF: (?<currentDigest>[a-f0-9]{40}) # renovate: datasource=(?<datasource>.+?) depName=(?<depName>.+?)(?: versioning=(?<versioning>.+?))? currentValue=(?<currentValue>.+?)\\s",
+      ],
+      matchStringsStrategy: "any",
+    },
+  ],
+
   packageRules: [
     // Check for updates, do not merge automatically. This rule does effectively nothing, but serves as a
     // reference for the kinds of managers used in Polaris.
