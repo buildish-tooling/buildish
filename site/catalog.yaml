@@ -44,6 +44,11 @@ components:
     weight: 300
     publication:
       mountPath: /components/site-pipeline/
+  - slug: release-tooling
+    localDir: buildish-release-tooling
+    weight: 400
+    publication:
+      mountPath: /components/site-release-tooling/
   - slug: site
     localDir: buildish/site
     weight: 1000
