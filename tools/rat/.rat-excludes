@@ -18,6 +18,7 @@
 build/**
 **/.idea/**
 **/.venv/**
+site/build/**
 site/.stage/**
 site/.preview/**
 site/.public/**

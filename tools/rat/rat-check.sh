@@ -84,4 +84,5 @@ exclude_file="$TOOL_DIR/tools/rat/.rat-excludes"
 java -jar "$rat_jar" \
   --input-include-std HIDDEN_DIR \
   --input-exclude-file "$exclude_file" \
+  --output-style unapproved-licenses \
   -- "$REPO_ROOT"
