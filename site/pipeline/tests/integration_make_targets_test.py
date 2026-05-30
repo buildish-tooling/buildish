@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -521,11 +522,15 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         repo_root = self.prepare_fixture_workspace()
         consumer_pyproject = repo_root / "site" / "pipeline" / "pyproject.toml"
         stale_wheel = "apache_buildish_site_pipeline-0.0.0.dev0+stale-py3-none-any.whl"
+        updated_text, replacements = re.subn(
+            r'apache_buildish_site_pipeline-[^"]+\.whl',
+            stale_wheel,
+            consumer_pyproject.read_text(encoding="utf-8"),
+            count=1,
+        )
+        self.assertEqual(1, replacements)
         consumer_pyproject.write_text(
-            consumer_pyproject.read_text(encoding="utf-8").replace(
-                "apache_buildish_site_pipeline-0.1.0-py3-none-any.whl",
-                stale_wheel,
-            ),
+            updated_text,
             encoding="utf-8",
         )
         snapshots_root = repo_root.parent / "buildish-site-pipeline" / "dist" / "snapshots"

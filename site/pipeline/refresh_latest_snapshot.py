@@ -301,8 +301,11 @@ def _load_latest_wheel_path(manifest_path: Path, snapshot_root: Path) -> Path:
             f"Snapshot manifest not found: {manifest_path}. Run 'make -C ../buildish-site-pipeline publish-snapshot-local'."
         )
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if payload.get("package") != PACKAGE_NAME:
-        raise ValueError(f"Unexpected snapshot package in {manifest_path}: {payload.get('package')!r}")
+    package_name = payload.get("name")
+    if package_name != PACKAGE_NAME:
+        raise ValueError(
+            f"Unexpected snapshot package in {manifest_path}: {package_name!r}"
+        )
     wheel_path_value = payload.get("wheelPath")
     if wheel_path_value is None:
         wheel_name = payload.get("wheel")

@@ -63,7 +63,7 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
         (snapshot_root / "latest.json").write_text(
             json.dumps(
                 {
-                    "package": "apache-buildish-site-pipeline",
+                    "name": "apache-buildish-site-pipeline",
                     "version": "0.1.0.devfixture+gtest",
                     "wheel": wheel_name,
                     "wheelPath": str(wheel_path),
