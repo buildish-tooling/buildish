@@ -24,6 +24,7 @@
 /resources/
 /node_modules/
 /build/
+/static/js/vendor/
 __pycache__/
 
 # Local overrides

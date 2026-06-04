@@ -85,10 +85,10 @@ docsy-check: ## Verify Node/PostCSS tooling for Docsy is available.
 	test -f $(NODE_MODULES_DIR)/lunr/lunr.min.js || { echo "Error: lunr is not available. Run npm install in site/."; exit 1; }
 
 vendor-assets: docsy-check ## Stage local vendor assets required by the renderer.
-	@mkdir -p .stage/static/js/vendor
-	@cp $(NODE_MODULES_DIR)/jquery/dist/jquery.min.js .stage/static/js/vendor/jquery.min.js
-	@cp $(NODE_MODULES_DIR)/mermaid/dist/mermaid.min.js .stage/static/js/vendor/mermaid.min.js
-	@cp $(NODE_MODULES_DIR)/lunr/lunr.min.js .stage/static/js/vendor/lunr.min.js
+	@mkdir -p static/js/vendor
+	@cp $(NODE_MODULES_DIR)/jquery/dist/jquery.min.js static/js/vendor/jquery.min.js
+	@cp $(NODE_MODULES_DIR)/mermaid/dist/mermaid.min.js static/js/vendor/mermaid.min.js
+	@cp $(NODE_MODULES_DIR)/lunr/lunr.min.js static/js/vendor/lunr.min.js
 
 site-check: container-site-check ## Run the 'site-pipeline check' command to validate the configuration and check for broken links in the build container.
 
@@ -99,6 +99,7 @@ stage: container-stage ## Build the staged site contract and lightweight preview
 
 stage-local: sanity-check ## Build the staged site contract and lightweight preview with host tools.
 	$(MAKE) --no-print-directory pipeline-stage-local
+	$(MAKE) --no-print-directory vendor-assets
 
 stage-watch: container-stage-watch ## Watch sources and rebuild the staged site contract only in the build container.
 
@@ -119,7 +120,7 @@ pipeline-core-check: sanity-check ## Run the extracted pipeline repository check
 
 serve: container-serve ## Serve the full Hugo site with automatic restaging in the build container; override PORT=<port> if needed.
 
-serve-local: sanity-check hugo-check docsy-check ## Serve the full Hugo site with automatic restaging using host tools; override PORT=<port> if needed.
+serve-local: sanity-check hugo-check docsy-check vendor-assets ## Serve the full Hugo site with automatic restaging using host tools; override PORT=<port> if needed.
 	@watch_pid=''; events_file=''; \
 	cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; if [ -n "$$events_file" ]; then rm -f "$$events_file"; fi; exit $$status; }; \
 	trap cleanup EXIT INT TERM; \
@@ -132,7 +133,7 @@ serve-local: sanity-check hugo-check docsy-check ## Serve the full Hugo site wit
 
 clean: sanity-check ## Remove generated pipeline and renderer output.
 	$(MAKE) --no-print-directory pipeline-clean-local
-	rm -rf .public .hugo_build.lock resources
+	rm -rf .public .hugo_build.lock resources static/js/vendor
 
 check: ## Run lint, type checks, tests, and build-local.
 	$(MAKE) clean

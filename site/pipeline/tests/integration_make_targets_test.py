@@ -553,6 +553,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             self.mammoth_page_path(repo_root),
             repo_root / "site" / ".public" / "index.html",
             repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache" / "assets" / "images" / "diagram.svg",
+            repo_root / "site" / "static" / "js" / "vendor" / "mermaid.min.js",
         )
         hugo_log = self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"]))
         self.assert_contains_all(hugo_log, "--source .", "--config hugo.yaml")
@@ -604,6 +605,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             repo_root / "site" / ".stage" / "manifest.json",
             self.mammoth_page_path(repo_root),
             repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache" / "assets" / "images" / "diagram.svg",
+            repo_root / "site" / "static" / "js" / "vendor" / "mermaid.min.js",
         )
         components_payload = self.load_json(repo_root / "site" / ".stage" / "data" / "components.json")
         slugs = {item["slug"] for item in components_payload["items"]}
@@ -840,6 +842,11 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         self.wait_for("fake local Hugo server readiness", lambda: Path(env["BUILDISH_FAKE_HUGO_READY"]).exists(), process=process)
         self.wait_for("initial serve-local stage", staged_page.exists, process=process)
         self.wait_for("fake generated resources", generated_resource.exists, process=process)
+        self.wait_for(
+            "serve-local vendor assets",
+            lambda: (site_root / "static" / "js" / "vendor" / "mermaid.min.js").exists(),
+            process=process,
+        )
         self.wait_for(
             "serve-local watch event file under build/",
             lambda: bool(self.build_watch_event_files(site_root)),

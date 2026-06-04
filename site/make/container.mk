@@ -185,6 +185,7 @@ CONTAINER_STAGE_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-stage] running site-pipeline build\\n"; \
 	$(SITE_PIPELINE) build --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
+	make vendor-assets; \
 	printf "==> [container-stage] staged site contract completed\\n"
 
 CONTAINER_SITE_CHECK_SCRIPT = \
@@ -201,6 +202,7 @@ CONTAINER_STAGE_WATCH_SCRIPT = \
 
 CONTAINER_SERVE_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
+	make vendor-assets; \
 	watch_pid=''; events_file=''; \
 	container_serve_cleanup() { status=$$?; if [ -n "$$watch_pid" ] && kill -0 "$$watch_pid" 2>/dev/null; then kill "$$watch_pid" 2>/dev/null || true; wait "$$watch_pid" 2>/dev/null || true; fi; if [ -n "$$events_file" ]; then rm -f "$$events_file"; fi; exit $$status; }; \
 	trap container_serve_cleanup EXIT INT TERM; \
