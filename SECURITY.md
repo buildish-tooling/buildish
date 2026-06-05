@@ -19,3 +19,12 @@ limitations under the License.
 Apache Buildish follows the Apache Software Foundation security process.
 
 Please report suspected security issues to [security@apache.org](mailto:security@apache.org).
+
+## Threat Model
+
+The Buildish project maintains a threat model in
+[site/site/docs/threat-model.md](site/site/docs/threat-model.md). It documents
+security boundaries, in-scope vs. out-of-scope issues, trust assumptions,
+security invariants, and triage guidance — useful both for human
+reviewers handling reports and for automated security tooling that
+consults the model before scanning.
