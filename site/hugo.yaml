@@ -15,7 +15,7 @@
 
 baseURL: https://buildish.apache.org/
 title: Apache Buildish (Incubating)
-languageCode: en-us
+locale: en-us
 enableRobotsTXT: true
 publishDir: .public
 
