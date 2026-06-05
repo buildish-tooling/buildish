@@ -71,13 +71,13 @@ The main generated paths remain:
 For pipeline behavior, workspace semantics, and the reusable component contract,
 use the `site-pipeline` docs:
 
-- [Site Pipeline docs index](/components/site-pipeline/development/docs/)
-- [Site Pipeline overview](/components/site-pipeline/development/docs/site-pipeline/)
-- [Site component contract](/components/site-pipeline/development/docs/site-component-contract/)
-- [Consumer workspace and CI model](/components/site-pipeline/development/docs/workspace-and-ci-model/)
-- [Design principles and future evolution](/components/site-pipeline/development/docs/design-principles/)
-- [Adoption guide](/components/site-pipeline/development/docs/adoption-guide/)
-- [Workspace examples](/components/site-pipeline/development/docs/examples/)
+- [Site Pipeline docs index](/components/site-pipeline/development/)
+- [Site Pipeline overview](/components/site-pipeline/)
+- [Staged output contract](/components/site-pipeline/development/reference/staged-output-contract/)
+- [API contract](/components/site-pipeline/development/reference/api-contract/)
+- [Flexible component publication](/components/site-pipeline/development/reference/flexible-component-publication/)
+- [Validation and check](/components/site-pipeline/development/reference/validation-and-check/)
+- [Hugo integration guide](/components/site-pipeline/how-to/integrate-with-hugo/)
 
 ## Buildish-specific notes
 

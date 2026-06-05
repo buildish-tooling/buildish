@@ -22,12 +22,12 @@ infrastructure for Apache Buildish.
 Use the local docs for Buildish-specific rendering, container, and workflow
 notes:
 
-- [Buildish Site docs](/components/site/development/docs/)
+- [Buildish Site docs](development/)
 
 For the canonical reusable pipeline docs, use the dedicated `site-pipeline`
 component:
 
-- [Site Pipeline docs](/components/site-pipeline/development/docs/)
-- [Site Pipeline overview](/components/site-pipeline/development/docs/site-pipeline/)
-- [Site component contract](/components/site-pipeline/development/docs/site-component-contract/)
-- [Consumer workspace and CI model](/components/site-pipeline/development/docs/workspace-and-ci-model/)
+- [Site Pipeline docs](/components/site-pipeline/development/)
+- [Site Pipeline overview](/components/site-pipeline/)
+- [Site Pipeline reference](/components/site-pipeline/development/reference/)
+- [Flexible component publication](/components/site-pipeline/development/reference/flexible-component-publication/)

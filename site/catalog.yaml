@@ -58,3 +58,9 @@ validation:
   linkChecks:
     enabled: true
     mode: directory
+    # Relative links are always checked. Root-absolute links are opt-in because
+    # they may point outside the staged route inventory; Buildish treats
+    # /components/ links as internal cross-component links and validates them.
+    checkRootAbsolute: true
+    internalPrefixes:
+      - /components/
