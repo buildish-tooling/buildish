@@ -68,8 +68,19 @@ limitations under the License.
 {{ end -}}
 
 {{ if index $componentContext "enabled" -}}
-  {{ with index $componentContext "component" -}}
-    {{ with $.Site.GetPage (printf "/components/%s" (index . "slug")) -}}
+  {{ $componentSidebarRoot := "" -}}
+  {{ with index $componentContext "componentPath" -}}
+    {{ $componentSidebarRoot = strings.TrimSuffix "/" . -}}
+  {{ end -}}
+  {{ if not $componentSidebarRoot -}}
+    {{ with index $componentContext "component" -}}
+      {{ with index . "slug" -}}
+      {{ $componentSidebarRoot = printf "/components/%s" . -}}
+      {{ end -}}
+    {{ end -}}
+  {{ end -}}
+  {{ with $componentSidebarRoot -}}
+    {{ with $.Site.GetPage . -}}
       {{ $sidebarRoot = . -}}
       {{ $skipRootSection = true -}}
     {{ end -}}

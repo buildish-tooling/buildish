@@ -44,7 +44,7 @@ limitations under the License.
     {{- end -}}
   {{- end -}}
   {{- /* Development label: old pipeline injected this; new pipeline does not. Default "Development". */ -}}
-  {{- $developmentLabel := "Development" -}}
+  {{- $developmentLabel := "Developer Docs (unreleased)" -}}
   {{- with index $component "developmentLabel" }}{{ $developmentLabel = . }}{{ end -}}
 
   {{- /* Collect release data.
@@ -76,10 +76,51 @@ limitations under the License.
 
   {{- $docsItems := slice -}}
   {{- if $componentPath -}}
-    {{- $docsItems = $docsItems | append (dict "label" "Overview" "href" $componentPath) -}}
+    {{- $docsItems = $docsItems | append (dict "label" "Overview" "href" $componentPath "kind" "overview") -}}
+  {{- end -}}
+  {{- $releaseDocEntries := slice -}}
+  {{- $componentSlug := index $component "slug" -}}
+  {{- if $componentSlug -}}
+  {{- with index hugo.Data "routes" -}}
+  {{- with index . "items" -}}
+  {{- range $route := . -}}
+  {{- if and
+    (eq (index $route "componentSlug") $componentSlug)
+    (eq (index $route "routeKind") "context")
+    (eq (index $route "section") "released")
+    (index $route "path")
+  -}}
+  {{- $version := "" -}}
+  {{- with index $route "version" }}{{ $version = printf "%v" . }}{{ end -}}
+  {{- if not $version -}}
+  {{- with index $route "targetId" -}}
+  {{- $targetParts := split . ":" -}}
+  {{- $version = index $targetParts (sub (len $targetParts) 1) -}}
+  {{- end -}}
+  {{- end -}}
+  {{- $label := $version -}}
+  {{- if and $latestStableVersion (eq $version $latestStableVersion) -}}
+  {{- $label = printf "%s (latest)" $version -}}
+  {{- end -}}
+  {{- if $label -}}
+  {{- $releaseDocEntries = $releaseDocEntries | append (dict
+    "label" $label
+    "href" (index $route "path")
+    "kind" "release"
+    "version" $version
+    "orderKey" (printf "%s:%s" $version (index $route "path"))
+  ) -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- range sort $releaseDocEntries "orderKey" "desc" -}}
+    {{- $docsItems = $docsItems | append . -}}
   {{- end -}}
   {{- if $docsPath -}}
-    {{- $docsItems = $docsItems | append (dict "label" $developmentLabel "href" $docsPath) -}}
+    {{- $docsItems = $docsItems | append (dict "label" $developmentLabel "href" $docsPath "kind" "development") -}}
   {{- end -}}
 
   {{- $releaseAnchor := "" -}}
