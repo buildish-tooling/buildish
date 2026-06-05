@@ -482,7 +482,8 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
 
     def test_make_stage_local_builds_fixture_workspace(self) -> None:
         repo_root = self.prepare_fixture_workspace()
-        result = self.run_make(repo_root / "site", "stage-local", self.local_env(repo_root / "site"))
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_native_docsy=True)
+        result = self.run_make(repo_root / "site", "stage-local", self.base_env(repo_root / "site", bin_dir))
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assert_paths_exist(
             repo_root / "site" / ".stage" / "manifest.json",
@@ -510,6 +511,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             [
                 "buildish-mammoth-cache",
                 "buildish-no-gradle-wrapper-jar",
+                "buildish-site-pipeline",
                 "buildish/site",
             ],
             result.stdout.splitlines(),
@@ -520,6 +522,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
 
     def test_make_stage_local_uses_extracted_checkout_instead_of_consumer_snapshot(self) -> None:
         repo_root = self.prepare_fixture_workspace()
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_native_docsy=True)
         consumer_pyproject = repo_root / "site" / "pipeline" / "pyproject.toml"
         stale_wheel = "apache_buildish_site_pipeline-0.0.0.dev0+stale-py3-none-any.whl"
         updated_text, replacements = re.subn(
@@ -536,7 +539,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         snapshots_root = repo_root.parent / "buildish-site-pipeline" / "dist" / "snapshots"
         shutil.rmtree(snapshots_root, ignore_errors=True)
 
-        result = self.run_make(repo_root / "site", "stage-local", self.local_env(repo_root / "site"))
+        result = self.run_make(repo_root / "site", "stage-local", self.base_env(repo_root / "site", bin_dir))
 
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertIn(stale_wheel, consumer_pyproject.read_text(encoding="utf-8"))

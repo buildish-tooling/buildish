@@ -56,6 +56,7 @@ fully endorsed by the ASF.
 FIXTURE_COMPONENTS = [
     {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
     {"slug": "no-gradle-wrapper-jar", "localDir": "buildish-no-gradle-wrapper-jar", "weight": 5},
+    {"slug": "site-pipeline", "localDir": "buildish-site-pipeline", "weight": 10},
     {"slug": "site", "localDir": "buildish/site", "weight": 100},
 ]
 
@@ -210,6 +211,41 @@ def seed_api_fixture_main_repo(repo_root: Path) -> None:
     write_fixture_catalog(site_root)
 
 
+def seed_site_pipeline_fixture(repo_root: Path) -> None:
+    """Seed the Site Pipeline routes linked by copied Buildish site content."""
+
+    write_files(
+        repo_root,
+        {
+            "site/component.yaml": text_block(
+                """
+                schemaVersion: 1
+                component:
+                  slug: site-pipeline
+                  displayName: Site Pipeline
+                content:
+                  pagesRoot: site/pages
+                  docsRoot: docs
+                """
+            ),
+            "site/pages/_index.md": "# Site Pipeline\n\nFixture Site Pipeline overview.\n",
+            "site/pages/how-to/integrate-with-hugo.md": (
+                "# Integrate with Hugo\n\nFixture Hugo integration guide.\n"
+            ),
+            "docs/_index.md": "# Site Pipeline development docs\n\nFixture docs index.\n",
+            "docs/reference/_index.md": "# Reference\n\nFixture reference index.\n",
+            "docs/reference/api-contract.md": "# API contract\n\nFixture API contract.\n",
+            "docs/reference/flexible-component-publication.md": (
+                "# Flexible component publication\n\nFixture publication reference.\n"
+            ),
+            "docs/reference/staged-output-contract.md": (
+                "# Staged output contract\n\nFixture staged output reference.\n"
+            ),
+            "docs/reference/validation-and-check.md": "# Validation and check\n\nFixture validation reference.\n",
+        },
+    )
+
+
 def seed_make_fixture_main_repo(repo_root: Path) -> None:
     """Seed the richer main-repo inputs needed by Make-target integration tests."""
 
@@ -234,6 +270,7 @@ def seed_make_fixture_main_repo(repo_root: Path) -> None:
     for relative in SITE_ROOT_FILES:
         shutil.copy2(SOURCE_REPO_ROOT / "site" / relative, site_root / relative)
     write_fixture_catalog(site_root)
+    seed_site_pipeline_fixture(repo_root.parent / "buildish-site-pipeline")
 
 
 def rewrite_snapshot_manifest(snapshot_root: Path) -> None:

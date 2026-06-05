@@ -27,6 +27,7 @@ from test_support import (
     seed_api_fixture_main_repo,
     seed_mammoth_fixture,
     seed_no_wrapper_fixture,
+    seed_site_pipeline_fixture,
     text_block,
 )
 
@@ -78,6 +79,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                 """
             ),
         )
+        seed_site_pipeline_fixture(workspace / "buildish-site-pipeline")
         return repo_root
 
     @staticmethod
@@ -113,7 +115,7 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
 
             components_payload = self.load_json(repo_root / "site" / ".stage" / "data" / "components.json")
             slugs = {item["slug"] for item in components_payload["items"]}
-            self.assertEqual({"mammoth-cache", "no-gradle-wrapper-jar", "site"}, slugs)
+            self.assertEqual({"mammoth-cache", "no-gradle-wrapper-jar", "site", "site-pipeline"}, slugs)
             mammoth = next(item for item in components_payload["items"] if item["slug"] == "mammoth-cache")
             self.assertEqual("/components/mammoth-cache/", mammoth["publication"]["paths"]["component"])
 

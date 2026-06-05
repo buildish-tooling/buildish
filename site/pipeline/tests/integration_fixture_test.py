@@ -26,6 +26,7 @@ from test_support import (
     seed_api_fixture_main_repo,
     seed_mammoth_fixture,
     seed_no_wrapper_fixture,
+    seed_site_pipeline_fixture,
     text_block,
 )
 
@@ -101,6 +102,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
 
             self.seed_mammoth_fixture(workspace / "buildish-mammoth-cache")
             self.seed_no_wrapper_fixture(workspace / "buildish-no-gradle-wrapper-jar")
+            seed_site_pipeline_fixture(workspace / "buildish-site-pipeline")
 
             first_result = self.run_pipeline_build(repo_root)
             second_result = self.run_pipeline_build(repo_root)
@@ -140,7 +142,7 @@ class SiteFixtureIntegrationTest(TestCaseHelpers, unittest.TestCase):
             component_items = self.load_json(data_root / "components.json")["items"]
             components = {item["slug"]: item for item in component_items}
             self.assertEqual(
-                {"mammoth-cache", "no-gradle-wrapper-jar", "site"},
+                {"mammoth-cache", "no-gradle-wrapper-jar", "site", "site-pipeline"},
                 set(components),
             )
             self.assertEqual(
