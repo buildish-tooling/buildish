@@ -1,0 +1,80 @@
+{{/*
+Copyright 2026 The Apache Software Foundation
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{ $page := .page -}}
+{{ $componentContext := .componentContext | default dict -}}
+{{ $version := dict -}}
+{{ with $page.Params.pipeline }}{{ with index . "page" }}{{ with index . "version" }}{{ $version = . }}{{ end }}{{ end }}{{ end -}}
+{{ $kind := "" -}}
+{{ with index $version "kind" }}{{ $kind = printf "%v" . }}{{ end -}}
+{{ if $kind -}}
+{{ $componentName := "" -}}
+{{ with index $componentContext "component" }}{{ with index . "displayName" }}{{ $componentName = . }}{{ else }}{{ with index . "slug" }}{{ $componentName = . }}{{ end }}{{ end }}{{ end -}}
+{{ $componentHref := "" -}}
+{{ with index $componentContext "componentPath" }}{{ $componentHref = . }}{{ end -}}
+{{ if not $componentHref -}}
+{{ with index $componentContext "component" }}{{ with index . "slug" }}{{ $componentHref = printf "/components/%s/" . }}{{ end }}{{ end -}}
+{{ end -}}
+{{ $label := "" -}}
+{{ with index $version "label" }}{{ $label = printf "%v" . }}{{ end -}}
+{{ $publicationState := "" -}}
+{{ with index $version "publicationState" }}{{ $publicationState = lower (printf "%v" .) }}{{ end -}}
+{{ $supportStatus := "" -}}
+{{ with index $version "supportStatus" }}{{ $supportStatus = lower (printf "%v" .) }}{{ end -}}
+{{ $maintenancePhase := "" -}}
+{{ with index $version "supportWindow" }}{{ with index . "maintenancePhase" }}{{ $maintenancePhase = lower (printf "%v" .) }}{{ end }}{{ end -}}
+{{ if not $supportStatus -}}
+{{ with index $version "releaseLine" }}{{ with index . "supportStatus" }}{{ $supportStatus = lower (printf "%v" .) }}{{ end }}{{ with index . "supportWindow" }}{{ with index . "maintenancePhase" }}{{ $maintenancePhase = lower (printf "%v" .) }}{{ end }}{{ end }}{{ end -}}
+{{ end -}}
+{{ $contextTitle := $label -}}
+{{ $contextNote := "" -}}
+{{ $contextClass := "" -}}
+{{ if eq $kind "development" -}}
+{{ $contextTitle = "Developer Docs (unreleased)" -}}
+{{ $contextNote = "Not ASF release documentation" -}}
+{{ $contextClass = "is-warning" -}}
+{{ else if eq $kind "candidate" -}}
+{{ $contextTitle = printf "Release Candidate %s" $label -}}
+{{ $contextNote = "Not final release documentation" -}}
+{{ $contextClass = "is-warning" -}}
+{{ else if eq $kind "released" -}}
+{{ $contextTitle = printf "Release %s Docs" $label -}}
+{{ if or (eq $publicationState "withdrawn") (eq $publicationState "tombstoned") -}}
+{{ $contextNote = printf "Marked %s" $publicationState -}}
+{{ $contextClass = "is-danger" -}}
+{{ else if or (in (slice "eol" "end-of-life" "end_of_life" "unsupported" "retired") $supportStatus) (in (slice "eol" "end-of-life" "end_of_life" "unsupported" "retired") $maintenancePhase) -}}
+{{ $contextNote = "No longer maintained" -}}
+{{ $contextClass = "is-danger" -}}
+{{ else if or (in (slice "security-only" "security-fix-only" "security-fixes" "security") $supportStatus) (in (slice "security-only" "security-fix-only" "security-fixes" "security") $maintenancePhase) -}}
+{{ $contextNote = "Limited maintenance" -}}
+{{ $contextClass = "is-warning" -}}
+{{ else -}}
+{{ $contextNote = "ASF release documentation" -}}
+{{ end -}}
+{{ end -}}
+<div class="buildish-sidebar-context {{ $contextClass }}">
+{{ if and $componentName $componentHref -}}
+<a class="buildish-sidebar-context__component-link" href="{{ $componentHref }}">Back to {{ $componentName }}</a>
+{{ else -}}
+{{ with $componentName -}}
+<div class="buildish-sidebar-context__component">{{ . }}</div>
+{{ end -}}
+{{ end -}}
+<div class="buildish-sidebar-context__version">
+<div class="buildish-sidebar-context__title">{{ $contextTitle }}</div>
+{{ with $contextNote }}<div class="buildish-sidebar-context__note">{{ . }}</div>{{ end }}
+</div>
+</div>
+{{ end -}}

@@ -29,6 +29,9 @@ limitations under the License.
 {{ $navRoot := cond (and (ne .Params.toc_root true) (eq .Site.Home.Type "docs")) .Site.Home .FirstSection -}}
 {{ $componentContext := partial "buildish-component-context.html" . -}}
 {{ $skipRootSection := false -}}
+{{ $excludeVersionedRoots := false -}}
+{{ $versionContext := dict -}}
+{{ with .Params.pipeline }}{{ with index . "page" }}{{ with index . "version" }}{{ $versionContext = . }}{{ end }}{{ end }}{{ end -}}
 {{ if .Site.Params.ui.sidebar_root_enabled -}}
   {{ if and .IsSection (eq .Params.sidebar_root_for "self") -}}
     {{ $sidebarRoot = . -}}
@@ -69,6 +72,10 @@ limitations under the License.
 
 {{ if index $componentContext "enabled" -}}
   {{ $componentSidebarRoot := "" -}}
+  {{ $versionSidebarRoot := "" -}}
+  {{ with index $versionContext "docsPath" -}}
+    {{ $versionSidebarRoot = strings.TrimSuffix "/" . -}}
+  {{ end -}}
   {{ with index $componentContext "componentPath" -}}
     {{ $componentSidebarRoot = strings.TrimSuffix "/" . -}}
   {{ end -}}
@@ -79,10 +86,16 @@ limitations under the License.
       {{ end -}}
     {{ end -}}
   {{ end -}}
-  {{ with $componentSidebarRoot -}}
+  {{ with $versionSidebarRoot -}}
+    {{ with $.Site.GetPage . -}}
+      {{ $sidebarRoot = . -}}
+      {{ $skipRootSection = false -}}
+    {{ end -}}
+  {{ else with $componentSidebarRoot -}}
     {{ with $.Site.GetPage . -}}
       {{ $sidebarRoot = . -}}
       {{ $skipRootSection = true -}}
+      {{ $excludeVersionedRoots = true -}}
     {{ end -}}
   {{ end -}}
 {{ end -}}
@@ -94,6 +107,8 @@ limitations under the License.
     "sidebarRoot" $sidebarRoot
     "sidebarRootID" $sidebarRootID
     "skipRootSection" $skipRootSection
+    "excludeVersionedRoots" $excludeVersionedRoots
+    "componentContext" $componentContext
 -}}
 {{ if $cacheSidebar -}}
   {{ $mid := printf "m-%s" (.RelPermalink | anchorize | safeJS) }}
