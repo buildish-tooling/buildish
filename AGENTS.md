@@ -41,3 +41,9 @@ scoped to rules that should apply across code, tests, docs, and release work.
 
 The embedded Buildish web site component lives under `site/site/` and has its
 own scoped instructions in `site/site/AGENTS.md`.
+
+## Site Publication Policy
+
+For Buildish site content, follow `site/site/AGENTS.md`. In particular,
+`development/` routes are unreleased documentation and must not be presented as
+latest, stable, current, release docs, or generic docs.

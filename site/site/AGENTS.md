@@ -50,9 +50,15 @@ Use relative pretty-route links within this component:
 Static pages in `pages/` publish at `/components/site/`:
 
 - Keep links between static pages relative.
-- When a static page links to this component's version-specific docs, use a
-  relative route such as `development/` from `pages/_index.md` or
-  `../development/` from a non-index static page.
+- Treat `development/` routes as unreleased, in-development documentation.
+- Link to `development/` only when the link text or surrounding prose clearly
+  identifies the target as unreleased development documentation.
+- Do not label `development/` links as `latest`, `current`, `stable`, `release
+  docs`, or generic `docs`.
+- Public/static pages may link to `development/` before the first ASF release
+  only when no released docs target exists.
+- After the first ASF release, public/static pages must link to released docs
+  or release-derived aliases instead of `development/`.
 
 Docs in `docs/` publish under the moving development route and may later be
 copied under a release-version route:
@@ -62,6 +68,8 @@ copied under a release-version route:
 - From a non-index docs page, link to a sibling as `../sibling/`.
 - Avoid root-absolute component links inside `docs/`; they hard-code the current
   development publication location and will not survive release-version copies.
+- Do not link from release-version docs to `development/`; released docs must
+  link to released docs or release-derived aliases.
 
 Links to another component may use that component's public catalog mount path,
 for example `/components/site-pipeline/`.
