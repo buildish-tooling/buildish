@@ -87,7 +87,7 @@ module:
   proxy: "https://proxy.golang.org,direct"
   hugoVersion:
     extended: true
-    min: 0.155.3
+    min: 0.158.0
   imports:
     - path: github.com/google/docsy
       disable: false
