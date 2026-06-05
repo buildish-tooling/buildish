@@ -13,16 +13,30 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Render a generated component-aware link.
+
+Use this when the target is owned by site-pipeline metadata: component overview,
+development docs, release docs, or source repository. Use buildish-button when
+the page author knows the exact authored relative link target.
+*/}}
+
+{{/* Resolve the current staged component context. */}}
 {{- $componentContext := partial "buildish-component-context.html" .Page -}}
 {{- $component := index $componentContext "component" -}}
 {{- if not $component -}}
   {{- errorf "%q shortcode requires sitePipelineComponent context on %s" .Name .Page.RelPermalink -}}
 {{- end -}}
+
+{{/* Publication paths are emitted under component.paths in old data and
+     component.publication.paths in current data. Support both shapes. */}}
 {{- $paths := dict -}}
 {{- with index $component "paths" }}{{ $paths = . }}{{ end -}}
 {{- if eq (len $paths) 0 -}}
   {{- with index $component "publication" }}{{ with index . "paths" }}{{ $paths = . }}{{ end }}{{ end -}}
 {{- end -}}
+
+{{/* Parse common attributes. */}}
 {{- $kind := "docs" -}}
 {{- with .Get "kind" }}{{ $kind = lower (printf "%v" .) }}{{ end -}}
 {{- $appearance := "link" -}}
@@ -35,6 +49,8 @@ limitations under the License.
 {{- $componentSlug := index $component "slug" -}}
 {{- $developmentLabel := "Developer Docs (unreleased)" -}}
 {{- with index $component "developmentLabel" }}{{ $developmentLabel = . }}{{ end -}}
+
+{{/* Collect release metadata for kind="docs" and kind="release". */}}
 {{- $latestStableVersion := "" -}}
 {{- $releaseLines := slice -}}
 {{- with index $component "artifacts" -}}
@@ -53,6 +69,8 @@ limitations under the License.
 {{- if eq (len $releaseLines) 0 -}}
   {{- with index $component "releaseLines" }}{{ $releaseLines = . }}{{ end -}}
 {{- end -}}
+
+{{/* Resolve the target href and default label by kind. */}}
 {{- if eq $kind "overview" -}}
   {{- with index $paths "component" }}{{ $href = . }}{{ end -}}
   {{- $label = "Overview" -}}
@@ -61,6 +79,8 @@ limitations under the License.
   {{- if not $href }}{{ with index $paths "docs" }}{{ $href = . }}{{ end }}{{ end -}}
   {{- $label = $developmentLabel -}}
 {{- else if or (eq $kind "docs") (eq $kind "release") -}}
+  {{/* kind="docs" means latest released docs. kind="release" may choose an
+       exact version, latest stable, or the latest version in a release line. */}}
   {{- $requestedVersion := "latest" -}}
   {{- with .Get "version" }}{{ $requestedVersion = printf "%v" . }}{{ end -}}
   {{- $requestedLine := "" -}}
@@ -78,6 +98,8 @@ limitations under the License.
   {{- else if eq $requestedVersion "latest" -}}
     {{- $requestedVersion = $latestStableVersion -}}
   {{- end -}}
+
+  {{/* Released docs are found in the staged routes aggregate. */}}
   {{- if $requestedVersion -}}
     {{- with index hugo.Data "routes" -}}
       {{- with index . "items" -}}
@@ -123,6 +145,8 @@ limitations under the License.
 {{- if and $external $href (not (or (hasPrefix $href "https://") (hasPrefix $href "http://"))) -}}
   {{- errorf "%q shortcode on %s requires an http(s) repository URL, got %q" .Name .Page.RelPermalink $href -}}
 {{- end -}}
+
+{{/* Apply shared presentation and render the anchor. */}}
 {{- $class := partial "buildish-link-appearance-class.html" (dict "appearance" $appearance "shortcodeName" .Name "pagePath" .Page.RelPermalink) -}}
 {{- if and (eq $kind "source") (not $href) -}}
   {{- $optional = true -}}

@@ -13,6 +13,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Return the best available page description.
+
+Preference order:
+1. Authored page description.
+2. Pipeline-derived description.
+3. Site description.
+*/}}
+
 {{- $page := .page -}}
 {{- $componentContext := partial "buildish-component-context.html" $page -}}
 {{- $pipelinePage := dict -}}

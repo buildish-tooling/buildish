@@ -37,6 +37,12 @@ Buildish owns the parts that are specific to this consumer site:
 - renderer-specific navigation, shortcodes, styling, and publication behavior
 - final search, indexing, and publishing policy for the public Buildish site
 
+## Authoring helpers
+
+Buildish-specific Hugo shortcodes and partials are documented separately:
+
+- [Hugo helpers](hugo-helpers/)
+
 ## Common workflows
 
 From `site/`:

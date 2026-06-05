@@ -13,6 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Emit social and schema metadata using Buildish title/description fallback rules.
+
+Hugo's embedded templates only see authored front matter. Staged pages may rely
+on pipeline-derived metadata, so this partial uses buildish-resolved-* helpers.
+*/}}
+
 {{- $page := . -}}
 {{- $resolvedTitle := $page.Site.Title -}}
 {{- if not $page.IsHome }}{{ $resolvedTitle = partial "buildish-resolved-title.html" (dict "page" $page) }}{{ end -}}

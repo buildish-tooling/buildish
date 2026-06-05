@@ -13,6 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Render prominent page-level version warnings.
+
+Development docs, release candidates, withdrawn releases, unsupported releases,
+and limited-maintenance releases all get visible policy/status banners.
+*/}}
+
 {{ if .Site.Params.archived_version -}}
 {{ $latestVersion := .Site.Params.url_latest_version -}}
 {{ $currentVersion := .Site.Params.version -}}

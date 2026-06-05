@@ -13,6 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Docsy head override for Buildish.
+
+Adds Buildish title/description fallback handling, redirect metadata, favicons,
+embedded social metadata, and the dark theme bootstrap before Docsy assets load.
+*/}}
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 {{ range .AlternativeOutputFormats -}}

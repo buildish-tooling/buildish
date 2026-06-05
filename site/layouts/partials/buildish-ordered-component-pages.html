@@ -13,6 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Return component pages in catalog order.
+
+The component index needs the staged component aggregate order. Hugo page
+weights alone cannot express cross-repository component ordering reliably.
+*/}}
+
 {{- $page := .page -}}
 {{- $componentPages := slice -}}
 {{- with .pages }}{{ $componentPages = . }}{{ end -}}

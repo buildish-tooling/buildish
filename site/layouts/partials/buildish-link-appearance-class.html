@@ -13,10 +13,21 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Shared button appearance map.
+
+Used by:
+- buildish-component-link: generated component/release/source links
+- buildish-button: authored Markdown links styled as buttons
+
+Keep supported values documented in site/site/docs/hugo-helpers.md.
+*/}}
+
 {{- $appearance := .appearance | default "link" -}}
 {{- $shortcodeName := .shortcodeName | default "shortcode" -}}
 {{- $pagePath := .pagePath | default "unknown page" -}}
 {{- $class := "" -}}
+
 {{- if eq $appearance "link" -}}
   {{- $class = "" -}}
 {{- else if eq $appearance "primary" -}}

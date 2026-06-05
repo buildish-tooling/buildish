@@ -13,6 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Docsy section-index override.
+
+Uses Buildish title/description fallback helpers so staged pages without
+authored front matter still render useful section cards.
+*/}}
+
 <div class="section-index">
     {{ $page := .Page -}}
     {{ $isComponentsLanding := and (eq $page.Section "components") (eq $page.RelPermalink ("/components/" | relURL)) -}}

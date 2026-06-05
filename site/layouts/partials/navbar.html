@@ -13,6 +13,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Main navigation override.
+
+On component pages this renders component-aware Docs, Releases, and Source
+entries before the global site menu. The docs dropdown separates release docs
+from Developer Docs (unreleased).
+*/}}
+
+{{/* Resolve global and component navigation context. */}}
 {{ $p := . -}}
 {{ $baseURL := urls.Parse .Site.BaseURL -}}
 {{ $componentsPage := .Site.GetPage "/components" -}}

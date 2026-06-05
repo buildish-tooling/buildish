@@ -13,12 +13,22 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Render the version context block above the left sidebar tree.
+
+This partial is layout-only. Page authors do not call it directly. It mirrors
+the main version banner at smaller sidebar scale and provides a clear link back
+to the component landing page.
+*/}}
+
+{{/* Resolve page, component, and version metadata from staged front matter. */}}
 {{ $page := .page -}}
 {{ $componentContext := .componentContext | default dict -}}
 {{ $version := dict -}}
 {{ with $page.Params.pipeline }}{{ with index . "page" }}{{ with index . "version" }}{{ $version = . }}{{ end }}{{ end }}{{ end -}}
 {{ $kind := "" -}}
 {{ with index $version "kind" }}{{ $kind = printf "%v" . }}{{ end -}}
+
 {{ if $kind -}}
 {{ $componentName := "" -}}
 {{ with index $componentContext "component" }}{{ with index . "displayName" }}{{ $componentName = . }}{{ else }}{{ with index . "slug" }}{{ $componentName = . }}{{ end }}{{ end }}{{ end -}}
@@ -38,6 +48,8 @@ limitations under the License.
 {{ if not $supportStatus -}}
 {{ with index $version "releaseLine" }}{{ with index . "supportStatus" }}{{ $supportStatus = lower (printf "%v" .) }}{{ end }}{{ with index . "supportWindow" }}{{ with index . "maintenancePhase" }}{{ $maintenancePhase = lower (printf "%v" .) }}{{ end }}{{ end }}{{ end -}}
 {{ end -}}
+
+{{/* Pick the sidebar label, note, and severity class for this version kind. */}}
 {{ $contextTitle := $label -}}
 {{ $contextNote := "" -}}
 {{ $contextClass := "" -}}
@@ -64,6 +76,7 @@ limitations under the License.
 {{ $contextNote = "ASF release documentation" -}}
 {{ end -}}
 {{ end -}}
+
 <div class="buildish-sidebar-context {{ $contextClass }}">
 {{ if and $componentName $componentHref -}}
 <a class="buildish-sidebar-context__component-link" href="{{ $componentHref }}">Back to {{ $componentName }}</a>

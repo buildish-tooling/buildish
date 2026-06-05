@@ -13,6 +13,14 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Docsy breadcrumb override for Buildish component pages.
+
+This keeps pipeline-derived page titles visible in breadcrumbs and suppresses
+the generic /components/ crumb when the current page already has component
+context.
+*/}}
+
 {{ $componentContext := partial "buildish-component-context.html" . -}}
 {{ $isComponentPage := index $componentContext "enabled" -}}
 {{ $isSingle := true -}}

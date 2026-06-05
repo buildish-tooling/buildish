@@ -13,6 +13,14 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Choose the sidebar root for the current page.
+
+Buildish splits component navigation into static component pages and
+version-specific docs. Static pages use the component root and hide versioned
+docs roots; versioned docs use that version's docs root.
+*/}}
+
 {{/* Notes:
 
 - Sidebars are generated for "blog", "docs", and possibly other page types.

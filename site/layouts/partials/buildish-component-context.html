@@ -13,6 +13,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Return normalized component context for the current staged page.
+
+This is the central bridge from site-pipeline front matter and aggregate data to
+Hugo layouts. It returns component paths, docs dropdown items, release dropdown
+items, repository URL, brand label, and component landing-page detection.
+*/}}
+
+{{/* Read component/page metadata from both old and current front matter shapes. */}}
 {{- $component := .Params.sitePipelineComponent -}}
 {{- if not $component -}}
   {{- with index .Params "pipeline" }}{{ with index . "component" }}{{ $component = . }}{{ end }}{{ end -}}
@@ -32,7 +41,7 @@ limitations under the License.
   {{- with index $paths "component" }}{{ $componentPath = . }}{{ end -}}
   {{- $docsPath := "" -}}
   {{- with index $paths "docs" }}{{ $docsPath = . }}{{ end -}}
-  {{- /* Repository URL: try legacy field first, then the consumer slug→URL map. */ -}}
+  {{- /* Repository URL: try legacy field first, then the consumer slug-to-URL map. */ -}}
   {{- $repositoryPath := "" -}}
   {{- with index $component "repository" }}{{ $repositoryPath = . }}{{ end -}}
   {{- if not $repositoryPath -}}
@@ -146,7 +155,7 @@ limitations under the License.
     {{- with index $releaseLine "path" }}{{ $href = . }}{{ end -}}
     {{- if $href -}}
       {{- $releaseItems = $releaseItems | append (dict
-        "label" (printf "%s — %s" $lineKey $lineStatus)
+	"label" (printf "%s - %s" $lineKey $lineStatus)
         "href" $href
         "kind" "line"
         "status" $lineStatus
@@ -178,7 +187,7 @@ limitations under the License.
   {{- if not $displayName }}{{ $displayName = index $component "slug" }}{{ end -}}
   {{- $brandLabel := .Site.Title -}}
   {{- with $displayName -}}
-    {{- $brandLabel = printf "%s — %s" $.Site.Title . -}}
+    {{- $brandLabel = printf "%s - %s" $.Site.Title . -}}
   {{- end -}}
 
   {{- $context = dict

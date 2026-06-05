@@ -13,9 +13,25 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Style one authored Markdown link as a button.
+
+Use angle-delimited shortcode syntax:
+
+  {{< buildish-button appearance="primary" >}}
+  [Get started](getting-started/)
+  {{< /buildish-button >}}
+
+The link stays visible to the site-pipeline source link checker because the
+target is still authored as Markdown in the page source.
+*/}}
+
+{{/* Parse attributes. */}}
 {{- $appearance := "primary" -}}
 {{- with .Get "appearance" }}{{ $appearance = lower (printf "%v" .) }}{{ end -}}
 {{- $class := partial "buildish-link-appearance-class.html" (dict "appearance" $appearance "shortcodeName" .Name "pagePath" .Page.RelPermalink) -}}
+
+{{/* Render the shortcode body to one HTML anchor and reject ambiguous bodies. */}}
 {{- $inner := trim .Inner " \n\t" -}}
 {{- if not $inner -}}
   {{- errorf "%q shortcode on %s requires exactly one authored link in its body" .Name .Page.RelPermalink -}}
@@ -29,6 +45,8 @@ limitations under the License.
 {{- if ne (len (findRE `(?s)<a\s+` $anchor)) 1 -}}
   {{- errorf "%q shortcode on %s requires exactly one link" .Name .Page.RelPermalink -}}
 {{- end -}}
+
+{{/* Add or extend the anchor class attribute with the shared appearance class. */}}
 {{- if $class -}}
   {{- if findRE `\sclass=` $anchor -}}
     {{- $anchor = replaceRE `\sclass=(["'])` (printf " class=${1}%s " $class) $anchor -}}

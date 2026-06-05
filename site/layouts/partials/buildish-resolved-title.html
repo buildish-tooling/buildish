@@ -13,6 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */}}
+{{/*
+Return the best available page title.
+
+When preferLinkTitle is true, LinkTitle wins for navigation labels. Otherwise
+the helper prefers authored title, pipeline-derived title, and then site title.
+*/}}
+
 {{- $page := .page -}}
 {{- $preferLinkTitle := false -}}
 {{- if isset . "preferLinkTitle" -}}{{- $preferLinkTitle = .preferLinkTitle -}}{{- end -}}
