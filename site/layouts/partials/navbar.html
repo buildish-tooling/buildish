@@ -49,16 +49,16 @@ limitations under the License.
         <a class="nav-link dropdown-toggle d-none d-md-flex{{ if $componentDocsActive }} active{{ end }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><span>Docs</span></a>
         <span class="nav-link navbar-mobile-section-title d-md-none{{ if $componentDocsActive }} active{{ end }}"><span>Docs</span></span>
         <ul class="dropdown-menu">
-{{ $previousDocsKind := "" -}}
+		{{ $previousDocsKind := "" -}}
           {{ range $componentDocsItems }}
-{{ $itemKind := .kind | default "" -}}
-{{ if and $previousDocsKind (ne $previousDocsKind $itemKind) (or (eq $itemKind "release") (eq $itemKind "development")) }}
-<li><hr class="dropdown-divider"></li>
-{{ end }}
+		{{ $itemKind := .kind | default "" -}}
+		{{ if and $previousDocsKind (ne $previousDocsKind $itemKind) (or (eq $itemKind "release") (eq $itemKind "development")) }}
+		<li><hr class="dropdown-divider"></li>
+		{{ end }}
           {{ $itemActive := eq $p.RelPermalink .href }}
           {{ if and .href (hasPrefix $p.RelPermalink .href) (ne .href $componentPath) }}{{ $itemActive = true }}{{ end }}
           <li><a class="dropdown-item{{ if $itemActive }} active{{ end }}" href="{{ .href }}">{{ .label }}</a></li>
-{{ $previousDocsKind = $itemKind -}}
+		{{ $previousDocsKind = $itemKind -}}
           {{ end }}
         </ul>
       </li>
