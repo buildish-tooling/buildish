@@ -1,0 +1,39 @@
+{{/*
+Copyright 2026 The Apache Software Foundation
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{- $appearance := "primary" -}}
+{{- with .Get "appearance" }}{{ $appearance = lower (printf "%v" .) }}{{ end -}}
+{{- $class := partial "buildish-link-appearance-class.html" (dict "appearance" $appearance "shortcodeName" .Name "pagePath" .Page.RelPermalink) -}}
+{{- $inner := trim .Inner " \n\t" -}}
+{{- if not $inner -}}
+  {{- errorf "%q shortcode on %s requires exactly one authored link in its body" .Name .Page.RelPermalink -}}
+{{- end -}}
+{{- $rendered := trim (.Page.RenderString $inner) " \n\t" -}}
+{{- $anchorPattern := `(?s)^<p>\s*(<a\s+[^>]*>.*?</a>)\s*</p>$` -}}
+{{- $anchor := replaceRE $anchorPattern "$1" $rendered -}}
+{{- if not (findRE `(?s)^<a\s+[^>]*href=` $anchor) -}}
+  {{- errorf "%q shortcode on %s requires its body to render to a single link" .Name .Page.RelPermalink -}}
+{{- end -}}
+{{- if ne (len (findRE `(?s)<a\s+` $anchor)) 1 -}}
+  {{- errorf "%q shortcode on %s requires exactly one link" .Name .Page.RelPermalink -}}
+{{- end -}}
+{{- if $class -}}
+  {{- if findRE `\sclass=` $anchor -}}
+    {{- $anchor = replaceRE `\sclass=(["'])` (printf " class=${1}%s " $class) $anchor -}}
+  {{- else -}}
+    {{- $anchor = replaceRE `^<a\s+` (printf "<a class=\"%s\" " $class) $anchor -}}
+  {{- end -}}
+{{- end -}}
+{{- $anchor | safeHTML -}}
