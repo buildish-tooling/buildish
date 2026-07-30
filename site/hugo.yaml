@@ -87,11 +87,9 @@ module:
   proxy: "https://proxy.golang.org,direct"
   hugoVersion:
     extended: true
-    min: 0.158.0
+    min: 0.160.1
   imports:
-    - path: github.com/google/docsy
-      disable: false
-    - path: github.com/google/docsy/dependencies
+    - path: github.com/google/docsy/theme
       disable: false
   mounts:
     # These mounts assemble Hugo's virtual filesystem from two sources:

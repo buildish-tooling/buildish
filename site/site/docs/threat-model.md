@@ -189,7 +189,7 @@ Operating system and runtime assumptions:
   tools unless a Make target explicitly delegates into a container. (inferred)
 - Site Python helper code assumes Python 3.13 through the consumer
   `pyproject.toml`. (documented)
-- Site rendering assumes Hugo extended 0.158.0 or newer through `site/hugo.yaml`.
+- Site rendering assumes Hugo extended 0.160.1 or newer through `site/hugo.yaml`.
   (documented)
 - Node/PostCSS tooling is installed from `site/package-lock.json`/`package.json`
   for renderer assets. (documented)

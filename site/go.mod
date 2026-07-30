@@ -13,9 +13,8 @@
 // limitations under the License.
 module github.com/snazy/buildish/site
 
-go 1.26.1
+go 1.26.5
 
 require (
-	github.com/google/docsy v0.15.0 // indirect
-	github.com/google/docsy/dependencies v0.7.2 // indirect
+	github.com/google/docsy/theme v0.16.0 // indirect
 )

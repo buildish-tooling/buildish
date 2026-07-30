@@ -22,8 +22,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "mypy>=1.19.1",
-    "ruff>=0.15.8",
+    "mypy>=2.3.0",
+    "ruff>=0.16.0",
 ]
 
 [tool.ruff]
@@ -43,4 +43,3 @@ no_implicit_optional = true
 
 [tool.uv.sources]
 apache-buildish-site-pipeline = { path = "../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0+snapshot.20260420170730492628-py3-none-any.whl" }
-

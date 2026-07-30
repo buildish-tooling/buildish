@@ -80,6 +80,8 @@ hugo-check: ## Verify Hugo is available on PATH.
 docsy-check: ## Verify Node/PostCSS tooling for Docsy is available.
 	@$(DOCSY_ENV); command -v node >/dev/null 2>&1 || { echo "Error: node is not available (expected via nvm)."; exit 1; }; \
 		command -v postcss >/dev/null 2>&1 || { echo "Error: postcss is not available. Run npm install in site/."; exit 1; }; \
+		test -f $(NODE_MODULES_DIR)/@fortawesome/fontawesome-free/scss/fontawesome.scss || { echo "Error: Font Awesome is not available. Run npm install in site/."; exit 1; }; \
+		test -f $(NODE_MODULES_DIR)/bootstrap/scss/bootstrap.scss || { echo "Error: Bootstrap is not available. Run npm install in site/."; exit 1; }; \
 		test -f $(NODE_MODULES_DIR)/jquery/dist/jquery.min.js || { echo "Error: jquery is not available. Run npm install in site/."; exit 1; }; \
 		test -f $(NODE_MODULES_DIR)/mermaid/dist/mermaid.min.js || { echo "Error: mermaid is not available. Run npm install in site/."; exit 1; }; \
 	test -f $(NODE_MODULES_DIR)/lunr/lunr.min.js || { echo "Error: lunr is not available. Run npm install in site/."; exit 1; }

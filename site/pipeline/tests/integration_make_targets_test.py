@@ -165,8 +165,17 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                   shift
                 done
                 root="$prefix/node_modules"
-                mkdir -p "$root/.bin" "$root/autoprefixer" "$root/jquery/dist" "$root/mermaid/dist" "$root/lunr"
+                mkdir -p \
+                  "$root/.bin" \
+                  "$root/@fortawesome/fontawesome-free/scss" \
+                  "$root/autoprefixer" \
+                  "$root/bootstrap/scss" \
+                  "$root/jquery/dist" \
+                  "$root/mermaid/dist" \
+                  "$root/lunr"
+                printf '// fake asset\n' > "$root/@fortawesome/fontawesome-free/scss/fontawesome.scss"
                 printf 'module.exports = {}\n' > "$root/autoprefixer/index.js"
+                printf '// fake asset\n' > "$root/bootstrap/scss/bootstrap.scss"
                 printf '#!/usr/bin/env sh\nset -eu\nif [ -n "${NODE_PATH:-}" ] && [ -f "${NODE_PATH}/autoprefixer/index.js" ]; then\n  exit 0\nfi\nif [ -f "$PWD/node_modules/autoprefixer/index.js" ]; then\n  exit 0\nfi\necho "autoprefixer is not resolvable" >&2\nexit 1\n' > "$root/.bin/postcss"
                 chmod 755 "$root/.bin/postcss"
                 printf '// fake asset\n' > "$root/jquery/dist/jquery.min.js"
@@ -360,6 +369,8 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 ),
             )
             for rel in (
+                "@fortawesome/fontawesome-free/scss/fontawesome.scss",
+                "bootstrap/scss/bootstrap.scss",
                 "jquery/dist/jquery.min.js",
                 "mermaid/dist/mermaid.min.js",
                 "lunr/lunr.min.js",
@@ -668,6 +679,28 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
 
         package_lock = repo_root / "site" / "package-lock.json"
         package_lock.write_text(package_lock.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+        second_result = self.run_make(repo_root / "site", "build", env)
+
+        self.assertEqual(0, second_result.returncode, second_result.stdout + second_result.stderr)
+        npm_invocations = Path(env["BUILDISH_FAKE_NPM_LOG"]).read_text(encoding="utf-8").splitlines()
+        self.assertEqual(2, len(npm_invocations), npm_invocations)
+        self.assertIn("syncing Node dependencies", second_result.stdout)
+
+    def test_make_build_reinstalls_cached_container_node_dependencies_after_hugo_workspace_change(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
+        env = self.base_env(repo_root / "site", bin_dir)
+        env["CONTAINER_ENGINE"] = "fake-container-engine"
+        env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
+        env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
+
+        first_result = self.run_make(repo_root / "site", "build", env)
+        self.assertEqual(0, first_result.returncode, first_result.stdout + first_result.stderr)
+
+        workspace_package = repo_root / "site" / "packages" / "hugoautogen" / "package.json"
+        workspace_package.write_text(workspace_package.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
         second_result = self.run_make(repo_root / "site", "build", env)
 

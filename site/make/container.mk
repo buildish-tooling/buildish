@@ -154,7 +154,7 @@ CONTAINER_PREPARE_SITE_ENV = \
 	node_root="$(CONTAINER_HOME)/node-work"; \
 	tool_bin="$(CONTAINER_HOME)/tool-bin"; \
 	node_inputs_hash_file="$$node_root/.buildish-node-inputs.sha256"; \
-	current_node_inputs_hash="$$(cat package.json package-lock.json | sha256sum)"; \
+	current_node_inputs_hash="$$(cat package.json package-lock.json packages/hugoautogen/package.json packages/hugoautogen/hugo_packagemeta.json | sha256sum)"; \
 	printf "==> [container] using scratch directory %s\\n" "$$scratch"; \
 	mkdir -p "$$scratch/uv-cache" "$$node_root" "$$tool_bin" "$(CONTAINER_HOME)/.cache/npm"; \
 	trap "printf \"==> [container] cleaning scratch directory %s\\n\" \"$$scratch\"; rm -rf \"$$scratch\"" EXIT; \
@@ -167,13 +167,17 @@ CONTAINER_PREPARE_SITE_ENV = \
 	fi; \
 	if [ -f "$$node_inputs_hash_file" ] && [ "$$(cat "$$node_inputs_hash_file")" = "$$current_node_inputs_hash" ] \
 		&& [ -x "$$node_root/node_modules/.bin/postcss" ] \
+		&& [ -f "$$node_root/node_modules/@fortawesome/fontawesome-free/scss/fontawesome.scss" ] \
+		&& [ -f "$$node_root/node_modules/bootstrap/scss/bootstrap.scss" ] \
 		&& [ -f "$$node_root/node_modules/jquery/dist/jquery.min.js" ] \
 		&& [ -f "$$node_root/node_modules/mermaid/dist/mermaid.min.js" ] \
 		&& [ -f "$$node_root/node_modules/lunr/lunr.min.js" ]; then \
 		printf "==> [container] reusing cached Node dependencies from %s\\n" "$$node_root"; \
 	else \
 		printf "==> [container] syncing Node dependencies into %s\\n" "$$node_root"; \
+		mkdir -p "$$node_root/packages/hugoautogen"; \
 		cp package.json package-lock.json "$$node_root"/; \
+		cp packages/hugoautogen/package.json "$$node_root/packages/hugoautogen/"; \
 		npm ci --ignore-scripts --prefix "$$node_root"; \
 		printf "%s\\n" "$$current_node_inputs_hash" > "$$node_inputs_hash_file"; \
 	fi; \
