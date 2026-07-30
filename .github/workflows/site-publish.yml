@@ -34,7 +34,7 @@ jobs:
     # Keep publishing constrained to the canonical repository and main branch.
     # This is intentionally stricter than an org-wide gate to avoid accidental
     # cross-repository or non-main publication through workflow_call.
-    if: github.repository == 'buildish-tooling/buildish' && github.ref == 'refs/heads/main'
+    if: github.repository == 'buildish-tooling/buildish' && github.ref == 'refs/heads/main' && false
     steps:
       - name: Check out aggregate repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
