@@ -1,5 +1,5 @@
 <!--
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -90,11 +90,11 @@ latest, stable, current, release docs, or generic docs.
 
 Before reporting or fixing security issues, read
 [site/site/docs/threat-model.md](site/site/docs/threat-model.md) to determine
-whether a finding is a Buildish vulnerability, a deployment responsibility, 
-a dependency issue, or a false positive. Use [`SECURITY.md`](SECURITY.md) 
+whether a finding is a Buildish vulnerability, a deployment responsibility,
+a dependency issue, or a false positive. Use [`SECURITY.md`](SECURITY.md)
 reporting process and disclosure handling.
 
-ASF severity, advisory status, and CVE candidacy are non-authoritative triage
+Assessments of severity, advisory status, and CVE candidacy are non-authoritative triage
 estimates. Do not infer them from `site/site/docs/threat-model.md` alone.
 
 Do not treat a test as proof of a vulnerability unless it demonstrates that the

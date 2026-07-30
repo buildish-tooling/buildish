@@ -1,5 +1,5 @@
 <!--
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,33 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Apache Buildish (Incubating)
+# Buildish
 
-Apache Buildish develops build automation, CI integrations, and supporting tooling.
+Buildish develops build automation, CI integrations, and supporting tooling.
 
 # TODOs
 
 1. Make the site publishing its own tool that Buildish uses itself.
 2. Need a workflow template so that component's site changes can be verified.
-3. Update RAT check to use what's done for the ASFinfra-actions repo.
+3. Keep the RAT check aligned with current repository needs.
 
 ## Available components
 
-See [buildish.apache.org](https://buildish.apache.org/) for the latest list of available components.
+See [buildish.org](https://buildish.org/) for the latest list of available components.
 
 ## License
 
-Apache Buildish is licensed under Apache License 2.0.
+Buildish is licensed under Apache License 2.0.
 
-See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE), and [`DISCLAIMER`](DISCLAIMER).
-
-## Incubation status
-
-Apache Buildish is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache
-Incubator PMC.
-
-Incubation is required of all newly accepted projects until a further review indicates that the infrastructure,
-communications, and decision-making process have stabilized in a manner consistent with other successful ASF projects.
-
-While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate
-that the project has yet to be fully endorsed by the ASF.
+See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).

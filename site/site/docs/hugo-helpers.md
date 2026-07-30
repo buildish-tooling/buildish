@@ -6,7 +6,7 @@ description: Buildish-specific Hugo shortcodes and partials used by page authors
 ---
 
 <!--
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -134,7 +134,7 @@ Link to unreleased development docs:
 {{</* buildish-component-link kind="development" label="Developer Docs (unreleased)" appearance="primary" */>}}
 ```
 
-Development docs are not ASF release documentation. Use this kind only when the
+Development docs are not release documentation. Use this kind only when the
 page is intentionally pointing to unreleased content.
 
 ### Latest release docs link
@@ -225,14 +225,10 @@ normally do not call them directly.
 These partials are called by page layouts or by other partials. They are not
 intended for direct use from authored Markdown.
 
-### `apache-buildish-pipeline-icon.html`
+### `buildish-pipeline-icon.html`
 
 Renders the inline SVG Buildish icon. Used by the navbar and other branded
 surfaces.
-
-### `apache-incubator-logo.html`
-
-Renders the inline SVG Apache Incubator logo.
 
 ### `breadcrumb.html`
 

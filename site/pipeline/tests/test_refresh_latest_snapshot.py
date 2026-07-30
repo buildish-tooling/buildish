@@ -1,4 +1,4 @@
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,14 +36,14 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
         self,
         consumer_root: Path,
         *,
-        source_entry: str = 'apache-buildish-site-pipeline = { path = "../../buildish-site-pipeline", editable = true }',
+        source_entry: str = 'buildish-site-pipeline = { path = "../../buildish-site-pipeline", editable = true }',
     ) -> None:
         consumer_root.mkdir(parents=True, exist_ok=True)
         (consumer_root / "pyproject.toml").write_text(
             "\n".join(
                 [
                     "[project]",
-                    'name = "apache-buildish-site-consumer"',
+                    'name = "buildish-site-consumer"',
                     'version = "0.1.0"',
                     "",
                     "[tool.uv.sources]",
@@ -63,7 +63,7 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
         (snapshot_root / "latest.json").write_text(
             json.dumps(
                 {
-                    "name": "apache-buildish-site-pipeline",
+                    "name": "buildish-site-pipeline",
                     "version": "0.1.0.devfixture+gtest",
                     "wheel": wheel_name,
                     "wheelPath": str(wheel_path),
@@ -81,7 +81,7 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
             snapshot_root = workspace / "buildish-site-pipeline" / "dist" / "snapshots"
             wheel_path = (
                 snapshot_root
-                / "apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
+                / "buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
             )
             wheel_path.parent.mkdir(parents=True, exist_ok=True)
             wheel_path.write_bytes(b"fixture wheel")
@@ -97,7 +97,7 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
 
             self.assertTrue(result.changed)
             self.assertEqual(
-                "../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl",
+                "../../../buildish-site-pipeline/dist/snapshots/buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl",
                 result.relative_wheel_path,
             )
             pyproject_text = (consumer_root / "pyproject.toml").read_text(encoding="utf-8")
@@ -113,7 +113,7 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
             workspace = Path(temp_dir)
             consumer_root = workspace / "buildish" / "site" / "pipeline"
             snapshot_root = workspace / "buildish-site-pipeline" / "dist" / "snapshots"
-            wheel_name = "apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
+            wheel_name = "buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
             wheel_path = snapshot_root / wheel_name
             wheel_path.parent.mkdir(parents=True, exist_ok=True)
             wheel_path.write_bytes(b"fixture wheel")
@@ -121,8 +121,8 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
             self.write_fixture_consumer(
                 consumer_root,
                 source_entry=(
-                    'apache-buildish-site-pipeline = { path = '
-                    '"../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl" }'
+                    'buildish-site-pipeline = { path = '
+                    '"../../../buildish-site-pipeline/dist/snapshots/buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl" }'
                 ),
             )
 
@@ -162,7 +162,7 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
             workspace = Path(temp_dir)
             consumer_root = workspace / "buildish" / "site" / "pipeline"
             snapshot_root = workspace / "buildish-site-pipeline" / "dist" / "snapshots"
-            wheel_name = "apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
+            wheel_name = "buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
             wheel_path = snapshot_root / wheel_name
             wheel_path.parent.mkdir(parents=True, exist_ok=True)
             wheel_path.write_bytes(b"fixture wheel")
@@ -201,7 +201,7 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
             workspace = Path(temp_dir)
             consumer_root = workspace / "buildish" / "site" / "pipeline"
             snapshot_root = workspace / "buildish-site-pipeline" / "dist" / "snapshots"
-            wheel_name = "apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
+            wheel_name = "buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
             wheel_path = snapshot_root / wheel_name
             wheel_path.parent.mkdir(parents=True, exist_ok=True)
             wheel_path.write_bytes(b"fixture wheel")
@@ -209,8 +209,8 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
             self.write_fixture_consumer(
                 consumer_root,
                 source_entry=(
-                    'apache-buildish-site-pipeline = { path = '
-                    '"../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl" }'
+                    'buildish-site-pipeline = { path = '
+                    '"../../../buildish-site-pipeline/dist/snapshots/buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl" }'
                 ),
             )
             venv_path = consumer_root / ".venv"
@@ -243,7 +243,7 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
             workspace_root = workspace / "workspace"
             catalog_path = workspace_root / "buildish" / "site" / "catalog.yaml"
             snapshot_root = workspace / "buildish-site-pipeline" / "dist" / "snapshots"
-            wheel_name = "apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
+            wheel_name = "buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl"
             wheel_path = snapshot_root / wheel_name
             wheel_path.parent.mkdir(parents=True, exist_ok=True)
             wheel_path.write_bytes(b"fixture wheel")
@@ -251,8 +251,8 @@ class RefreshLatestSnapshotTest(unittest.TestCase):
             self.write_fixture_consumer(
                 consumer_root,
                 source_entry=(
-                    'apache-buildish-site-pipeline = { path = '
-                    '"../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl" }'
+                    'buildish-site-pipeline = { path = '
+                    '"../../../buildish-site-pipeline/dist/snapshots/buildish_site_pipeline-0.1.0.devfixture+gtest-py3-none-any.whl" }'
                 ),
             )
             venv_path = consumer_root / ".venv"

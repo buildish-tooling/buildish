@@ -1,5 +1,5 @@
 ---
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 title: Get Involved
-description: Ways contributors can participate in Apache Buildish while the project is taking shape.
+description: Ways contributors can participate in Buildish while the project is taking shape.
 type: docs
 weight: 20
 ---
 
-Apache Buildish is looking for feedback on project structure, docs, workflows, and tooling ideas while the site and components take shape.
+Buildish is looking for feedback on project structure, docs, workflows, and tooling ideas while the site and components take shape.
 
 ## Ways to contribute
 
 - Try the staged components and share what works or what feels rough.
-- Join the [development mailing list](mailto:dev@buildish.apache.org) to discuss ideas and priorities.
-- Browse the [source repository](https://github.com/apache/buildish) for issues, pull requests, and project structure.
+- Join the [development mailing list](mailto:dev@buildish.org) to discuss ideas and priorities.
+- Browse the [source repository](https://github.com/buildish-tooling/buildish) for issues, pull requests, and project structure.
 - Improve docs, examples, naming, onboarding notes, and contributor guidance.
 
 ## Early focus areas

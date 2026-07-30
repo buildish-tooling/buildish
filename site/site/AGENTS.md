@@ -1,5 +1,5 @@
 <!--
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,10 +71,10 @@ Static pages in `pages/` publish at `/components/site/`:
   identifies the target as unreleased development documentation.
 - Do not label `development/` links as `latest`, `current`, `stable`, `release
   docs`, or generic `docs`.
-- Public/static pages may link to `development/` before the first ASF release
-  only when no released docs target exists.
-- After the first ASF release, public/static pages must link to released docs
-  or release-derived aliases instead of `development/`.
+- Public/static pages may link to `development/` only when no released docs
+  target exists for that component.
+- When a released docs target exists, public/static pages must link to released
+  docs or release-derived aliases instead of `development/`.
 
 Docs in `docs/` publish under the moving development route and may later be
 copied under a release-version route:

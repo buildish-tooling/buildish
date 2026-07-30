@@ -1,5 +1,5 @@
 #
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ PIPELINE_REPO_ROOT ?= ..
 PIPELINE_CONSUMER_ROOT ?= $(CURDIR)/pipeline
 PIPELINE_VENV ?= $(PIPELINE_CONSUMER_ROOT)/.venv
 PIPELINE_REFRESH_SCRIPT ?= pipeline/refresh_latest_snapshot.py
-SITE_PIPELINE_BIN ?= $(SITE_PIPELINE_REPO_ROOT)/.venv/bin/site-pipeline
+SITE_PIPELINE_PYTHON ?= $(SITE_PIPELINE_REPO_ROOT)/.venv/bin/python
 SITE_PIPELINE_CATALOG ?= $(CURDIR)/catalog.yaml
 SITE_STAGE_ROOT ?= $(CURDIR)/.stage
 PIPELINE_CHECK_REPORT_ARGS ?= --report-format text --report-output -
@@ -33,7 +33,7 @@ SITE_PIPELINE_LOCAL_BASE_ARGS = \
 	--workspace-root '$(WORKSPACE_ROOT)' \
 	--catalog '$(SITE_PIPELINE_CATALOG)' \
 	$(SITE_PIPELINE_ARGS)
-SITE_PIPELINE_LOCAL_EXEC = PYTHONPATH='$(SITE_PIPELINE_REPO_ROOT)/src' '$(SITE_PIPELINE_BIN)'
+SITE_PIPELINE_LOCAL_EXEC = PYTHONPATH='$(SITE_PIPELINE_REPO_ROOT)/src' '$(SITE_PIPELINE_PYTHON)' -m buildish_site_pipeline
 
 define RUN_PIPELINE_MANAGED_COMMAND
 python_cmd='$(PYTHON)'; \
@@ -48,8 +48,8 @@ command -v "$$python_cmd" >/dev/null 2>&1 || { \
 endef
 
 define REQUIRE_SITE_PIPELINE_LOCAL
-if [ ! -x '$(SITE_PIPELINE_BIN)' ]; then \
-	echo "Error: expected site-pipeline executable at $(SITE_PIPELINE_BIN)."; \
+if [ ! -x '$(SITE_PIPELINE_PYTHON)' ]; then \
+	echo "Error: expected Site Pipeline Python at $(SITE_PIPELINE_PYTHON)."; \
 	echo "Hint: prepare the sibling buildish-site-pipeline checkout and its .venv first."; \
 	exit 1; \
 fi; \

@@ -1,5 +1,5 @@
 ---
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,22 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 title: Contributing Guidelines
-description: How to report issues, propose changes, and submit pull requests to Apache Buildish projects.
+description: How to report issues, propose changes, and submit pull requests to Buildish projects.
 type: docs
 weight: 30
 ---
 
-Thank you for considering contributing to Apache Buildish. Contributions to code, docs, tests, examples, naming, onboarding, and project structure are all valuable.
+Thank you for considering contributing to Buildish. Contributions to code, docs, tests, examples, naming, onboarding, and project structure are all valuable.
 
 ## Report bugs and request features
 
 Open a GitHub issue in the most relevant Buildish repository.
 
-- For umbrella-project work such as the site, shared docs, or cross-component coordination, use the [apache/buildish](https://github.com/apache/buildish) repository.
+- For umbrella-project work such as the site, shared docs, or cross-component coordination, use the [buildish-tooling/buildish](https://github.com/buildish-tooling/buildish) repository.
 - For component-specific work, open the issue in that component's repository.
-- If you are not sure where something belongs, start with the [development mailing list](mailto:dev@buildish.apache.org).
+- If you are not sure where something belongs, start with the [development mailing list](mailto:dev@buildish.org).
 
-If you find a security vulnerability, **do not** open a public issue. Follow the [Security Report](/community/security-report/) guidance instead.
+If you find a security vulnerability, **do not** open a public issue. Follow the
+[Security](/community/security/) guidance instead.
 
 When filing an issue, include:
 
@@ -44,7 +45,7 @@ Review open issues and discuss your approach before starting a larger change. Fo
 
 ## Submit changes in a pull request
 
-The best way to contribute changes is through a pull request against the relevant Apache Buildish repository.
+The best way to contribute changes is through a pull request against the relevant Buildish repository.
 
 Recommended workflow:
 
@@ -75,8 +76,8 @@ Contributors may use AI tools while preparing changes, but the person opening th
 
 - Understand the change end to end.
 - Be ready to explain and justify the implementation during review.
-- Ensure contributed material is compatible with ASF licensing and policy.
-- Review the [ASF Generative Tooling Guidance](https://www.apache.org/legal/generative-tooling.html) when using AI-assisted tooling for contributions.
+- Ensure contributed material is compatible with the project's licensing and
+  contribution requirements.
 - Consider disclosing significant AI assistance in the pull request description for transparency.
 
 ## Code contribution guidelines

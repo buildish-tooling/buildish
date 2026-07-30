@@ -1,5 +1,5 @@
 <!--
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Contributing to Apache Buildish
+# Contributing to Buildish
 
-Thank you for considering a contribution to Apache Buildish.
+Thank you for considering a contribution to Buildish.
 
 ## Before opening a pull request
 
@@ -33,4 +33,4 @@ Thank you for considering a contribution to Apache Buildish.
 
 ## Security issues
 
-Do **not** open a public issue for a suspected security vulnerability. Instead, report it to [security@apache.org](mailto:security@apache.org).
+Do **not** open a public issue for a suspected security vulnerability. Instead, report it to [security@buildish.org](mailto:security@buildish.org).

@@ -12,11 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-title: Community
-description: Community links, contributor entry points, and contact information for Buildish.
+title: License
+description: Licensing information for Buildish source code and distributions.
 type: docs
-buildish_landing_page: true
-weight: 20
+weight: 60
 ---
 
-Buildish is built in the open. Use this section to find project communication channels, contributor entry points, and security reporting guidance.
+Buildish source code is licensed under the
+[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+Each repository's `LICENSE` and `NOTICE` files are the authoritative legal
+documents for that repository.
+
+Some distributions include third-party software under other compatible
+licenses. Consult the `LICENSE` and `NOTICE` files shipped with a distribution
+for the complete terms and attributions that apply to it.

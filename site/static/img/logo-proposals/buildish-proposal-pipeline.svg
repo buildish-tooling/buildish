@@ -1,5 +1,5 @@
 <!--
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" role="img" aria-labelledby="title desc">
-  <title id="title">Apache Buildish logo proposal 1: Pipeline Blocks</title>
-  <desc id="desc">A rounded-square icon with staged build blocks and connected nodes beside the Apache Buildish wordmark and headline.</desc>
+  <title id="title">Buildish logo proposal 1: Pipeline Blocks</title>
+  <desc id="desc">A rounded-square icon with staged build blocks and connected nodes beside the Buildish wordmark and headline.</desc>
   <defs>
     <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#0f172a"/>
@@ -33,6 +33,6 @@ limitations under the License.
     <circle cx="111" cy="155" r="8" fill="#e2e8f0"/>
     <rect x="78" y="148" width="74" height="18" rx="9" fill="#34d399" opacity="0.95"/>
   </g>
-  <text x="252" y="110" fill="#0f172a" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="56" font-weight="700">Apache Buildish</text>
-  <text x="252" y="156" fill="#475569" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="22">Apache Buildish develops build automation, CI integrations, and supporting tooling.</text>
+  <text x="252" y="110" fill="#0f172a" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="56" font-weight="700">Buildish</text>
+  <text x="252" y="156" fill="#475569" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="22">Buildish develops build automation, CI integrations, and supporting tooling.</text>
 </svg>

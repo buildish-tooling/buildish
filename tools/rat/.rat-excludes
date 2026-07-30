@@ -1,5 +1,5 @@
 #
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,20 +15,29 @@
 
 .git/**
 .idea/**
+.agents/**
+CODE_OF_CONDUCT.md
 build/**
 **/.idea/**
 **/.venv/**
+**/.mypy_cache/**
+**/.npm/**
+**/.pytest_cache/**
+**/.ruff_cache/**
 site/build/**
+site/.config/**
 site/.stage/**
 site/.preview/**
 site/.public/**
 site/.container-home/**
 site/resources/**
 site/node_modules/**
+site/static/js/vendor/**
 **/__pycache__/**
 **/*.swp
 site/.hugo_build.lock
 site/.nvmrc
+site/static/CNAME
 site/go.sum
 **/uv.lock
 site/uv.lock

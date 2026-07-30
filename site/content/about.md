@@ -1,5 +1,5 @@
 ---
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-title: About Apache Buildish
-description: Apache Buildish develops build automation, CI integrations, and supporting tooling.
+title: About Buildish
+description: Buildish develops build automation, CI integrations, and supporting tooling.
 type: docs
 weight: 5
 ---

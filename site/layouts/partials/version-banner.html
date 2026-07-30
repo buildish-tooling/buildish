@@ -1,5 +1,5 @@
 {{/*
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,15 +48,15 @@ and limited-maintenance releases all get visible policy/status banners.
 
 {{ if eq $kind "development" -}}
 <div class="pageinfo pageinfo-warning">
-<p><strong>IMPORTANT:</strong> Developer documentation for the current development branch. This content is unreleased, may change without notice, and must not be treated as Apache Buildish release documentation.</p>
+<p><strong>IMPORTANT:</strong> Developer documentation for the current development branch. This content is unreleased, may change without notice, and must not be treated as Buildish release documentation.</p>
 </div>
 {{ else if eq $kind "candidate" -}}
 <div class="pageinfo pageinfo-warning">
-<p><strong>IMPORTANT:</strong> Release-candidate documentation{{ with $label }} for {{ . }}{{ end }}. This content is not final Apache Buildish release documentation and may change before a release is approved.</p>
+<p><strong>IMPORTANT:</strong> Release-candidate documentation{{ with $label }} for {{ . }}{{ end }}. This content is not final Buildish release documentation and may change before a release is approved.</p>
 </div>
 {{ else if or (eq $publicationState "withdrawn") (eq $publicationState "tombstoned") -}}
 <div class="pageinfo pageinfo-danger">
-<p><strong>IMPORTANT:</strong> This release documentation{{ with $label }} for {{ . }}{{ end }} is marked {{ $publicationState }} and should not be used as current Apache Buildish documentation.</p>
+<p><strong>IMPORTANT:</strong> This release documentation{{ with $label }} for {{ . }}{{ end }} is marked {{ $publicationState }} and should not be used as current Buildish documentation.</p>
 </div>
 {{ else if $isUnsupported -}}
 <div class="pageinfo pageinfo-danger">

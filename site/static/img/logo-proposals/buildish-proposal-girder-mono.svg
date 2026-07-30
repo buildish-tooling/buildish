@@ -1,5 +1,5 @@
 <!--
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" role="img" aria-labelledby="title desc">
-  <title id="title">Apache Buildish logo proposal 2 monochrome: Girder Stack</title>
-  <desc id="desc">A monochrome version of the structural girder stack proposal for Apache Buildish.</desc>
+  <title id="title">Buildish logo proposal 2 monochrome: Girder Stack</title>
+  <desc id="desc">A monochrome version of the structural girder stack proposal for Buildish.</desc>
   <g transform="translate(28 44)">
     <rect x="10" y="132" width="196" height="34" rx="17" fill="#111827"/>
     <path d="M24 130 76 34h38l-52 96z" fill="#111827" opacity="0.95"/>
@@ -26,6 +26,6 @@ limitations under the License.
     <circle cx="133" cy="151" r="10" fill="#f8fafc" opacity="0.78"/>
     <circle cx="171" cy="151" r="10" fill="#f8fafc" opacity="0.58"/>
   </g>
-  <text x="252" y="110" fill="#111827" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="56" font-weight="700">Apache Buildish</text>
-  <text x="252" y="156" fill="#111827" opacity="0.72" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="22">Apache Buildish develops build automation, CI integrations, and supporting tooling.</text>
+  <text x="252" y="110" fill="#111827" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="56" font-weight="700">Buildish</text>
+  <text x="252" y="156" fill="#111827" opacity="0.72" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif" font-size="22">Buildish develops build automation, CI integrations, and supporting tooling.</text>
 </svg>

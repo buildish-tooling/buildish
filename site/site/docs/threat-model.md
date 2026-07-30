@@ -1,5 +1,5 @@
 <!--
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Apache Buildish Threat Model
+# Buildish Threat Model
 
 ## 1. Header
 
-Project: Apache Buildish (Incubating).
+Project: Buildish.
 
 Version binding: this draft is bound to repository commit `694017c` on
 2026-06-05. Future vulnerability reports should be triaged against the threat
@@ -42,8 +42,8 @@ claims. The high inferred count reflects that this is the first threat-model
 pass and several negative side-effect and operational-contract claims are not yet
 stated as maintainer policy.
 
-Apache Buildish is an incubating Apache project for build automation, CI
-integrations, and supporting tooling. This repository is an aggregate and site
+Buildish is a project for build automation, CI integrations, and supporting
+tooling. This repository is an aggregate and site
 consumer: it contains project-level governance files, a Buildish website
 consumer, Hugo layouts and shortcodes, local wrapper Make targets, and small
 consumer-side scripts that integrate with the reusable Site Pipeline
@@ -54,7 +54,7 @@ implementation in the sibling `../buildish-site-pipeline` checkout.
 
 Primary intended use cases:
 
-- Maintain Apache Buildish project-level files, release-process notes, and the
+- Maintain Buildish project-level files, release-process notes, and the
   aggregate component catalog. (documented)
 - Build and validate the Buildish public website from trusted local component
   checkouts through the sibling Site Pipeline, Hugo, Node/PostCSS assets, and
@@ -70,8 +70,7 @@ Deployment contexts:
   optionally Docker or Podman. (documented)
 - CI-like build environment running the same site checks and build targets.
   (inferred)
-- Static website output published by ASF infrastructure or equivalent static
-  hosting. (inferred)
+- Static website output published through GitHub Pages. (documented)
 
 Caller expectations:
 
@@ -106,7 +105,7 @@ Component-family table:
 The model does not cover:
 
 - Vulnerabilities in Hugo, Docsy, Python, uv, Node packages, Java, Docker,
-  Podman, operating systems, or ASF hosting infrastructure. Those are upstream
+  Podman, operating systems, or hosting infrastructure. Those are upstream
   or deployment-layer concerns. (inferred)
 - The reusable Site Pipeline implementation under `../buildish-site-pipeline`,
   except as a trusted sibling dependency consumed by this aggregate repository.
@@ -127,7 +126,7 @@ The model does not cover:
   imported from trusted same-origin static assets or component content. Active
   content requires deployment policy such as origin isolation and CSP. (inferred)
 - Supply-chain hygiene questions such as dependency freshness, release signing,
-  GitHub Actions pinning, or ASF release compliance. Those may be important but
+  GitHub Actions pinning, or release-process compliance. Those may be important but
   are not threat-model properties for this document. (documented from guidance)
 
 ## 4. Trust boundaries and data flow
@@ -324,7 +323,7 @@ Out-of-scope actors:
   control of configured tool executables. (inferred)
 - Attackers who can modify dependency caches, container images, or upstream
   third-party packages used by the build. (inferred)
-- Network attackers against package registries, module mirrors, or ASF hosting
+- Network attackers against package registries, module mirrors, or hosting
   infrastructure. Those are dependency/deployment concerns. (inferred)
 
 Attacker goals considered:
@@ -412,7 +411,7 @@ Well-known attack classes left to callers/operators:
 
 Buildish maintainers and site operators must:
 
-- Report and route suspected security issues through `security@apache.org` as
+- Report and route suspected security issues through `security@buildish.org` as
   documented in `SECURITY.md`. (documented)
 - Review changes to site catalog, component metadata, Hugo templates,
   shortcodes, Makefiles, and helper scripts as security-relevant when they affect

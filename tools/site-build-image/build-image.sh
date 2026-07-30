@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ usage() {
   cat <<'EOF'
 Usage: build-image.sh --image <image-ref> [options]
 
-Build the Apache Buildish site builder image.
+Build the Buildish site builder image.
 
 Options:
   --image <ref>         Fully-qualified image reference to build.

@@ -1,6 +1,6 @@
-# yaml-language-server: $schema=https://buildish.apache.org/components/site-pipeline/schemas/site-pipeline-catalog-v1.schema.json
+# yaml-language-server: $schema=https://buildish.org/components/site-pipeline/schemas/site-pipeline-catalog-v1.schema.json
 #
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ site:
   pagesRoot: buildish/site/content
 origins:
   docs:
-    baseUrl: https://buildish.apache.org/
+    baseUrl: https://buildish.org/
     canonical: true
 components:
   - slug: mammoth-cache
@@ -48,7 +48,7 @@ components:
     localDir: buildish-release-tooling
     weight: 400
     publication:
-      mountPath: /components/site-release-tooling/
+      mountPath: /components/release-tooling/
   - slug: site
     localDir: buildish/site
     weight: 1000

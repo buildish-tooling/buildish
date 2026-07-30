@@ -1,10 +1,10 @@
 ---
-title: Apache Buildish Site Documentation
-description: Buildish-specific notes for using Site Pipeline with the Apache Buildish web site.
+title: Buildish Site Documentation
+description: Buildish-specific notes for using Site Pipeline with the Buildish web site.
 ---
 
 <!--
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

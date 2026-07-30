@@ -1,7 +1,7 @@
 {
   "name": "buildish-site-docsy",
   "version": "0.1.0",
-  "description": "Local Docsy/PostCSS tooling for the Apache Buildish site",
+  "description": "Local Docsy/PostCSS tooling for the Buildish site",
   "main": "index.js",
   "directories": {
     "test": "tests"
@@ -10,7 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "Apache Buildish",
+  "author": "Buildish",
   "license": "Apache-2.0",
   "type": "commonjs",
   "private": true,

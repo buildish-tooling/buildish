@@ -1,5 +1,5 @@
 #
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-baseURL: https://buildish.apache.org/
-title: Apache Buildish (Incubating)
+baseURL: https://buildish.org/
+title: Buildish
 locale: en-us
 enableRobotsTXT: true
 publishDir: .public
@@ -58,14 +58,13 @@ markup:
 
 params:
   author:
-    name: 'Apache Buildish contributors'
+    name: 'Buildish'
   offlineSearch: true
 
-  #github_repo: https://github.com/apache/buildish
-  #github_project_repo: https://github.com/apache/buildish
+  github_repo: https://github.com/buildish-tooling/buildish
+  github_project_repo: https://github.com/buildish-tooling/buildish
   #github_branch: main
   #github_subdir: site
-  privacy_policy: https://privacy.apache.org/policies/privacy-policy-public.html
 
   ui:
     breadcrumb_disable: false
@@ -75,12 +74,10 @@ params:
     sidebar_search_disable: true
     showLightDarkModeMenu: false
   plantuml:
-    # Disabled for now, loads external JS, see ASF data policy
-    # https://privacy.apache.org/policies/website-policy.html
+    # Disabled for now because it loads external JavaScript.
     enable: false
   markmap:
-    # Disabled for now, loads external JS, see ASF data policy
-    # https://privacy.apache.org/policies/website-policy.html
+    # Disabled for now because it loads external JavaScript.
     enable: false
 
 module:
@@ -182,48 +179,23 @@ menu:
       pageRef: /community/community-guidelines
       parent: community
       weight: 40
-    - identifier: security-report
-      name: Security Report
-      pageRef: /community/security-report
+    - identifier: code-of-conduct
+      name: Code of Conduct
+      url: https://github.com/buildish-tooling/buildish/blob/main/CODE_OF_CONDUCT.md
       parent: community
       weight: 50
+    - identifier: security
+      name: Security
+      pageRef: /community/security
+      parent: community
+      weight: 60
+    - identifier: license
+      name: License
+      pageRef: /community/license
+      parent: community
+      weight: 70
     - identifier: source-code
       name: Source Code
-      url: https://github.com/apache/buildish
+      url: https://github.com/buildish-tooling/buildish
       parent: community
-      weight: 60
-    - identifier: asf
-      name: The ASF
-      weight: 30
-    - name: Foundation
-      url: https://www.apache.org/
-      parent: asf
-      weight: 10
-    - name: License
-      url: https://www.apache.org/licenses/
-      parent: asf
-      weight: 20
-    - name: Code of Conduct
-      url: https://www.apache.org/foundation/policies/conduct
-      parent: asf
-      weight: 30
-    - name: Events
-      url: https://www.apache.org/events/current-event
-      parent: asf
-      weight: 40
-    - name: Privacy
-      url: https://privacy.apache.org/policies/privacy-policy-public.html
-      parent: asf
-      weight: 50
-    - name: Security
-      url: https://www.apache.org/security/
-      parent: asf
-      weight: 60
-    - name: Sponsorship
-      url: https://www.apache.org/foundation/sponsorship.html
-      parent: asf
-      weight: 70
-    - name: Thanks
-      url: https://www.apache.org/foundation/thanks.html
-      parent: asf
       weight: 80

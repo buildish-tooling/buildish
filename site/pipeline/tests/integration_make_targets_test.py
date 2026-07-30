@@ -1,4 +1,4 @@
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,9 +37,9 @@ from test_support import (
 )
 
 EXTRACTED_PIPELINE_REPO_ROOT = (SOURCE_REPO_ROOT.parent / "buildish-site-pipeline").resolve()
-EXTRACTED_PIPELINE_BIN = (
-    EXTRACTED_PIPELINE_REPO_ROOT / ".venv" / "bin" / "site-pipeline"
-).resolve()
+EXTRACTED_PIPELINE_PYTHON = (
+    EXTRACTED_PIPELINE_REPO_ROOT / ".venv" / "bin" / "python"
+)
 DEFAULT_FIXTURE_ROOT = (
     SOURCE_REPO_ROOT / "site" / "build" / "tests" / f"integration-make-targets-{os.getpid()}"
 )
@@ -193,12 +193,17 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 import os
                 import sys
 
-                os.execv(
-                    {str(EXTRACTED_PIPELINE_BIN)!r},
+                env = os.environ.copy()
+                env["PYTHONPATH"] = {str(EXTRACTED_PIPELINE_REPO_ROOT / "src")!r}
+                os.execve(
+                    {str(EXTRACTED_PIPELINE_PYTHON)!r},
                     [
-                        {str(EXTRACTED_PIPELINE_BIN)!r},
+                        {str(EXTRACTED_PIPELINE_PYTHON)!r},
+                        "-m",
+                        "buildish_site_pipeline",
                         *sys.argv[1:],
                     ],
+                    env,
                 )
                 """
             ),
@@ -383,7 +388,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
     def local_env(self, _site_root: Path) -> dict[str, str]:
         env = os.environ.copy()
         env["SITE_PIPELINE_REPO_ROOT"] = str(EXTRACTED_PIPELINE_REPO_ROOT)
-        env["SITE_PIPELINE_BIN"] = str(EXTRACTED_PIPELINE_BIN)
+        env["SITE_PIPELINE_PYTHON"] = str(EXTRACTED_PIPELINE_PYTHON)
         return env
 
     def base_env(self, site_root: Path, bin_dir: Path) -> dict[str, str]:
@@ -535,9 +540,9 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         repo_root = self.prepare_fixture_workspace()
         bin_dir = self.seed_fake_tools(repo_root / "site", include_native_docsy=True)
         consumer_pyproject = repo_root / "site" / "pipeline" / "pyproject.toml"
-        stale_wheel = "apache_buildish_site_pipeline-0.0.0.dev0+stale-py3-none-any.whl"
+        stale_wheel = "buildish_site_pipeline-0.0.0.dev0+stale-py3-none-any.whl"
         updated_text, replacements = re.subn(
-            r'apache_buildish_site_pipeline-[^"]+\.whl',
+            r'buildish_site_pipeline-[^"]+\.whl',
             stale_wheel,
             consumer_pyproject.read_text(encoding="utf-8"),
             count=1,

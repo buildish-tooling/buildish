@@ -1,5 +1,5 @@
 ---
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,6 @@ cascade:
 buildish_landing_page: true
 ---
 
-Browse staged components and supporting documentation collected from the local Apache Buildish catalog.
+Browse staged components and supporting documentation collected from the local Buildish catalog.
 
 Each component section is assembled from local metadata, staged docs, and generated lifecycle information so the umbrella-project site stays close to the current development state.

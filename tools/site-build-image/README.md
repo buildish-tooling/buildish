@@ -1,5 +1,5 @@
 <!--
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# Apache Buildish site builder image
+# Buildish site builder image
 
-This directory contains the Buildish-specific derived container image definition for Apache Buildish site workflows.
+This directory contains the Buildish-specific derived container image definition for Buildish site workflows.
 
 The generic `site-pipeline` runtime image now lives in the extracted `buildish-site-pipeline` repository. The image defined here layers Hugo, Node, Go, and the current Buildish-specific render/serve expectations on top of that generic base image.
 

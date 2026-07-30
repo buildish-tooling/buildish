@@ -1,4 +1,4 @@
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,8 +31,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
 
-PACKAGE_NAME = "apache-buildish-site-pipeline"
-SOURCE_LINE_RE = re.compile(r"(?m)^apache-buildish-site-pipeline = \{.*\}$")
+PACKAGE_NAME = "buildish-site-pipeline"
+SOURCE_LINE_RE = re.compile(r"(?m)^buildish-site-pipeline = \{.*\}$")
 ACTIVE_CONSUMER_ROOT_ENV = "BUILDISH_SITE_PIPELINE_CONSUMER_ROOT"
 ACTIVE_VENV_PATH_ENV = "BUILDISH_SITE_PIPELINE_VENV"
 ACTIVE_ENV_READY_ENV = "BUILDISH_SITE_PIPELINE_ENV_READY"

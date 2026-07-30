@@ -1,5 +1,5 @@
 {{/*
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ limitations under the License.
 {{ with $componentsPage }}{{ $componentSections = partial "buildish-ordered-component-pages.html" (dict "page" . "pages" (where .Pages "Kind" "section")) }}{{ end }}
 <div class="td-content">
   <div class="buildish-home-hero">
-    <div class="buildish-home-hero__logo" aria-hidden="true">{{ partial "apache-buildish-pipeline-icon.html" (dict "gradientId" "buildish-home-panel") }}</div>
+    <div class="buildish-home-hero__logo" aria-hidden="true">{{ partial "buildish-pipeline-icon.html" (dict "gradientId" "buildish-home-panel") }}</div>
     <div class="buildish-home-hero__content">
       <h1>{{ .Title }}</h1>
       {{ with .Params.description }}<div class="lead">{{ . | markdownify }}</div>{{ end }}
@@ -27,7 +27,7 @@ limitations under the License.
       <p class="buildish-home-actions mb-4">
         <a class="btn btn-primary me-2 mb-2" href="{{ "/community/" | relURL }}">Community</a>
         <a class="btn btn-outline-secondary me-2 mb-2" href="{{ "/about/" | relURL }}">About Buildish</a>
-        <a class="btn btn-link mb-2" href="{{ "/community/security-report/" | relURL }}">Security report</a>
+        <a class="btn btn-link mb-2" href="{{ "/community/security/" | relURL }}">Security</a>
       </p>
     </div>
   </div>
@@ -48,20 +48,6 @@ limitations under the License.
     </div>
   </div>
   {{ end }}
-  {{/* incubator-start */}}
-  <hr class="my-5">
-  <div class="buildish-incubator-disclaimer d-flex flex-column flex-md-row gap-3 align-items-start">
-    <a class="buildish-incubator-disclaimer__logo" href="https://incubator.apache.org/" target="_blank" rel="noopener" aria-label="Apache Incubator">
-      <span class="visually-hidden">Apache Incubator</span>
-      {{ partial "apache-incubator-logo.html" . }}
-    </a>
-    <div class="buildish-incubator-disclaimer__content">
-      <h2>Incubation status</h2>
-      <p>This project is currently incubating at The Apache Software Foundation (ASF).</p>
-      <p>Incubation is required of all newly accepted projects until a further review indicates that the project has established the needed community, governance, and decision-making processes.</p>
-    </div>
-  </div>
-  {{/* incubator-end */}}
   {{ with .Params.trademark_attribution }}
   <div class="buildish-home-legal-card mt-3">
     <p class="mb-0 small">{{ . | markdownify }}</p>

@@ -1,4 +1,4 @@
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 [project]
-name = "apache-buildish-site-consumer"
+name = "buildish-site-consumer"
 version = "0.1.0"
 description = "Buildish consumer environment for the extracted site pipeline"
+authors = [{ name = "Buildish", email = "dev@buildish.org" }]
 requires-python = ">=3.13"
 dependencies = [
-    "apache-buildish-site-pipeline",
+    "buildish-site-pipeline",
 ]
 
 [dependency-groups]
@@ -42,4 +43,4 @@ warn_unused_ignores = true
 no_implicit_optional = true
 
 [tool.uv.sources]
-apache-buildish-site-pipeline = { path = "../../../buildish-site-pipeline/dist/snapshots/apache_buildish_site_pipeline-0.1.0+snapshot.20260420170730492628-py3-none-any.whl" }
+buildish-site-pipeline = { path = "../../../buildish-site-pipeline/dist/snapshots/buildish_site_pipeline-0.1.0+snapshot.20260730155829534833-py3-none-any.whl" }

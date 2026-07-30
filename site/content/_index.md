@@ -1,5 +1,5 @@
 ---
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-title: Apache Buildish (Incubating)
-description: Apache Buildish develops build automation, CI integrations, and supporting tooling.
-trademark_attribution: Apache® is a registered trademark of The Apache Software Foundation. Apache Maven™ and Maven™ are trademarks of The Apache Software Foundation. Gradle® is a registered trademark of Gradle, Inc.
+title: Buildish
+description: Buildish develops build automation, CI integrations, and supporting tooling.
+trademark_attribution: Apache Maven™ and Maven™ are trademarks of The Apache Software Foundation. Gradle® is a registered trademark of Gradle, Inc.
 ---
 
-Apache Buildish is an incubating Apache umbrella project focused on practical tooling for build engineering and CI-aware developer workflows.
+Buildish is an umbrella project focused on practical tooling for build
+engineering and CI-aware developer workflows.
 
 Use this site to explore staged components, learn what the umbrella project is building toward, and find the best way to join the community.

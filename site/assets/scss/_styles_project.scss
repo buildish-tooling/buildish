@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 The Apache Software Foundation
+ * Copyright 2026 The Buildish Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -399,44 +399,10 @@ html[data-bs-theme='dark'] .td-sidebar .td-sidebar-nav-active-item {
   }
 }
 
-.buildish-incubator-disclaimer,
 .buildish-home-legal-card {
   background: #2c3136;
   border-radius: 0.5rem;
   color: #fff;
-}
-
-.buildish-incubator-disclaimer {
-  padding: 1rem 1.1rem;
-
-  h2,
-  p {
-    color: inherit;
-  }
-
-  h2 {
-    margin-bottom: 0.65rem;
-  }
-
-  p {
-    margin-bottom: 0.75rem;
-  }
-
-  p:last-child {
-    margin-bottom: 0;
-  }
-
-  &__logo {
-    display: inline-flex;
-    width: 200px;
-    flex: 0 0 auto;
-  }
-
-  &__logo svg {
-    display: block;
-    height: auto;
-    width: 100%;
-  }
 }
 
 .buildish-home-legal-card {

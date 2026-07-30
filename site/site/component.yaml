@@ -1,6 +1,6 @@
-# yaml-language-server: $schema=https://buildish.apache.org/components/site-pipeline/schemas/site-pipeline-component-v1.schema.json
+# yaml-language-server: $schema=https://buildish.org/components/site-pipeline/schemas/site-pipeline-component-v1.schema.json
 #
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

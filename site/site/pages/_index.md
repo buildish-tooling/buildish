@@ -1,5 +1,5 @@
 <!--
-Copyright 2026 The Apache Software Foundation
+Copyright 2026 The Buildish Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ limitations under the License.
 # Buildish Site
 
 Buildish Site provides the shared website and Buildish-specific site
-infrastructure for Apache Buildish.
+infrastructure for Buildish.
 
 Use the local docs for Buildish-specific rendering, container, and workflow
 notes:

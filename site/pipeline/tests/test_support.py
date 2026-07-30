@@ -1,4 +1,4 @@
-# Copyright 2026 The Apache Software Foundation
+# Copyright 2026 The Buildish Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,17 +42,6 @@ PIPELINE_FIXTURE_IGNORE = shutil.ignore_patterns(
     ".mypy_cache",
     ".ruff_cache",
 )
-BUILDISH_DISCLAIMER = """Apache Buildish (Incubating) is an effort undergoing incubation at The Apache
-Software Foundation (ASF), sponsored by the Apache Incubator PMC.
-
-Incubation is required of all newly accepted projects until a further review
-indicates that the infrastructure, communications, and decision making process
-have stabilized in a manner consistent with other successful ASF projects.
-
-While incubation status is not necessarily a reflection of the completeness
-or stability of the code, it does indicate that the project has yet to be
-fully endorsed by the ASF.
-"""
 FIXTURE_COMPONENTS = [
     {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
     {"slug": "no-gradle-wrapper-jar", "localDir": "buildish-no-gradle-wrapper-jar", "weight": 5},
@@ -207,7 +196,6 @@ def seed_api_fixture_main_repo(repo_root: Path) -> None:
     site_root.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SOURCE_REPO_ROOT / "site" / "content", site_root / "content", dirs_exist_ok=True)
     shutil.copytree(SOURCE_REPO_ROOT / "site" / "site", site_root / "site", dirs_exist_ok=True)
-    shutil.copy2(SOURCE_REPO_ROOT / "DISCLAIMER", repo_root / "DISCLAIMER")
     write_fixture_catalog(site_root)
 
 
@@ -266,7 +254,6 @@ def seed_make_fixture_main_repo(repo_root: Path) -> None:
         dirs_exist_ok=True,
     )
     rewrite_snapshot_manifest(repo_root.parent / "buildish-site-pipeline" / "dist" / "snapshots")
-    shutil.copy2(SOURCE_REPO_ROOT / "DISCLAIMER", repo_root / "DISCLAIMER")
     for relative in SITE_ROOT_FILES:
         shutil.copy2(SOURCE_REPO_ROOT / "site" / relative, site_root / relative)
     write_fixture_catalog(site_root)
@@ -282,7 +269,7 @@ def rewrite_snapshot_manifest(snapshot_root: Path) -> None:
     wheel_path = (snapshot_root / wheel_name).resolve()
     payload["wheelPath"] = str(wheel_path)
     payload["fileUrl"] = wheel_path.as_uri()
-    payload["dependencySpec"] = f"apache-buildish-site-pipeline @ {wheel_path.as_uri()}"
+    payload["dependencySpec"] = f"buildish-site-pipeline @ {wheel_path.as_uri()}"
     manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
