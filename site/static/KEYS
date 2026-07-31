@@ -1,19 +1,16 @@
-#
-# Copyright 2026 The Buildish Authors
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+-----BEGIN PGP PUBLIC KEY BLOCK-----
 
-# No Buildish release signing keys have been published yet.
-#
-# Future release signing keys will be published here as ASCII-armored OpenPGP
-# public key blocks.
+mDMEamylMxYJKwYBBAHaRw8BAQdAO74YcoADOm4miYQIVyRUrtcuR/EvySLU3yGV
+zKKIeKS0NUJ1aWxkaXNoIEF1dG9tYXRlZCBSZWxlYXNlIFNpZ25pbmcgPGRldkBi
+dWlsZGlzaC5vcmc+iJYEExYKAD4WIQSAQ/w0RQ3sJMJ8yJ2SeYOoayOPygUCamyl
+MwIbAQUJBaOagAULCQgHAgYVCgkICwIEFgIDAQIeAQIXgAAKCRCSeYOoayOPytb2
+AQDK/9asVjW+qst2PsbJZNYfD9aoDoBTd3lmgh9F4n6UbwD9FKq4lgwR8waphu7J
+TVS0t5idIkbqI80mkXI663gwgwa4MwRqbKVhFgkrBgEEAdpHDwEBB0BjfuLLSZp0
+wyqyvemmUn2B8qfRFULeFjebm6pj6vIAyIj1BBgWCgAmFiEEgEP8NEUN7CTCfMid
+knmDqGsjj8oFAmpspWECGwIFCQHhM4AAgQkQknmDqGsjj8p2IAQZFgoAHRYhBNUq
+NeNVq4Lia4ebYpiQ9zjfS7M3BQJqbKVhAAoJEJiQ9zjfS7M3D7oBAIK9qA+CdA1Y
+sSN/zcm6Ontz+X5bhdIQVAs2FABB5sE4AQDZ2jALZmAGjChO/9T5x9rgT8mzCI2b
+DIiwGxaGd/iHDl0KAP9Zj97NoXu3MuCidm/ef6aD3FW92dmpUNcE06j+9adDlQEA
+rDhqNDg4+Y7SKHVam+XiupHE/N56x46jhvZHbKmDKQY=
+=Kzey
+-----END PGP PUBLIC KEY BLOCK-----
