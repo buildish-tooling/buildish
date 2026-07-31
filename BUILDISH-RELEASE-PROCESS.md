@@ -22,3 +22,7 @@ The Buildish release process has not been defined yet. Existing release
 automation is retained as development tooling, but it does not define an
 approved Buildish release process and must not be used to publish a release
 until reviewed instructions replace this document.
+
+Creation, custody, and publication of the release signing key are documented
+separately in [`RELEASE-SIGNING-KEY.md`](RELEASE-SIGNING-KEY.md). That key
+ceremony does not define or authorize a release.
