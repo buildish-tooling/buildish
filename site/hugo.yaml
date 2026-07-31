@@ -63,8 +63,8 @@ params:
 
   github_repo: https://github.com/buildish-tooling/buildish
   github_project_repo: https://github.com/buildish-tooling/buildish
-  #github_branch: main
-  #github_subdir: site
+  github_branch: main
+  github_subdir: site
 
   ui:
     breadcrumb_disable: false

@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://buildish.org/components/site-pipeline/schemas/site-pipeline-component-v1.schema.json
+# yaml-language-server: $schema=../../../buildish-site-pipeline/site/pages/schemas/component-v1.schema.json
 #
 # Copyright 2026 The Buildish Authors
 #
@@ -19,4 +19,6 @@ component:
   slug: site
   displayName: Website
 content:
+  pagesRoot: site/site/pages
+  docsRoot: site/site/docs
   assetsRoot: null

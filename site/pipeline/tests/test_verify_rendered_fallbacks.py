@@ -26,12 +26,25 @@ SCRIPT_GLOBALS = runpy.run_path(str(SCRIPT_PATH))
 RenderExpectation = SCRIPT_GLOBALS["RenderExpectation"]
 check_rendered_file = SCRIPT_GLOBALS["check_rendered_file"]
 check_rendered_site = SCRIPT_GLOBALS["check_rendered_site"]
+check_for_staged_source_links = SCRIPT_GLOBALS["check_for_staged_source_links"]
 
 
 class VerifyRenderedFallbacksTest(unittest.TestCase):
     def test_default_checks_accept_expected_resolved_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             public_root = Path(temp_dir)
+            about_page = public_root / "about" / "index.html"
+            about_page.parent.mkdir(parents=True, exist_ok=True)
+            about_page.write_text(
+                "\n".join(
+                    (
+                        '<a href="https://github.com/buildish-tooling/buildish/blob/main/site/content/about.md">View source</a>',
+                        '<a href="https://github.com/buildish-tooling/buildish/edit/main/site/content/about.md">Edit source</a>',
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             component_root_page = public_root / "components" / "site-pipeline" / "index.html"
             component_root_page.parent.mkdir(parents=True, exist_ok=True)
             component_root_page.write_text(
@@ -42,6 +55,25 @@ class VerifyRenderedFallbacksTest(unittest.TestCase):
             nested_docs_page.parent.mkdir(parents=True, exist_ok=True)
             nested_docs_page.write_text(
                 '<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none"></aside>\n',
+                encoding="utf-8",
+            )
+            schema_guide = (
+                public_root
+                / "components"
+                / "site-pipeline"
+                / "how-to"
+                / "use-json-schema-for-yaml-authoring"
+                / "index.html"
+            )
+            schema_guide.parent.mkdir(parents=True, exist_ok=True)
+            schema_guide.write_text(
+                "\n".join(
+                    (
+                        '<a href="https://github.com/buildish-tooling/buildish-site-pipeline/blob/main/site/pages/how-to/use-json-schema-for-yaml-authoring.md">View source</a>',
+                        '<a href="https://github.com/buildish-tooling/buildish-site-pipeline/edit/main/site/pages/how-to/use-json-schema-for-yaml-authoring.md">Edit source</a>',
+                    )
+                )
+                + "\n",
                 encoding="utf-8",
             )
             metadata_page = public_root / "components" / "site-pipeline" / "architecture" / "build-architecture" / "index.html"
@@ -76,6 +108,32 @@ class VerifyRenderedFallbacksTest(unittest.TestCase):
             )
 
             self.assertEqual([], check_rendered_site(public_root))
+
+    def test_reports_repository_link_to_staged_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            public_root = Path(temp_dir)
+            rendered_page = public_root / "components" / "example" / "index.html"
+            rendered_page.parent.mkdir(parents=True, exist_ok=True)
+            rendered_page.write_text(
+                '<a href="https://github.com/buildish-tooling/buildish/edit/main/.stage/content/components/example/_index.md">Edit</a>\n',
+                encoding="utf-8",
+            )
+
+            errors = check_for_staged_source_links(public_root)
+
+            self.assertEqual([f"Found staged source link in {rendered_page}"], errors)
+
+    def test_ignores_stage_path_mentioned_as_page_content(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            public_root = Path(temp_dir)
+            rendered_page = public_root / "guide" / "index.html"
+            rendered_page.parent.mkdir(parents=True, exist_ok=True)
+            rendered_page.write_text(
+                "<p>Hugo reads generated pages from <code>.stage/content</code>.</p>\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual([], check_for_staged_source_links(public_root))
 
     def test_reports_component_root_with_docs_sidebar(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

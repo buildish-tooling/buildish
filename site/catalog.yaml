@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://buildish.org/components/site-pipeline/schemas/site-pipeline-catalog-v1.schema.json
+# yaml-language-server: $schema=../../buildish-site-pipeline/site/pages/schemas/catalog-v1.schema.json
 #
 # Copyright 2026 The Buildish Authors
 #
@@ -28,29 +28,56 @@ origins:
   docs:
     baseUrl: https://buildish.org/
     canonical: true
+sources:
+  mammoth-cache:
+    localDir: buildish-mammoth-cache
+    repository: https://github.com/buildish-tooling/buildish-mammoth-cache
+    defaultBranch: main
+  no-gradle-wrapper-jar:
+    localDir: buildish-no-gradle-wrapper-jar
+    repository: https://github.com/buildish-tooling/buildish-no-gradle-wrapper-jar
+    defaultBranch: main
+  site-pipeline:
+    localDir: buildish-site-pipeline
+    repository: https://github.com/buildish-tooling/buildish-site-pipeline
+    defaultBranch: main
+  release-tooling:
+    localDir: buildish-release-tooling
+    repository: https://github.com/buildish-tooling/buildish-release-tooling
+    defaultBranch: main
+  site:
+    localDir: buildish
+    repository: https://github.com/buildish-tooling/buildish
+    defaultBranch: main
+    metadataFile: site/site/component.yaml
 components:
   - slug: mammoth-cache
-    localDir: buildish-mammoth-cache
+    content:
+      source: mammoth-cache
     weight: 100
     publication:
       mountPath: /components/mammoth-cache/
   - slug: no-gradle-wrapper-jar
-    localDir: buildish-no-gradle-wrapper-jar
+    content:
+      source: no-gradle-wrapper-jar
     weight: 200
     publication:
       mountPath: /components/no-gradle-wrapper-jar/
   - slug: site-pipeline
-    localDir: buildish-site-pipeline
+    content:
+      source: site-pipeline
     weight: 300
     publication:
       mountPath: /components/site-pipeline/
   - slug: release-tooling
-    localDir: buildish-release-tooling
+    content:
+      source: release-tooling
     weight: 400
     publication:
       mountPath: /components/release-tooling/
   - slug: site
-    localDir: buildish/site
+    content:
+      source: site
     weight: 1000
     publication:
       mountPath: /components/site/

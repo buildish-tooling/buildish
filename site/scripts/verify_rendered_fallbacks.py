@@ -35,6 +35,13 @@ class RenderExpectation(NamedTuple):
 
 DEFAULT_EXPECTATIONS = (
     RenderExpectation(
+        relative_path="about/index.html",
+        required_snippets=(
+            'href="https://github.com/buildish-tooling/buildish/blob/main/site/content/about.md"',
+            'href="https://github.com/buildish-tooling/buildish/edit/main/site/content/about.md"',
+        ),
+    ),
+    RenderExpectation(
         relative_path="components/site-pipeline/index.html",
         required_snippets=(
             '<body class="td-section buildish-docs-landing-page buildish-component-landing-page">',
@@ -47,6 +54,13 @@ DEFAULT_EXPECTATIONS = (
             '<aside class="col-12 col-md-3 col-xl-2 td-sidebar d-print-none">',
         ),
         forbidden_patterns=(r'buildish-component-landing-page',),
+    ),
+    RenderExpectation(
+        relative_path="components/site-pipeline/how-to/use-json-schema-for-yaml-authoring/index.html",
+        required_snippets=(
+            'href="https://github.com/buildish-tooling/buildish-site-pipeline/blob/main/site/pages/how-to/use-json-schema-for-yaml-authoring.md"',
+            'href="https://github.com/buildish-tooling/buildish-site-pipeline/edit/main/site/pages/how-to/use-json-schema-for-yaml-authoring.md"',
+        ),
     ),
     RenderExpectation(
         relative_path="components/site-pipeline/architecture/build-architecture/index.html",
@@ -69,6 +83,8 @@ DEFAULT_EXPECTATIONS = (
     ),
 )
 
+STAGED_SOURCE_LINK_PATTERN = re.compile(r'href=["\'][^"\']*\.stage/content')
+
 
 def check_rendered_file(public_root: Path, expectation: RenderExpectation) -> list[str]:
     """Validate one rendered HTML file against required snippets and forbidden regexes."""
@@ -87,6 +103,16 @@ def check_rendered_file(public_root: Path, expectation: RenderExpectation) -> li
     return errors
 
 
+def check_for_staged_source_links(public_root: Path) -> list[str]:
+    """Reject repository links that expose Hugo's generated stage path."""
+
+    errors: list[str] = []
+    for html_path in sorted(public_root.rglob("*.html")):
+        if STAGED_SOURCE_LINK_PATTERN.search(html_path.read_text(encoding="utf-8")):
+            errors.append(f"Found staged source link in {html_path}")
+    return errors
+
+
 def check_rendered_site(
     public_root: Path, expectations: tuple[RenderExpectation, ...] = DEFAULT_EXPECTATIONS
 ) -> list[str]:
@@ -95,6 +121,7 @@ def check_rendered_site(
     errors: list[str] = []
     for expectation in expectations:
         errors.extend(check_rendered_file(public_root, expectation))
+    errors.extend(check_for_staged_source_links(public_root))
     return errors
 
 

@@ -23,6 +23,7 @@ from pathlib import Path
 
 import yaml
 from test_support import (
+    SOURCE_REPO_ROOT,
     TestCaseHelpers,
     seed_api_fixture_main_repo,
     seed_mammoth_fixture,
@@ -33,6 +34,45 @@ from test_support import (
 
 
 class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
+    def test_authored_schema_modelines_resolve_to_current_local_schemas(self) -> None:
+        authored_files = {
+            SOURCE_REPO_ROOT / "site" / "catalog.yaml": "catalog-v1.schema.json",
+            SOURCE_REPO_ROOT
+            / "site"
+            / "site"
+            / "component.yaml": "component-v1.schema.json",
+        }
+
+        for authored_path, expected_schema_name in authored_files.items():
+            with self.subTest(authored_path=authored_path):
+                first_line = authored_path.read_text(encoding="utf-8").splitlines()[0]
+                schema_path = first_line.removeprefix(
+                    "# yaml-language-server: $schema="
+                )
+
+                self.assertEqual(expected_schema_name, Path(schema_path).name)
+                self.assertTrue(
+                    (authored_path.parent / schema_path).resolve().is_file()
+                )
+
+    def test_site_component_source_binding_is_repository_rooted(self) -> None:
+        catalog = yaml.safe_load(
+            (SOURCE_REPO_ROOT / "site" / "catalog.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        component = yaml.safe_load(
+            (SOURCE_REPO_ROOT / "site" / "site" / "component.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        source = catalog["sources"]["site"]
+
+        self.assertEqual("buildish", source["localDir"])
+        self.assertEqual("site/site/component.yaml", source["metadataFile"])
+        self.assertEqual("site/site/pages", component["content"]["pagesRoot"])
+        self.assertEqual("site/site/docs", component["content"]["docsRoot"])
+
     @staticmethod
     def prepare_fixture_workspace(workspace: Path) -> Path:
         repo_root = workspace / "buildish"

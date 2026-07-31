@@ -38,6 +38,7 @@ include make/container.mk
 	help-all \
 	hugo-check \
 	integration-test \
+	rendered-fallback-check \
 	render \
 	render-local \
 	sanity-check \
@@ -113,6 +114,9 @@ render: container-render ## Render the current staged site through Hugo in the b
 render-local: hugo-check docsy-check vendor-assets ## Render the current staged site through Hugo with host tools.
 	@$(DOCSY_ENV); $(HUGO) --source . --config hugo.yaml --cleanDestinationDir
 
+rendered-fallback-check: ## Verify curated rendered-site behavior, including real source links.
+	@$(PYTHON) scripts/verify_rendered_fallbacks.py --public-root .public
+
 build: container-build ## Build the staged contract and full Hugo site in the build container.
 
 build-local: stage-local render-local ## Build the staged contract and full Hugo site with host tools.
@@ -145,3 +149,4 @@ check: ## Run lint, type checks, tests, and build-local.
 	$(MAKE) test
 	$(MAKE) integration-test
 	$(MAKE) build-local
+	$(MAKE) rendered-fallback-check

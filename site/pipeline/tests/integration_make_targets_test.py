@@ -528,7 +528,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 "buildish-mammoth-cache",
                 "buildish-no-gradle-wrapper-jar",
                 "buildish-site-pipeline",
-                "buildish/site",
+                "buildish",
             ],
             result.stdout.splitlines(),
             result.stdout + result.stderr,

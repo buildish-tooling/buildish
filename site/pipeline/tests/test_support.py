@@ -43,10 +43,14 @@ PIPELINE_FIXTURE_IGNORE = shutil.ignore_patterns(
     ".ruff_cache",
 )
 FIXTURE_COMPONENTS = [
-    {"slug": "mammoth-cache", "localDir": "buildish-mammoth-cache"},
-    {"slug": "no-gradle-wrapper-jar", "localDir": "buildish-no-gradle-wrapper-jar", "weight": 5},
-    {"slug": "site-pipeline", "localDir": "buildish-site-pipeline", "weight": 10},
-    {"slug": "site", "localDir": "buildish/site", "weight": 100},
+    {"slug": "mammoth-cache", "content": {"source": "mammoth-cache"}},
+    {
+        "slug": "no-gradle-wrapper-jar",
+        "content": {"source": "no-gradle-wrapper-jar"},
+        "weight": 5,
+    },
+    {"slug": "site-pipeline", "content": {"source": "site-pipeline"}, "weight": 10},
+    {"slug": "site", "content": {"source": "site"}, "weight": 100},
 ]
 
 
