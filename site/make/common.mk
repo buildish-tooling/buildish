@@ -46,3 +46,4 @@ REPO_NAME := $(notdir $(REPO_ROOT))
 SITE_PIPELINE_REPO_ROOT ?= $(WORKSPACE_ROOT)/buildish-site-pipeline
 SITE_PIPELINE_CATALOG ?= $(REPO_ROOT)/site/catalog.yaml
 NODE_MODULES_DIR ?= $(CURDIR)/node_modules
+HUGO_VENDOR_DIR := build/hugo-vendor

@@ -168,12 +168,14 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 mkdir -p \
                   "$root/.bin" \
                   "$root/@fortawesome/fontawesome-free/scss" \
+                  "$root/@fortawesome/fontawesome-free/webfonts" \
                   "$root/autoprefixer" \
                   "$root/bootstrap/scss" \
                   "$root/jquery/dist" \
                   "$root/mermaid/dist" \
                   "$root/lunr"
                 printf '// fake asset\n' > "$root/@fortawesome/fontawesome-free/scss/fontawesome.scss"
+                printf 'fake webfont\n' > "$root/@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2"
                 printf 'module.exports = {}\n' > "$root/autoprefixer/index.js"
                 printf '// fake asset\n' > "$root/bootstrap/scss/bootstrap.scss"
                 printf '#!/usr/bin/env sh\nset -eu\nif [ -n "${NODE_PATH:-}" ] && [ -f "${NODE_PATH}/autoprefixer/index.js" ]; then\n  exit 0\nfi\nif [ -f "$PWD/node_modules/autoprefixer/index.js" ]; then\n  exit 0\nfi\necho "autoprefixer is not resolvable" >&2\nexit 1\n' > "$root/.bin/postcss"
@@ -375,6 +377,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             )
             for rel in (
                 "@fortawesome/fontawesome-free/scss/fontawesome.scss",
+                "@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2",
                 "bootstrap/scss/bootstrap.scss",
                 "jquery/dist/jquery.min.js",
                 "mermaid/dist/mermaid.min.js",
@@ -573,6 +576,14 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             repo_root / "site" / ".public" / "index.html",
             repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache" / "assets" / "images" / "diagram.svg",
             repo_root / "site" / "static" / "js" / "vendor" / "mermaid.min.js",
+            repo_root / "site" / "build" / "hugo-vendor" / "bootstrap" / "scss" / "bootstrap.scss",
+            repo_root
+            / "site"
+            / "build"
+            / "hugo-vendor"
+            / "Font-Awesome"
+            / "webfonts"
+            / "fa-solid-900.woff2",
         )
         hugo_log = self.read_text(Path(env["BUILDISH_FAKE_HUGO_LOG"]))
         self.assert_contains_all(hugo_log, "--source .", "--config hugo.yaml")

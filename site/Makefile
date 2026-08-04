@@ -82,12 +82,18 @@ docsy-check: ## Verify Node/PostCSS tooling for Docsy is available.
 	@$(DOCSY_ENV); command -v node >/dev/null 2>&1 || { echo "Error: node is not available (expected via nvm)."; exit 1; }; \
 		command -v postcss >/dev/null 2>&1 || { echo "Error: postcss is not available. Run npm install in site/."; exit 1; }; \
 		test -f $(NODE_MODULES_DIR)/@fortawesome/fontawesome-free/scss/fontawesome.scss || { echo "Error: Font Awesome is not available. Run npm install in site/."; exit 1; }; \
+		test -d $(NODE_MODULES_DIR)/@fortawesome/fontawesome-free/webfonts || { echo "Error: Font Awesome webfonts are not available. Run npm install in site/."; exit 1; }; \
 		test -f $(NODE_MODULES_DIR)/bootstrap/scss/bootstrap.scss || { echo "Error: Bootstrap is not available. Run npm install in site/."; exit 1; }; \
 		test -f $(NODE_MODULES_DIR)/jquery/dist/jquery.min.js || { echo "Error: jquery is not available. Run npm install in site/."; exit 1; }; \
 		test -f $(NODE_MODULES_DIR)/mermaid/dist/mermaid.min.js || { echo "Error: mermaid is not available. Run npm install in site/."; exit 1; }; \
 	test -f $(NODE_MODULES_DIR)/lunr/lunr.min.js || { echo "Error: lunr is not available. Run npm install in site/."; exit 1; }
 
 vendor-assets: docsy-check ## Stage local vendor assets required by the renderer.
+	@rm -rf $(HUGO_VENDOR_DIR)
+	@mkdir -p $(HUGO_VENDOR_DIR)/bootstrap $(HUGO_VENDOR_DIR)/Font-Awesome
+	@cp -R $(NODE_MODULES_DIR)/bootstrap/scss $(HUGO_VENDOR_DIR)/bootstrap/
+	@cp -R $(NODE_MODULES_DIR)/@fortawesome/fontawesome-free/scss $(HUGO_VENDOR_DIR)/Font-Awesome/
+	@cp -R $(NODE_MODULES_DIR)/@fortawesome/fontawesome-free/webfonts $(HUGO_VENDOR_DIR)/Font-Awesome/
 	@mkdir -p static/js/vendor
 	@cp $(NODE_MODULES_DIR)/jquery/dist/jquery.min.js static/js/vendor/jquery.min.js
 	@cp $(NODE_MODULES_DIR)/mermaid/dist/mermaid.min.js static/js/vendor/mermaid.min.js
@@ -144,7 +150,7 @@ serve-local: sanity-check hugo-check docsy-check vendor-assets ## Serve the full
 
 clean: sanity-check ## Remove generated pipeline and renderer output.
 	$(MAKE) --no-print-directory pipeline-clean-local
-	rm -rf .public .hugo_build.lock resources static/js/vendor static/third-party-licenses.txt
+	rm -rf .public .hugo_build.lock resources $(HUGO_VENDOR_DIR) static/js/vendor static/third-party-licenses.txt
 
 check: ## Run lint, type checks, tests, and build-local.
 	$(MAKE) clean

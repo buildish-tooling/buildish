@@ -127,6 +127,16 @@ module:
     # SCSS / JS / image assets processed by Hugo Pipes.
     - source: assets
       target: assets
+    # Docsy's module config expects its npm dependencies below `node_modules`,
+    # but container builds keep that dependency tree in an isolated cache.
+    # `make vendor-assets` copies only the renderer inputs into this generated
+    # tree so clean and cached builds use the same Hugo module mounts.
+    - source: build/hugo-vendor/bootstrap
+      target: assets/vendor/bootstrap
+    - source: build/hugo-vendor/Font-Awesome
+      target: assets/vendor/Font-Awesome
+    - source: build/hugo-vendor/Font-Awesome/webfonts
+      target: static/webfonts
 
 privacy:
   googleAnalytics:
