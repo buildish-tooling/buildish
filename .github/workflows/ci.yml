@@ -97,6 +97,26 @@ jobs:
           SITE_PIPELINE_REPO_ROOT: ${{ github.workspace }}/buildish-site-pipeline
         run: bash .github/scripts/ci-site-verify.sh
 
+  site-build:
+    name: Aggregate site build
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.site_verify == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # Keep the aggregate repository in the same sibling layout used by local
+      # development and site publication. This bootstrap checkout is required
+      # before GitHub can load the repository-local composite action.
+      - name: Check out aggregate repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: buildish
+          persist-credentials: false
+
+      - name: Build aggregate site
+        uses: ./buildish/.github/actions/build-site
+
   container-image:
     name: Site builder image
     needs: changes
@@ -298,6 +318,7 @@ jobs:
       - changes
       - rat
       - site-verify
+      - site-build
       - container-image
       - codeql
       - zizmor
@@ -308,6 +329,7 @@ jobs:
           CHANGES_RESULT: ${{ needs.changes.result }}
           RAT_RESULT: ${{ needs.rat.result }}
           SITE_VERIFY_RESULT: ${{ needs.site-verify.result }}
+          SITE_BUILD_RESULT: ${{ needs.site-build.result }}
           CONTAINER_IMAGE_RESULT: ${{ needs.container-image.result }}
           CODEQL_RESULT: ${{ needs.codeql.result }}
           ZIZMOR_RESULT: ${{ needs.zizmor.result }}
@@ -316,6 +338,7 @@ jobs:
             "$CHANGES_RESULT" \
             "$RAT_RESULT" \
             "$SITE_VERIFY_RESULT" \
+            "$SITE_BUILD_RESULT" \
             "$CONTAINER_IMAGE_RESULT" \
             "$CODEQL_RESULT" \
             "$ZIZMOR_RESULT"; do

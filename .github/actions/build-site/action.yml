@@ -1,0 +1,54 @@
+#
+# Copyright 2026 The Buildish Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Build aggregate site
+description: Check out the Buildish components and build the aggregate site
+
+runs:
+  using: composite
+  steps:
+    # The caller checks out this repository at `buildish` first so GitHub can
+    # load this local action and the aggregate workspace has its expected shape.
+    - name: Check out Mammoth Cache
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        repository: buildish-tooling/buildish-mammoth-cache
+        path: buildish-mammoth-cache
+        persist-credentials: false
+
+    - name: Check out No Gradle Wrapper Jar
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        repository: buildish-tooling/buildish-no-gradle-wrapper-jar
+        path: buildish-no-gradle-wrapper-jar
+        persist-credentials: false
+
+    - name: Check out Release Tooling
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        repository: buildish-tooling/buildish-release-tooling
+        path: buildish-release-tooling
+        persist-credentials: false
+
+    - name: Check out Site Pipeline
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        repository: buildish-tooling/buildish-site-pipeline
+        path: buildish-site-pipeline
+        persist-credentials: false
+
+    - name: Build site
+      shell: bash
+      run: make -C buildish/site build

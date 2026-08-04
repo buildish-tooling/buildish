@@ -25,7 +25,7 @@ github_output="${GITHUB_OUTPUT:?GITHUB_OUTPUT must be set}"
 site_verify=false
 site_build_image=false
 
-site_verify_pattern='^(\.github/workflows/ci\.yml|\.github/scripts/ci-detect-changes\.sh|\.github/scripts/ci-site-verify\.sh|site/|tools/site-build-image/)'
+site_verify_pattern='^(\.github/actions/build-site/|\.github/workflows/(ci|site-publish)\.yml|\.github/scripts/ci-detect-changes\.sh|\.github/scripts/ci-site-verify\.sh|site/|tools/site-build-image/)'
 site_build_image_pattern='^(\.github/workflows/ci\.yml|\.github/scripts/ci-detect-changes\.sh|tools/site-build-image/)'
 
 enable_all() {
