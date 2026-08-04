@@ -27,15 +27,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish-site:
-    name: Publish aggregate site
+  build-site:
+    name: Build aggregate site
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Required to update this repository's gh-pages branch.
+      contents: read
+      pages: read
     # Push publishing reaches this reusable workflow only after the canonical CI
     # required-check job succeeds. Manual dispatch remains a main-only operator
-    # override. Publishing stays disabled until all components and deployment
-    # credentials are ready.
+    # override.
     if: >-
       github.repository == 'buildish-tooling/buildish' &&
       github.ref == 'refs/heads/main' &&
@@ -75,15 +75,30 @@ jobs:
           path: buildish-site-pipeline
           persist-credentials: false
 
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
       - name: Build site
         env:
           SITE_PIPELINE_ARGS: --missing-components fail
         run: make -C buildish/site build
 
-      - name: Deploy Static Site to GitHub
-        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
-        if: false
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: ./buildish/site/.public
+          path: ./buildish/site/.public
+
+  deploy-site:
+    name: Deploy aggregate site
+    needs: build-site
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages site
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

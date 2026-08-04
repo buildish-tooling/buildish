@@ -334,10 +334,14 @@ jobs:
     name: Publish aggregate site after CI
     needs: required_checks
     if: >-
+      always() &&
+      !cancelled() &&
       github.repository == 'buildish-tooling/buildish' &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
       needs.required_checks.result == 'success'
     permissions:
-      contents: write
+      contents: read
+      pages: write
+      id-token: write
     uses: ./.github/workflows/site-publish.yml
