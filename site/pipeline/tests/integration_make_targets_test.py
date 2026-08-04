@@ -171,6 +171,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                   "$root/@fortawesome/fontawesome-free/webfonts" \
                   "$root/autoprefixer" \
                   "$root/bootstrap/scss" \
+                  "$root/bootstrap/dist/js" \
                   "$root/jquery/dist" \
                   "$root/mermaid/dist" \
                   "$root/lunr"
@@ -178,6 +179,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 printf 'fake webfont\n' > "$root/@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2"
                 printf 'module.exports = {}\n' > "$root/autoprefixer/index.js"
                 printf '// fake asset\n' > "$root/bootstrap/scss/bootstrap.scss"
+                printf '// fake asset\n' > "$root/bootstrap/dist/js/bootstrap.bundle.js"
                 printf '#!/usr/bin/env sh\nset -eu\nif [ -n "${NODE_PATH:-}" ] && [ -f "${NODE_PATH}/autoprefixer/index.js" ]; then\n  exit 0\nfi\nif [ -f "$PWD/node_modules/autoprefixer/index.js" ]; then\n  exit 0\nfi\necho "autoprefixer is not resolvable" >&2\nexit 1\n' > "$root/.bin/postcss"
                 chmod 755 "$root/.bin/postcss"
                 printf '// fake asset\n' > "$root/jquery/dist/jquery.min.js"
@@ -379,6 +381,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
                 "@fortawesome/fontawesome-free/scss/fontawesome.scss",
                 "@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2",
                 "bootstrap/scss/bootstrap.scss",
+                "bootstrap/dist/js/bootstrap.bundle.js",
                 "jquery/dist/jquery.min.js",
                 "mermaid/dist/mermaid.min.js",
                 "lunr/lunr.min.js",
@@ -577,6 +580,14 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             repo_root / "site" / ".stage" / "static" / "components" / "mammoth-cache" / "assets" / "images" / "diagram.svg",
             repo_root / "site" / "static" / "js" / "vendor" / "mermaid.min.js",
             repo_root / "site" / "build" / "hugo-vendor" / "bootstrap" / "scss" / "bootstrap.scss",
+            repo_root
+            / "site"
+            / "build"
+            / "hugo-vendor"
+            / "bootstrap"
+            / "dist"
+            / "js"
+            / "bootstrap.bundle.js",
             repo_root
             / "site"
             / "build"

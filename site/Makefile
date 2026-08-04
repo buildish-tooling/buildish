@@ -84,14 +84,16 @@ docsy-check: ## Verify Node/PostCSS tooling for Docsy is available.
 		test -f $(NODE_MODULES_DIR)/@fortawesome/fontawesome-free/scss/fontawesome.scss || { echo "Error: Font Awesome is not available. Run npm install in site/."; exit 1; }; \
 		test -d $(NODE_MODULES_DIR)/@fortawesome/fontawesome-free/webfonts || { echo "Error: Font Awesome webfonts are not available. Run npm install in site/."; exit 1; }; \
 		test -f $(NODE_MODULES_DIR)/bootstrap/scss/bootstrap.scss || { echo "Error: Bootstrap is not available. Run npm install in site/."; exit 1; }; \
+		test -f $(NODE_MODULES_DIR)/bootstrap/dist/js/bootstrap.bundle.js || { echo "Error: Bootstrap JavaScript is not available. Run npm install in site/."; exit 1; }; \
 		test -f $(NODE_MODULES_DIR)/jquery/dist/jquery.min.js || { echo "Error: jquery is not available. Run npm install in site/."; exit 1; }; \
 		test -f $(NODE_MODULES_DIR)/mermaid/dist/mermaid.min.js || { echo "Error: mermaid is not available. Run npm install in site/."; exit 1; }; \
 	test -f $(NODE_MODULES_DIR)/lunr/lunr.min.js || { echo "Error: lunr is not available. Run npm install in site/."; exit 1; }
 
 vendor-assets: docsy-check ## Stage local vendor assets required by the renderer.
 	@rm -rf $(HUGO_VENDOR_DIR)
-	@mkdir -p $(HUGO_VENDOR_DIR)/bootstrap $(HUGO_VENDOR_DIR)/Font-Awesome
+	@mkdir -p $(HUGO_VENDOR_DIR)/bootstrap/dist $(HUGO_VENDOR_DIR)/Font-Awesome
 	@cp -R $(NODE_MODULES_DIR)/bootstrap/scss $(HUGO_VENDOR_DIR)/bootstrap/
+	@cp -R $(NODE_MODULES_DIR)/bootstrap/dist/js $(HUGO_VENDOR_DIR)/bootstrap/dist/
 	@cp -R $(NODE_MODULES_DIR)/@fortawesome/fontawesome-free/scss $(HUGO_VENDOR_DIR)/Font-Awesome/
 	@cp -R $(NODE_MODULES_DIR)/@fortawesome/fontawesome-free/webfonts $(HUGO_VENDOR_DIR)/Font-Awesome/
 	@mkdir -p static/js/vendor
