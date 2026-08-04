@@ -86,6 +86,14 @@
       // 3 days should be the minimum
       "minimumReleaseAge": "3 days"
     },
+    // Hugo-required dependencies
+    {
+      // Hugo generates this workspace from the dependencies declared by Docsy.
+      // Regenerate it when updating Docsy; do not update its packages independently.
+      matchManagers: ["npm"],
+      matchFileNames: ["site/packages/hugoautogen/package.json"],
+      enabled: false,
+    }
   ],
 
   // Max 50 PRs in total, 5 per hour.
