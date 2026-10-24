@@ -117,6 +117,23 @@ jobs:
       - name: Build aggregate site
         uses: ./buildish/.github/actions/build-site # zizmor: ignore[self-repository]
 
+  site-build-native:
+    name: Aggregate site build (.nvmrc)
+    needs: changes
+    if: needs.changes.outputs.site_verify == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out aggregate repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: buildish
+          persist-credentials: false
+
+      - name: Build aggregate site with host tools
+        uses: ./buildish/.github/actions/build-site # zizmor: ignore[self-repository]
+        with:
+          native: 'true'
+
   container-image:
     name: Site builder image
     needs: changes
@@ -319,6 +336,7 @@ jobs:
       - rat
       - site-verify
       - site-build
+      - site-build-native
       - container-image
       - codeql
       - zizmor
@@ -330,6 +348,8 @@ jobs:
           RAT_RESULT: ${{ needs.rat.result }}
           SITE_VERIFY_RESULT: ${{ needs.site-verify.result }}
           SITE_BUILD_RESULT: ${{ needs.site-build.result }}
+          SITE_BUILD_NATIVE_RESULT: ${{ needs.site-build-native.result }}
+          SITE_VERIFY_REQUIRED: ${{ needs.changes.outputs.site_verify }}
           CONTAINER_IMAGE_RESULT: ${{ needs.container-image.result }}
           CODEQL_RESULT: ${{ needs.codeql.result }}
           ZIZMOR_RESULT: ${{ needs.zizmor.result }}
@@ -339,6 +359,7 @@ jobs:
             "$RAT_RESULT" \
             "$SITE_VERIFY_RESULT" \
             "$SITE_BUILD_RESULT" \
+            "$SITE_BUILD_NATIVE_RESULT" \
             "$CONTAINER_IMAGE_RESULT" \
             "$CODEQL_RESULT" \
             "$ZIZMOR_RESULT"; do
@@ -350,6 +371,11 @@ jobs:
                 ;;
             esac
           done
+
+          if [ "$SITE_VERIFY_REQUIRED" = 'true' ] && [ "$SITE_BUILD_NATIVE_RESULT" != 'success' ]; then
+            echo "The native site build must succeed for site changes."
+            exit 1
+          fi
 
           echo "All required jobs succeeded for this event."
 

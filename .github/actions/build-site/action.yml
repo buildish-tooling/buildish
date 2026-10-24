@@ -16,6 +16,11 @@
 name: Build aggregate site
 description: Check out the Buildish components and build the aggregate site
 
+inputs:
+  native:
+    description: Build with host tools and the Node version from site/.nvmrc
+    default: 'false'
+
 runs:
   using: composite
   steps:
@@ -49,6 +54,54 @@ runs:
         path: buildish-site-pipeline
         persist-credentials: false
 
-    - name: Build site
+    - name: Set up Node from .nvmrc
+      if: inputs.native == 'true'
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version-file: buildish/site/.nvmrc
+        package-manager-cache: false
+
+    - name: Set up Go
+      if: inputs.native == 'true'
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: buildish/site/go.mod
+        cache: false
+
+    - name: Set up uv
+      if: inputs.native == 'true'
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      with:
+        python-version: '3.13'
+        enable-cache: false
+
+    - name: Set up Hugo Extended
+      if: inputs.native == 'true'
+      shell: bash
+      run: |
+        containerfile=buildish/tools/site-build-image/Containerfile
+        hugo_version="$(awk -F= '$1 == "ARG HUGO_VERSION" {print $2}' "$containerfile")"
+        hugo_sha="$(awk -F= '$1 == "ARG HUGO_SHA256_AMD64" {print $2}' "$containerfile")"
+        hugo_dir="$RUNNER_TEMP/buildish-hugo"
+        mkdir -p "$hugo_dir"
+        curl -fsSLo "$hugo_dir/hugo.tar.gz" "https://github.com/gohugoio/hugo/releases/download/v${hugo_version}/hugo_extended_${hugo_version}_linux-amd64.tar.gz"
+        echo "$hugo_sha  $hugo_dir/hugo.tar.gz" | sha256sum -c -
+        tar -xzf "$hugo_dir/hugo.tar.gz" -C "$hugo_dir" hugo
+
+    - name: Build site with .nvmrc Node version
+      if: inputs.native == 'true'
+      shell: bash
+      # Keep the Make targets on setup-node's PATH even if the runner has nvm.
+      env:
+        NVM_DIR: ${{ runner.temp }}/buildish-no-nvm
+      run: |
+        test "$(node --version)" = "v$(tr -d '[:space:]' < buildish/site/.nvmrc)"
+        uv sync --project buildish-site-pipeline --locked --no-dev
+        npm ci --ignore-scripts --prefix buildish/site
+        make -C buildish/site HUGO="$RUNNER_TEMP/buildish-hugo/hugo" build-local
+        make -C buildish/site rendered-fallback-check
+
+    - name: Build site in container
+      if: inputs.native != 'true'
       shell: bash
       run: make -C buildish/site build
