@@ -115,7 +115,7 @@ jobs:
           persist-credentials: false
 
       - name: Build aggregate site
-        uses: $/buildish/.github/actions/build-site
+        uses: ./buildish/.github/actions/build-site # zizmor: ignore[self-repository]
 
   container-image:
     name: Site builder image
