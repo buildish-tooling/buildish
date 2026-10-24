@@ -18,7 +18,7 @@
     "autoprefixer": "^10.5.4",
     "jquery": "^4.0.0",
     "lunr": "^2.3.9",
-    "mermaid": "^11.16.1",
+    "mermaid": "^12.0.0",
     "postcss-cli": "^12.0.0"
   },
   "workspaces": [
