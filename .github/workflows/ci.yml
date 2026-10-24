@@ -115,7 +115,7 @@ jobs:
           persist-credentials: false
 
       - name: Build aggregate site
-        uses: ./buildish/.github/actions/build-site
+        uses: $/buildish/.github/actions/build-site
 
   container-image:
     name: Site builder image
@@ -367,4 +367,4 @@ jobs:
       contents: read
       pages: write
       id-token: write
-    uses: ./.github/workflows/site-publish.yml
+    uses: $/.github/workflows/site-publish.yml
