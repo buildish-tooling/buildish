@@ -33,6 +33,10 @@ sources:
     localDir: buildish-mammoth-cache
     repository: https://github.com/buildish-tooling/buildish-mammoth-cache
     defaultBranch: main
+  atr-maven-bundle:
+    localDir: buildish-atr-maven-bundle
+    repository: https://github.com/buildish-tooling/buildish-atr-maven-bundle
+    defaultBranch: main
   no-gradle-wrapper-jar:
     localDir: buildish-no-gradle-wrapper-jar
     repository: https://github.com/buildish-tooling/buildish-no-gradle-wrapper-jar
@@ -57,12 +61,12 @@ components:
     weight: 100
     publication:
       mountPath: /components/mammoth-cache/
-  - slug: no-gradle-wrapper-jar
+  - slug: atr-maven-bundle
     content:
-      source: no-gradle-wrapper-jar
-    weight: 200
+      source: atr-maven-bundle
+    weight: 100
     publication:
-      mountPath: /components/no-gradle-wrapper-jar/
+      mountPath: /components/atr-maven-bundle/
   - slug: site-pipeline
     content:
       source: site-pipeline
@@ -75,6 +79,12 @@ components:
     weight: 400
     publication:
       mountPath: /components/release-tooling/
+  - slug: no-gradle-wrapper-jar
+    content:
+      source: no-gradle-wrapper-jar
+    weight: 500
+    publication:
+      mountPath: /components/no-gradle-wrapper-jar/
   - slug: site
     content:
       source: site
