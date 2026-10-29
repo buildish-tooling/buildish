@@ -65,6 +65,7 @@ usage() {
 Usage: build-image.sh --image <image-ref> [options]
 
 Build the Buildish site builder image.
+The Node.js version is read from site/.nvmrc relative to this script.
 
 Options:
   --image <ref>         Fully-qualified image reference to build.
@@ -221,7 +222,7 @@ build_with_podman() {
   local platform
   local -a platforms podman_build_args
 
-  podman_build_args=()
+  podman_build_args=(--build-arg "NODE_VERSION=$NODE_VERSION")
   if [[ -n "$SITE_PIPELINE_BASE_IMAGE" ]]; then
     podman_build_args+=(--build-arg "SITE_PIPELINE_BASE_IMAGE=$SITE_PIPELINE_BASE_IMAGE")
   fi
@@ -305,6 +306,12 @@ fi
 
 validate_push_settings
 
+NODE_VERSION="$(tr -d '\r\n' < "$SCRIPT_DIR/../../site/.nvmrc")"
+if [[ ! "$NODE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Error: site/.nvmrc must contain an exact Node.js version (major.minor.patch)." >&2
+  exit 1
+fi
+
 if [[ -z "$ENGINE" ]]; then
   if command -v podman >/dev/null 2>&1; then
     ENGINE=podman
@@ -326,12 +333,14 @@ case "$ENGINE" in
       exit 1
     fi
     run_cmd docker buildx version
-    docker_cmd=(docker buildx build --platform "$PLATFORMS" --rm --tag "$IMAGE_REF" -f "$CONTAINERFILE_DEFAULT")
+    docker_cmd=(docker buildx build --platform "$PLATFORMS" --rm --tag "$IMAGE_REF" --build-arg "NODE_VERSION=$NODE_VERSION" -f "$CONTAINERFILE_DEFAULT")
     if [[ -n "$SITE_PIPELINE_BASE_IMAGE" ]]; then
       docker_cmd+=(--build-arg "SITE_PIPELINE_BASE_IMAGE=$SITE_PIPELINE_BASE_IMAGE")
     fi
     if $PUSH_IMAGE; then
       docker_cmd+=(--push)
+    elif [[ "$PLATFORMS" != *,* ]]; then
+      docker_cmd+=(--load)
     fi
     docker_cmd+=("$BUILD_CONTEXT_DEFAULT")
     run_cmd "${docker_cmd[@]}"

@@ -17,9 +17,7 @@ ARG SITE_PIPELINE_BASE_IMAGE=localhost/buildish-site-pipeline:local
 
 FROM ${SITE_PIPELINE_BASE_IMAGE}
 
-ARG NODE_VERSION=24.18.1
-ARG NODE_SHA256_AMD64=d6c664df3f3f61458e8c277585571328522d705166723a7c7823a9253a4d15a0
-ARG NODE_SHA256_ARM64=7201e3a09dc825bac57867c81913e2b8f0ef87d04cb9082af4cda82f6ff3d88c
+ARG NODE_VERSION
 ARG GO_VERSION=1.26.5
 ARG GO_SHA256_AMD64=5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053
 ARG GO_SHA256_ARM64=fe4789e92b1f33358680864bbe8704289e7bb5fc207d80623c308935bd696d49
@@ -32,20 +30,24 @@ USER root
 RUN set -eux; \
     : "Install base OS packages required by the derived site builder."; \
     apt-get update; \
-    apt-get install -y --no-install-recommends curl git make xz-utils; \
+    apt-get install -y --no-install-recommends curl git libatomic1 make xz-utils; \
     rm -rf /var/lib/apt/lists/*; \
     : "Resolve architecture-specific download targets and checksums."; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
-      amd64) node_arch='x64'; node_sha="$NODE_SHA256_AMD64"; go_arch='amd64'; go_sha="$GO_SHA256_AMD64"; hugo_arch='amd64'; hugo_sha="$HUGO_SHA256_AMD64" ;; \
-      arm64) node_arch='arm64'; node_sha="$NODE_SHA256_ARM64"; go_arch='arm64'; go_sha="$GO_SHA256_ARM64"; hugo_arch='arm64'; hugo_sha="$HUGO_SHA256_ARM64" ;; \
+      amd64) node_arch='x64'; go_arch='amd64'; go_sha="$GO_SHA256_AMD64"; hugo_arch='amd64'; hugo_sha="$HUGO_SHA256_AMD64" ;; \
+      arm64) node_arch='arm64'; go_arch='arm64'; go_sha="$GO_SHA256_ARM64"; hugo_arch='arm64'; hugo_sha="$HUGO_SHA256_ARM64" ;; \
       *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
     esac; \
     : "Install Node.js."; \
+    : "${NODE_VERSION:?Pass NODE_VERSION from site/.nvmrc via build-image.sh}"; \
+    curl -fsSLo /tmp/node-SHASUMS256.txt "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"; \
+    node_sha="$(awk -v archive="node-v${NODE_VERSION}-linux-${node_arch}.tar.xz" '$2 == archive {print $1}' /tmp/node-SHASUMS256.txt)"; \
+    test -n "$node_sha"; \
     curl -fsSLo /tmp/node.tar.xz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
     echo "${node_sha}  /tmp/node.tar.xz" | sha256sum -c -; \
     tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1; \
-    rm -f /tmp/node.tar.xz; \
+    rm -f /tmp/node.tar.xz /tmp/node-SHASUMS256.txt; \
     : "Install Go."; \
     curl -fsSLo /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-${go_arch}.tar.gz"; \
     echo "${go_sha}  /tmp/go.tar.gz" | sha256sum -c -; \

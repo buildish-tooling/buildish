@@ -66,6 +66,7 @@ def normalize_fixture_component(component: Mapping[str, object]) -> dict[str, ob
         normalized["publication"] = publication
     return normalized
 SITE_ROOT_FILES = (
+    ".nvmrc",
     "Makefile",
     "go.mod",
     "go.sum",

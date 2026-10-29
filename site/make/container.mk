@@ -154,7 +154,7 @@ CONTAINER_PREPARE_SITE_ENV = \
 	node_root="$(CONTAINER_HOME)/node-work"; \
 	tool_bin="$(CONTAINER_HOME)/tool-bin"; \
 	node_inputs_hash_file="$$node_root/.buildish-node-inputs.sha256"; \
-	current_node_inputs_hash="$$(cat package.json package-lock.json packages/hugoautogen/package.json packages/hugoautogen/hugo_packagemeta.json | sha256sum)"; \
+	current_node_inputs_hash="$$( { node --version; cat package.json package-lock.json packages/hugoautogen/package.json packages/hugoautogen/hugo_packagemeta.json; } | sha256sum)"; \
 	printf "==> [container] using scratch directory %s\\n" "$$scratch"; \
 	mkdir -p "$$scratch/uv-cache" "$$node_root" "$$tool_bin" "$(CONTAINER_HOME)/.cache/npm"; \
 	trap "printf \"==> [container] cleaning scratch directory %s\\n\" \"$$scratch\"; rm -rf \"$$scratch\"" EXIT; \
@@ -305,22 +305,22 @@ site-pipeline-container-image: container-engine-check ## Build the generic site-
 		CONTAINER_IMAGE_PLATFORMS=$(CONTAINER_PLATFORM)
 
 container-image-ensure: site-pipeline-container-image-ensure ## Build the site builder image if it is missing locally.
-	@if $(CONTAINER_ENGINE) image inspect $(CONTAINER_IMAGE) >/dev/null 2>&1 \
+	@expected_node_version="v$$(tr -d '\r\n' < .nvmrc)"; \
+	if $(CONTAINER_ENGINE) image inspect $(CONTAINER_IMAGE) >/dev/null 2>&1 \
 		&& { [ '$(CONTAINER_ENGINE_BASENAME)' != 'podman' ] && [ '$(CONTAINER_ENGINE_BASENAME)' != 'docker' ] \
-			|| $(CONTAINER_ENGINE) run --rm $(CONTAINER_PLATFORM_FLAG) --entrypoint /bin/bash $(CONTAINER_IMAGE) -c 'site-pipeline build --help | grep -q -- --workspace-root && site-pipeline component-source-roots --help >/dev/null' >/dev/null 2>&1; }; then \
+			|| $(CONTAINER_ENGINE) run --rm $(CONTAINER_PLATFORM_FLAG) --entrypoint /bin/bash $(CONTAINER_IMAGE) -c 'site-pipeline build --help | grep -q -- --workspace-root && site-pipeline component-source-roots --help >/dev/null && test "$$(node --version)" = "$$1"' buildish-node-check "$$expected_node_version" >/dev/null 2>&1; }; then \
 		printf '==> [container-image] using existing image %s via %s\n' '$(CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
 	else \
-		printf '==> [container-image] rebuilding image %s via %s to match the current CLI\n' '$(CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
+		printf '==> [container-image] rebuilding image %s via %s to match the current CLI and Node version\n' '$(CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
 		$(MAKE) container-image; \
 	fi
 
 container-image: site-pipeline-container-image-ensure ## Build the Buildish-derived container image used for reproducible site builds.
-	$(CONTAINER_ENGINE) build \
-		$(CONTAINER_PLATFORM_FLAG) \
-		-t $(CONTAINER_IMAGE) \
-		--build-arg SITE_PIPELINE_BASE_IMAGE=$(SITE_PIPELINE_CONTAINER_IMAGE) \
-		-f $(CONTAINER_BUILD_DIR)/Containerfile \
-		$(CONTAINER_BUILD_DIR)
+	$(CONTAINER_BUILD_DIR)/build-image.sh \
+		--engine $(CONTAINER_ENGINE_BASENAME) \
+		--image $(CONTAINER_IMAGE) \
+		--platforms $(CONTAINER_PLATFORM) \
+		--site-pipeline-base-image $(SITE_PIPELINE_CONTAINER_IMAGE)
 
 container-test: container-image ## Run the site unit tests inside the build container.
 	@$(PREPARE_CONTAINER_SCRATCH)

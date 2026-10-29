@@ -140,6 +140,7 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             text_block(
                 r"""
                 #!/usr/bin/env sh
+                echo "${BUILDISH_FAKE_NODE_VERSION:-v24.22.2}"
                 exit 0
                 """
             ),
@@ -691,6 +692,26 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
         npm_invocations = Path(env["BUILDISH_FAKE_NPM_LOG"]).read_text(encoding="utf-8").splitlines()
         self.assertEqual(1, len(npm_invocations), npm_invocations)
         self.assertIn("reusing cached Node dependencies", second_result.stdout)
+
+    def test_make_build_reinstalls_cached_container_node_dependencies_after_node_version_change(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        bin_dir = self.seed_fake_tools(repo_root / "site", include_engine=True, include_hugo=True)
+        env = self.base_env(repo_root / "site", bin_dir)
+        env["CONTAINER_ENGINE"] = "fake-container-engine"
+        env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_HOME"] = str(repo_root / "site" / "build" / "fake-container-home")
+        env["CONTAINER_SCRATCH_ROOT"] = str(repo_root / "site" / "build" / "container")
+        env["BUILDISH_FAKE_NODE_VERSION"] = "v24.22.1"
+
+        first_result = self.run_make(repo_root / "site", "build", env)
+        self.assertEqual(0, first_result.returncode, first_result.stdout + first_result.stderr)
+        env["BUILDISH_FAKE_NODE_VERSION"] = "v24.22.2"
+        second_result = self.run_make(repo_root / "site", "build", env)
+
+        self.assertEqual(0, second_result.returncode, second_result.stdout + second_result.stderr)
+        npm_invocations = Path(env["BUILDISH_FAKE_NPM_LOG"]).read_text(encoding="utf-8").splitlines()
+        self.assertEqual(2, len(npm_invocations), npm_invocations)
+        self.assertIn("syncing Node dependencies", second_result.stdout)
 
     def test_make_build_reinstalls_cached_container_node_dependencies_after_lockfile_change(self) -> None:
         repo_root = self.prepare_fixture_workspace()

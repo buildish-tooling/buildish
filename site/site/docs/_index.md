@@ -66,6 +66,11 @@ without installing the full local toolchain.
 - `site/Makefile` remains the main entrypoint for both containerized and native
   workflows
 
+Both workflows select Node from `site/.nvmrc`. The image build script passes
+that version to the Containerfile, which verifies the Node archive against the
+matching upstream checksum manifest. Containerized Make targets rebuild a local
+builder image when its Node version differs from `.nvmrc`.
+
 The main generated paths remain:
 
 - `site/.stage/`
