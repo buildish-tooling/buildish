@@ -29,7 +29,7 @@ concurrency:
 jobs:
   build-site:
     name: Build aggregate site
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pages: read
@@ -61,7 +61,7 @@ jobs:
   deploy-site:
     name: Deploy aggregate site
     needs: build-site
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pages: write
       id-token: write
