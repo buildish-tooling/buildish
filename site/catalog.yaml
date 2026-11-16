@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../buildish-site-pipeline/site/pages/schemas/catalog-v1.schema.json
+# yaml-language-server: $schema=https://buildish.org/components/site-pipeline/schemas/catalog-v1.schema.json
 #
 # Copyright 2026 The Buildish Authors
 #
