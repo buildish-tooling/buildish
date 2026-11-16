@@ -29,4 +29,4 @@
 __pycache__/
 
 # Local overrides
-/components.local.yaml
+/site/site/components.local.yaml
