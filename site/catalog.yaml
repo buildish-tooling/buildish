@@ -61,10 +61,10 @@ components:
     weight: 100
     publication:
       mountPath: /components/mammoth-cache/
-#    providerSnapshot:
-#      source: mammoth-cache
-#      path: docs/releases/provider-snapshot.json
-#      requirement: publication
+    providerSnapshot:
+      source: mammoth-cache
+      path: docs/releases/provider-snapshot.json
+      requirement: publication
   - slug: atr-maven-bundle
     content:
       source: atr-maven-bundle

@@ -18,7 +18,6 @@ import subprocess
 import unittest
 
 import yaml
-
 from test_support import SOURCE_REPO_ROOT
 
 
@@ -67,11 +66,19 @@ class ReleasedDocsWorkflowTests(unittest.TestCase):
             (SOURCE_REPO_ROOT / ".github/actions/build-site/action.yml").read_text()
         )
         steps = action["runs"]["steps"]
-        checkout = next(step for step in steps if step.get("with", {}).get("ref") == "versioned-docs")
-        self.assertEqual("buildish-tooling/buildish-release-tooling", checkout["with"]["repository"])
-        self.assertEqual("buildish-release-tooling/docs/releases", checkout["with"]["path"])
-        self.assertFalse(checkout["with"]["persist-credentials"])
-        self.assertFalse(checkout.get("continue-on-error", False))
+        for component in ("mammoth-cache", "release-tooling"):
+            with self.subTest(component=component):
+                checkouts = [
+                    step
+                    for step in steps
+                    if step.get("with", {}).get("ref") == "versioned-docs"
+                    and step["with"].get("repository") == f"buildish-tooling/buildish-{component}"
+                ]
+                self.assertEqual(1, len(checkouts))
+                checkout = checkouts[0]
+                self.assertEqual(f"buildish-{component}/docs/releases", checkout["with"]["path"])
+                self.assertFalse(checkout["with"]["persist-credentials"])
+                self.assertFalse(checkout.get("continue-on-error", False))
         for native, check_target, build_target in (
             ("inputs.native == 'true'", "site-check-local", "build-local"),
             ("inputs.native != 'true'", "site-check", "build"),
