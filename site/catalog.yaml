@@ -83,10 +83,10 @@ components:
     weight: 400
     publication:
       mountPath: /components/release-tooling/
-#    providerSnapshot:
-#      source: release-tooling
-#      path: docs/releases/provider-snapshot.json
-#      requirement: publication
+    providerSnapshot:
+      source: release-tooling
+      path: docs/releases/provider-snapshot.json
+      requirement: publication
   - slug: no-gradle-wrapper-jar
     content:
       source: no-gradle-wrapper-jar
