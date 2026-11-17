@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import tempfile
@@ -40,6 +41,52 @@ def write_text(root: Path, relative_path: str, content: str) -> None:
 @unittest.skipUnless(HUGO, "Hugo is required for template integration tests")
 class HugoSourceLinksIntegrationTest(unittest.TestCase):
     """Render representative provenance states through the real Hugo templates."""
+
+    def test_latest_release_navigation_requires_an_available_docs_route(self) -> None:
+        temp_root = SOURCE_REPO_ROOT / "site/build/tests"
+        temp_root.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=temp_root) as temp_dir:
+            fixture = Path(temp_dir)
+            write_text(fixture, "hugo.yaml", "baseURL: https://example.test/\n")
+            write_text(fixture, "layouts/home.html", '{{ $context := partial "buildish-component-context.html" . }}<nav>{{ range $context.releaseItems }}<a href="{{ .href }}">{{ .label }}</a>{{ end }}</nav>')
+            write_text(fixture, "content/_index.md", """
+                ---
+                title: Test
+                pipeline:
+                  component:
+                    slug: release-tooling
+                    publication:
+                      paths:
+                        component: /components/release-tooling/
+                    artifacts:
+                      - key: release-tooling
+                        latestStable: 0.1.3
+                ---
+                """)
+            target = fixture / "layouts/partials"
+            target.mkdir(parents=True)
+            shutil.copyfile(PARTIALS_ROOT / "buildish-component-context.html", target / "buildish-component-context.html")
+            route = {
+                "componentSlug": "release-tooling", "routeKind": "context",
+                "section": "released", "version": "0.1.3",
+                "path": "/components/release-tooling/releases/0.1.3/",
+            }
+            for available in (True, False):
+                with self.subTest(available=available):
+                    write_text(fixture, "data/routes.json", json.dumps({"items": [route] if available else []}))
+                    result = subprocess.run(  # noqa: S603 - fixed Hugo invocation in a disposable fixture
+                        [HUGO, "--source", str(fixture), "--destination", str(fixture / "public")],
+                        capture_output=True, text=True, check=False,
+                    )
+                    self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                    rendered = (fixture / "public/index.html").read_text()
+                    if available:
+                        self.assertIn('href="/components/release-tooling/releases/0.1.3/"', rendered)
+                        self.assertIn("Latest stable (0.1.3)", rendered)
+                    else:
+                        self.assertNotIn("Latest stable", rendered)
+                        self.assertNotIn("development", rendered)
+                        self.assertNotIn("#release-lines", rendered)
 
     def test_source_links_use_provenance_and_fail_closed(self) -> None:
         temp_root = SOURCE_REPO_ROOT / "site" / "build" / "tests"

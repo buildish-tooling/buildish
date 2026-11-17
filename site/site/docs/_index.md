@@ -77,6 +77,46 @@ The main generated paths remain:
 - `site/.preview/`
 - `site/.public/`
 
+## Released component documentation
+
+Release Tooling publishes released docs from its independent `versioned-docs`
+branch. The shared CI build checks that branch out at
+`buildish-release-tooling/docs/releases/`, so its provider inventory and version
+folders come from the same commit. Site Pipeline consumes these local inputs;
+it does not fetch branches or generate documentation.
+
+The aggregate catalog binds each component-owned `provider-snapshot.json` with
+`requirement: publication`. Artifact definitions and repository-relative content
+roots belong to the component metadata. Release records, release lines and their
+latest versions belong to that component's provider snapshot. Adding a release
+must not require copying its version or latest designation into this catalog.
+Optional catalog artifact entries may still bind sources and publication policy.
+Hidden or withdrawn historical records remain inventory rather than being deleted
+and rediscovered by imports.
+
+Component metadata, inventory and exported docs must agree with the Site Pipeline
+contract. An invalid present snapshot fails in both profiles; the local profile
+only permits absence. Validate component exporter upgrades and inventory migrations
+together before using them in a publication build.
+
+Normal developer targets use `SITE_PIPELINE_PROFILE=local`. Developers may
+preview static and development docs without the released-docs checkout; links
+to unavailable released docs are omitted. To preview the released docs, use the
+checkout helper in the Release Tooling source repository before building here.
+
+Publication uses an explicit profile in both native and container build paths:
+
+```sh
+make SITE_PIPELINE_PROFILE=publication site-check-local build-local
+make SITE_PIPELINE_PROFILE=publication site-check build
+```
+
+Run these commands from `site/`. Missing required snapshots or selected released
+docs block publication. A present malformed snapshot is an error in either
+profile. The profile is not inferred from `CI`, environment names, or branch
+names. Existing container images without profile support are rebuilt by the
+normal image compatibility probe.
+
 ## Canonical Site Pipeline docs
 
 For pipeline behavior, workspace semantics, and the reusable component contract,

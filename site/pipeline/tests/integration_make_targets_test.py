@@ -36,9 +36,15 @@ from test_support import (
     text_block,
 )
 
-EXTRACTED_PIPELINE_REPO_ROOT = (SOURCE_REPO_ROOT.parent / "buildish-site-pipeline").resolve()
-EXTRACTED_PIPELINE_PYTHON = (
-    EXTRACTED_PIPELINE_REPO_ROOT / ".venv" / "bin" / "python"
+EXTRACTED_PIPELINE_REPO_ROOT = Path(
+    os.environ.get(
+        "BUILDISH_TEST_SITE_PIPELINE_ROOT", str(SOURCE_REPO_ROOT.parent / "buildish-site-pipeline")
+    )
+).resolve()
+EXTRACTED_PIPELINE_PYTHON = Path(
+    os.environ.get(
+        "BUILDISH_TEST_SITE_PIPELINE_PYTHON", str(EXTRACTED_PIPELINE_REPO_ROOT / ".venv/bin/python")
+    )
 )
 DEFAULT_FIXTURE_ROOT = (
     SOURCE_REPO_ROOT / "site" / "build" / "tests" / f"integration-make-targets-{os.getpid()}"
@@ -502,6 +508,34 @@ class MakeTargetIntegrationTest(TestCaseHelpers, unittest.TestCase):
             / "mammoth-cache"
             / "_index.md"
         )
+
+    def test_publication_profile_blocks_missing_snapshot_in_native_and_container_targets(self) -> None:
+        repo_root = self.prepare_fixture_workspace()
+        bin_dir = self.seed_fake_tools(
+            repo_root / "site", include_engine=True, include_hugo=True, include_native_docsy=True
+        )
+        env = self.base_env(repo_root / "site", bin_dir)
+        env["CONTAINER_ENGINE"] = "fake-container-engine"
+        env["CONTAINER_IMAGE"] = "fake/buildish-site:local"
+        env["CONTAINER_HOME"] = str(repo_root / "site/build/fake-container-home")
+        catalog_path = repo_root / "site/catalog.yaml"
+        catalog = self.load_yaml(catalog_path)
+        component = next(item for item in catalog["components"] if item["slug"] == "mammoth-cache")
+        component["providerSnapshot"] = {
+            "source": "mammoth-cache",
+            "path": "site/docs/releases/provider-snapshot.json",
+            "requirement": "publication",
+        }
+        self.write_yaml(catalog_path, catalog)
+        for target in ("site-check-local", "site-check", "build-local", "build"):
+            with self.subTest(target=target):
+                env["SITE_PIPELINE_PROFILE"] = "publication"
+                result = self.run_make(repo_root / "site", target, env)
+                self.assertNotEqual(0, result.returncode, result.stdout + result.stderr)
+                self.assertIn("snapshot", result.stdout + result.stderr)
+        env["SITE_PIPELINE_PROFILE"] = "local"
+        result = self.run_make(repo_root / "site", "site-check-local", env)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_make_stage_local_builds_fixture_workspace(self) -> None:
         repo_root = self.prepare_fixture_workspace()

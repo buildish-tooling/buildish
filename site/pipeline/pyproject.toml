@@ -43,4 +43,4 @@ warn_unused_ignores = true
 no_implicit_optional = true
 
 [tool.uv.sources]
-buildish-site-pipeline = { path = "../../../buildish-site-pipeline/dist/snapshots/buildish_site_pipeline-0.1.0+snapshot.20260730155829534833-py3-none-any.whl" }
+buildish-site-pipeline = { path = "../../../buildish-site-pipeline/dist/snapshots/buildish_site_pipeline-0.1.0+snapshot.20261117101807236163-py3-none-any.whl" }

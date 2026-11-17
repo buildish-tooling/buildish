@@ -88,6 +88,7 @@ items, repository URL, brand label, and component landing-page detection.
     {{- $docsItems = $docsItems | append (dict "label" "Overview" "href" $componentPath "kind" "overview") -}}
   {{- end -}}
   {{- $releaseDocEntries := slice -}}
+  {{- $latestReleaseDocsPath := "" -}}
   {{- $componentSlug := index $component "slug" -}}
   {{- if $componentSlug -}}
   {{- with index hugo.Data "routes" -}}
@@ -110,6 +111,7 @@ items, repository URL, brand label, and component landing-page detection.
   {{- $label := $version -}}
   {{- if and $latestStableVersion (eq $version $latestStableVersion) -}}
   {{- $label = printf "%s (latest)" $version -}}
+  {{- $latestReleaseDocsPath = index $route "path" -}}
   {{- end -}}
   {{- if $label -}}
   {{- $releaseDocEntries = $releaseDocEntries | append (dict
@@ -137,12 +139,9 @@ items, repository URL, brand label, and component landing-page detection.
     {{- $releaseAnchor = printf "%s#release-lines" $componentPath -}}
   {{- end -}}
   {{- $releaseItems := slice -}}
-  {{- /* Latest-stable entry: new pipeline gives a plain string; no dedicated path yet, so
-       always fall back to the component landing anchor. */ -}}
-  {{- with $latestStableVersion -}}
-    {{- if $releaseAnchor -}}
-      {{- $releaseItems = $releaseItems | append (dict "label" (printf "Latest stable (%s)" .) "href" $releaseAnchor "kind" "latest") -}}
-    {{- end -}}
+  {{- /* Offer latest docs only when their context is in the staged routes. */ -}}
+  {{- if $latestReleaseDocsPath -}}
+    {{- $releaseItems = $releaseItems | append (dict "label" (printf "Latest stable (%s)" $latestStableVersion) "href" $latestReleaseDocsPath "kind" "latest") -}}
   {{- end -}}
   {{- /* Release lines: new field names are "key" (was "line") and "supportStatus" (was "status").
        Both are checked so old and new pipeline output work without changes to the template. */ -}}

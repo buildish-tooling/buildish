@@ -34,7 +34,7 @@ from test_support import (
 
 
 class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
-    def test_authored_schema_modelines_resolve_to_current_local_schemas(self) -> None:
+    def test_authored_schema_modelines_name_current_published_schemas(self) -> None:
         authored_files = {
             SOURCE_REPO_ROOT / "site" / "catalog.yaml": "catalog-v1.schema.json",
             SOURCE_REPO_ROOT
@@ -50,9 +50,12 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
                     "# yaml-language-server: $schema="
                 )
 
-                self.assertEqual(expected_schema_name, Path(schema_path).name)
+                self.assertEqual(
+                    f"https://buildish.org/components/site-pipeline/schemas/{expected_schema_name}",
+                    schema_path,
+                )
                 self.assertTrue(
-                    (authored_path.parent / schema_path).resolve().is_file()
+                    (SOURCE_REPO_ROOT.parent / "buildish-site-pipeline/site/pages/schemas" / expected_schema_name).is_file()
                 )
 
     def test_site_component_source_binding_is_repository_rooted(self) -> None:
@@ -265,8 +268,8 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
 
             result = self.run_pipeline_build(repo_root)
 
-            self.assert_command_failed(result, "Document validation failed")
-            self.assertIn(str(metadata_path), result.stdout + result.stderr)
+            self.assert_command_failed(result, "input-validation-failed")
+            self.assertIn(metadata_path.relative_to(workspace).as_posix(), result.stdout + result.stderr)
 
     def test_build_reports_a_missing_default_catalog_document(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -277,8 +280,8 @@ class SitePipelineTest(TestCaseHelpers, unittest.TestCase):
 
             result = self.run_pipeline_build(repo_root)
 
-            self.assert_command_failed(result, "Missing catalog document")
-            self.assertIn(str(catalog_path), result.stdout + result.stderr)
+            self.assert_command_failed(result, "input-not-found")
+            self.assertIn(catalog_path.relative_to(workspace).as_posix(), result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

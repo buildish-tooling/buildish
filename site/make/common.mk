@@ -15,6 +15,7 @@
 
 HUGO ?= hugo
 NVM_DIR ?= $(HOME)/.nvm
+SITE_PIPELINE_PROFILE ?= local
 UV ?= uv
 PYTHON ?= python3
 WATCH_READY_TIMEOUT_SECONDS ?= 20

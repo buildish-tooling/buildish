@@ -59,3 +59,24 @@ class RequiredChecksTests(unittest.TestCase):
     def test_unrelated_changes_allow_skipped_native_build(self) -> None:
         result = self.run_gate(site_changes=False, native_result="skipped")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+
+class ReleasedDocsWorkflowTests(unittest.TestCase):
+    def test_shared_build_checks_out_docs_and_uses_publication_profile(self) -> None:
+        action = yaml.safe_load(
+            (SOURCE_REPO_ROOT / ".github/actions/build-site/action.yml").read_text()
+        )
+        steps = action["runs"]["steps"]
+        checkout = next(step for step in steps if step.get("with", {}).get("ref") == "versioned-docs")
+        self.assertEqual("buildish-tooling/buildish-release-tooling", checkout["with"]["repository"])
+        self.assertEqual("buildish-release-tooling/docs/releases", checkout["with"]["path"])
+        self.assertFalse(checkout["with"]["persist-credentials"])
+        self.assertFalse(checkout.get("continue-on-error", False))
+        for native, check_target, build_target in (
+            ("inputs.native == 'true'", "site-check-local", "build-local"),
+            ("inputs.native != 'true'", "site-check", "build"),
+        ):
+            commands = "\n".join(step.get("run", "") for step in steps if step.get("if") == native)
+            self.assertIn("SITE_PIPELINE_PROFILE=publication", commands)
+            self.assertIn(check_target, commands)
+            self.assertIn(build_target, commands)

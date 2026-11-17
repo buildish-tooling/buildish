@@ -54,6 +54,14 @@ runs:
         path: buildish-release-tooling
         persist-credentials: false
 
+    - name: Check out Release Tooling released documentation
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        repository: buildish-tooling/buildish-release-tooling
+        ref: versioned-docs
+        path: buildish-release-tooling/docs/releases
+        persist-credentials: false
+
     - name: Check out Site Pipeline
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
@@ -105,10 +113,11 @@ runs:
         test "$(node --version)" = "v$(tr -d '[:space:]' < buildish/site/.nvmrc)"
         uv sync --project buildish-site-pipeline --locked --no-dev
         npm ci --ignore-scripts --prefix buildish/site
-        make -C buildish/site HUGO="$RUNNER_TEMP/buildish-hugo/hugo" build-local
+        make -C buildish/site SITE_PIPELINE_PROFILE=publication site-check-local
+        make -C buildish/site SITE_PIPELINE_PROFILE=publication HUGO="$RUNNER_TEMP/buildish-hugo/hugo" build-local
         make -C buildish/site rendered-fallback-check
 
     - name: Build site in container
       if: inputs.native != 'true'
       shell: bash
-      run: make -C buildish/site build
+      run: make -C buildish/site SITE_PIPELINE_PROFILE=publication site-check build

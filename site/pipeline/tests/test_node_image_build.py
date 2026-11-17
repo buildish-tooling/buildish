@@ -166,7 +166,7 @@ if [ "$1" = run ]; then
   exec /bin/bash -c "$@"
 fi
 """,
-            "site-pipeline": "#!/bin/sh\necho --workspace-root\n",
+            "site-pipeline": "#!/bin/sh\necho --workspace-root --profile\n",
             "node": '#!/bin/sh\necho "$BUILDISH_TEST_IMAGE_NODE"\n',
         }
         for name, content in scripts.items():

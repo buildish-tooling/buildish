@@ -297,7 +297,6 @@ def seed_mammoth_fixture(
                 "displayName": "Fixture Mammoth Cache for Gradle® and Apache Maven™",
             },
             "content": {"docsRoot": "site/docs"},
-            "lifecycle": {"latestStable": "v1.2.3"},
         },
     )
     write_files(

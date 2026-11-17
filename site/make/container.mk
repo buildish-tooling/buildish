@@ -188,20 +188,20 @@ CONTAINER_PREPARE_SITE_ENV = \
 CONTAINER_STAGE_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-stage] running site-pipeline build\\n"; \
-	$(SITE_PIPELINE) build --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
+	$(SITE_PIPELINE) build --profile '$(SITE_PIPELINE_PROFILE)' --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
 	make vendor-assets; \
 	printf "==> [container-stage] staged site contract completed\\n"
 
 CONTAINER_SITE_CHECK_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-stage] running site-pipeline check\\n"; \
-	$(SITE_PIPELINE) check --report-format text --report-output - --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
+	$(SITE_PIPELINE) check --profile '$(SITE_PIPELINE_PROFILE)' --report-format text --report-output - --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
 	printf "==> [container-stage] site check completed\\n"
 
 CONTAINER_STAGE_WATCH_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-stage-watch] running site-pipeline watch\\n"; \
-	$(SITE_PIPELINE) watch --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
+	$(SITE_PIPELINE) watch --profile '$(SITE_PIPELINE_PROFILE)' --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
 	printf "==> [container-stage-watch] stage watch exited\\n"
 
 CONTAINER_SERVE_SCRIPT = \
@@ -213,7 +213,7 @@ CONTAINER_SERVE_SCRIPT = \
 	mkdir -p '$(WATCH_EVENTS_ROOT)'; \
 	events_file="$$(mktemp '$(WATCH_EVENTS_TEMPLATE)')"; \
 	printf "==> [container-serve] running site-pipeline watch on %s:%s\n" "0.0.0.0" "$(PORT)"; \
-	$(SITE_PIPELINE) watch --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_READY_ARGS) --unstable-events-output "$$events_file" $(SITE_PIPELINE_ARGS) & \
+	$(SITE_PIPELINE) watch --profile '$(SITE_PIPELINE_PROFILE)' --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_READY_ARGS) --unstable-events-output "$$events_file" $(SITE_PIPELINE_ARGS) & \
 	watch_pid=$$!; \
 	$(WAIT_FOR_WATCH_READY) --events-file "$$events_file" --pid "$$watch_pid" --timeout $(WATCH_READY_TIMEOUT_SECONDS); \
 	$(DOCSY_ENV); $(HUGO) server --source . --config hugo.yaml --baseURL http://127.0.0.1:$(PORT)/ --bind 0.0.0.0 --port $(PORT) --poll 700ms --disableFastRender --noBuildLock --renderToMemory; \
@@ -228,7 +228,7 @@ CONTAINER_RENDER_SCRIPT = \
 CONTAINER_BUILD_SCRIPT = \
 	$(CONTAINER_PREPARE_SITE_ENV); \
 	printf "==> [container-build] running site-pipeline build and make render-local\\n"; \
-	$(SITE_PIPELINE) build --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
+	$(SITE_PIPELINE) build --profile '$(SITE_PIPELINE_PROFILE)' --workspace-root $(CONTAINER_SITE_PIPELINE_WORKSPACE_ARG) --catalog $(CONTAINER_SITE_PIPELINE_CATALOG_ARG) $(SITE_PIPELINE_ARGS); \
 	make render-local; \
 	printf "==> [container-build] site render completed\\n"
 
@@ -286,7 +286,7 @@ container-engine-check: ## Verify Podman or Docker is available for containerize
 site-pipeline-container-image-ensure: container-engine-check ## Build the generic site-pipeline base image if it is missing locally.
 	@if $(CONTAINER_ENGINE) image inspect $(SITE_PIPELINE_CONTAINER_IMAGE) >/dev/null 2>&1 \
 		&& { [ '$(CONTAINER_ENGINE_BASENAME)' != 'podman' ] && [ '$(CONTAINER_ENGINE_BASENAME)' != 'docker' ] \
-			|| $(CONTAINER_ENGINE) run --rm $(CONTAINER_PLATFORM_FLAG) --entrypoint /bin/bash $(SITE_PIPELINE_CONTAINER_IMAGE) -c 'site-pipeline build --help | grep -q -- --workspace-root && site-pipeline component-source-roots --help >/dev/null' >/dev/null 2>&1; }; then \
+			|| $(CONTAINER_ENGINE) run --rm $(CONTAINER_PLATFORM_FLAG) --entrypoint /bin/bash $(SITE_PIPELINE_CONTAINER_IMAGE) -c 'site-pipeline build --help | grep -q -- --profile && site-pipeline component-source-roots --help >/dev/null' >/dev/null 2>&1; }; then \
 		printf '==> [site-pipeline-image] using existing image %s via %s\n' '$(SITE_PIPELINE_CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
 	else \
 		printf '==> [site-pipeline-image] rebuilding image %s via %s to match the current CLI\n' '$(SITE_PIPELINE_CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
@@ -308,7 +308,7 @@ container-image-ensure: site-pipeline-container-image-ensure ## Build the site b
 	@expected_node_version="v$$(tr -d '\r\n' < .nvmrc)"; \
 	if $(CONTAINER_ENGINE) image inspect $(CONTAINER_IMAGE) >/dev/null 2>&1 \
 		&& { [ '$(CONTAINER_ENGINE_BASENAME)' != 'podman' ] && [ '$(CONTAINER_ENGINE_BASENAME)' != 'docker' ] \
-			|| $(CONTAINER_ENGINE) run --rm $(CONTAINER_PLATFORM_FLAG) --entrypoint /bin/bash $(CONTAINER_IMAGE) -c 'site-pipeline build --help | grep -q -- --workspace-root && site-pipeline component-source-roots --help >/dev/null && test "$$(node --version)" = "$$1"' buildish-node-check "$$expected_node_version" >/dev/null 2>&1; }; then \
+			|| $(CONTAINER_ENGINE) run --rm $(CONTAINER_PLATFORM_FLAG) --entrypoint /bin/bash $(CONTAINER_IMAGE) -c 'site-pipeline build --help | grep -q -- --profile && site-pipeline component-source-roots --help >/dev/null && test "$$(node --version)" = "$$1"' buildish-node-check "$$expected_node_version" >/dev/null 2>&1; }; then \
 		printf '==> [container-image] using existing image %s via %s\n' '$(CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
 	else \
 		printf '==> [container-image] rebuilding image %s via %s to match the current CLI and Node version\n' '$(CONTAINER_IMAGE)' '$(CONTAINER_ENGINE_BASENAME)'; \
