@@ -71,6 +71,10 @@ components:
     weight: 100
     publication:
       mountPath: /components/atr-maven-bundle/
+    providerSnapshot:
+      source: atr-maven-bundle
+      path: docs/releases/provider-snapshot.json
+      requirement: publication
   - slug: site-pipeline
     content:
       source: site-pipeline

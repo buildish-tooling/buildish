@@ -48,6 +48,14 @@ runs:
         path: buildish-atr-maven-bundle
         persist-credentials: false
 
+    - name: Check out ATR Maven Bundle released documentation
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        repository: buildish-tooling/buildish-atr-maven-bundle
+        ref: versioned-docs
+        path: buildish-atr-maven-bundle/docs/releases
+        persist-credentials: false
+
     - name: Check out No Gradle Wrapper Jar
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
