@@ -134,8 +134,18 @@ class VersionedDocsIntegrationTest(TestCaseHelpers, unittest.TestCase):
             if route.get("section") == "released"
             and route.get("routeKind") == "context"
         ]
-        self.assertEqual(1, len(released))
-        self.assertIn("0.1.3", released[0]["path"])
+        self.assertEqual(3, len(released))
+        self.assertTrue(
+            (
+                stage / "content/components/release-tooling/releases/0.1.3/_index.md"
+            ).exists()
+        )
+        for version in ("0.1.1", "0.1.2"):
+            self.assertFalse(
+                (
+                    stage / f"content/components/release-tooling/releases/{version}"
+                ).exists()
+            )
         development_files = list((stage / "content").rglob("development/**/*.md"))
         self.assertTrue(development_files)
         for path in development_files:
@@ -190,6 +200,7 @@ class VersionedDocsIntegrationTest(TestCaseHelpers, unittest.TestCase):
             for route in routes
             if route.get("section") == "released"
             and route.get("routeKind") == "context"
+            and route["path"].endswith("/0.1.3/")
         )
         output = site / "public" / released["path"].strip("/") / "index.html"
         html = output.read_text()
@@ -221,8 +232,20 @@ class VersionedDocsIntegrationTest(TestCaseHelpers, unittest.TestCase):
             if route.get("section") == "released"
             and route.get("routeKind") == "context"
         ]
-        self.assertEqual(1, len(released))
-        self.assertIn("0.1.4", released[0]["path"])
+        self.assertEqual(
+            {
+                f"/components/release-tooling/releases/{version}/"
+                for version in ("0.1.1", "0.1.2", "0.1.3", "0.1.4")
+            },
+            {route["path"] for route in released},
+        )
+        for version in ("0.1.3", "0.1.4"):
+            self.assertTrue(
+                (
+                    self.repo
+                    / f"site/.stage/content/components/release-tooling/releases/{version}/_index.md"
+                ).exists()
+            )
         self.assertEqual(original_catalog, catalog.read_bytes())
 
     def test_catalog_can_keep_an_optional_artifact_binding(self) -> None:

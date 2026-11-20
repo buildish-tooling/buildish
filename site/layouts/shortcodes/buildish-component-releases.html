@@ -70,7 +70,8 @@ release lines.
   {{- if not $lineKey }}{{ $lineKey = index $releaseLine "line" }}{{ end -}}
   {{- $lineStatus := index $releaseLine "supportStatus" -}}
   {{- if not $lineStatus }}{{ $lineStatus = index $releaseLine "status" }}{{ end -}}
-  {{- $item := printf "%s - %s" $lineKey $lineStatus -}}
+  {{- $item := printf "%s" $lineKey -}}
+  {{- with $lineStatus }}{{ $item = printf "%s - %s" $item . }}{{ end -}}
   {{- with index $releaseLine "latest" }}{{ $item = printf "%s (latest %s)" $item . }}{{ end -}}
   {{- with index $releaseLine "aliases" }}{{ if gt (len .) 0 }}{{ $item = printf "%s; aliases: %s" $item (delimit . ", ") }}{{ end }}{{ end -}}
   {{- $items = $items | append $item -}}

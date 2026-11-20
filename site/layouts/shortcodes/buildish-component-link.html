@@ -46,7 +46,6 @@ the page author knows the exact authored relative link target.
 {{- $href := "" -}}
 {{- $label := "" -}}
 {{- $external := false -}}
-{{- $componentSlug := index $component "slug" -}}
 {{- $developmentLabel := "Developer Docs (unreleased)" -}}
 {{- with index $component "developmentLabel" }}{{ $developmentLabel = . }}{{ end -}}
 
@@ -99,30 +98,10 @@ the page author knows the exact authored relative link target.
     {{- $requestedVersion = $latestStableVersion -}}
   {{- end -}}
 
-  {{/* Released docs are found in the staged routes aggregate. */}}
-  {{- if $requestedVersion -}}
-    {{- with index hugo.Data "routes" -}}
-      {{- with index . "items" -}}
-	{{- range $route := . -}}
-	  {{- $routeVersion := "" -}}
-	  {{- with index $route "version" }}{{ $routeVersion = printf "%v" . }}{{ end -}}
-	  {{- if not $routeVersion -}}
-	    {{- with index $route "targetId" -}}
-	      {{- $targetParts := split . ":" -}}
-	      {{- $routeVersion = index $targetParts (sub (len $targetParts) 1) -}}
-	    {{- end -}}
-	  {{- end -}}
-	  {{- if and
-	    (eq (index $route "componentSlug") $componentSlug)
-	    (eq (index $route "section") "released")
-	    (eq (index $route "routeKind") "context")
-	    (eq $routeVersion $requestedVersion)
-	    (index $route "path")
-	  -}}
-	    {{- $href = index $route "path" -}}
-	  {{- end -}}
-	{{- end -}}
-      {{- end -}}
+  {{/* Use only released docs pages available to navigation. */}}
+  {{- range $componentContext.docsItems -}}
+    {{- if and (eq .kind "release") (eq .version $requestedVersion) -}}
+      {{- $href = .href -}}
     {{- end -}}
   {{- end -}}
   {{- if eq $kind "docs" -}}

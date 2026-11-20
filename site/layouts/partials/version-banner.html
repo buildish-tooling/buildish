@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */}}
 {{/*
-Render prominent page-level version warnings.
+Render layout-only page-level version warnings and release update notices.
 
 Development docs, release candidates, withdrawn releases, unsupported releases,
 and limited-maintenance releases all get visible policy/status banners.
@@ -66,4 +66,28 @@ and limited-maintenance releases all get visible policy/status banners.
 <div class="pageinfo pageinfo-warning">
 <p><strong>IMPORTANT:</strong> This release documentation{{ with $label }} for {{ . }}{{ end }} is for a release in limited maintenance. Check the project support policy before relying on it for new deployments.</p>
 </div>
+{{ end -}}
+
+{{ if eq $kind "released" -}}
+{{ $context := partial "buildish-component-context.html" . -}}
+{{ $lineKey := "" -}}
+{{ with index $version "releaseLine" }}{{ with index . "key" }}{{ $lineKey = printf "%v" . }}{{ end }}{{ end -}}
+{{ $lineLatest := dict -}}
+{{ $stable := dict -}}
+{{ range $context.releaseItems -}}
+{{ if eq .kind "latest" }}{{ $stable = . }}{{ end -}}
+{{ if and (eq .kind "line") (eq .line $lineKey) }}{{ $lineLatest = . }}{{ end -}}
+{{ end -}}
+{{ $hasLineUpdate := and $lineLatest (ne $lineLatest.version $label) -}}
+{{ $hasStableUpdate := and $stable (ne $stable.version $label) (ne $stable.version $lineLatest.version) -}}
+{{ if or $hasLineUpdate $hasStableUpdate -}}
+<div class="pageinfo pageinfo-primary">
+{{ if $hasLineUpdate -}}
+<p>You are reading documentation for {{ $label }}. The latest release in the {{ $lineKey }} line is <a href="{{ $lineLatest.href | relURL }}">{{ $lineLatest.version }}</a>.</p>
+{{ end -}}
+{{ if $hasStableUpdate -}}
+<p>The latest stable release is <a href="{{ $stable.href | relURL }}">{{ $stable.version }}</a>.</p>
+{{ end -}}
+</div>
+{{ end -}}
 {{ end -}}

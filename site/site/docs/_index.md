@@ -91,6 +91,9 @@ roots belong to the component metadata. Release records, release lines and their
 latest versions belong to that component's provider snapshot. Adding a release
 must not require copying its version or latest designation into this catalog.
 Optional catalog artifact entries may still bind sources and publication policy.
+The released components use `publicationSelection.releases.mode: allKnown`, so
+publishing a newer patch retains older released docs URLs. Explicit hidden and
+removed release policies still apply.
 Hidden or withdrawn historical records remain inventory rather than being deleted
 and rediscovered by imports.
 

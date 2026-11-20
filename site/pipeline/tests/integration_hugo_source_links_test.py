@@ -48,8 +48,15 @@ class HugoSourceLinksIntegrationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=temp_root) as temp_dir:
             fixture = Path(temp_dir)
             write_text(fixture, "hugo.yaml", "baseURL: https://example.test/\n")
-            write_text(fixture, "layouts/home.html", '{{ $context := partial "buildish-component-context.html" . }}<nav>{{ range $context.releaseItems }}<a href="{{ .href }}">{{ .label }}</a>{{ end }}</nav>')
-            write_text(fixture, "content/_index.md", """
+            write_text(
+                fixture,
+                "layouts/home.html",
+                '{{ $context := partial "buildish-component-context.html" . }}<nav>{{ range $context.releaseItems }}<a href="{{ .href }}">{{ .label }}</a>{{ end }}</nav>',
+            )
+            write_text(
+                fixture,
+                "content/_index.md",
+                """
                 ---
                 title: Test
                 pipeline:
@@ -61,32 +68,257 @@ class HugoSourceLinksIntegrationTest(unittest.TestCase):
                     artifacts:
                       - key: release-tooling
                         latestStable: 0.1.3
+                        releaseLines:
+                          - key: "0.1"
+                            latest: 0.1.3
+                          - key: "0.0"
+                            latest: 0.0.9
+                            supportStatus: unsupported
                 ---
-                """)
+                """,
+            )
             target = fixture / "layouts/partials"
             target.mkdir(parents=True)
-            shutil.copyfile(PARTIALS_ROOT / "buildish-component-context.html", target / "buildish-component-context.html")
+            shutil.copyfile(
+                PARTIALS_ROOT / "buildish-component-context.html",
+                target / "buildish-component-context.html",
+            )
             route = {
-                "componentSlug": "release-tooling", "routeKind": "context",
-                "section": "released", "version": "0.1.3",
+                "componentSlug": "release-tooling",
+                "routeKind": "context",
+                "section": "released",
+                "version": "0.1.3",
                 "path": "/components/release-tooling/releases/0.1.3/",
             }
             for available in (True, False):
                 with self.subTest(available=available):
-                    write_text(fixture, "data/routes.json", json.dumps({"items": [route] if available else []}))
-                    result = subprocess.run(  # noqa: S603 - fixed Hugo invocation in a disposable fixture
-                        [HUGO, "--source", str(fixture), "--destination", str(fixture / "public")],
-                        capture_output=True, text=True, check=False,
+                    write_text(
+                        fixture,
+                        "data/routes.json",
+                        json.dumps({"items": [route]}),
                     )
-                    self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                    release_page = (
+                        fixture
+                        / "content/components/release-tooling/releases/0.1.3/_index.md"
+                    )
+                    if available:
+                        write_text(
+                            fixture,
+                            str(release_page.relative_to(fixture)),
+                            "---\ntitle: Release\n---\n",
+                        )
+                    elif release_page.exists():
+                        release_page.unlink()
+                    result = subprocess.run(  # noqa: S603 - fixed Hugo invocation in a disposable fixture
+                        [
+                            HUGO,
+                            "--source",
+                            str(fixture),
+                            "--destination",
+                            str(fixture / "public"),
+                        ],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(
+                        0, result.returncode, result.stdout + result.stderr
+                    )
                     rendered = (fixture / "public/index.html").read_text()
                     if available:
-                        self.assertIn('href="/components/release-tooling/releases/0.1.3/"', rendered)
+                        self.assertIn(
+                            'href="/components/release-tooling/releases/0.1.3/"',
+                            rendered,
+                        )
                         self.assertIn("Latest stable (0.1.3)", rendered)
+                        self.assertIn("0.1 (latest 0.1.3)", rendered)
+                        self.assertNotIn("0.0 (latest", rendered)
+                        self.assertNotIn("%!", rendered)
+                        self.assertNotIn("#release-lines", rendered)
                     else:
                         self.assertNotIn("Latest stable", rendered)
                         self.assertNotIn("development", rendered)
                         self.assertNotIn("#release-lines", rendered)
+
+    def test_component_version_shortcode_resolves_latest_and_release_line(self) -> None:
+        temp_root = SOURCE_REPO_ROOT / "site/build/tests"
+        temp_root.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=temp_root) as temp_dir:
+            fixture = Path(temp_dir)
+            write_text(fixture, "hugo.yaml", "baseURL: https://example.test/\n")
+            write_text(fixture, "layouts/home.html", "{{ .Content }}")
+            write_text(
+                fixture,
+                "content/_index.md",
+                """
+                ---
+                pipeline:
+                  component:
+                    slug: test
+                    artifacts:
+                      - key: test
+                        latestStable: 0.2.2
+                        releaseLines:
+                          - key: "0.1"
+                            latest: 0.1.2
+                          - key: "0.2"
+                            latest: 0.2.2
+                ---
+                Latest: {{< buildish-component-version >}}.
+                Line: {{< buildish-component-version releaseLine="0.1" >}}.
+                {{< buildish-component-link kind="docs" >}}
+                {{< buildish-component-link kind="release" releaseLine="0.1" >}}
+                """,
+            )
+            for folder, name in (
+                ("partials", "buildish-component-context.html"),
+                ("partials", "buildish-link-appearance-class.html"),
+                ("shortcodes", "buildish-component-link.html"),
+                ("shortcodes", "buildish-component-version.html"),
+            ):
+                target = fixture / "layouts" / folder / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(PARTIALS_ROOT.parent / folder / name, target)
+            routes = [
+                {
+                    "componentSlug": "test",
+                    "routeKind": "context",
+                    "section": "released",
+                    "version": version,
+                    "path": f"/components/test/releases/{version}/",
+                }
+                for version in ("0.1.2", "0.2.2")
+            ]
+            for version in ("0.1.2", "0.2.2"):
+                write_text(
+                    fixture,
+                    f"content/components/test/releases/{version}/_index.md",
+                    "---\ntitle: Release\n---\n",
+                )
+            write_text(fixture, "data/routes.json", json.dumps({"items": routes}))
+            command = [
+                HUGO,
+                "--source",
+                str(fixture),
+                "--destination",
+                str(fixture / "public"),
+            ]
+            result = subprocess.run(  # noqa: S603 - fixed Hugo invocation in a disposable fixture
+                command, capture_output=True, text=True, check=False
+            )
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            rendered = (fixture / "public/index.html").read_text()
+            self.assertIn("Latest: 0.2.2.", rendered)
+            self.assertIn("Line: 0.1.2.", rendered)
+            self.assertIn('href="/components/test/releases/0.2.2/"', rendered)
+            self.assertIn('href="/components/test/releases/0.1.2/"', rendered)
+            write_text(fixture, "data/routes.json", json.dumps({"items": []}))
+            result = subprocess.run(  # noqa: S603 - fixed Hugo invocation in a disposable fixture
+                command, capture_output=True, text=True, check=False
+            )
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("found no published release", result.stdout + result.stderr)
+
+    def test_release_banners_link_to_line_and_stable_updates(self) -> None:
+        temp_root = SOURCE_REPO_ROOT / "site/build/tests"
+        temp_root.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=temp_root) as temp_dir:
+            fixture = Path(temp_dir)
+            write_text(fixture, "hugo.yaml", "baseURL: https://example.test/\n")
+            write_text(
+                fixture, "layouts/home.html", '{{ partial "version-banner.html" . }}'
+            )
+            for name in ("version-banner.html", "buildish-component-context.html"):
+                target = fixture / "layouts/partials" / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(PARTIALS_ROOT / name, target)
+            routes = [
+                {
+                    "componentSlug": "test",
+                    "routeKind": "context",
+                    "section": "released",
+                    "version": version,
+                    "path": f"/components/test/releases/{version}/",
+                }
+                for version in ("0.1.2", "0.2.2")
+            ]
+            write_text(fixture, "data/routes.json", json.dumps({"items": routes}))
+            for label, line, kind, available, line_notice, stable_notice in (
+                ("0.1.0", "0.1", "released", True, True, True),
+                ("0.1.2", "0.1", "released", True, False, True),
+                ("0.2.0", "0.2", "released", True, True, False),
+                ("0.2.2", "0.2", "released", True, False, False),
+                ("main", "0.1", "development", True, False, False),
+                ("0.1.0", "0.1", "candidate", True, False, False),
+                ("0.1.0", "0.1", "released", False, False, False),
+            ):
+                with self.subTest(label=label, kind=kind, available=available):
+                    metadata = {
+                        "pipeline": {
+                            "component": {
+                                "slug": "test",
+                                "artifacts": [
+                                    {
+                                        "key": "test",
+                                        "latestStable": "0.2.2",
+                                        "releaseLines": [
+                                            {"key": "0.1", "latest": "0.1.2"},
+                                            {"key": "0.2", "latest": "0.2.2"},
+                                        ],
+                                    }
+                                ],
+                            },
+                            "page": {
+                                "version": {
+                                    "kind": kind,
+                                    "label": label,
+                                    "releaseLine": {"key": line},
+                                }
+                            },
+                        }
+                    }
+                    write_text(
+                        fixture,
+                        "content/_index.md",
+                        "---\n" + json.dumps(metadata) + "\n---\n",
+                    )
+                    for version in ("0.1.2", "0.2.2"):
+                        relative = (
+                            f"content/components/test/releases/{version}/_index.md"
+                        )
+                        if available:
+                            write_text(fixture, relative, "---\ntitle: Release\n---\n")
+                        elif (fixture / relative).exists():
+                            (fixture / relative).unlink()
+                    result = subprocess.run(  # noqa: S603 - fixed Hugo invocation in a disposable fixture
+                        [
+                            HUGO,
+                            "--source",
+                            str(fixture),
+                            "--destination",
+                            str(fixture / "public"),
+                        ],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(
+                        0, result.returncode, result.stdout + result.stderr
+                    )
+                    rendered = (fixture / "public/index.html").read_text()
+                    self.assertEqual(line_notice, "latest release in the" in rendered)
+                    self.assertEqual(
+                        stable_notice, "latest stable release is" in rendered
+                    )
+                    if line_notice:
+                        target = "0.1.2" if line == "0.1" else "0.2.2"
+                        self.assertIn(
+                            f'href="/components/test/releases/{target}/"', rendered
+                        )
+                    if stable_notice:
+                        self.assertIn(
+                            'href="/components/test/releases/0.2.2/"', rendered
+                        )
 
     def test_source_links_use_provenance_and_fail_closed(self) -> None:
         temp_root = SOURCE_REPO_ROOT / "site" / "build" / "tests"

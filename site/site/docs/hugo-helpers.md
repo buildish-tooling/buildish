@@ -193,6 +193,27 @@ and emits no link.
 | `line` | no | empty | Alias for `releaseLine`. |
 | `release-line` | no | empty | Alias for `releaseLine`. |
 
+## `buildish-component-version`
+
+Render the latest published version as plain text, for example in a dependency
+declaration or installation command:
+
+```md
+{{</* buildish-component-version */>}}
+{{</* buildish-component-version releaseLine="0.2" */>}}
+```
+
+With no attributes, this selects the component's `latestStable` version.
+The optional `releaseLine` attribute selects that line's `latest` version.
+The selected version must have a published docs route; missing releases fail the
+build. These shortcodes work in sibling components' authored pages and docs when
+rendered by this aggregate Hugo site. They are not expanded in repository
+READMEs or by other Markdown renderers.
+
+Use `buildish-component-link` for generated links to those releases. Its targets
+are concrete versioned docs URLs; the site does not automatically publish
+`latest/` or release-line redirect URLs.
+
 ## `buildish-component-releases`
 
 `buildish-component-releases` renders a compact release summary for the current
@@ -306,6 +327,9 @@ renders the prominent link back to the component landing page.
 
 Renders the main content warning banner for development docs, release candidates,
 withdrawn releases, unsupported releases, and limited-maintenance releases.
+Released docs also link to the latest patch in their release line and the latest
+stable release when those differ. Update notices use the component's designated
+latest versions and only link to available published docs pages.
 
 ### `buildish-component-context.html` and release data
 

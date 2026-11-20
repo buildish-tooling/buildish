@@ -99,6 +99,7 @@ items, repository URL, brand label, and component landing-page detection.
     (eq (index $route "routeKind") "context")
     (eq (index $route "section") "released")
     (index $route "path")
+    ($.Site.GetPage (index $route "path"))
   -}}
   {{- $version := "" -}}
   {{- with index $route "version" }}{{ $version = printf "%v" . }}{{ end -}}
@@ -134,29 +135,34 @@ items, repository URL, brand label, and component landing-page detection.
     {{- $docsItems = $docsItems | append (dict "label" $developmentLabel "href" $docsPath "kind" "development") -}}
   {{- end -}}
 
-  {{- $releaseAnchor := "" -}}
-  {{- if $componentPath -}}
-    {{- $releaseAnchor = printf "%s#release-lines" $componentPath -}}
-  {{- end -}}
   {{- $releaseItems := slice -}}
-  {{- /* Offer latest docs only when their context is in the staged routes. */ -}}
+  {{- /* Offer latest docs only when their route has a staged page. */ -}}
   {{- if $latestReleaseDocsPath -}}
-    {{- $releaseItems = $releaseItems | append (dict "label" (printf "Latest stable (%s)" $latestStableVersion) "href" $latestReleaseDocsPath "kind" "latest") -}}
+    {{- $releaseItems = $releaseItems | append (dict "label" (printf "Latest stable (%s)" $latestStableVersion) "href" $latestReleaseDocsPath "kind" "latest" "version" $latestStableVersion) -}}
   {{- end -}}
   {{- /* Release lines: new field names are "key" (was "line") and "supportStatus" (was "status").
        Both are checked so old and new pipeline output work without changes to the template. */ -}}
   {{- range $releaseLine := $releaseLines -}}
     {{- $lineKey := index $releaseLine "key" -}}
     {{- if not $lineKey }}{{ $lineKey = index $releaseLine "line" }}{{ end -}}
-    {{- $lineStatus := index $releaseLine "supportStatus" -}}
+    {{- $lineStatus := "" -}}
+    {{- with index $releaseLine "supportStatus" }}{{ $lineStatus = . }}{{ end -}}
     {{- if not $lineStatus }}{{ $lineStatus = index $releaseLine "status" }}{{ end -}}
-    {{- $href := $releaseAnchor -}}
-    {{- with index $releaseLine "path" }}{{ $href = . }}{{ end -}}
+    {{- $href := "" -}}
+    {{- $version := "" -}}
+    {{- with index $releaseLine "latest" }}{{ $version = printf "%v" . }}{{ end -}}
+    {{- range $releaseDocEntries -}}
+      {{- if eq .version $version }}{{ $href = .href }}{{ end -}}
+    {{- end -}}
+    {{- $label := printf "%s" $lineKey -}}
+    {{- with $version }}{{ $label = printf "%s (latest %s)" $label . }}{{ end -}}
+    {{- with $lineStatus }}{{ $label = printf "%s - %s" $label . }}{{ end -}}
     {{- if $href -}}
       {{- $releaseItems = $releaseItems | append (dict
-	"label" (printf "%s - %s" $lineKey $lineStatus)
+	"label" $label
         "href" $href
         "kind" "line"
+        "line" $lineKey
         "status" $lineStatus
         "version" (index $releaseLine "latest")) -}}
     {{- end -}}
@@ -197,7 +203,7 @@ items, repository URL, brand label, and component landing-page detection.
     "docsPath" $docsPath
     "repositoryPath" $repositoryPath
     "docsItems" $docsItems
-    "releaseAnchor" $releaseAnchor
+    "releaseAnchor" $latestReleaseDocsPath
     "releaseItems" $releaseItems
     "brandLabel" $brandLabel
     "isComponentLanding" $isComponentLanding
