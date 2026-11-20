@@ -211,8 +211,33 @@ rendered by this aggregate Hugo site. They are not expanded in repository
 READMEs or by other Markdown renderers.
 
 Use `buildish-component-link` for generated links to those releases. Its targets
-are concrete versioned docs URLs; the site does not automatically publish
-`latest/` or release-line redirect URLs.
+are concrete versioned docs URLs.
+
+### Moving release URLs
+
+For released components, the aggregate Hugo site generates these landing URLs:
+
+- `/components/<component>/latest/` redirects to the designated latest stable
+  release's docs root.
+- `/components/<component>/releases/<line>/latest/` redirects to the designated
+  latest release in that line.
+
+For example, `/components/mammoth-cache/releases/0.1/latest/` tracks the latest
+published Mammoth Cache 0.1 docs. New versions and release lines are picked up
+from component metadata on the next site build; no version pins are added to the
+aggregate catalog. Hidden, withdrawn, and unavailable docs targets do not get
+moving URLs, and there is no fallback to development docs or an older release.
+
+These are static HTML redirects with immediate refresh, canonical targets, and
+fallback links. They are omitted from navigation, search, and sitemaps. They
+redirect the landing URL only; paths below `latest/` are not rewritten.
+Component-wide moving URLs require a single artifact, so components with multiple
+artifacts do not acquire an ambiguous default.
+
+Moving URLs are generated during Hugo rendering, after Site Pipeline source-link
+validation. Use `buildish-component-link` for metadata-derived links within site
+content; full public moving URLs are suitable for external links such as
+repository READMEs.
 
 ## `buildish-component-releases`
 

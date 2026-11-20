@@ -184,6 +184,20 @@ class VersionedDocsIntegrationTest(TestCaseHelpers, unittest.TestCase):
             SOURCE_REPO_ROOT / "site/layouts/partials/buildish-component-context.html",
             partial,
         )
+        for source, destination in (
+            ("content/_content.gotmpl", ".stage/content/_content.gotmpl"),
+            (
+                "layouts/partials/buildish-release-redirects.html",
+                "layouts/partials/buildish-release-redirects.html",
+            ),
+            (
+                "layouts/buildish-release-redirect/single.html",
+                "layouts/buildish-release-redirect/single.html",
+            ),
+        ):
+            target = site / destination
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(SOURCE_REPO_ROOT / "site" / source, target)
         hugo = shutil.which("hugo")
         if hugo is None:
             self.fail("missing Hugo after prerequisite check")
@@ -206,6 +220,13 @@ class VersionedDocsIntegrationTest(TestCaseHelpers, unittest.TestCase):
         html = output.read_text()
         self.assertIn("Latest stable (0.1.3)", html)
         self.assertIn(f'href="{released["path"]}"', html)
+        for moving in ("latest", "releases/0.1/latest"):
+            redirect = (
+                site / f"public/components/release-tooling/{moving}/index.html"
+            ).read_text()
+            self.assertIn(
+                'content="0; url=/components/release-tooling/releases/0.1.3/"', redirect
+            )
 
     def test_component_can_advance_latest_without_catalog_changes(self) -> None:
         self.seed_released_docs()

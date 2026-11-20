@@ -1,0 +1,68 @@
+{{/*
+Copyright 2026 The Buildish Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{/* Layout-only: derive moving release redirects from recommendations with staged docs roots. */}}
+{{- $roots := dict -}}
+{{- range (index hugo.Data "content-index").items -}}
+  {{- if eq .pageKind "release-page" -}}
+    {{- $key := printf "%s:%s:%s" .componentSlug .artifactKey (strings.TrimSuffix "/" .path) -}}
+    {{- $roots = merge $roots (dict $key true) -}}
+  {{- end -}}
+{{- end -}}
+{{- $blocked := dict -}}
+{{- range hugo.Data.releases.items -}}
+  {{- if in (slice "hidden" "withdrawn" "tombstoned") .publicationState -}}
+    {{- $key := printf "%s:%s:%s" .componentSlug .artifactKey .version -}}
+    {{- $blocked = merge $blocked (dict $key true) -}}
+  {{- end -}}
+{{- end -}}
+{{- $targets := dict -}}
+{{- range hugo.Data.routes.items -}}
+  {{- if and (eq .routeKind "context") (eq .section "released") -}}
+    {{- $version := .version -}}
+    {{- if not $version }}{{ $version = index (split .targetId ":") (sub (len (split .targetId ":")) 1) }}{{ end -}}
+    {{- $key := printf "%s:%s:%s" .componentSlug .artifactKey $version -}}
+    {{- $root := printf "%s:%s:%s" .componentSlug .artifactKey (strings.TrimSuffix "/" .path) -}}
+    {{- if and (index $roots $root) (not (index $blocked $key)) -}}
+      {{- $targets = merge $targets (dict $key .path) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $redirects := slice -}}
+{{- range hugo.Data.components.items -}}
+  {{- $component := . -}}
+  {{- /* Component-wide aliases have an unambiguous owner only for a single artifact. */ -}}
+  {{- if eq (len (.artifacts | default slice)) 1 -}}
+    {{- $artifact := index .artifacts 0 -}}
+    {{- $base := strings.TrimSuffix "/" .publication.paths.component -}}
+    {{- $recommendations := slice -}}
+    {{- with $artifact.latestStable -}}
+      {{- $recommendations = $recommendations | append (dict "path" (printf "%s/latest/" $base) "version" .) -}}
+    {{- end -}}
+    {{- range $artifact.releaseLines -}}
+      {{- if .latest -}}
+        {{- $recommendations = $recommendations | append (dict "path" (printf "%s/releases/%s/latest/" $base .key) "version" .latest) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- range $recommendations -}}
+      {{- $key := printf "%s:%s:%s" $component.slug $artifact.key .version -}}
+      {{- $path := .path -}}
+      {{- with index $targets $key -}}
+        {{- $redirects = $redirects | append (dict "path" $path "target" .) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- return $redirects -}}
